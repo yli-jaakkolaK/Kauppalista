@@ -77,3 +77,25 @@ h1 {
   color: #aaa;
   text-decoration: line-through;
 }
+
+.list li {
+  display: flex;
+  align-items: stretch;
+  padding: 0;
+  overflow: hidden;
+}
+
+.list li span {
+  flex: 1;
+  padding: 14px 16px;
+}
+
+.delete-btn {
+  width: 56px;
+  background: #E24B4A;
+  color: white;
+  border: none;
+  font-size: 22px;
+  cursor: pointer;
+  border-radius: 0 8px 8px 0;
+}
