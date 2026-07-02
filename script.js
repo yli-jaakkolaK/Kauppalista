@@ -1,19 +1,21 @@
-// Haetaan samat elementit kuin ennenkin
+// Yhdistetään Supabaseen
+const { createClient } = supabase;
+const db = createClient(
+  'https://uctmxxeewoeydabuepye.supabase.co',
+  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVjdG14eGVld29leWRhYnVlcHllIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODI5MjI1NDYsImV4cCI6MjA5ODQ5ODU0Nn0.oJLbtc2BDTqwKu-Ih8ahZMM-s-XpqGvULV5ENGhDYJU'
+);
+
 const input = document.querySelector('.add-item input');
 const button = document.querySelector('.add-item button');
 const list = document.querySelector('.list');
 
-// UUTTA: Ladataan lista localStoragesta kun sivu avataan
-// JSON.parse muuttaa tallennetun tekstin takaisin listaksi
-// Jos localStoragessa ei ole vielä mitään, käytetään tyhjää listaa []
-let tuotteet = JSON.parse(localStorage.getItem('kauppalista')) || [];
+// Piirtää listan näytölle
+function paivitaNaytto(tuotteet) {
+  list.innerHTML = '';
 
-// UUTTA: Tämä funktio piirtää listan näytölle aina uudestaan
-function paivitaNaytto() {
-  list.innerHTML = ''; // Tyhjennetään näytön lista ensin
-
-  tuotteet.forEach(function(tuote, indeksi) {
+  tuotteet.forEach(function(tuote) {
     const item = document.createElement('li');
+
     const teksti = document.createElement('span');
     teksti.textContent = tuote.nimi;
     item.appendChild(teksti);
@@ -23,52 +25,51 @@ function paivitaNaytto() {
     nappi.className = 'delete-btn';
     item.appendChild(nappi);
 
-    nappi.addEventListener('click', function(event) {
-        event.stopPropagation();
-        tuotteet.splice(indeksi, 1);
-        tallenna();
-    });
-
     if (tuote.tehty) {
       item.classList.add('done');
     }
 
-    item.addEventListener('click', function() {
-      // UUTTA: Muutetaan tuotteen tila ja tallennetaan heti
-      tuotteet[indeksi].tehty = !tuotteet[indeksi].tehty;
-      tallenna();
+    // Poistetaan tuote Supabasesta
+    nappi.addEventListener('click', async function(event) {
+      event.stopPropagation();
+      await db.from('tuotteet').delete().eq('id', tuote.id);
+      lataaLista();
+    });
+
+    // Merkitään tehty/tekemättä Supabasessa
+    item.addEventListener('click', async function() {
+      await db.from('tuotteet').update({ tehty: !tuote.tehty }).eq('id', tuote.id);
+      lataaLista();
     });
 
     list.appendChild(item);
   });
 }
 
-// UUTTA: Tämä funktio tallentaa listan localStorageen
-// JSON.stringify muuttaa listan tekstimuotoon jotta se voidaan tallentaa
-function tallenna() {
-  localStorage.setItem('kauppalista', JSON.stringify(tuotteet));
-  paivitaNaytto();
+// Haetaan kaikki tuotteet Supabasesta ja näytetään ne
+async function lataaLista() {
+  const { data } = await db.from('tuotteet').select().order('id');
+  paivitaNaytto(data);
 }
 
-// Napin klikkaus — sama logiikka kuin ennen mutta tallennetaan nyt
-button.addEventListener('click', function() {
+// Lisätään uusi tuote Supabaseen
+button.addEventListener('click', async function() {
   const teksti = input.value.trim();
   if (teksti === '') return;
 
-  // UUTTA: Lisätään tuote listaan objektina jossa on nimi ja tila
-  tuotteet.push({ nimi: teksti, tehty: false });
-  tallenna();
+  await db.from('tuotteet').insert({ nimi: teksti, tehty: false });
+  lataaLista();
 
   input.value = '';
   input.focus();
 });
 
-// Enter-näppäin — sama kuin ennen
+// Enter-näppäin toimii myös
 input.addEventListener('keydown', function(event) {
   if (event.key === 'Enter') {
     button.click();
   }
 });
 
-// UUTTA: Näytetään lista heti kun sivu aukeaa
-paivitaNaytto();
+// Ladataan lista heti kun sivu aukeaa
+lataaLista();
