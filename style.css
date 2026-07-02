@@ -59,6 +59,15 @@ h1 {
   margin-bottom: 20px;
 }
 
+.sync-indicator {
+  font-size: 11px;
+  letter-spacing: 0.1em;
+  color: var(--muted);
+  text-align: center;
+  margin-bottom: 8px;
+  display: none;
+}
+
 .divider {
   border: none;
   border-top: 1px dashed var(--border-dash);

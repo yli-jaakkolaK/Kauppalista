@@ -12,6 +12,70 @@ const list = document.querySelector('.list');
 let historyOpen = false;
 let cachedTuotteet = [];
 
+// === OFFLINE-JONO ===
+const QUEUE_KEY = 'kauppalista_jono';
+
+function getQueue() {
+  return JSON.parse(localStorage.getItem(QUEUE_KEY) || '[]');
+}
+
+function saveQueue(q) {
+  localStorage.setItem(QUEUE_KEY, JSON.stringify(q));
+  updateSyncIndicator();
+}
+
+function addToQueue(action) {
+  const q = getQueue();
+  q.push(action);
+  saveQueue(q);
+}
+
+function updateSyncIndicator() {
+  let el = document.getElementById('sync-indicator');
+  if (!el) {
+    el = document.createElement('div');
+    el.id = 'sync-indicator';
+    el.className = 'sync-indicator';
+    const divider = document.querySelector('.divider');
+    divider.parentNode.insertBefore(el, divider);
+  }
+  const q = getQueue();
+  if (!navigator.onLine) {
+    el.textContent = '● ei yhteyttä';
+    el.style.display = 'block';
+  } else if (q.length > 0) {
+    el.textContent = '● synkronoidaan...';
+    el.style.display = 'block';
+  } else {
+    el.style.display = 'none';
+  }
+}
+
+async function processQueue() {
+  const q = getQueue();
+  if (q.length === 0) return;
+  const remaining = [];
+  for (const action of q) {
+    try {
+      if (action.type === 'insert') {
+        await db.from('tuotteet').insert(action.data);
+      } else if (action.type === 'update') {
+        const { id, ...data } = action.data;
+        await db.from('tuotteet').update(data).eq('id', id);
+      } else if (action.type === 'delete') {
+        await db.from('tuotteet').delete().eq('id', action.data.id);
+      }
+    } catch (e) {
+      remaining.push(action);
+    }
+  }
+  saveQueue(remaining);
+  lataaLista();
+}
+
+window.addEventListener('online', () => { updateSyncIndicator(); processQueue(); });
+window.addEventListener('offline', () => { updateSyncIndicator(); });
+
 const SVG_SILMA_AUKI = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>';
 const SVG_SILMA_KIINNI = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>';
 
@@ -30,11 +94,16 @@ function paivitaNaytto(tuotteet) {
     item.appendChild(checkNappi);
 
     checkNappi.addEventListener('click', async function() {
-      await db.from('tuotteet').update({
-        tehty: !tuote.tehty,
-        bought_at: !tuote.tehty ? new Date().toISOString() : null
-      }).eq('id', tuote.id);
-      lataaLista();
+      const updateData = { tehty: !tuote.tehty, bought_at: !tuote.tehty ? new Date().toISOString() : null };
+      if (navigator.onLine) {
+        await db.from('tuotteet').update(updateData).eq('id', tuote.id);
+        lataaLista();
+      } else {
+        addToQueue({ type: 'update', data: { id: tuote.id, ...updateData } });
+        cachedTuotteet = cachedTuotteet.map(t => t.id === tuote.id ? { ...t, ...updateData } : t);
+        paivitaNaytto(cachedTuotteet);
+        paivitaFooter(cachedTuotteet);
+      }
     });
 
     // Keskellä: teksti, napautus avaa muokkauksen
@@ -67,9 +136,18 @@ function paivitaNaytto(tuotteet) {
       async function tallenna() {
         const uusi = inputti.value.trim();
         if (uusi && uusi !== tuote.nimi) {
-          await db.from('tuotteet').update({ nimi: uusi }).eq('id', tuote.id);
+          if (navigator.onLine) {
+            await db.from('tuotteet').update({ nimi: uusi }).eq('id', tuote.id);
+            lataaLista();
+          } else {
+            addToQueue({ type: 'update', data: { id: tuote.id, nimi: uusi } });
+            cachedTuotteet = cachedTuotteet.map(t => t.id === tuote.id ? { ...t, nimi: uusi } : t);
+            paivitaNaytto(cachedTuotteet);
+            paivitaFooter(cachedTuotteet);
+          }
+        } else {
+          lataaLista();
         }
-        lataaLista();
       }
 
       inputti.addEventListener('blur', tallenna);
@@ -90,8 +168,15 @@ function paivitaNaytto(tuotteet) {
     }
 
     nappi.addEventListener('click', async function() {
-      await db.from('tuotteet').delete().eq('id', tuote.id);
-      lataaLista();
+      if (navigator.onLine) {
+        await db.from('tuotteet').delete().eq('id', tuote.id);
+        lataaLista();
+      } else {
+        addToQueue({ type: 'delete', data: { id: tuote.id } });
+        cachedTuotteet = cachedTuotteet.filter(t => t.id !== tuote.id);
+        paivitaNaytto(cachedTuotteet);
+        paivitaFooter(cachedTuotteet);
+      }
     });
 
     list.appendChild(item);
@@ -162,10 +247,16 @@ async function showHistory() {
 
 // Haetaan kaikki tuotteet Supabasesta ja näytetään ne
 async function lataaLista() {
+  if (!navigator.onLine) {
+    paivitaNaytto(cachedTuotteet);
+    paivitaFooter(cachedTuotteet);
+    return;
+  }
   const { data } = await db.from('tuotteet').select().order('id');
   cachedTuotteet = data;
   paivitaNaytto(data);
   paivitaFooter(data);
+  updateSyncIndicator();
 }
 
 // Lisätään uusi tuote Supabaseen
@@ -173,8 +264,15 @@ button.addEventListener('click', async function() {
   const teksti = input.value.trim();
   if (teksti === '') return;
 
-  await db.from('tuotteet').insert({ nimi: teksti, tehty: false });
-  lataaLista();
+  if (navigator.onLine) {
+    await db.from('tuotteet').insert({ nimi: teksti, tehty: false });
+    lataaLista();
+  } else {
+    addToQueue({ type: 'insert', data: { nimi: teksti, tehty: false } });
+    cachedTuotteet.push({ id: 'temp_' + Date.now(), nimi: teksti, tehty: false, bought_at: null });
+    paivitaNaytto(cachedTuotteet);
+    paivitaFooter(cachedTuotteet);
+  }
 
   input.value = '';
   input.focus();
@@ -189,6 +287,7 @@ input.addEventListener('keydown', function(event) {
 
 // Ladataan lista heti kun sivu aukeaa
 lataaLista();
+updateSyncIndicator();
 
 // Silmänappi — näyttää/piilottaa ostetut tuotteet
 document.getElementById('eye-btn').addEventListener('click', function() {

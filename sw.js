@@ -1,16 +1,8 @@
-const CACHE = 'kauppalista-v2';
-const FILES = [
-  '/',
-  '/index.html',
-  '/style.css',
-  '/script.js',
-  '/manifest.json',
-];
+const CACHE = 'kauppalista-v3';
+const APP_FILES = ['/', '/index.html', '/style.css', '/script.js', '/manifest.json', '/icon.png'];
 
 self.addEventListener('install', event => {
-  event.waitUntil(
-    caches.open(CACHE).then(cache => cache.addAll(FILES))
-  );
+  event.waitUntil(caches.open(CACHE).then(cache => cache.addAll(APP_FILES)));
   self.skipWaiting();
 });
 
@@ -24,9 +16,18 @@ self.addEventListener('activate', event => {
 });
 
 self.addEventListener('fetch', event => {
+  // Supabase API-kutsut: ei cacheta, menee suoraan verkkoon
+  if (event.request.url.includes('supabase.co')) return;
+
+  // Appitiedostot: cache ensin, verkko varalla
   event.respondWith(
-    fetch(event.request).catch(() =>
-      caches.match(event.request)
-    )
+    caches.match(event.request).then(cached => {
+      return cached || fetch(event.request).then(response => {
+        if (response.ok) {
+          caches.open(CACHE).then(cache => cache.put(event.request, response.clone()));
+        }
+        return response;
+      });
+    })
   );
 });
