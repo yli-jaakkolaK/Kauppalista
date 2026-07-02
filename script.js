@@ -46,10 +46,31 @@ function paivitaNaytto(tuotteet) {
   });
 }
 
+function paivitaFooter(tuotteet) {
+  const jaljella = tuotteet.filter(t => !t.tehty).length;
+  const ostettu = tuotteet.filter(t => t.tehty).length;
+  const subtitle = document.getElementById('subtitle');
+  const footer = document.getElementById('list-footer');
+  const footerDivider = document.getElementById('footer-divider');
+  const footerCount = document.getElementById('footer-count');
+
+  subtitle.textContent = jaljella + ' jäljellä · ' + ostettu + ' ostettu';
+
+  if (tuotteet.length > 0) {
+    footer.style.display = 'block';
+    footerDivider.style.display = 'block';
+    footerCount.textContent = jaljella + ' KPL JÄLJELLÄ';
+  } else {
+    footer.style.display = 'none';
+    footerDivider.style.display = 'none';
+  }
+}
+
 // Haetaan kaikki tuotteet Supabasesta ja näytetään ne
 async function lataaLista() {
   const { data } = await db.from('tuotteet').select().order('id');
   paivitaNaytto(data);
+  paivitaFooter(data);
 }
 
 // Lisätään uusi tuote Supabaseen

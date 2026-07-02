@@ -1,24 +1,31 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="fi">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Shopping List</title>
+  <title>Kauppalista</title>
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
 
   <div class="container">
-    <h1>Shopping List</h1>
+    <h1>✱ kauppalista ✱</h1>
+    <div class="subtitle" id="subtitle">ladataan...</div>
+
+    <hr class="divider">
 
     <div class="add-item">
-      <input type="text" placeholder="Add item...">
-      <button>Add</button>
+      <span class="prefix">›</span>
+      <input type="text" placeholder="lisää tuote...">
+      <button>+</button>
     </div>
 
-    <ul class="list">
-    
-    </ul>
+    <ul class="list"></ul>
+
+    <hr class="divider" id="footer-divider" style="display:none">
+    <div class="list-footer" id="list-footer" style="display:none">
+      <div class="count" id="footer-count"></div>
+    </div>
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
