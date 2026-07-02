@@ -23,7 +23,10 @@ function paivitaNaytto(tuotteet) {
     item.appendChild(checkNappi);
 
     checkNappi.addEventListener('click', async function() {
-      await db.from('tuotteet').update({ tehty: !tuote.tehty }).eq('id', tuote.id);
+      await db.from('tuotteet').update({
+        tehty: !tuote.tehty,
+        bought_at: !tuote.tehty ? new Date().toISOString() : null
+      }).eq('id', tuote.id);
       lataaLista();
     });
 
