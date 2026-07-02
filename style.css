@@ -127,8 +127,43 @@ h1 {
   border-bottom: none;
 }
 
+.check-btn {
+  min-width: 52px;
+  min-height: 52px;
+  background: none;
+  border: none;
+  outline: none;
+  appearance: none;
+  -webkit-appearance: none;
+  font-size: 18px;
+  color: var(--muted);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  -webkit-tap-highlight-color: transparent;
+  font-family: 'Courier New', Courier, monospace;
+}
+
+.list li.done .check-btn {
+  color: var(--accent);
+}
+
 .list li span {
   flex: 1;
+  padding: 4px 0;
+  cursor: pointer;
+}
+
+.edit-input {
+  flex: 1;
+  background: none;
+  border: none;
+  border-bottom: 1px solid var(--accent);
+  outline: none;
+  font-family: 'Courier New', Courier, monospace;
+  font-size: 18px;
+  color: var(--text);
   padding: 4px 0;
 }
 

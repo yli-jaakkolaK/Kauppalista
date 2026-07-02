@@ -16,10 +16,47 @@ function paivitaNaytto(tuotteet) {
   tuotteet.forEach(function(tuote) {
     const item = document.createElement('li');
 
+    // Vasemmalla: yliviivaustoiminto
+    const checkNappi = document.createElement('button');
+    checkNappi.textContent = tuote.tehty ? '✓' : '○';
+    checkNappi.className = 'check-btn';
+    item.appendChild(checkNappi);
+
+    checkNappi.addEventListener('click', async function() {
+      await db.from('tuotteet').update({ tehty: !tuote.tehty }).eq('id', tuote.id);
+      lataaLista();
+    });
+
+    // Keskellä: teksti, napautus avaa muokkauksen
     const teksti = document.createElement('span');
     teksti.textContent = tuote.nimi;
     item.appendChild(teksti);
 
+    teksti.addEventListener('click', async function() {
+      const inputti = document.createElement('input');
+      inputti.type = 'text';
+      inputti.value = tuote.nimi;
+      inputti.className = 'edit-input';
+      teksti.replaceWith(inputti);
+      inputti.focus();
+      inputti.select();
+
+      async function tallenna() {
+        const uusi = inputti.value.trim();
+        if (uusi && uusi !== tuote.nimi) {
+          await db.from('tuotteet').update({ nimi: uusi }).eq('id', tuote.id);
+        }
+        lataaLista();
+      }
+
+      inputti.addEventListener('blur', tallenna);
+      inputti.addEventListener('keydown', function(e) {
+        if (e.key === 'Enter') inputti.blur();
+        if (e.key === 'Escape') { inputti.value = tuote.nimi; inputti.blur(); }
+      });
+    });
+
+    // Oikealla: poistaminen
     const nappi = document.createElement('button');
     nappi.textContent = '×';
     nappi.className = 'delete-btn';
@@ -29,16 +66,8 @@ function paivitaNaytto(tuotteet) {
       item.classList.add('done');
     }
 
-    // Poistetaan tuote Supabasesta
-    nappi.addEventListener('click', async function(event) {
-      event.stopPropagation();
+    nappi.addEventListener('click', async function() {
       await db.from('tuotteet').delete().eq('id', tuote.id);
-      lataaLista();
-    });
-
-    // Merkitään tehty/tekemättä Supabasessa
-    item.addEventListener('click', async function() {
-      await db.from('tuotteet').update({ tehty: !tuote.tehty }).eq('id', tuote.id);
       lataaLista();
     });
 
