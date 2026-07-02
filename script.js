@@ -9,11 +9,18 @@ const input = document.querySelector('.add-item input');
 const button = document.querySelector('.add-item button');
 const list = document.querySelector('.list');
 
+let historyOpen = false;
+let cachedTuotteet = [];
+
+const SVG_SILMA_AUKI = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>';
+const SVG_SILMA_KIINNI = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>';
+
 // Piirtää listan näytölle
 function paivitaNaytto(tuotteet) {
   list.innerHTML = '';
+  const naytettavat = historyOpen ? tuotteet : tuotteet.filter(t => !t.tehty);
 
-  tuotteet.forEach(function(tuote) {
+  naytettavat.forEach(function(tuote) {
     const item = document.createElement('li');
 
     // Vasemmalla: yliviivaustoiminto
@@ -34,6 +41,19 @@ function paivitaNaytto(tuotteet) {
     const teksti = document.createElement('span');
     teksti.textContent = tuote.nimi;
     item.appendChild(teksti);
+
+    if (tuote.tehty && tuote.bought_at) {
+      const d = new Date(tuote.bought_at);
+      const aika = d.getDate().toString().padStart(2, '0') + '.' +
+                   (d.getMonth() + 1).toString().padStart(2, '0') + '.' +
+                   d.getFullYear() + ' ' +
+                   d.getHours().toString().padStart(2, '0') + ':' +
+                   d.getMinutes().toString().padStart(2, '0');
+      const aikaEl = document.createElement('span');
+      aikaEl.textContent = aika;
+      aikaEl.className = 'history-time';
+      item.appendChild(aikaEl);
+    }
 
     teksti.addEventListener('click', async function() {
       const inputti = document.createElement('input');
@@ -85,6 +105,7 @@ function paivitaFooter(tuotteet) {
   const footer = document.getElementById('list-footer');
   const footerDivider = document.getElementById('footer-divider');
   const footerCount = document.getElementById('footer-count');
+  const eyeNappi = document.getElementById('eye-btn');
 
   subtitle.textContent = jaljella + ' jäljellä · ' + ostettu + ' ostettu';
 
@@ -96,11 +117,53 @@ function paivitaFooter(tuotteet) {
     footer.style.display = 'none';
     footerDivider.style.display = 'none';
   }
+
+  eyeNappi.style.display = 'flex';
+  eyeNappi.innerHTML = historyOpen ? SVG_SILMA_KIINNI : SVG_SILMA_AUKI;
+}
+
+async function showHistory() {
+  const { data } = await db.from('tuotteet')
+    .select()
+    .not('bought_at', 'is', null)
+    .order('bought_at', { ascending: false });
+
+  list.innerHTML = '';
+
+  data.forEach(function(tuote) {
+    const item = document.createElement('li');
+    item.className = 'history-item';
+
+    const spacer = document.createElement('div');
+    spacer.className = 'footer-spacer';
+    item.appendChild(spacer);
+
+    const teksti = document.createElement('span');
+    teksti.textContent = tuote.nimi;
+    item.appendChild(teksti);
+
+    const d = new Date(tuote.bought_at);
+    const pvm = d.getDate().toString().padStart(2, '0') + '.' +
+                (d.getMonth() + 1).toString().padStart(2, '0') + '.' +
+                d.getFullYear() + ' ' +
+                d.getHours().toString().padStart(2, '0') + ':' +
+                d.getMinutes().toString().padStart(2, '0');
+
+    const aika = document.createElement('span');
+    aika.textContent = pvm;
+    aika.className = 'history-time';
+    item.appendChild(aika);
+
+    list.appendChild(item);
+  });
+
+  paivitaFooter(cachedTuotteet);
 }
 
 // Haetaan kaikki tuotteet Supabasesta ja näytetään ne
 async function lataaLista() {
   const { data } = await db.from('tuotteet').select().order('id');
+  cachedTuotteet = data;
   paivitaNaytto(data);
   paivitaFooter(data);
 }
@@ -126,6 +189,12 @@ input.addEventListener('keydown', function(event) {
 
 // Ladataan lista heti kun sivu aukeaa
 lataaLista();
+
+// Silmänappi — näyttää/piilottaa ostetut tuotteet
+document.getElementById('eye-btn').addEventListener('click', function() {
+  historyOpen = !historyOpen;
+  lataaLista();
+});
 
 // Kuunnellaan muutoksia reaaliajassa — päivittyy automaattisesti
 db.channel('tuotteet')

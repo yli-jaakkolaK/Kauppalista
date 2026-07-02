@@ -167,7 +167,7 @@ h1 {
   padding: 4px 0;
 }
 
-.list li.done span {
+.list li.done span:not(.history-time) {
   text-decoration: line-through;
   color: var(--muted);
 }
@@ -198,12 +198,69 @@ h1 {
 
 .list-footer {
   margin-top: 16px;
-  text-align: center;
+}
+
+.footer-row {
+  display: flex;
+  align-items: center;
+  min-height: 52px;
+}
+
+.footer-spacer {
+  min-width: 52px;
 }
 
 .list-footer .count {
+  flex: 1;
   font-size: 14px;
   letter-spacing: 0.16em;
   color: var(--accent);
-  margin-bottom: 3px;
+  padding-left: 24px;
+}
+
+.eye-btn {
+  min-width: 52px;
+  min-height: 52px;
+  background: none;
+  border: none;
+  outline: none;
+  appearance: none;
+  -webkit-appearance: none;
+  color: var(--accent);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  -webkit-tap-highlight-color: transparent;
+  opacity: 0.6;
+}
+
+.eye-btn:hover,
+.eye-btn:active {
+  opacity: 1;
+}
+
+.history-item {
+  display: flex;
+  align-items: center;
+  min-height: 52px;
+  border-bottom: 1px solid var(--border);
+}
+
+.history-item:last-child {
+  border-bottom: none;
+}
+
+.history-item span {
+  flex: 1;
+  padding: 4px 0;
+  color: var(--muted);
+}
+
+.history-time {
+  font-size: 12px;
+  letter-spacing: 0.04em;
+  color: var(--muted);
+  padding: 0 8px 0 0;
+  white-space: nowrap;
 }
