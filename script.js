@@ -73,3 +73,10 @@ input.addEventListener('keydown', function(event) {
 
 // Ladataan lista heti kun sivu aukeaa
 lataaLista();
+
+// Kuunnellaan muutoksia reaaliajassa — päivittyy automaattisesti
+db.channel('tuotteet')
+  .on('postgres_changes', { event: '*', schema: 'public', table: 'tuotteet' }, () => {
+    lataaLista();
+  })
+  .subscribe();
