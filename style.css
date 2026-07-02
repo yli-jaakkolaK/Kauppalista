@@ -93,6 +93,9 @@ h1 {
   background: none;
   color: #ccc;
   border: none;
+  outline: none;
+  appearance: none;
+  -webkit-appearance: none;
   font-size: 26px;
   cursor: pointer;
   border-radius: 0 8px 8px 0;
