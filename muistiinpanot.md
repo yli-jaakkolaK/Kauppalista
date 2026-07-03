@@ -12,8 +12,6 @@
 
 ## Supabase-tiedot
 - Project URL: https://uctmxxeewoeydabuepye.supabase.co/
-- supabase.com password: AS@m9+vh2-vi-ne
-- anon public key: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVjdG14eGVld29leWRhYnVlcHllIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODI5MjI1NDYsImV4cCI6MjA5ODQ5ODU0Nn0.oJLbtc2BDTqwKu-Ih8ahZMM-s-XpqGvULV5ENGhDYJU
 
 ## Tilanne nyt (Claude-muistio)
 
@@ -54,3 +52,31 @@ Sovellus on valmis peruskäyttöön. Toimii PWA:na iPhonessa, synkkaa reaaliajas
 - Supabase (PostgreSQL) tietokantana
 - PWA eikä natiivi appi
 - GitHub + Vercel + Supabase — kaikki ilmaisia
+
+## Muistutukset 2.0 — Suunnitelma
+
+### Perusrakenne
+- Useita listoja (luo, nimeä, poista, väri/ikoni)
+- Kirjautuminen Google-tilillä
+- Jakaminen sähköpostilla
+
+### Muistutukset
+- Rulla-systeemi: 15min → 1 vuosi (ei valmiita vaihtoehtoja)
+- Oletuksena: siirtyy seuraavaan päivään jos tekemättä
+- Voi valita siirtyykö vai toistuuko normaalisti
+- Snooze-toiminto
+- Prioriteetti
+
+### Kodin huoltokirja
+- Lisää tehtäviä suositelulla välillä (esim. jääkaapin takana siivous → 6kk)
+- Historia tallentaa milloin tehty
+- Sovellus huomaa jos väli ylittyy → ehdottaa lisäämistä listalle
+- "Jääkaapin takana siivous — viimeksi 8kk sitten, haluatko lisätä listalle?"
+- Jaettu miehen kanssa — molemmat näkee kodin tilanteen
+
+### Vaiheet
+1. Kirjautuminen (Google-login Supabasella)
+2. Useita listoja
+3. Jakaminen
+4. Muistutukset + rulla-systeemi
+5. Kodin huoltokirja + historia
