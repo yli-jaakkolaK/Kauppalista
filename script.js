@@ -296,8 +296,22 @@ document.getElementById('eye-btn').addEventListener('click', function() {
 });
 
 // Kuunnellaan muutoksia reaaliajassa — päivittyy automaattisesti
-db.channel('tuotteet')
+const realtimeChannel = db.channel('tuotteet')
   .on('postgres_changes', { event: '*', schema: 'public', table: 'tuotteet' }, () => {
     lataaLista();
   })
   .subscribe();
+
+// Päivitetään lista ja Realtime-yhteys kun appi tulee taustalta etualalle
+document.addEventListener('visibilitychange', function() {
+  if (document.visibilityState === 'visible') {
+    lataaLista();
+    if (realtimeChannel.state !== 'joined') {
+      realtimeChannel.subscribe();
+    }
+  }
+});
+
+window.addEventListener('focus', function() {
+  lataaLista();
+});
