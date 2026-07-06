@@ -13,7 +13,13 @@
 </head>
 <body>
 
-  <div class="container">
+  <div id="login-view" style="display:none">
+    <h1>✱ SATAMA ✱</h1>
+    <hr class="divider" style="width:100%">
+    <button class="login-btn" id="login-btn">Kirjaudu Googlella</button>
+  </div>
+
+  <div class="container" id="app-view" style="display:none">
     <h1>✱ kauppalista ✱</h1>
     <div class="subtitle" id="subtitle">ladataan...</div>
 
@@ -34,6 +40,7 @@
         <button class="eye-btn" id="eye-btn" style="display:none"></button>
       </div>
     </div>
+    <button id="signout-link">kirjaudu ulos</button>
   </div>
 
   <script>

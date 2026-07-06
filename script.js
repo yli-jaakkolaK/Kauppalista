@@ -5,6 +5,16 @@ const db = createClient(
   'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVjdG14eGVld29leWRhYnVlcHllIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODI5MjI1NDYsImV4cCI6MjA5ODQ5ODU0Nn0.oJLbtc2BDTqwKu-Ih8ahZMM-s-XpqGvULV5ENGhDYJU'
 );
 
+function showLoginView() {
+  document.getElementById('login-view').style.display = 'flex';
+  document.getElementById('app-view').style.display = 'none';
+}
+
+function showAppView() {
+  document.getElementById('login-view').style.display = 'none';
+  document.getElementById('app-view').style.display = 'block';
+}
+
 const input = document.querySelector('.add-item input');
 const button = document.querySelector('.add-item button');
 const list = document.querySelector('.list');
@@ -314,4 +324,30 @@ document.addEventListener('visibilitychange', function() {
 
 window.addEventListener('focus', function() {
   lataaLista();
+});
+
+// === AUTH ===
+
+document.getElementById('login-btn').addEventListener('click', function() {
+  db.auth.signInWithOAuth({ provider: 'google', options: { redirectTo: window.location.origin } });
+});
+
+document.getElementById('signout-link').addEventListener('click', function() {
+  db.auth.signOut();
+});
+
+db.auth.onAuthStateChange(function(event, session) {
+  if (session) {
+    showAppView();
+  } else {
+    showLoginView();
+  }
+});
+
+db.auth.getSession().then(function(result) {
+  if (result.data.session) {
+    showAppView();
+  } else {
+    showLoginView();
+  }
 });
