@@ -21,6 +21,26 @@ const list = document.querySelector('.list');
 
 let historyOpen = false;
 let cachedTuotteet = [];
+let currentUserId = null;
+let KAUPPALISTA_LIST_ID = null;
+
+// Haetaan Kauppalista-listan id kerran käynnistyessä
+async function haeListaId() {
+  const { data } = await db.from('lists').select('id').eq('name', 'Kauppalista').single();
+  KAUPPALISTA_LIST_ID = data ? data.id : null;
+}
+
+// Kirjaa tapahtuman lokiin. Ei koskaan estä käyttöliittymää — virheet vaietaan.
+function logEvent(action, targetType, targetId, targetName, listId) {
+  db.from('events').insert({
+    user_id: currentUserId,
+    action: action,
+    target_type: targetType,
+    target_id: targetId != null ? String(targetId) : null,
+    target_name: targetName,
+    list_id: listId,
+  }).then(function() {}, function() {});
+}
 
 // === OFFLINE-JONO ===
 const QUEUE_KEY = 'kauppalista_jono';
@@ -105,14 +125,17 @@ function paivitaNaytto(tuotteet) {
 
     checkNappi.addEventListener('click', async function() {
       const updateData = { tehty: !tuote.tehty, bought_at: !tuote.tehty ? new Date().toISOString() : null };
+      const eventAction = updateData.tehty ? 'checked' : 'unchecked';
       if (navigator.onLine) {
         await db.from('tuotteet').update(updateData).eq('id', tuote.id);
+        logEvent(eventAction, 'item', tuote.id, tuote.nimi, tuote.list_id);
         lataaLista();
       } else {
         addToQueue({ type: 'update', data: { id: tuote.id, ...updateData } });
         cachedTuotteet = cachedTuotteet.map(t => t.id === tuote.id ? { ...t, ...updateData } : t);
         paivitaNaytto(cachedTuotteet);
         paivitaFooter(cachedTuotteet);
+        logEvent(eventAction, 'item', tuote.id, tuote.nimi, tuote.list_id);
       }
     });
 
@@ -180,12 +203,14 @@ function paivitaNaytto(tuotteet) {
     nappi.addEventListener('click', async function() {
       if (navigator.onLine) {
         await db.from('tuotteet').delete().eq('id', tuote.id);
+        logEvent('deleted', 'item', tuote.id, tuote.nimi, tuote.list_id);
         lataaLista();
       } else {
         addToQueue({ type: 'delete', data: { id: tuote.id } });
         cachedTuotteet = cachedTuotteet.filter(t => t.id !== tuote.id);
         paivitaNaytto(cachedTuotteet);
         paivitaFooter(cachedTuotteet);
+        logEvent('deleted', 'item', tuote.id, tuote.nimi, tuote.list_id);
       }
     });
 
@@ -220,6 +245,7 @@ function paivitaFooter(tuotteet) {
 async function showHistory() {
   const { data } = await db.from('tuotteet')
     .select()
+    .eq('list_id', KAUPPALISTA_LIST_ID)
     .not('bought_at', 'is', null)
     .order('bought_at', { ascending: false });
 
@@ -262,7 +288,7 @@ async function lataaLista() {
     paivitaFooter(cachedTuotteet);
     return;
   }
-  const { data } = await db.from('tuotteet').select().order('id');
+  const { data } = await db.from('tuotteet').select().eq('list_id', KAUPPALISTA_LIST_ID).order('id');
   cachedTuotteet = data;
   paivitaNaytto(data);
   paivitaFooter(data);
@@ -275,13 +301,15 @@ button.addEventListener('click', async function() {
   if (teksti === '') return;
 
   if (navigator.onLine) {
-    await db.from('tuotteet').insert({ nimi: teksti, tehty: false });
+    const { data } = await db.from('tuotteet').insert({ nimi: teksti, tehty: false, list_id: KAUPPALISTA_LIST_ID }).select().single();
+    logEvent('added', 'item', data ? data.id : null, teksti, KAUPPALISTA_LIST_ID);
     lataaLista();
   } else {
-    addToQueue({ type: 'insert', data: { nimi: teksti, tehty: false } });
-    cachedTuotteet.push({ id: 'temp_' + Date.now(), nimi: teksti, tehty: false, bought_at: null });
+    addToQueue({ type: 'insert', data: { nimi: teksti, tehty: false, list_id: KAUPPALISTA_LIST_ID } });
+    cachedTuotteet.push({ id: 'temp_' + Date.now(), nimi: teksti, tehty: false, bought_at: null, list_id: KAUPPALISTA_LIST_ID });
     paivitaNaytto(cachedTuotteet);
     paivitaFooter(cachedTuotteet);
+    logEvent('added', 'item', null, teksti, KAUPPALISTA_LIST_ID);
   }
 
   input.value = '';
@@ -296,7 +324,7 @@ input.addEventListener('keydown', function(event) {
 });
 
 // Ladataan lista heti kun sivu aukeaa
-lataaLista();
+haeListaId().then(lataaLista);
 updateSyncIndicator();
 
 // Silmänappi — näyttää/piilottaa ostetut tuotteet
@@ -337,6 +365,7 @@ document.getElementById('signout-link').addEventListener('click', function() {
 });
 
 db.auth.onAuthStateChange(function(event, session) {
+  currentUserId = session ? session.user.id : null;
   if (session) {
     showAppView();
   } else {
@@ -345,6 +374,7 @@ db.auth.onAuthStateChange(function(event, session) {
 });
 
 db.auth.getSession().then(function(result) {
+  currentUserId = result.data.session ? result.data.session.user.id : null;
   if (result.data.session) {
     showAppView();
   } else {
