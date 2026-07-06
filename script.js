@@ -23,9 +23,9 @@ function showAppView() {
   document.getElementById('app-view').style.display = 'block';
 }
 
-const input = document.querySelector('.add-item input');
-const button = document.querySelector('.add-item button');
-const list = document.querySelector('.list');
+const input = document.querySelector('#app-view .add-item input');
+const button = document.querySelector('#app-view .add-item button');
+const list = document.querySelector('#app-view .list');
 
 let historyOpen = false;
 let cachedTuotteet = [];
@@ -117,8 +117,9 @@ async function poistaLista(lista) {
   if (!vahvistus) return;
 
   await db.from('tuotteet').delete().eq('list_id', lista.id);
+  await db.from('events').delete().eq('list_id', lista.id);
   await db.from('lists').delete().eq('id', lista.id);
-  logEvent('deleted', 'list', lista.id, lista.name, lista.id);
+  logEvent('deleted', 'list', lista.id, lista.name, null);
 
   if (currentList && currentList.id === lista.id) {
     localStorage.removeItem(LAST_LIST_KEY);
