@@ -51,14 +51,26 @@ h1 {
 }
 
 .list-header {
-  position: relative;
+  display: grid;
+  grid-template-columns: 44px 1fr 44px;
+  align-items: center;
+  margin-bottom: 4px;
+}
+
+.list-header h1 {
+  grid-column: 2;
+  margin-bottom: 0;
+  font-size: 20px;
+  letter-spacing: 0.14em;
+  text-indent: 0.14em;
+  word-spacing: -0.3em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .back-btn {
-  position: absolute;
-  left: -8px;
-  top: 50%;
-  transform: translateY(-50%);
+  grid-column: 1;
   min-width: 44px;
   min-height: 44px;
   background: none;
