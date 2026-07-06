@@ -307,6 +307,86 @@ h1 {
   white-space: nowrap;
 }
 
+/* === VAHVISTUSDIALOGI === */
+
+.dialog-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  z-index: 100;
+}
+
+.dialog-box {
+  width: 100%;
+  max-width: 320px;
+  background: var(--ground);
+  border-top: 1px dashed var(--border-dash);
+  border-bottom: 1px dashed var(--border-dash);
+  padding: 28px 20px;
+}
+
+.dialog-title {
+  font-size: 16px;
+  letter-spacing: 0.02em;
+  color: var(--text);
+  text-align: center;
+  margin-bottom: 8px;
+}
+
+.dialog-body {
+  font-size: 13px;
+  letter-spacing: 0.02em;
+  color: var(--muted);
+  text-align: center;
+  margin-bottom: 4px;
+}
+
+.dialog-buttons {
+  display: flex;
+  gap: 12px;
+  margin-top: 20px;
+}
+
+.dialog-btn {
+  flex: 1;
+  font-family: 'Courier New', Courier, monospace;
+  font-size: 13px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  background: none;
+  padding: 12px 8px;
+  cursor: pointer;
+  appearance: none;
+  -webkit-appearance: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.dialog-btn-cancel {
+  border: 1px dashed var(--accent);
+  color: var(--accent);
+}
+
+.dialog-btn-cancel:hover,
+.dialog-btn-cancel:active {
+  background: var(--accent);
+  color: var(--ground);
+}
+
+.dialog-btn-danger {
+  border: 1px solid #E24B4A;
+  color: #E24B4A;
+}
+
+.dialog-btn-danger:hover,
+.dialog-btn-danger:active {
+  background: #E24B4A;
+  color: var(--ground);
+}
+
 /* === LOGIN VIEW === */
 
 #login-view {

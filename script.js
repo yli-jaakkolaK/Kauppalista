@@ -72,8 +72,48 @@ async function lataaKotinakyma() {
   });
 }
 
+// Näyttää oman kuitti-tyylisen vahvistusdialogin ja palauttaa Promise<boolean>
+function naytaVahvistus(otsikko, teksti) {
+  return new Promise(function(resolve) {
+    const overlay = document.getElementById('dialog-overlay');
+    const titleEl = document.getElementById('dialog-title');
+    const bodyEl = document.getElementById('dialog-body');
+    const peruNappi = document.getElementById('dialog-cancel');
+    const poistaNappi = document.getElementById('dialog-confirm');
+
+    titleEl.textContent = otsikko;
+    if (teksti) {
+      bodyEl.textContent = teksti;
+      bodyEl.style.display = 'block';
+    } else {
+      bodyEl.style.display = 'none';
+    }
+
+    function sulje(tulos) {
+      overlay.style.display = 'none';
+      overlay.removeEventListener('click', ulkopuolelleKlikkaus);
+      peruNappi.removeEventListener('click', peru);
+      poistaNappi.removeEventListener('click', vahvista);
+      resolve(tulos);
+    }
+    function peru() { sulje(false); }
+    function vahvista() { sulje(true); }
+    function ulkopuolelleKlikkaus(e) {
+      if (e.target === overlay) sulje(false);
+    }
+
+    peruNappi.addEventListener('click', peru);
+    poistaNappi.addEventListener('click', vahvista);
+    overlay.addEventListener('click', ulkopuolelleKlikkaus);
+
+    overlay.style.display = 'flex';
+  });
+}
+
 async function poistaLista(lista) {
-  const vahvistus = confirm('Poistetaanko ' + lista.name + '? Tuotteet poistuvat myös.');
+  const { count } = await db.from('tuotteet').select('id', { count: 'exact', head: true }).eq('list_id', lista.id);
+  const teksti = count > 0 ? 'Listalla on ' + count + ' asiaa — nekin poistuvat.' : null;
+  const vahvistus = await naytaVahvistus('Poistetaanko ' + lista.name + '?', teksti);
   if (!vahvistus) return;
 
   await db.from('tuotteet').delete().eq('list_id', lista.id);
