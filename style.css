@@ -50,6 +50,36 @@ h1 {
   margin-bottom: 4px;
 }
 
+.list-header {
+  position: relative;
+}
+
+.back-btn {
+  position: absolute;
+  left: -8px;
+  top: 50%;
+  transform: translateY(-50%);
+  min-width: 44px;
+  min-height: 44px;
+  background: none;
+  border: none;
+  outline: none;
+  appearance: none;
+  -webkit-appearance: none;
+  font-size: 30px;
+  font-family: 'Courier New', Courier, monospace;
+  color: var(--accent);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  -webkit-tap-highlight-color: transparent;
+}
+
+#home-list li {
+  cursor: pointer;
+}
+
 .subtitle {
   font-size: 14px;
   letter-spacing: 0.1em;

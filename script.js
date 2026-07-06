@@ -7,11 +7,19 @@ const db = createClient(
 
 function showLoginView() {
   document.getElementById('login-view').style.display = 'flex';
+  document.getElementById('home-view').style.display = 'none';
+  document.getElementById('app-view').style.display = 'none';
+}
+
+function showHomeView() {
+  document.getElementById('login-view').style.display = 'none';
+  document.getElementById('home-view').style.display = 'block';
   document.getElementById('app-view').style.display = 'none';
 }
 
 function showAppView() {
   document.getElementById('login-view').style.display = 'none';
+  document.getElementById('home-view').style.display = 'none';
   document.getElementById('app-view').style.display = 'block';
 }
 
@@ -22,12 +30,77 @@ const list = document.querySelector('.list');
 let historyOpen = false;
 let cachedTuotteet = [];
 let currentUserId = null;
-let KAUPPALISTA_LIST_ID = null;
+let currentList = null;
+const LAST_LIST_KEY = 'kauppalista_viimeisin_lista';
 
-// Haetaan Kauppalista-listan id kerran käynnistyessä
-async function haeListaId() {
-  const { data } = await db.from('lists').select('id').eq('name', 'Kauppalista').single();
-  KAUPPALISTA_LIST_ID = data ? data.id : null;
+// Avaa valitun listan ja muistaa sen seuraavaa käynnistystä varten
+function avaaLista(lista) {
+  currentList = lista;
+  historyOpen = false;
+  localStorage.setItem(LAST_LIST_KEY, lista.id);
+  document.getElementById('list-title').textContent = '✱ ' + lista.name + ' ✱';
+  showAppView();
+  lataaLista();
+}
+
+// Hakee kaikki listat ja piirtää ne kotinäkymään
+async function lataaKotinakyma() {
+  const { data } = await db.from('lists').select().order('created_at');
+  const homeList = document.getElementById('home-list');
+  homeList.innerHTML = '';
+
+  (data || []).forEach(function(lista) {
+    const item = document.createElement('li');
+    item.addEventListener('click', function() { avaaLista(lista); });
+
+    const teksti = document.createElement('span');
+    teksti.textContent = lista.name;
+    item.appendChild(teksti);
+
+    if (lista.name !== 'Kauppalista') {
+      const poistoNappi = document.createElement('button');
+      poistoNappi.textContent = '×';
+      poistoNappi.className = 'delete-btn';
+      poistoNappi.addEventListener('click', function(e) {
+        e.stopPropagation();
+        poistaLista(lista);
+      });
+      item.appendChild(poistoNappi);
+    }
+
+    homeList.appendChild(item);
+  });
+}
+
+async function poistaLista(lista) {
+  const vahvistus = confirm('Poistetaanko ' + lista.name + '? Tuotteet poistuvat myös.');
+  if (!vahvistus) return;
+
+  await db.from('tuotteet').delete().eq('list_id', lista.id);
+  await db.from('lists').delete().eq('id', lista.id);
+  logEvent('deleted', 'list', lista.id, lista.name, lista.id);
+
+  if (currentList && currentList.id === lista.id) {
+    localStorage.removeItem(LAST_LIST_KEY);
+    currentList = null;
+    showHomeView();
+  }
+  lataaKotinakyma();
+}
+
+// Kirjautumisen jälkeen: palataan viimeisimpään listaan tai näytetään koti
+async function siirryKirjautumisenJalkeen() {
+  const viimeisinId = localStorage.getItem(LAST_LIST_KEY);
+  if (viimeisinId) {
+    const { data } = await db.from('lists').select().eq('id', viimeisinId).single();
+    if (data) {
+      avaaLista(data);
+      return;
+    }
+    localStorage.removeItem(LAST_LIST_KEY);
+  }
+  showHomeView();
+  lataaKotinakyma();
 }
 
 // Kirjaa tapahtuman lokiin. Ei koskaan estä käyttöliittymää — virheet vaietaan.
@@ -66,7 +139,7 @@ function updateSyncIndicator() {
     el = document.createElement('div');
     el.id = 'sync-indicator';
     el.className = 'sync-indicator';
-    const divider = document.querySelector('.divider');
+    const divider = document.querySelector('#app-view .divider');
     divider.parentNode.insertBefore(el, divider);
   }
   const q = getQueue();
@@ -245,7 +318,7 @@ function paivitaFooter(tuotteet) {
 async function showHistory() {
   const { data } = await db.from('tuotteet')
     .select()
-    .eq('list_id', KAUPPALISTA_LIST_ID)
+    .eq('list_id', currentList.id)
     .not('bought_at', 'is', null)
     .order('bought_at', { ascending: false });
 
@@ -283,12 +356,13 @@ async function showHistory() {
 
 // Haetaan kaikki tuotteet Supabasesta ja näytetään ne
 async function lataaLista() {
+  if (!currentList) return;
   if (!navigator.onLine) {
     paivitaNaytto(cachedTuotteet);
     paivitaFooter(cachedTuotteet);
     return;
   }
-  const { data } = await db.from('tuotteet').select().eq('list_id', KAUPPALISTA_LIST_ID).order('id');
+  const { data } = await db.from('tuotteet').select().eq('list_id', currentList.id).order('id');
   cachedTuotteet = data;
   paivitaNaytto(data);
   paivitaFooter(data);
@@ -298,18 +372,19 @@ async function lataaLista() {
 // Lisätään uusi tuote Supabaseen
 button.addEventListener('click', async function() {
   const teksti = input.value.trim();
-  if (teksti === '') return;
+  if (teksti === '' || !currentList) return;
+  const listId = currentList.id;
 
   if (navigator.onLine) {
-    const { data } = await db.from('tuotteet').insert({ nimi: teksti, tehty: false, list_id: KAUPPALISTA_LIST_ID }).select().single();
-    logEvent('added', 'item', data ? data.id : null, teksti, KAUPPALISTA_LIST_ID);
+    const { data } = await db.from('tuotteet').insert({ nimi: teksti, tehty: false, list_id: listId }).select().single();
+    logEvent('added', 'item', data ? data.id : null, teksti, listId);
     lataaLista();
   } else {
-    addToQueue({ type: 'insert', data: { nimi: teksti, tehty: false, list_id: KAUPPALISTA_LIST_ID } });
-    cachedTuotteet.push({ id: 'temp_' + Date.now(), nimi: teksti, tehty: false, bought_at: null, list_id: KAUPPALISTA_LIST_ID });
+    addToQueue({ type: 'insert', data: { nimi: teksti, tehty: false, list_id: listId } });
+    cachedTuotteet.push({ id: 'temp_' + Date.now(), nimi: teksti, tehty: false, bought_at: null, list_id: listId });
     paivitaNaytto(cachedTuotteet);
     paivitaFooter(cachedTuotteet);
-    logEvent('added', 'item', null, teksti, KAUPPALISTA_LIST_ID);
+    logEvent('added', 'item', null, teksti, listId);
   }
 
   input.value = '';
@@ -323,8 +398,6 @@ input.addEventListener('keydown', function(event) {
   }
 });
 
-// Ladataan lista heti kun sivu aukeaa
-haeListaId().then(lataaLista);
 updateSyncIndicator();
 
 // Silmänappi — näyttää/piilottaa ostetut tuotteet
@@ -333,10 +406,36 @@ document.getElementById('eye-btn').addEventListener('click', function() {
   lataaLista();
 });
 
-// Kuunnellaan muutoksia reaaliajassa — päivittyy automaattisesti
+// Takaisin-nuoli — palaa kotinäkymään
+document.getElementById('back-btn').addEventListener('click', function() {
+  showHomeView();
+  lataaKotinakyma();
+});
+
+// Uuden listan lisäys kotinäkymässä
+document.getElementById('new-list-btn').addEventListener('click', async function() {
+  const listInput = document.getElementById('new-list-input');
+  const nimi = listInput.value.trim();
+  if (nimi === '') return;
+
+  const { data } = await db.from('lists').insert({ name: nimi, type: 'checklist', owner_id: currentUserId }).select().single();
+  if (data) {
+    logEvent('created', 'list', data.id, nimi, data.id);
+  }
+  listInput.value = '';
+  lataaKotinakyma();
+});
+
+document.getElementById('new-list-input').addEventListener('keydown', function(event) {
+  if (event.key === 'Enter') {
+    document.getElementById('new-list-btn').click();
+  }
+});
+
+// Kuunnellaan muutoksia reaaliajassa — päivittää auki olevan listan
 const realtimeChannel = db.channel('tuotteet')
   .on('postgres_changes', { event: '*', schema: 'public', table: 'tuotteet' }, () => {
-    lataaLista();
+    if (currentList) lataaLista();
   })
   .subscribe();
 
@@ -367,7 +466,7 @@ document.getElementById('signout-link').addEventListener('click', function() {
 db.auth.onAuthStateChange(function(event, session) {
   currentUserId = session ? session.user.id : null;
   if (session) {
-    showAppView();
+    siirryKirjautumisenJalkeen();
   } else {
     showLoginView();
   }
@@ -376,7 +475,7 @@ db.auth.onAuthStateChange(function(event, session) {
 db.auth.getSession().then(function(result) {
   currentUserId = result.data.session ? result.data.session.user.id : null;
   if (result.data.session) {
-    showAppView();
+    siirryKirjautumisenJalkeen();
   } else {
     showLoginView();
   }
