@@ -11,6 +11,7 @@ function piilotaKaikkiNakymat() {
   document.getElementById('app-view').style.display = 'none';
   document.getElementById('laituri-view').style.display = 'none';
   document.getElementById('muistilaput-view').style.display = 'none';
+  document.getElementById('varasto-view').style.display = 'none';
 }
 
 function showLoginView() {
@@ -37,6 +38,15 @@ function showMuistilaputView() {
   piilotaKaikkiNakymat();
   document.getElementById('muistilaput-view').style.display = 'block';
 }
+
+function showVarastoView() {
+  piilotaKaikkiNakymat();
+  document.getElementById('varasto-view').style.display = 'block';
+}
+
+// Muistaa mistä näkymästä (kategoriasta) nykyinen lista avattiin, jotta
+// listanäkymän takaisin-nuoli palaa oikeaan paikkaan (Muistilaput vs. Varasto)
+let listanAvausLahde = 'muistilaput';
 
 const input = document.querySelector('#app-view .add-item input');
 const button = document.querySelector('#app-view .add-item button');
@@ -129,15 +139,25 @@ async function lataaKotinakyma() {
   paivitaPaivamaara();
 }
 
-// Hakee kaikki listat ja piirtää ne Muistilaput-näkymään
-async function lataaMuistilaput() {
-  const { data } = await db.from('lists').select().order('created_at');
-  const muistilaputList = document.getElementById('muistilaput-list');
-  muistilaputList.innerHTML = '';
+// Hakee kategorian listat ja piirtää ne annettuun säiliöön. Käytetään sekä
+// Muistilaput- että Varasto-näkymälle — sama lists/tuotteet-rakenne, eri suodatus.
+async function lataaListatNakymaan(containerId, kategoria) {
+  const { data, error } = await db.from('lists').select().eq('category', kategoria).order('created_at');
+  if (error) {
+    console.error('Listojen haku epäonnistui:', error);
+    return;
+  }
+
+  const containerEl = document.getElementById(containerId);
+  containerEl.innerHTML = '';
+  const paivitaNakyma = function() { lataaListatNakymaan(containerId, kategoria); };
 
   (data || []).forEach(function(lista) {
     const item = document.createElement('li');
-    item.addEventListener('click', function() { avaaLista(lista); });
+    item.addEventListener('click', function() {
+      listanAvausLahde = kategoria;
+      avaaLista(lista);
+    });
 
     const teksti = document.createElement('span');
     teksti.textContent = lista.name;
@@ -149,7 +169,7 @@ async function lataaMuistilaput() {
       muokkausNappi.className = 'edit-btn';
       muokkausNappi.addEventListener('click', function(e) {
         e.stopPropagation();
-        aloitaListanMuokkaus(teksti, lista);
+        aloitaListanMuokkaus(teksti, lista, paivitaNakyma);
       });
       item.appendChild(muokkausNappi);
 
@@ -158,13 +178,21 @@ async function lataaMuistilaput() {
       poistoNappi.className = 'delete-btn';
       poistoNappi.addEventListener('click', function(e) {
         e.stopPropagation();
-        poistaLista(lista);
+        poistaLista(lista, paivitaNakyma);
       });
       item.appendChild(poistoNappi);
     }
 
-    muistilaputList.appendChild(item);
+    containerEl.appendChild(item);
   });
+}
+
+async function lataaMuistilaput() {
+  return lataaListatNakymaan('muistilaput-list', 'muistilaput');
+}
+
+async function lataaVarasto() {
+  return lataaListatNakymaan('varasto-list', 'varasto');
 }
 
 // Näyttää tämänpäiväisen päivämäärän suomeksi etusivun yläosassa
@@ -212,6 +240,7 @@ async function lataaAnkkurit() {
     checkNappi.textContent = '○';
     checkNappi.className = 'check-btn';
     checkNappi.addEventListener('click', async function() {
+      tuntopalauteValmis();
       const { error } = await db.from('ankkurit').update({ done: true, done_at: new Date().toISOString() }).eq('id', ankkuri.id);
       if (error) {
         console.error('Ankkurin merkintä epäonnistui:', error);
@@ -258,6 +287,7 @@ async function lataaAnkkurit() {
 // Hakee etusivun osiot (Laituri, Ankkurit, ym.) ja piirtää ne geneerisesti —
 // osiot tulevat tietokannasta (nimi, ikoni, reitti, järjestys), ei kovakoodattuina
 async function lataaOsiot() {
+  if (raahattavaRivi) return;
   const { data, error } = await db.from('home_sections').select().eq('enabled', true).order('sort_order');
   if (error) {
     console.error('Osioiden haku epäonnistui:', error);
@@ -270,6 +300,8 @@ async function lataaOsiot() {
   (data || []).forEach(function(osio) {
     const tile = document.createElement('div');
     tile.className = 'section-tile';
+    tile.dataset.tuoteId = osio.id;
+    alustaRaahaus(tile, osio, { container: sectionsGrid, cache: data, taulu: 'home_sections', jalkeenPaivitys: lataaOsiot });
     tile.addEventListener('click', function() { avaaOsio(osio); });
 
     const ikoni = document.createElement('span');
@@ -301,6 +333,9 @@ function avaaOsio(osio) {
   } else if (osio.route === 'muistilaput') {
     showMuistilaputView();
     lataaMuistilaput();
+  } else if (osio.route === 'varasto') {
+    showVarastoView();
+    lataaVarasto();
   } else {
     alert(osio.name + ' tulossa pian.');
   }
@@ -393,7 +428,7 @@ async function lataaLaituri(hakusana) {
 }
 
 // Muuttaa listan nimen inline-muokattavaksi kotinäkymässä
-function aloitaListanMuokkaus(teksti, lista) {
+function aloitaListanMuokkaus(teksti, lista, paivitaNakyma) {
   const inputti = document.createElement('input');
   inputti.type = 'text';
   inputti.value = lista.name;
@@ -413,7 +448,7 @@ function aloitaListanMuokkaus(teksti, lista) {
         logEvent('renamed', 'list', lista.id, uusi, lista.id);
       }
     }
-    lataaMuistilaput();
+    paivitaNakyma();
   }
 
   inputti.addEventListener('blur', tallenna);
@@ -463,7 +498,7 @@ function naytaVahvistus(otsikko, teksti, poistaTeksti) {
   });
 }
 
-async function poistaLista(lista) {
+async function poistaLista(lista, paivitaNakyma) {
   const { count } = await db.from('tuotteet').select('id', { count: 'exact', head: true }).eq('list_id', lista.id);
   const teksti = count > 0 ? 'Listalla on ' + count + ' asiaa — nekin poistuvat.' : null;
   const vahvistus = await naytaVahvistus('Poistetaanko ' + lista.name + '?', teksti, 'Poista lista');
@@ -481,7 +516,7 @@ async function poistaLista(lista) {
     localStorage.removeItem(LAST_LIST_KEY);
     currentList = null;
   }
-  lataaMuistilaput();
+  paivitaNakyma();
 }
 
 // Kirjautumisen jälkeen: palataan viimeisimpään listaan tai näytetään koti
@@ -490,6 +525,7 @@ async function siirryKirjautumisenJalkeen() {
   if (viimeisinId) {
     const { data } = await db.from('lists').select().eq('id', viimeisinId).single();
     if (data) {
+      listanAvausLahde = data.category || 'muistilaput';
       avaaLista(data);
       return;
     }
@@ -602,6 +638,12 @@ async function poistaTuote(tuote) {
     paivitaFooter(cachedTuotteet);
     logEvent('deleted', tuote.is_header ? 'header' : 'item', tuote.id, tuote.nimi, tuote.list_id);
   }
+}
+
+// Pieni tuntopalaute kun jokin merkitään valmiiksi (tuote, ankkuri) — ei
+// jokaisesta klikkauksesta, vain onnistumisesta. Ei kaadu jos laite ei tue.
+function tuntopalauteValmis() {
+  if (navigator.vibrate) navigator.vibrate([20, 40, 20]);
 }
 
 // === RAAHAUS (pitkä painallus + siirto) ===
@@ -785,6 +827,7 @@ function paivitaNaytto(tuotteet) {
     checkNappi.addEventListener('click', async function() {
       const updateData = { tehty: !tuote.tehty, bought_at: !tuote.tehty ? new Date().toISOString() : null };
       const eventAction = updateData.tehty ? 'checked' : 'unchecked';
+      if (updateData.tehty) tuntopalauteValmis();
       if (navigator.onLine) {
         const { error } = await db.from('tuotteet').update(updateData).eq('id', tuote.id);
         if (error) {
@@ -1013,10 +1056,15 @@ document.getElementById('eye-btn').addEventListener('click', function() {
   lataaLista();
 });
 
-// Takaisin-nuoli — palaa Muistilaput-näkymään (sieltä listat avataan)
+// Takaisin-nuoli — palaa näkymään josta lista avattiin (Muistilaput tai Varasto)
 document.getElementById('back-btn').addEventListener('click', function() {
-  showMuistilaputView();
-  lataaMuistilaput();
+  if (listanAvausLahde === 'varasto') {
+    showVarastoView();
+    lataaVarasto();
+  } else {
+    showMuistilaputView();
+    lataaMuistilaput();
+  }
 });
 
 // Listan asetukset — näkyvyyden vaihto
@@ -1119,7 +1167,7 @@ document.getElementById('new-list-btn').addEventListener('click', async function
   const nimi = listInput.value.trim();
   if (nimi === '') { listInput.focus(); return; }
 
-  const { data, error } = await db.from('lists').insert({ name: nimi, type: 'checklist', owner_id: currentUserId }).select().single();
+  const { data, error } = await db.from('lists').insert({ name: nimi, type: 'checklist', owner_id: currentUserId, category: 'muistilaput' }).select().single();
   if (error) {
     console.error('Listan luonti epäonnistui:', error);
   }
@@ -1128,6 +1176,33 @@ document.getElementById('new-list-btn').addEventListener('click', async function
   }
   listInput.value = '';
   lataaMuistilaput();
+});
+
+document.getElementById('varasto-back-btn').addEventListener('click', function() {
+  showHomeView();
+  lataaKotinakyma();
+});
+
+document.getElementById('new-varasto-btn').addEventListener('click', async function() {
+  const varastoInput = document.getElementById('new-varasto-input');
+  const nimi = varastoInput.value.trim();
+  if (nimi === '') { varastoInput.focus(); return; }
+
+  const { data, error } = await db.from('lists').insert({ name: nimi, type: 'checklist', owner_id: currentUserId, category: 'varasto' }).select().single();
+  if (error) {
+    console.error('Listan luonti epäonnistui:', error);
+  }
+  if (data) {
+    logEvent('created', 'list', data.id, nimi, data.id);
+  }
+  varastoInput.value = '';
+  lataaVarasto();
+});
+
+document.getElementById('new-varasto-input').addEventListener('keydown', function(event) {
+  if (event.key === 'Enter') {
+    document.getElementById('new-varasto-btn').click();
+  }
 });
 
 document.getElementById('new-list-input').addEventListener('keydown', function(event) {
