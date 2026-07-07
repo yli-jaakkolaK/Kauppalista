@@ -142,7 +142,8 @@ async function lataaKotinakyma() {
 // Hakee kategorian listat ja piirtää ne annettuun säiliöön. Käytetään sekä
 // Muistilaput- että Varasto-näkymälle — sama lists/tuotteet-rakenne, eri suodatus.
 async function lataaListatNakymaan(containerId, kategoria) {
-  const { data, error } = await db.from('lists').select().eq('category', kategoria).order('created_at');
+  if (raahattavaRivi) return;
+  const { data, error } = await db.from('lists').select().eq('category', kategoria).order('sort_order');
   if (error) {
     console.error('Listojen haku epäonnistui:', error);
     return;
@@ -154,6 +155,8 @@ async function lataaListatNakymaan(containerId, kategoria) {
 
   (data || []).forEach(function(lista) {
     const item = document.createElement('li');
+    item.dataset.tuoteId = lista.id;
+    alustaRaahaus(item, lista, { container: containerEl, cache: data, taulu: 'lists', jalkeenPaivitys: paivitaNakyma });
     item.addEventListener('click', function() {
       listanAvausLahde = kategoria;
       avaaLista(lista);
