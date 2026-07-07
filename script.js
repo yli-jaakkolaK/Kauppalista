@@ -1076,7 +1076,21 @@ document.getElementById('settings-btn').addEventListener('click', function() {
   const jaettu = currentList.visibility === 'shared';
   document.getElementById('visibility-toggle').checked = jaettu;
   document.getElementById('settings-visibility-label').textContent = jaettu ? 'Näkyy molemmille' : 'Näkyy vain sinulle';
+  document.getElementById('move-category-btn').textContent = currentList.category === 'varasto' ? 'Siirrä Muistilappuihin' : 'Siirrä Varastoon';
   document.getElementById('settings-overlay').style.display = 'flex';
+});
+
+document.getElementById('move-category-btn').addEventListener('click', async function() {
+  const uusiKategoria = currentList.category === 'varasto' ? 'muistilaput' : 'varasto';
+  const { error } = await db.from('lists').update({ category: uusiKategoria }).eq('id', currentList.id);
+  if (error) {
+    console.error('Kategorian vaihto epäonnistui:', error);
+    return;
+  }
+  currentList.category = uusiKategoria;
+  listanAvausLahde = uusiKategoria;
+  logEvent(uusiKategoria === 'varasto' ? 'moved_to_varasto' : 'moved_to_muistilaput', 'list', currentList.id, currentList.name, currentList.id);
+  document.getElementById('move-category-btn').textContent = uusiKategoria === 'varasto' ? 'Siirrä Muistilappuihin' : 'Siirrä Varastoon';
 });
 
 document.getElementById('settings-close').addEventListener('click', function() {
