@@ -23,6 +23,14 @@
     <h1>✱ SATAMA ✱</h1>
     <hr class="divider">
 
+    <div class="place-link" id="laituri-link">
+      <span class="prefix">›</span>
+      <span class="place-link-label">Laituri</span>
+      <span class="place-link-badge" id="laituri-badge" style="display:none"></span>
+    </div>
+
+    <hr class="divider">
+
     <ul class="list" id="home-list"></ul>
 
     <hr class="divider">
@@ -36,10 +44,34 @@
     <button id="signout-link">kirjaudu ulos</button>
   </div>
 
+  <div class="container" id="laituri-view" style="display:none">
+    <div class="list-header">
+      <button class="back-btn" id="laituri-back-btn">‹</button>
+      <h1>✱ LAITURI ✱</h1>
+      <span></span>
+    </div>
+
+    <div class="add-item">
+      <span class="prefix">›</span>
+      <input type="text" id="laituri-input" placeholder="uusi ajatus...">
+      <button id="laituri-add-btn">+</button>
+    </div>
+
+    <div class="add-item">
+      <span class="prefix">⌕</span>
+      <input type="text" id="laituri-search" placeholder="hae...">
+    </div>
+
+    <hr class="divider">
+
+    <ul class="list" id="laituri-list"></ul>
+  </div>
+
   <div class="container" id="app-view" style="display:none">
     <div class="list-header">
       <button class="back-btn" id="back-btn">‹</button>
       <h1 id="list-title">✱ kauppalista ✱</h1>
+      <button class="settings-btn" id="settings-btn">🔒</button>
     </div>
     <div class="subtitle" id="subtitle">ladataan...</div>
 
@@ -69,6 +101,22 @@
       <div class="dialog-buttons">
         <button class="dialog-btn dialog-btn-cancel" id="dialog-cancel">Peru</button>
         <button class="dialog-btn dialog-btn-danger" id="dialog-confirm">Poista lista</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="dialog-overlay" id="settings-overlay" style="display:none">
+    <div class="dialog-box">
+      <p class="dialog-title">Listan asetukset</p>
+      <div class="settings-row">
+        <span id="settings-visibility-label">Näkyy vain sinulle</span>
+        <label class="toggle">
+          <input type="checkbox" id="visibility-toggle">
+          <span class="toggle-track"></span>
+        </label>
+      </div>
+      <div class="dialog-buttons">
+        <button class="dialog-btn dialog-btn-cancel" id="settings-close">Sulje</button>
       </div>
     </div>
   </div>

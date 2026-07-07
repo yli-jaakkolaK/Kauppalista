@@ -9,18 +9,28 @@ function showLoginView() {
   document.getElementById('login-view').style.display = 'flex';
   document.getElementById('home-view').style.display = 'none';
   document.getElementById('app-view').style.display = 'none';
+  document.getElementById('laituri-view').style.display = 'none';
 }
 
 function showHomeView() {
   document.getElementById('login-view').style.display = 'none';
   document.getElementById('home-view').style.display = 'block';
   document.getElementById('app-view').style.display = 'none';
+  document.getElementById('laituri-view').style.display = 'none';
 }
 
 function showAppView() {
   document.getElementById('login-view').style.display = 'none';
   document.getElementById('home-view').style.display = 'none';
   document.getElementById('app-view').style.display = 'block';
+  document.getElementById('laituri-view').style.display = 'none';
+}
+
+function showLaituriView() {
+  document.getElementById('login-view').style.display = 'none';
+  document.getElementById('home-view').style.display = 'none';
+  document.getElementById('app-view').style.display = 'none';
+  document.getElementById('laituri-view').style.display = 'block';
 }
 
 const input = document.querySelector('#app-view .add-item input');
@@ -39,8 +49,14 @@ function avaaLista(lista) {
   historyOpen = false;
   localStorage.setItem(LAST_LIST_KEY, lista.id);
   document.getElementById('list-title').textContent = '✱ ' + lista.name + ' ✱';
+  paivitaNakyvyysIkoni();
   showAppView();
   lataaLista();
+}
+
+// Päivittää listan asetusnapin ikonin nykyisen näkyvyystilan mukaan
+function paivitaNakyvyysIkoni() {
+  document.getElementById('settings-btn').textContent = currentList.visibility === 'shared' ? '⚓' : '🔒';
 }
 
 // Hakee kaikki listat ja piirtää ne kotinäkymään
@@ -78,6 +94,93 @@ async function lataaKotinakyma() {
     }
 
     homeList.appendChild(item);
+  });
+
+  paivitaLaituriBadge();
+}
+
+// Hakee Laiturin uusien (ei vielä sijoitettujen) rivien määrän kotinäkymän merkkiä varten
+async function paivitaLaituriBadge() {
+  const { count } = await db.from('laituri').select('id', { count: 'exact', head: true }).eq('status', 'uusi');
+  const badge = document.getElementById('laituri-badge');
+  if (count) {
+    badge.textContent = count;
+    badge.style.display = 'flex';
+  } else {
+    badge.style.display = 'none';
+  }
+}
+
+// Hakee ja piirtää Laiturin rivit, valinnaisesti hakusanalla suodatettuna
+async function lataaLaituri(hakusana) {
+  let kysely = db.from('laituri').select().order('created_at', { ascending: false });
+  if (hakusana) {
+    kysely = kysely.ilike('content', '%' + hakusana + '%');
+  }
+  const { data, error } = await kysely;
+  if (error) {
+    console.error('Laiturin haku epäonnistui:', error);
+  }
+
+  const listEl = document.getElementById('laituri-list');
+  listEl.innerHTML = '';
+
+  (data || []).forEach(function(rivi) {
+    const li = document.createElement('li');
+    li.className = 'laituri-row' + (rivi.status === 'sijoitettu' ? ' sijoitettu' : '');
+
+    const sisalto = document.createElement('div');
+    sisalto.className = 'laituri-content';
+
+    const teksti = document.createElement('span');
+    teksti.className = 'laituri-text';
+    teksti.textContent = rivi.content;
+    sisalto.appendChild(teksti);
+
+    const meta = document.createElement('span');
+    meta.className = 'laituri-meta';
+    const kuka = rivi.user_id === currentUserId ? 'sinä' : 'kumppani';
+    const d = new Date(rivi.created_at);
+    const aika = d.getDate().toString().padStart(2, '0') + '.' + (d.getMonth() + 1).toString().padStart(2, '0') + '. ' +
+                 d.getHours().toString().padStart(2, '0') + ':' + d.getMinutes().toString().padStart(2, '0');
+    meta.textContent = kuka + ' · ' + aika + (rivi.status === 'sijoitettu' ? ' · → ' + rivi.placed_where : '');
+    sisalto.appendChild(meta);
+
+    li.appendChild(sisalto);
+
+    if (rivi.status !== 'sijoitettu') {
+      const sijoitaNappi = document.createElement('button');
+      sijoitaNappi.className = 'place-btn';
+      sijoitaNappi.textContent = '→';
+      sijoitaNappi.addEventListener('click', async function() {
+        const minne = prompt('Minne sijoitit tämän?');
+        if (!minne || !minne.trim()) return;
+        const { error } = await db.from('laituri').update({ status: 'sijoitettu', placed_where: minne.trim() }).eq('id', rivi.id);
+        if (error) {
+          console.error('Sijoitus epäonnistui:', error);
+        }
+        lataaLaituri(document.getElementById('laituri-search').value.trim());
+        paivitaLaituriBadge();
+      });
+      li.appendChild(sijoitaNappi);
+    }
+
+    const poistoNappi = document.createElement('button');
+    poistoNappi.className = 'delete-btn';
+    poistoNappi.textContent = '×';
+    poistoNappi.addEventListener('click', async function() {
+      const vahvistus = await naytaVahvistus('Poistetaanko tämä ajatus?', null, 'Poista');
+      if (!vahvistus) return;
+      const { error } = await db.from('laituri').delete().eq('id', rivi.id);
+      if (error) {
+        console.error('Laiturin rivin poisto epäonnistui:', error);
+      }
+      lataaLaituri(document.getElementById('laituri-search').value.trim());
+      paivitaLaituriBadge();
+    });
+    li.appendChild(poistoNappi);
+
+    listEl.appendChild(li);
   });
 }
 
@@ -268,6 +371,27 @@ window.addEventListener('offline', () => { updateSyncIndicator(); });
 const SVG_SILMA_AUKI = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>';
 const SVG_SILMA_KIINNI = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>';
 
+// Poistaa tuotteen tai väliotsikon (yhteinen molemmille)
+async function poistaTuote(tuote) {
+  const vahvistus = await naytaVahvistus('Poistetaanko ' + tuote.nimi + '?', null, tuote.is_header ? 'Poista' : 'Poista tuote');
+  if (!vahvistus) return;
+
+  if (navigator.onLine) {
+    const { error } = await db.from('tuotteet').delete().eq('id', tuote.id);
+    if (error) {
+      console.error('Poisto epäonnistui:', error);
+    }
+    logEvent('deleted', tuote.is_header ? 'header' : 'item', tuote.id, tuote.nimi, tuote.list_id);
+    lataaLista();
+  } else {
+    addToQueue({ type: 'delete', data: { id: tuote.id } });
+    cachedTuotteet = cachedTuotteet.filter(t => t.id !== tuote.id);
+    paivitaNaytto(cachedTuotteet);
+    paivitaFooter(cachedTuotteet);
+    logEvent('deleted', tuote.is_header ? 'header' : 'item', tuote.id, tuote.nimi, tuote.list_id);
+  }
+}
+
 // Piirtää listan näytölle
 function paivitaNaytto(tuotteet) {
   list.innerHTML = '';
@@ -275,6 +399,28 @@ function paivitaNaytto(tuotteet) {
 
   naytettavat.forEach(function(tuote) {
     const item = document.createElement('li');
+
+    // Väliotsikko: ei checkboxia, ei muokkausta, vain teksti + poisto
+    if (tuote.is_header) {
+      item.className = 'header-row';
+
+      const spacer = document.createElement('div');
+      spacer.className = 'footer-spacer';
+      item.appendChild(spacer);
+
+      const otsikkoTeksti = document.createElement('span');
+      otsikkoTeksti.textContent = tuote.nimi;
+      item.appendChild(otsikkoTeksti);
+
+      const otsikkoPoisto = document.createElement('button');
+      otsikkoPoisto.textContent = '×';
+      otsikkoPoisto.className = 'delete-btn';
+      otsikkoPoisto.addEventListener('click', function() { poistaTuote(tuote); });
+      item.appendChild(otsikkoPoisto);
+
+      list.appendChild(item);
+      return;
+    }
 
     // Vasemmalla: yliviivaustoiminto
     const checkNappi = document.createElement('button');
@@ -365,33 +511,16 @@ function paivitaNaytto(tuotteet) {
       item.classList.add('done');
     }
 
-    nappi.addEventListener('click', async function() {
-      const vahvistus = await naytaVahvistus('Poistetaanko ' + tuote.nimi + '?', null, 'Poista tuote');
-      if (!vahvistus) return;
-
-      if (navigator.onLine) {
-        const { error } = await db.from('tuotteet').delete().eq('id', tuote.id);
-        if (error) {
-          console.error('Tuotteen poisto epäonnistui:', error);
-        }
-        logEvent('deleted', 'item', tuote.id, tuote.nimi, tuote.list_id);
-        lataaLista();
-      } else {
-        addToQueue({ type: 'delete', data: { id: tuote.id } });
-        cachedTuotteet = cachedTuotteet.filter(t => t.id !== tuote.id);
-        paivitaNaytto(cachedTuotteet);
-        paivitaFooter(cachedTuotteet);
-        logEvent('deleted', 'item', tuote.id, tuote.nimi, tuote.list_id);
-      }
-    });
+    nappi.addEventListener('click', function() { poistaTuote(tuote); });
 
     list.appendChild(item);
   });
 }
 
 function paivitaFooter(tuotteet) {
-  const jaljella = tuotteet.filter(t => !t.tehty).length;
-  const ostettu = tuotteet.filter(t => t.tehty).length;
+  const varsinaiset = tuotteet.filter(t => !t.is_header);
+  const jaljella = varsinaiset.filter(t => !t.tehty).length;
+  const ostettu = varsinaiset.filter(t => t.tehty).length;
   const subtitle = document.getElementById('subtitle');
   const footer = document.getElementById('list-footer');
   const footerDivider = document.getElementById('footer-divider');
@@ -469,24 +598,28 @@ async function lataaLista() {
 
 // Lisätään uusi tuote Supabaseen
 button.addEventListener('click', async function() {
-  const teksti = input.value.trim();
-  if (teksti === '') { input.focus(); return; }
+  const raakaTeksti = input.value.trim();
+  if (raakaTeksti === '') { input.focus(); return; }
   if (!currentList) return;
   const listId = currentList.id;
 
+  const onOtsikko = raakaTeksti.startsWith('#');
+  const teksti = onOtsikko ? raakaTeksti.slice(1).trim() : raakaTeksti;
+  if (teksti === '') { input.focus(); return; }
+
   if (navigator.onLine) {
-    const { data, error } = await db.from('tuotteet').insert({ nimi: teksti, tehty: false, list_id: listId }).select().single();
+    const { data, error } = await db.from('tuotteet').insert({ nimi: teksti, tehty: false, list_id: listId, is_header: onOtsikko }).select().single();
     if (error) {
-      console.error('Tuotteen lisäys epäonnistui:', error);
+      console.error('Lisäys epäonnistui:', error);
     }
-    logEvent('added', 'item', data ? data.id : null, teksti, listId);
+    logEvent(onOtsikko ? 'created' : 'added', onOtsikko ? 'header' : 'item', data ? data.id : null, teksti, listId);
     lataaLista();
   } else {
-    addToQueue({ type: 'insert', data: { nimi: teksti, tehty: false, list_id: listId } });
-    cachedTuotteet.push({ id: 'temp_' + Date.now(), nimi: teksti, tehty: false, bought_at: null, list_id: listId });
+    addToQueue({ type: 'insert', data: { nimi: teksti, tehty: false, list_id: listId, is_header: onOtsikko } });
+    cachedTuotteet.push({ id: 'temp_' + Date.now(), nimi: teksti, tehty: false, bought_at: null, list_id: listId, is_header: onOtsikko });
     paivitaNaytto(cachedTuotteet);
     paivitaFooter(cachedTuotteet);
-    logEvent('added', 'item', null, teksti, listId);
+    logEvent(onOtsikko ? 'created' : 'added', onOtsikko ? 'header' : 'item', null, teksti, listId);
   }
 
   input.value = '';
@@ -512,6 +645,74 @@ document.getElementById('eye-btn').addEventListener('click', function() {
 document.getElementById('back-btn').addEventListener('click', function() {
   showHomeView();
   lataaKotinakyma();
+});
+
+// Listan asetukset — näkyvyyden vaihto
+document.getElementById('settings-btn').addEventListener('click', function() {
+  if (!currentList) return;
+  const jaettu = currentList.visibility === 'shared';
+  document.getElementById('visibility-toggle').checked = jaettu;
+  document.getElementById('settings-visibility-label').textContent = jaettu ? 'Näkyy molemmille' : 'Näkyy vain sinulle';
+  document.getElementById('settings-overlay').style.display = 'flex';
+});
+
+document.getElementById('settings-close').addEventListener('click', function() {
+  document.getElementById('settings-overlay').style.display = 'none';
+});
+
+document.getElementById('settings-overlay').addEventListener('click', function(e) {
+  if (e.target === this) this.style.display = 'none';
+});
+
+document.getElementById('visibility-toggle').addEventListener('change', async function(e) {
+  const uusiTila = e.target.checked ? 'shared' : 'private';
+  const { error } = await db.from('lists').update({ visibility: uusiTila }).eq('id', currentList.id);
+  if (error) {
+    console.error('Näkyvyyden muutos epäonnistui:', error);
+    e.target.checked = !e.target.checked;
+    return;
+  }
+  currentList.visibility = uusiTila;
+  document.getElementById('settings-visibility-label').textContent = e.target.checked ? 'Näkyy molemmille' : 'Näkyy vain sinulle';
+  paivitaNakyvyysIkoni();
+  logEvent(uusiTila === 'shared' ? 'shared' : 'unshared', 'list', currentList.id, currentList.name, currentList.id);
+});
+
+// Laituri
+document.getElementById('laituri-link').addEventListener('click', function() {
+  showLaituriView();
+  lataaLaituri();
+});
+
+document.getElementById('laituri-back-btn').addEventListener('click', function() {
+  showHomeView();
+  lataaKotinakyma();
+});
+
+document.getElementById('laituri-add-btn').addEventListener('click', async function() {
+  const laituriInput = document.getElementById('laituri-input');
+  const teksti = laituriInput.value.trim();
+  if (teksti === '') { laituriInput.focus(); return; }
+
+  const { error } = await db.from('laituri').insert({ user_id: currentUserId, content: teksti });
+  if (error) {
+    console.error('Laituri-lisäys epäonnistui:', error);
+  }
+  laituriInput.value = '';
+  lataaLaituri(document.getElementById('laituri-search').value.trim());
+});
+
+document.getElementById('laituri-input').addEventListener('keydown', function(event) {
+  if (event.key === 'Enter') {
+    document.getElementById('laituri-add-btn').click();
+  }
+});
+
+let laituriHakuAjastin = null;
+document.getElementById('laituri-search').addEventListener('input', function(e) {
+  clearTimeout(laituriHakuAjastin);
+  const hakusana = e.target.value.trim();
+  laituriHakuAjastin = setTimeout(function() { lataaLaituri(hakusana); }, 250);
 });
 
 // Uuden listan lisäys kotinäkymässä

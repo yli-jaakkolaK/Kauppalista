@@ -342,10 +342,10 @@ Isompi visio: ADHD-päin rakennettu perheen toiminnanohjausjärjestelmä.
    - Monikko (koti + useita listoja, luonti/poisto) ✓ (2026-07-06)
    - Tapahtumaloki ✓ (2026-07-06)
    - Uudelleennimeäminen (✎ kotinäkymässä, ei Kauppalistalle) ✓ (2026-07-06)
-   - Jakaminen (list_members-taulu olemassa, ei vielä käytössä koodissa) ⏳ — vaatii oman suunnittelun: kutsulinkki vai sähköposti, kenelle-näkymä per lista
-   - Väliotsikot/alaryhmät listan sisällä ⏳ — idea 2026-07-06: esim. vuosikello-listassa kuukaudet väliotsikoiksi, ettei kuukautta tarvitse toistaa jokaisessa rivissä. Ei suunniteltu vielä: onko väliotsikko vain erikoismerkitty tuotteet-rivi (ei rastitettava, lihavoitu) vai oma rakenteensa — päätettävä ennen toteutusta
-   - Laituri (yhteiset keskeneräiset ajatukset) ⏳
-   - RLS päälle ⏳ — ks. TODO lopussa
+   - Väliotsikot listan sisällä (`#`-etuliite tuotteen nimessä → lihavoitu, ei checkboxia, ei osu jäljellä/ostettu-laskuriin) ✓ (2026-07-07)
+   - Näkyvyysmalli + RLS ✓ koodissa, ⏳ SQL ajamatta (ks. TODO) — ks. tarkka kuvaus alla "Pääsynhallinta"-osiossa
+   - Laituri (yhteinen muistilista, oma näkymä kotinäkymän kautta) ✓ koodissa, ⏳ SQL ajamatta
+   - Jakaminen kolmansille (list_members + kutsulinkki) — taulu valmiina, EI kuulu E1:n valmiusehtoihin, ei UI:ta vielä
 2. Tehtävät + push-ilmoitukset + kiertoseuranta
 3. Siri-äly (Claude API)
 4. Nostot / Odottaa / Ruoka
@@ -379,5 +379,28 @@ Isompi visio: ADHD-päin rakennettu perheen toiminnanohjausjärjestelmä.
 - Kaksi eri ×-nappia sovelluksessa (listan poisto kotinäkymässä vs. tuotteen poisto listan sisällä) käyttävät samaa symbolia ja delete-btn-luokkaa — helposti sekoittuvat kun keskustellaan "×:stä" ilman tarkennusta kummasta puhutaan
 - PWA:n service worker -välimuisti pitää bumpata JOKA KERTA kun index.html/style.css/script.js/icon.png muuttuu — unohtuu helposti, tuli vastaan monta kertaa tässä sessiossa (v4 → v9)
 
-- [ ] Etappi 1 lopuksi: RLS päälle (lists, list_members, events, tuotteet)
-      + Siri-API:lle service-avain — CRITICAL-varoitus poistuu tässä
+## Pääsynhallinta (2026-07-07)
+
+**Malli:** yksityinen oletuksena, tietoinen jako. `lists.visibility` = `'private'` (oletus, uusi lista syntyy AINA näin, ei valintaa luontihetkellä) tai `'shared'` (näkyy koko perheelle — käytännössä Katri + Juha). Jako tapahtuu listan asetuksista (🔒/⚓-nappi listanäkymän otsikkorivillä oikealla) — iOS-tyylinen vihreä kytkin, ei mitään muuta valintaa.
+
+- Yhteisessä listassa KUKA TAHANSA näkevä saa lisätä/täpätä/muokata/poistaa RIVEJÄ. Vain listan omistaja hallinnoi listaa itseään (nimi, näkyvyys, poisto).
+- Kolmansien osapuolten kutsuminen (`list_members` + kutsulinkki/koodi) EI kuulu E1:een — taulu ja RLS-policyt ovat valmiina sitä varten, mutta ei UI:ta eikä kutsulogiikkaa vielä.
+- Backfill-periaate: kaikki jo olemassa olevat listat (Kauppalista, Siivouslista, Vuosikello) merkitään `visibility='shared'` migraatiossa 003, jotta mikään ei katoa Juhalta RLS:n kytkeytyessä.
+- Sama näkyvyysperiaate tulee myöhemmin muihinkin osioihin: Laituri = aina yhteinen (ei kytkintä), Ruoka = aina yhteinen, Muistiinpanot (E8) = kuten listat (omat + jaetut), Hytti (opiskelu/työ-muistiinpanot, myöhempi osio) = aina yksityinen omistajalleen.
+- **Testaa ehdottomasti molemmilla tileillä RLS:n käyttöönoton jälkeen:** yhteinen lista näkyy molemmille, yksityinen EI näy toiselle. Claude ei pysty testaamaan tätä itse (ei pääsyä kahteen oikeaan Google-tiliin).
+
+## Laituri (2026-07-07)
+
+Yhteinen "keskeneräisten ajatusten" muistilista, aina näkyvissä molemmille (ei näkyvyyskytkintä). Oma taulu `laituri` (id, user_id, content, status 'uusi'/'sijoitettu', placed_where, created_at). Kotinäkymässä linkki + merkki (uusien lukumäärä). Kategorisointi ei poista riviä — se himmenee ja saa merkinnän "→ [minne]". Tekstihaku `ilike`-kyselyllä, 250ms debounce.
+
+E1-versio on kevyt: yksi kenttä + tallennus, lista alle, ei vielä sijoitus-kohteen valintaa listasta (käytetään `prompt()`:ia "minne sijoitit" -kysymykseen). Voi tarkentaa myöhemmin.
+
+## TODO ennen etapin 1 valmistumista (määräaika 23.7.2026 — kehityskone palautuu silloin)
+
+- [ ] Aja `sql/003_row_level_security.sql` Supabasessa (näkyvyysmalli + RLS + backfill)
+- [ ] Aja `sql/004_laituri.sql` Supabasessa (Laituri-taulu)
+- [ ] Hae Supabase Dashboard → Project Settings → API → **service_role**-avain (SALAINEN, ei anon-avain)
+- [ ] Lisää se Vercelin ympäristömuuttujaksi `SUPABASE_SERVICE_KEY` (Production + Preview), redeploy
+- [ ] Testaa molemmilla tileillä: yhteinen näkyy kahdelle, yksityinen ei näy toiselle, Siri-lisäys toimii yhä
+- [ ] Suunnitteluperiaate koko loppuprojektille: kaikki säädettävä (välit, kellonajat, rajat) dataan/tauluihin, EI kovakoodata — sovellusta pitää voida muokata ilman koodimuutoksia 23.7. jälkeen
+- [ ] Etusivun tavoitetila (E2+): kalenteri-ikoni, moottoribanneri, Ankkurit (max 3), Muut tänään, paikkalinkit (Laituri/Listat/Ruoka/Muistiinpanot/Hytti) — E1:ssä riittää nykyinen kevytversio, mutta rakennettu niin että lohkot on helppo lisätä myöhemmin

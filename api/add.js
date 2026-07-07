@@ -1,5 +1,8 @@
 const SUPABASE_URL = 'https://uctmxxeewoeydabuepye.supabase.co';
-const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVjdG14eGVld29leWRhYnVlcHllIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODI5MjI1NDYsImV4cCI6MjA5ODQ5ODU0Nn0.oJLbtc2BDTqwKu-Ih8ahZMM-s-XpqGvULV5ENGhDYJU';
+// RLS on päällä lists/tuotteet-tauluilla, joten Siri-lisäys tarvitsee
+// service_role-avaimen (ohittaa RLS:n). Asetettava Vercelin ympäristömuuttujaksi
+// SUPABASE_SERVICE_KEY — EI koskaan koodiin tai selaimen puolelle.
+const SUPABASE_KEY = process.env.SUPABASE_SERVICE_KEY;
 
 async function haeKauppalistaId() {
   const response = await fetch(`${SUPABASE_URL}/rest/v1/lists?name=eq.Kauppalista&select=id`, {
@@ -23,6 +26,10 @@ module.exports = async function handler(req, res) {
 
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
+  }
+
+  if (!SUPABASE_KEY) {
+    return res.status(500).json({ error: 'SUPABASE_SERVICE_KEY puuttuu Vercelin ympäristömuuttujista' });
   }
 
   const { nimi } = req.body;
