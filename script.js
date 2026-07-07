@@ -47,6 +47,31 @@ let cachedTuotteet = [];
 let currentUserId = null;
 let currentList = null;
 let aktiivinenOtsikkoId = null;
+let ankkuroidutIdt = new Set();
+
+// Hakee mitkä nykyisen listan riveistä on jo nostettu Ankkureihin
+async function paivitaAnkkuroidutIdt() {
+  const { data, error } = await db.from('ankkurit').select('source_ref').eq('source', 'muistilaput');
+  if (error) {
+    console.error('Ankkurointitilan haku epäonnistui:', error);
+    return;
+  }
+  ankkuroidutIdt = new Set((data || []).map(function(rivi) { return rivi.source_ref; }));
+}
+
+// Nostaa/poistaa rivin ankkuroinnin (napautus samasta ⚓-napista listan sisällä)
+async function vaihdaAnkkurointi(tuote) {
+  const idStr = String(tuote.id);
+  if (ankkuroidutIdt.has(idStr)) {
+    const { error } = await db.from('ankkurit').delete().eq('source', 'muistilaput').eq('source_ref', idStr);
+    if (error) console.error('Ankkuroinnin poisto epäonnistui:', error);
+  } else {
+    const { error } = await db.from('ankkurit').insert({ content: tuote.nimi, source: 'muistilaput', source_ref: idStr, user_id: currentUserId });
+    if (error) console.error('Ankkurointi epäonnistui:', error);
+  }
+  await paivitaAnkkuroidutIdt();
+  paivitaNaytto(cachedTuotteet);
+}
 const LAST_LIST_KEY = 'kauppalista_viimeisin_lista';
 
 // Avaa valitun listan ja muistaa sen seuraavaa käynnistystä varten
@@ -150,21 +175,38 @@ function paivitaPaivamaara() {
   document.getElementById('home-date').textContent = paivat[nyt.getDay()] + ' ' + nyt.getDate() + '. ' + kuukaudet[nyt.getMonth()];
 }
 
-// Hakee päivän kolme tärkeintä tekemätöntä ankkuria järjestyksessä.
+let cachedAnkkurit = [];
+let ankkuritKaikkiNakyvissa = false;
+
+// Hakee päivän tärkeimmät tekemättömät ankkurit järjestyksessä. Oletuksena
+// vain 3 näkyy (loput piilossa "+ N muuta" -linkin takana), mutta käyttäjä
+// voi laajentaa näkymän nähdäkseen ja priorisoidakseen kaikki raahaamalla.
 // Kun yksi merkitään tehdyksi, seuraava nousee automaattisesti näkyviin
 // koska kysely suodattaa done=false — ei tarvita erillistä "ylennyslogiikkaa".
 async function lataaAnkkurit() {
-  const { data, error } = await db.from('ankkurit').select().eq('done', false).order('sort_order').limit(3);
+  if (raahattavaRivi) return;
+  const { data, error } = await db.from('ankkurit').select().eq('done', false).order('sort_order');
   if (error) {
     console.error('Ankkureiden haku epäonnistui:', error);
     return;
   }
 
+  cachedAnkkurit = data || [];
+  const nayta = ankkuritKaikkiNakyvissa ? cachedAnkkurit : cachedAnkkurit.slice(0, 3);
+  const piilossa = cachedAnkkurit.length - nayta.length;
+
   const listEl = document.getElementById('ankkurit-list');
   listEl.innerHTML = '';
 
-  (data || []).forEach(function(ankkuri) {
+  nayta.forEach(function(ankkuri) {
     const li = document.createElement('li');
+    li.dataset.tuoteId = ankkuri.id;
+    alustaRaahaus(li, ankkuri, {
+      container: listEl,
+      cache: cachedAnkkurit,
+      taulu: 'ankkurit',
+      jalkeenPaivitys: lataaAnkkurit,
+    });
 
     const checkNappi = document.createElement('button');
     checkNappi.textContent = '○';
@@ -182,22 +224,35 @@ async function lataaAnkkurit() {
     teksti.textContent = ankkuri.content;
     li.appendChild(teksti);
 
-    const poistoNappi = document.createElement('button');
-    poistoNappi.textContent = '×';
-    poistoNappi.className = 'delete-btn';
-    poistoNappi.addEventListener('click', async function() {
-      const vahvistus = await naytaVahvistus('Poistetaanko ' + ankkuri.content + '?', null, 'Poista');
-      if (!vahvistus) return;
-      const { error } = await db.from('ankkurit').delete().eq('id', ankkuri.id);
-      if (error) {
-        console.error('Ankkurin poisto epäonnistui:', error);
-      }
-      lataaAnkkurit();
+    const irrotaNappi = document.createElement('button');
+    irrotaNappi.textContent = '⚓';
+    irrotaNappi.className = 'anchor-btn active';
+    irrotaNappi.addEventListener('click', function() {
+      irrotaNappi.classList.add('leaving');
+      li.style.opacity = '0.3';
+      setTimeout(async function() {
+        const { error } = await db.from('ankkurit').delete().eq('id', ankkuri.id);
+        if (error) {
+          console.error('Ankkurin irrotus epäonnistui:', error);
+        }
+        lataaAnkkurit();
+      }, 250);
     });
-    li.appendChild(poistoNappi);
+    li.appendChild(irrotaNappi);
 
     listEl.appendChild(li);
   });
+
+  const laajennusLinkki = document.getElementById('ankkurit-laajenna');
+  if (ankkuritKaikkiNakyvissa) {
+    laajennusLinkki.style.display = cachedAnkkurit.length > 3 ? 'block' : 'none';
+    laajennusLinkki.textContent = 'näytä vain 3 tärkeintä';
+  } else if (piilossa > 0) {
+    laajennusLinkki.style.display = 'block';
+    laajennusLinkki.textContent = '+ ' + piilossa + ' muuta odottaa — näytä kaikki';
+  } else {
+    laajennusLinkki.style.display = 'none';
+  }
 }
 
 // Hakee etusivun osiot (Laituri, Ankkurit, ym.) ja piirtää ne geneerisesti —
@@ -554,7 +609,9 @@ const RAAHAUS_VIIVE_MS = 450;
 const RAAHAUS_PERUUTUS_PX = 10;
 let raahattavaRivi = null;
 
-function alustaRaahaus(li, tuote) {
+// asetukset = { container, cache, taulu, jalkeenPaivitys } — samaa raahauslogiikkaa
+// käytetään sekä listan tuoteriveille että Ankkureille, vain kohdetaulu/säiliö vaihtuu
+function alustaRaahaus(li, kohde, asetukset) {
   let ajastin = null;
   let alkuY = 0;
   let alkuX = 0;
@@ -598,7 +655,7 @@ function alustaRaahaus(li, tuote) {
 
     if (raahausKaynnissa) {
       e.preventDefault();
-      siirraRaahattavaKohtaan(li, piste.clientY);
+      siirraRaahattavaKohtaan(li, piste.clientY, asetukset.container);
     }
   }
 
@@ -612,8 +669,8 @@ function alustaRaahaus(li, tuote) {
       raahausKaynnissa = false;
       raahattavaRivi = null;
       li.classList.remove('dragging');
-      await tallennaUusiJarjestys(li, tuote);
-      lataaLista();
+      await tallennaUusiJarjestys(li, kohde, asetukset);
+      asetukset.jalkeenPaivitys();
     }
   }
 
@@ -634,51 +691,50 @@ function alustaRaahaus(li, tuote) {
 }
 
 // Siirtää raahattavan rivin DOM:ssa sen mukaan minkä sisarusrivin puolivälin ylitetty
-function siirraRaahattavaKohtaan(li, clientY) {
-  const sisarukset = Array.from(list.children).filter(function(el) { return el !== li; });
+function siirraRaahattavaKohtaan(li, clientY, container) {
+  const sisarukset = Array.from(container.children).filter(function(el) { return el !== li; });
 
   for (const sisarus of sisarukset) {
     const rect = sisarus.getBoundingClientRect();
     const puolivali = rect.top + rect.height / 2;
     if (clientY < puolivali) {
       if (sisarus.previousElementSibling !== li) {
-        list.insertBefore(li, sisarus);
+        container.insertBefore(li, sisarus);
       }
       return;
     }
   }
 
-  if (list.lastElementChild !== li) {
-    list.appendChild(li);
+  if (container.lastElementChild !== li) {
+    container.appendChild(li);
   }
 }
 
 // Laskee uuden sort_order-arvon rivin lopullisen DOM-sijainnin naapureista ja tallentaa sen
-async function tallennaUusiJarjestys(li, tuote) {
-  const kaikki = Array.from(list.children);
+async function tallennaUusiJarjestys(li, kohde, asetukset) {
+  const kaikki = Array.from(asetukset.container.children);
   const index = kaikki.indexOf(li);
   const edellinen = kaikki[index - 1];
   const seuraava = kaikki[index + 1];
 
-  const edellinenTuote = edellinen ? cachedTuotteet.find(function(t) { return String(t.id) === edellinen.dataset.tuoteId; }) : null;
-  const seuraavaTuote = seuraava ? cachedTuotteet.find(function(t) { return String(t.id) === seuraava.dataset.tuoteId; }) : null;
+  const edellinenKohde = edellinen ? asetukset.cache.find(function(t) { return String(t.id) === edellinen.dataset.tuoteId; }) : null;
+  const seuraavaKohde = seuraava ? asetukset.cache.find(function(t) { return String(t.id) === seuraava.dataset.tuoteId; }) : null;
 
   let uusiJarjestys;
-  if (edellinenTuote && seuraavaTuote) {
-    uusiJarjestys = (edellinenTuote.sort_order + seuraavaTuote.sort_order) / 2;
-  } else if (edellinenTuote) {
-    uusiJarjestys = edellinenTuote.sort_order + 1;
-  } else if (seuraavaTuote) {
-    uusiJarjestys = seuraavaTuote.sort_order - 1;
+  if (edellinenKohde && seuraavaKohde) {
+    uusiJarjestys = (edellinenKohde.sort_order + seuraavaKohde.sort_order) / 2;
+  } else if (edellinenKohde) {
+    uusiJarjestys = edellinenKohde.sort_order + 1;
+  } else if (seuraavaKohde) {
+    uusiJarjestys = seuraavaKohde.sort_order - 1;
   } else {
     uusiJarjestys = 1;
   }
 
-  tuote.sort_order = uusiJarjestys;
-  const { error } = await db.from('tuotteet').update({ sort_order: uusiJarjestys }).eq('id', tuote.id);
+  kohde.sort_order = uusiJarjestys;
+  const { error } = await db.from(asetukset.taulu).update({ sort_order: uusiJarjestys }).eq('id', kohde.id);
   if (error) {
     console.error('Järjestyksen tallennus epäonnistui:', error);
-    lataaLista();
   }
 }
 
@@ -691,7 +747,7 @@ function paivitaNaytto(tuotteet) {
   naytettavat.forEach(function(tuote) {
     const item = document.createElement('li');
     item.dataset.tuoteId = tuote.id;
-    alustaRaahaus(item, tuote);
+    alustaRaahaus(item, tuote, { container: list, cache: cachedTuotteet, taulu: 'tuotteet', jalkeenPaivitys: lataaLista });
 
     // Väliotsikko: ei checkboxia, ei muokkausta, vain teksti + poisto.
     // Napautus valitsee sen lisäyskohteeksi (uudet rivit menevät sen alle).
@@ -799,6 +855,13 @@ function paivitaNaytto(tuotteet) {
       });
     });
 
+    // Ankkurointi: nostaa/poistaa rivin päivän Ankkureihin
+    const ankkuriNappi = document.createElement('button');
+    ankkuriNappi.textContent = '⚓';
+    ankkuriNappi.className = 'anchor-btn' + (ankkuroidutIdt.has(String(tuote.id)) ? ' active' : '');
+    ankkuriNappi.addEventListener('click', function() { vaihdaAnkkurointi(tuote); });
+    item.appendChild(ankkuriNappi);
+
     // Oikealla: poistaminen
     const nappi = document.createElement('button');
     nappi.textContent = '×';
@@ -893,6 +956,7 @@ async function lataaLista() {
     return;
   }
   cachedTuotteet = data || [];
+  await paivitaAnkkuroidutIdt();
   paivitaNaytto(cachedTuotteet);
   paivitaFooter(cachedTuotteet);
   updateSyncIndicator();
@@ -1004,6 +1068,11 @@ document.getElementById('ankkurit-input').addEventListener('keydown', function(e
   if (event.key === 'Enter') {
     document.getElementById('ankkurit-add-btn').click();
   }
+});
+
+document.getElementById('ankkurit-laajenna').addEventListener('click', function() {
+  ankkuritKaikkiNakyvissa = !ankkuritKaikkiNakyvissa;
+  lataaAnkkurit();
 });
 
 // Muistilaput (linkki renderöidään dynaamisesti lataaOsiot():ssa)

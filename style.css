@@ -179,6 +179,15 @@ h1 {
   padding: 16px 0;
 }
 
+.section-link {
+  font-size: 12px;
+  letter-spacing: 0.04em;
+  color: var(--accent);
+  text-align: center;
+  padding: 8px 0;
+  cursor: pointer;
+}
+
 .sections-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -456,6 +465,39 @@ h1 {
 .delete-btn:active {
   color: #e24b4a;
   opacity: 1;
+}
+
+.anchor-btn {
+  min-width: 44px;
+  min-height: 44px;
+  background: none;
+  border: none;
+  outline: none;
+  appearance: none;
+  -webkit-appearance: none;
+  font-size: 20px;
+  color: var(--muted);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  -webkit-tap-highlight-color: transparent;
+  opacity: 0.4;
+}
+
+.anchor-btn:hover,
+.anchor-btn:active {
+  opacity: 1;
+}
+
+.anchor-btn.active {
+  color: var(--accent);
+  opacity: 1;
+}
+
+.anchor-btn.leaving {
+  opacity: 0;
+  transition: opacity 0.25s ease;
 }
 
 .edit-btn {
