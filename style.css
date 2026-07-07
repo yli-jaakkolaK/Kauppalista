@@ -106,6 +106,148 @@ h1 {
   -webkit-tap-highlight-color: transparent;
 }
 
+.kalenteri-tilat {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.kalenteri-tila-btn {
+  flex: 1;
+  font-family: 'Courier New', Courier, monospace;
+  font-size: 13px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  background: none;
+  border: 1px dashed var(--border-dash);
+  color: var(--muted);
+  padding: 10px 4px;
+  cursor: pointer;
+  appearance: none;
+  -webkit-appearance: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.kalenteri-tila-btn.active {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.kalenteri-nav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+
+.kalenteri-nav button {
+  min-width: 44px;
+  min-height: 44px;
+  background: none;
+  border: none;
+  outline: none;
+  font-size: 26px;
+  color: var(--accent);
+  cursor: pointer;
+  appearance: none;
+  -webkit-appearance: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.kalenteri-nav span {
+  font-size: 15px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text);
+}
+
+.kalenteri-paiva-otsikko {
+  font-size: 13px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin: 20px 0 4px;
+}
+
+.kalenteri-paiva-otsikko:first-child {
+  margin-top: 0;
+}
+
+.kalenteri-tyhja {
+  font-size: 13px;
+  color: var(--muted);
+  padding: 4px 0 16px;
+}
+
+.kalenteri-aika {
+  font-size: 13px;
+  color: var(--muted);
+  min-width: 48px;
+  padding-left: 4px;
+}
+
+.kalenteri-paiva-ryhma {
+  break-inside: avoid;
+}
+
+/* Puhelin käännettynä vaakaan kalenterinäkymässä: enemmän tilaa. Viikko
+   näytetään 7 pystysarakkeena (yksi per viikonpäivä) rinnakkain, kuukausi
+   kahtena palstana. Vaatii käyttäjän itse kääntämään puhelimen — iOS
+   Safari ei tue suunnan ohjelmallista lukitusta. */
+@media (orientation: landscape) {
+  #kalenteri-view {
+    max-width: 900px;
+  }
+
+  #kalenteri-view[data-tila="viikko"] #kalenteri-sisalto {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 0 8px;
+    align-items: start;
+  }
+
+  #kalenteri-view[data-tila="viikko"] .kalenteri-paiva-ryhma {
+    min-width: 0;
+  }
+
+  #kalenteri-view[data-tila="viikko"] .kalenteri-paiva-otsikko {
+    margin-top: 0;
+    font-size: 10px;
+    letter-spacing: 0.02em;
+    overflow-wrap: break-word;
+  }
+
+  #kalenteri-view[data-tila="viikko"] .kalenteri-tyhja {
+    font-size: 11px;
+    padding: 0;
+  }
+
+  #kalenteri-view[data-tila="viikko"] .kalenteri-aika {
+    min-width: 0;
+    display: block;
+  }
+
+  #kalenteri-view[data-tila="viikko"] .list li {
+    flex-direction: column;
+    align-items: flex-start;
+    min-height: auto;
+    padding: 4px 0;
+    font-size: 12px;
+  }
+
+  #kalenteri-view[data-tila="viikko"] .list li .delete-btn {
+    min-width: 0;
+    min-height: 0;
+    font-size: 14px;
+    padding: 2px 0;
+  }
+
+  #kalenteri-view[data-tila="kuukausi"] #kalenteri-sisalto {
+    column-count: 2;
+    column-gap: 32px;
+  }
+}
+
 .settings-row {
   display: flex;
   align-items: center;

@@ -12,6 +12,7 @@ function piilotaKaikkiNakymat() {
   document.getElementById('laituri-view').style.display = 'none';
   document.getElementById('muistilaput-view').style.display = 'none';
   document.getElementById('varasto-view').style.display = 'none';
+  document.getElementById('kalenteri-view').style.display = 'none';
 }
 
 function showLoginView() {
@@ -42,6 +43,11 @@ function showMuistilaputView() {
 function showVarastoView() {
   piilotaKaikkiNakymat();
   document.getElementById('varasto-view').style.display = 'block';
+}
+
+function showKalenteriView() {
+  piilotaKaikkiNakymat();
+  document.getElementById('kalenteri-view').style.display = 'block';
 }
 
 // Muistaa mistä näkymästä (kategoriasta) nykyinen lista avattiin, jotta
@@ -198,6 +204,162 @@ async function lataaVarasto() {
   return lataaListatNakymaan('varasto-list', 'varasto');
 }
 
+// === KALENTERI ===
+let kalenteriTila = 'paiva';
+let kalenteriPvm = new Date();
+
+const KALENTERI_KUUKAUDET = ['tammikuuta', 'helmikuuta', 'maaliskuuta', 'huhtikuuta', 'toukokuuta', 'kesäkuuta', 'heinäkuuta', 'elokuuta', 'syyskuuta', 'lokakuuta', 'marraskuuta', 'joulukuuta'];
+const KALENTERI_PAIVAT = ['sunnuntai', 'maanantai', 'tiistai', 'keskiviikko', 'torstai', 'perjantai', 'lauantai'];
+
+function paivamaaraISO(d) {
+  return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+}
+
+function viikonAlku(d) {
+  const kopio = new Date(d);
+  const paiva = kopio.getDay();
+  const siirtyma = paiva === 0 ? -6 : 1 - paiva;
+  kopio.setDate(kopio.getDate() + siirtyma);
+  return kopio;
+}
+
+function siirraKalenteria(suunta) {
+  if (kalenteriTila === 'paiva') {
+    kalenteriPvm.setDate(kalenteriPvm.getDate() + suunta);
+  } else if (kalenteriTila === 'viikko') {
+    kalenteriPvm.setDate(kalenteriPvm.getDate() + suunta * 7);
+  } else {
+    kalenteriPvm.setMonth(kalenteriPvm.getMonth() + suunta);
+  }
+  lataaKalenteri();
+}
+
+// Piirtää yhden päivän tapahtumat, valinnaisella päiväotsikolla (viikko/kuukausinäkymä)
+function piirraKalenteriPaivaRyhma(container, tapahtumat, otsikkoTeksti) {
+  const ryhma = document.createElement('div');
+  ryhma.className = 'kalenteri-paiva-ryhma';
+
+  if (otsikkoTeksti) {
+    const otsikko = document.createElement('div');
+    otsikko.className = 'kalenteri-paiva-otsikko';
+    otsikko.textContent = otsikkoTeksti;
+    ryhma.appendChild(otsikko);
+  }
+
+  if (tapahtumat.length === 0) {
+    const tyhja = document.createElement('p');
+    tyhja.className = 'kalenteri-tyhja';
+    tyhja.textContent = 'Ei tapahtumia.';
+    ryhma.appendChild(tyhja);
+    container.appendChild(ryhma);
+    return;
+  }
+
+  const ul = document.createElement('ul');
+  ul.className = 'list';
+
+  tapahtumat.forEach(function(t) {
+    const li = document.createElement('li');
+
+    const aika = document.createElement('span');
+    aika.className = 'kalenteri-aika';
+    aika.textContent = t.event_time ? t.event_time.slice(0, 5) : '';
+    li.appendChild(aika);
+
+    const teksti = document.createElement('span');
+    teksti.textContent = t.title;
+    li.appendChild(teksti);
+
+    const poistoNappi = document.createElement('button');
+    poistoNappi.textContent = '×';
+    poistoNappi.className = 'delete-btn';
+    poistoNappi.addEventListener('click', async function() {
+      const vahvistus = await naytaVahvistus('Poistetaanko ' + t.title + '?', null, 'Poista');
+      if (!vahvistus) return;
+      const { error } = await db.from('kalenteri_tapahtumat').delete().eq('id', t.id);
+      if (error) {
+        console.error('Tapahtuman poisto epäonnistui:', error);
+      }
+      lataaKalenteri();
+    });
+    li.appendChild(poistoNappi);
+
+    ul.appendChild(li);
+  });
+
+  ryhma.appendChild(ul);
+  container.appendChild(ryhma);
+}
+
+async function lataaKalenteri() {
+  let alku, loppu, otsikko;
+
+  if (kalenteriTila === 'paiva') {
+    alku = new Date(kalenteriPvm);
+    loppu = new Date(kalenteriPvm);
+    otsikko = KALENTERI_PAIVAT[kalenteriPvm.getDay()] + ' ' + kalenteriPvm.getDate() + '. ' + KALENTERI_KUUKAUDET[kalenteriPvm.getMonth()];
+  } else if (kalenteriTila === 'viikko') {
+    alku = viikonAlku(kalenteriPvm);
+    loppu = new Date(alku);
+    loppu.setDate(loppu.getDate() + 6);
+    otsikko = alku.getDate() + '.' + (alku.getMonth() + 1) + '. – ' + loppu.getDate() + '.' + (loppu.getMonth() + 1) + '.';
+  } else {
+    alku = new Date(kalenteriPvm.getFullYear(), kalenteriPvm.getMonth(), 1);
+    loppu = new Date(kalenteriPvm.getFullYear(), kalenteriPvm.getMonth() + 1, 0);
+    otsikko = KALENTERI_KUUKAUDET[kalenteriPvm.getMonth()].replace('ta', '') + ' ' + kalenteriPvm.getFullYear();
+  }
+
+  document.getElementById('kalenteri-otsikko').textContent = otsikko;
+  document.getElementById('kalenteri-view').dataset.tila = kalenteriTila;
+  document.getElementById('kalenteri-add-rivi').style.display = kalenteriTila === 'paiva' ? 'flex' : 'none';
+
+  const { data, error } = await db.from('kalenteri_tapahtumat')
+    .select()
+    .gte('event_date', paivamaaraISO(alku))
+    .lte('event_date', paivamaaraISO(loppu))
+    .order('event_date')
+    .order('event_time', { nullsFirst: false });
+
+  if (error) {
+    console.error('Kalenterin haku epäonnistui:', error);
+    return;
+  }
+
+  const sisalto = document.getElementById('kalenteri-sisalto');
+  sisalto.innerHTML = '';
+
+  if (kalenteriTila === 'paiva') {
+    piirraKalenteriPaivaRyhma(sisalto, data || [], null);
+    return;
+  }
+
+  const ryhmat = {};
+  (data || []).forEach(function(t) {
+    (ryhmat[t.event_date] = ryhmat[t.event_date] || []).push(t);
+  });
+
+  if (kalenteriTila === 'viikko') {
+    for (let i = 0; i < 7; i++) {
+      const pvm = new Date(alku);
+      pvm.setDate(pvm.getDate() + i);
+      const iso = paivamaaraISO(pvm);
+      const otsikkoTeksti = KALENTERI_PAIVAT[pvm.getDay()] + ' ' + pvm.getDate() + '.' + (pvm.getMonth() + 1) + '.';
+      piirraKalenteriPaivaRyhma(sisalto, ryhmat[iso] || [], otsikkoTeksti);
+    }
+  } else {
+    const avaimet = Object.keys(ryhmat).sort();
+    if (avaimet.length === 0) {
+      piirraKalenteriPaivaRyhma(sisalto, [], null);
+    } else {
+      avaimet.forEach(function(iso) {
+        const pvm = new Date(iso + 'T00:00:00');
+        const otsikkoTeksti = KALENTERI_PAIVAT[pvm.getDay()] + ' ' + pvm.getDate() + '.' + (pvm.getMonth() + 1) + '.';
+        piirraKalenteriPaivaRyhma(sisalto, ryhmat[iso], otsikkoTeksti);
+      });
+    }
+  }
+}
+
 // Näyttää tämänpäiväisen päivämäärän suomeksi etusivun yläosassa
 function paivitaPaivamaara() {
   const paivat = ['sunnuntai', 'maanantai', 'tiistai', 'keskiviikko', 'torstai', 'perjantai', 'lauantai'];
@@ -339,6 +501,12 @@ function avaaOsio(osio) {
   } else if (osio.route === 'varasto') {
     showVarastoView();
     lataaVarasto();
+  } else if (osio.route === 'kalenteri') {
+    showKalenteriView();
+    kalenteriTila = 'paiva';
+    kalenteriPvm = new Date();
+    document.querySelectorAll('.kalenteri-tila-btn').forEach(function(b) { b.classList.toggle('active', b.dataset.tila === 'paiva'); });
+    lataaKalenteri();
   } else {
     alert(osio.name + ' tulossa pian.');
   }
@@ -1219,6 +1387,46 @@ document.getElementById('new-varasto-btn').addEventListener('click', async funct
 document.getElementById('new-varasto-input').addEventListener('keydown', function(event) {
   if (event.key === 'Enter') {
     document.getElementById('new-varasto-btn').click();
+  }
+});
+
+// Kalenteri
+document.getElementById('kalenteri-back-btn').addEventListener('click', function() {
+  showHomeView();
+  lataaKotinakyma();
+});
+
+document.querySelectorAll('.kalenteri-tila-btn').forEach(function(btn) {
+  btn.addEventListener('click', function() {
+    kalenteriTila = btn.dataset.tila;
+    document.querySelectorAll('.kalenteri-tila-btn').forEach(function(b) { b.classList.toggle('active', b === btn); });
+    lataaKalenteri();
+  });
+});
+
+document.getElementById('kalenteri-edellinen').addEventListener('click', function() { siirraKalenteria(-1); });
+document.getElementById('kalenteri-seuraava').addEventListener('click', function() { siirraKalenteria(1); });
+
+document.getElementById('kalenteri-add-btn').addEventListener('click', async function() {
+  const kalenteriInput = document.getElementById('kalenteri-input');
+  const otsikko = kalenteriInput.value.trim();
+  if (otsikko === '') { kalenteriInput.focus(); return; }
+
+  const { error } = await db.from('kalenteri_tapahtumat').insert({
+    title: otsikko,
+    event_date: paivamaaraISO(kalenteriPvm),
+    user_id: currentUserId,
+  });
+  if (error) {
+    console.error('Tapahtuman lisäys epäonnistui:', error);
+  }
+  kalenteriInput.value = '';
+  lataaKalenteri();
+});
+
+document.getElementById('kalenteri-input').addEventListener('keydown', function(event) {
+  if (event.key === 'Enter') {
+    document.getElementById('kalenteri-add-btn').click();
   }
 });
 

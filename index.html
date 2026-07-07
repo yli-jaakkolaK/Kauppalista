@@ -79,6 +79,36 @@
     </div>
   </div>
 
+  <div class="container" id="kalenteri-view" style="display:none">
+    <div class="list-header">
+      <button class="back-btn" id="kalenteri-back-btn">‹</button>
+      <h1>✱ KALENTERI ✱</h1>
+      <span></span>
+    </div>
+
+    <div class="kalenteri-tilat">
+      <button class="kalenteri-tila-btn active" data-tila="paiva">Päivä</button>
+      <button class="kalenteri-tila-btn" data-tila="viikko">Viikko</button>
+      <button class="kalenteri-tila-btn" data-tila="kuukausi">Kuukausi</button>
+    </div>
+
+    <div class="kalenteri-nav">
+      <button id="kalenteri-edellinen">‹</button>
+      <span id="kalenteri-otsikko"></span>
+      <button id="kalenteri-seuraava">›</button>
+    </div>
+
+    <div class="add-item" id="kalenteri-add-rivi">
+      <span class="prefix">›</span>
+      <input type="text" id="kalenteri-input" placeholder="uusi tapahtuma...">
+      <button id="kalenteri-add-btn">+</button>
+    </div>
+
+    <hr class="divider">
+
+    <div id="kalenteri-sisalto"></div>
+  </div>
+
   <div class="container" id="laituri-view" style="display:none">
     <div class="list-header">
       <button class="back-btn" id="laituri-back-btn">‹</button>
