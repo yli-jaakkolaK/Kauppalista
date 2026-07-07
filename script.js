@@ -58,6 +58,15 @@ async function lataaKotinakyma() {
     item.appendChild(teksti);
 
     if (lista.name !== 'Kauppalista') {
+      const muokkausNappi = document.createElement('button');
+      muokkausNappi.textContent = '✎';
+      muokkausNappi.className = 'edit-btn';
+      muokkausNappi.addEventListener('click', function(e) {
+        e.stopPropagation();
+        aloitaListanMuokkaus(teksti, lista);
+      });
+      item.appendChild(muokkausNappi);
+
       const poistoNappi = document.createElement('button');
       poistoNappi.textContent = '×';
       poistoNappi.className = 'delete-btn';
@@ -69,6 +78,38 @@ async function lataaKotinakyma() {
     }
 
     homeList.appendChild(item);
+  });
+}
+
+// Muuttaa listan nimen inline-muokattavaksi kotinäkymässä
+function aloitaListanMuokkaus(teksti, lista) {
+  const inputti = document.createElement('input');
+  inputti.type = 'text';
+  inputti.value = lista.name;
+  inputti.className = 'edit-input';
+  teksti.replaceWith(inputti);
+  inputti.focus();
+  inputti.select();
+  inputti.addEventListener('click', function(e) { e.stopPropagation(); });
+
+  async function tallenna() {
+    const uusi = inputti.value.trim();
+    if (uusi && uusi !== lista.name) {
+      const { error } = await db.from('lists').update({ name: uusi }).eq('id', lista.id);
+      if (error) {
+        console.error('Listan nimen muokkaus epäonnistui:', error);
+      } else {
+        logEvent('renamed', 'list', lista.id, uusi, lista.id);
+      }
+    }
+    lataaKotinakyma();
+  }
+
+  inputti.addEventListener('blur', tallenna);
+  inputti.addEventListener('keydown', function(e) {
+    e.stopPropagation();
+    if (e.key === 'Enter') inputti.blur();
+    if (e.key === 'Escape') { inputti.value = lista.name; inputti.blur(); }
   });
 }
 
@@ -117,9 +158,12 @@ async function poistaLista(lista) {
   const vahvistus = await naytaVahvistus('Poistetaanko ' + lista.name + '?', teksti, 'Poista lista');
   if (!vahvistus) return;
 
-  await db.from('tuotteet').delete().eq('list_id', lista.id);
-  await db.from('events').delete().eq('list_id', lista.id);
-  await db.from('lists').delete().eq('id', lista.id);
+  const del1 = await db.from('tuotteet').delete().eq('list_id', lista.id);
+  if (del1.error) console.error('Listan tuotteiden poisto epäonnistui:', del1.error);
+  const del2 = await db.from('events').delete().eq('list_id', lista.id);
+  if (del2.error) console.error('Listan tapahtumien poisto epäonnistui:', del2.error);
+  const del3 = await db.from('lists').delete().eq('id', lista.id);
+  if (del3.error) console.error('Listan poisto epäonnistui:', del3.error);
   logEvent('deleted', 'list', lista.id, lista.name, null);
 
   if (currentList && currentList.id === lista.id) {
@@ -242,7 +286,10 @@ function paivitaNaytto(tuotteet) {
       const updateData = { tehty: !tuote.tehty, bought_at: !tuote.tehty ? new Date().toISOString() : null };
       const eventAction = updateData.tehty ? 'checked' : 'unchecked';
       if (navigator.onLine) {
-        await db.from('tuotteet').update(updateData).eq('id', tuote.id);
+        const { error } = await db.from('tuotteet').update(updateData).eq('id', tuote.id);
+        if (error) {
+          console.error('Tuotteen merkintä epäonnistui:', error);
+        }
         logEvent(eventAction, 'item', tuote.id, tuote.nimi, tuote.list_id);
         lataaLista();
       } else {
@@ -285,7 +332,10 @@ function paivitaNaytto(tuotteet) {
         const uusi = inputti.value.trim();
         if (uusi && uusi !== tuote.nimi) {
           if (navigator.onLine) {
-            await db.from('tuotteet').update({ nimi: uusi }).eq('id', tuote.id);
+            const { error } = await db.from('tuotteet').update({ nimi: uusi }).eq('id', tuote.id);
+            if (error) {
+              console.error('Tuotteen nimen muokkaus epäonnistui:', error);
+            }
             lataaLista();
           } else {
             addToQueue({ type: 'update', data: { id: tuote.id, nimi: uusi } });
@@ -320,7 +370,10 @@ function paivitaNaytto(tuotteet) {
       if (!vahvistus) return;
 
       if (navigator.onLine) {
-        await db.from('tuotteet').delete().eq('id', tuote.id);
+        const { error } = await db.from('tuotteet').delete().eq('id', tuote.id);
+        if (error) {
+          console.error('Tuotteen poisto epäonnistui:', error);
+        }
         logEvent('deleted', 'item', tuote.id, tuote.nimi, tuote.list_id);
         lataaLista();
       } else {
@@ -417,11 +470,15 @@ async function lataaLista() {
 // Lisätään uusi tuote Supabaseen
 button.addEventListener('click', async function() {
   const teksti = input.value.trim();
-  if (teksti === '' || !currentList) return;
+  if (teksti === '') { input.focus(); return; }
+  if (!currentList) return;
   const listId = currentList.id;
 
   if (navigator.onLine) {
-    const { data } = await db.from('tuotteet').insert({ nimi: teksti, tehty: false, list_id: listId }).select().single();
+    const { data, error } = await db.from('tuotteet').insert({ nimi: teksti, tehty: false, list_id: listId }).select().single();
+    if (error) {
+      console.error('Tuotteen lisäys epäonnistui:', error);
+    }
     logEvent('added', 'item', data ? data.id : null, teksti, listId);
     lataaLista();
   } else {
@@ -461,9 +518,12 @@ document.getElementById('back-btn').addEventListener('click', function() {
 document.getElementById('new-list-btn').addEventListener('click', async function() {
   const listInput = document.getElementById('new-list-input');
   const nimi = listInput.value.trim();
-  if (nimi === '') return;
+  if (nimi === '') { listInput.focus(); return; }
 
-  const { data } = await db.from('lists').insert({ name: nimi, type: 'checklist', owner_id: currentUserId }).select().single();
+  const { data, error } = await db.from('lists').insert({ name: nimi, type: 'checklist', owner_id: currentUserId }).select().single();
+  if (error) {
+    console.error('Listan luonti epäonnistui:', error);
+  }
   if (data) {
     logEvent('created', 'list', data.id, nimi, data.id);
   }

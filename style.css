@@ -250,6 +250,30 @@ h1 {
   opacity: 1;
 }
 
+.edit-btn {
+  min-width: 44px;
+  min-height: 44px;
+  background: none;
+  border: none;
+  outline: none;
+  appearance: none;
+  -webkit-appearance: none;
+  font-size: 17px;
+  color: var(--muted);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  -webkit-tap-highlight-color: transparent;
+  opacity: 0.5;
+}
+
+.edit-btn:hover,
+.edit-btn:active {
+  color: var(--accent);
+  opacity: 1;
+}
+
 .list-footer {
   margin-top: 16px;
 }
