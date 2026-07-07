@@ -93,7 +93,7 @@ function valitseLisaysKohde(tuote) {
 
 // Päivittää listan asetusnapin ikonin nykyisen näkyvyystilan mukaan
 function paivitaNakyvyysIkoni() {
-  document.getElementById('settings-btn').textContent = currentList.visibility === 'shared' ? '⚓' : '🔒';
+  document.getElementById('settings-btn').textContent = currentList.visibility === 'shared' ? '👥' : '🔒';
 }
 
 // Lataa etusivun: navigointiruudukko, Ankkurit ja päivämäärä.
