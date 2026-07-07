@@ -392,6 +392,125 @@ async function poistaTuote(tuote) {
   }
 }
 
+// === RAAHAUS (pitkä painallus + siirto) ===
+const RAAHAUS_VIIVE_MS = 450;
+const RAAHAUS_PERUUTUS_PX = 10;
+let raahattavaRivi = null;
+
+function alustaRaahaus(li, tuote) {
+  let ajastin = null;
+  let alkuY = 0;
+  let alkuX = 0;
+  let raahausKaynnissa = false;
+  let sivuutaSeuraavaKlikkaus = false;
+
+  function alkaa(e) {
+    const piste = e.touches ? e.touches[0] : e;
+    alkuY = piste.clientY;
+    alkuX = piste.clientX;
+    ajastin = setTimeout(function() {
+      raahausKaynnissa = true;
+      sivuutaSeuraavaKlikkaus = true;
+      raahattavaRivi = li;
+      li.classList.add('dragging');
+      if (navigator.vibrate) navigator.vibrate(15);
+    }, RAAHAUS_VIIVE_MS);
+  }
+
+  function liikkuu(e) {
+    const piste = e.touches ? e.touches[0] : e;
+    const dx = Math.abs(piste.clientX - alkuX);
+    const dy = Math.abs(piste.clientY - alkuY);
+
+    if (!raahausKaynnissa && ajastin && (dx > RAAHAUS_PERUUTUS_PX || dy > RAAHAUS_PERUUTUS_PX)) {
+      clearTimeout(ajastin);
+      ajastin = null;
+      return;
+    }
+
+    if (raahausKaynnissa) {
+      e.preventDefault();
+      siirraRaahattavaKohtaan(li, piste.clientY);
+    }
+  }
+
+  async function loppuu() {
+    if (ajastin) {
+      clearTimeout(ajastin);
+      ajastin = null;
+    }
+    if (raahausKaynnissa) {
+      raahausKaynnissa = false;
+      raahattavaRivi = null;
+      li.classList.remove('dragging');
+      await tallennaUusiJarjestys(li, tuote);
+    }
+  }
+
+  function estaKlikkausJosRaahattiin(e) {
+    if (sivuutaSeuraavaKlikkaus) {
+      e.preventDefault();
+      e.stopPropagation();
+      sivuutaSeuraavaKlikkaus = false;
+    }
+  }
+
+  li.addEventListener('touchstart', alkaa, { passive: true });
+  li.addEventListener('touchmove', liikkuu, { passive: false });
+  li.addEventListener('touchend', loppuu);
+  li.addEventListener('touchcancel', loppuu);
+  li.addEventListener('click', estaKlikkausJosRaahattiin, true);
+}
+
+// Siirtää raahattavan rivin DOM:ssa sen mukaan minkä sisarusrivin puolivälin ylitetty
+function siirraRaahattavaKohtaan(li, clientY) {
+  const sisarukset = Array.from(list.children).filter(function(el) { return el !== li; });
+
+  for (const sisarus of sisarukset) {
+    const rect = sisarus.getBoundingClientRect();
+    const puolivali = rect.top + rect.height / 2;
+    if (clientY < puolivali) {
+      if (sisarus.previousElementSibling !== li) {
+        list.insertBefore(li, sisarus);
+      }
+      return;
+    }
+  }
+
+  if (list.lastElementChild !== li) {
+    list.appendChild(li);
+  }
+}
+
+// Laskee uuden sort_order-arvon rivin lopullisen DOM-sijainnin naapureista ja tallentaa sen
+async function tallennaUusiJarjestys(li, tuote) {
+  const kaikki = Array.from(list.children);
+  const index = kaikki.indexOf(li);
+  const edellinen = kaikki[index - 1];
+  const seuraava = kaikki[index + 1];
+
+  const edellinenTuote = edellinen ? cachedTuotteet.find(function(t) { return String(t.id) === edellinen.dataset.tuoteId; }) : null;
+  const seuraavaTuote = seuraava ? cachedTuotteet.find(function(t) { return String(t.id) === seuraava.dataset.tuoteId; }) : null;
+
+  let uusiJarjestys;
+  if (edellinenTuote && seuraavaTuote) {
+    uusiJarjestys = (edellinenTuote.sort_order + seuraavaTuote.sort_order) / 2;
+  } else if (edellinenTuote) {
+    uusiJarjestys = edellinenTuote.sort_order + 1;
+  } else if (seuraavaTuote) {
+    uusiJarjestys = seuraavaTuote.sort_order - 1;
+  } else {
+    uusiJarjestys = 1;
+  }
+
+  tuote.sort_order = uusiJarjestys;
+  const { error } = await db.from('tuotteet').update({ sort_order: uusiJarjestys }).eq('id', tuote.id);
+  if (error) {
+    console.error('Järjestyksen tallennus epäonnistui:', error);
+    lataaLista();
+  }
+}
+
 // Piirtää listan näytölle
 function paivitaNaytto(tuotteet) {
   list.innerHTML = '';
@@ -399,6 +518,8 @@ function paivitaNaytto(tuotteet) {
 
   naytettavat.forEach(function(tuote) {
     const item = document.createElement('li');
+    item.dataset.tuoteId = tuote.id;
+    alustaRaahaus(item, tuote);
 
     // Väliotsikko: ei checkboxia, ei muokkausta, vain teksti + poisto
     if (tuote.is_header) {
@@ -589,7 +710,7 @@ async function lataaLista() {
     paivitaFooter(cachedTuotteet);
     return;
   }
-  const { data } = await db.from('tuotteet').select().eq('list_id', currentList.id).order('id');
+  const { data } = await db.from('tuotteet').select().eq('list_id', currentList.id).order('sort_order');
   cachedTuotteet = data;
   paivitaNaytto(data);
   paivitaFooter(data);
