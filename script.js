@@ -142,7 +142,43 @@ function paivitaNakyvyysIkoni() {
 async function lataaKotinakyma() {
   lataaOsiot();
   lataaAnkkurit();
+  lataaAnkkuritTanaan();
   paivitaPaivamaara();
+}
+
+// Näyttää tämän päivän kalenteritapahtumat pienenä, ei-vuorovaikutteisena
+// listana Ankkurit-lohkon yläpuolella. Ei sekoiteta itse ankkureihin, koska
+// kalenteriaika ja päivän kolmen tärkeimmän priorisointi ovat eri asioita.
+async function lataaAnkkuritTanaan() {
+  const tanaan = paivamaaraISO(new Date());
+  const { data, error } = await db.from('kalenteri_tapahtumat')
+    .select()
+    .eq('event_date', tanaan)
+    .order('event_time', { nullsFirst: false });
+
+  const container = document.getElementById('ankkurit-tanaan');
+  container.innerHTML = '';
+
+  if (error) {
+    console.error('Tämän päivän kalenterin haku epäonnistui:', error);
+    return;
+  }
+
+  (data || []).forEach(function(t) {
+    const rivi = document.createElement('div');
+    rivi.className = 'ankkurit-tanaan-rivi';
+
+    const aika = document.createElement('span');
+    aika.className = 'kalenteri-aika';
+    aika.textContent = t.event_time ? t.event_time.slice(0, 5) : '';
+    rivi.appendChild(aika);
+
+    const teksti = document.createElement('span');
+    teksti.textContent = t.title;
+    rivi.appendChild(teksti);
+
+    container.appendChild(rivi);
+  });
 }
 
 // Hakee kategorian listat ja piirtää ne annettuun säiliöön. Käytetään sekä

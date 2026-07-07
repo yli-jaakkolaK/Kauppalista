@@ -186,6 +186,21 @@ h1 {
   padding-left: 4px;
 }
 
+.ankkurit-tanaan-rivi {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--muted);
+  padding: 2px 0;
+}
+
+.ankkurit-tanaan-rivi .kalenteri-aika {
+  min-width: 40px;
+  padding-left: 0;
+  color: var(--accent);
+}
+
 .kalenteri-paiva-ryhma {
   break-inside: avoid;
 }
