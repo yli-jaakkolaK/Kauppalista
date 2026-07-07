@@ -21,17 +21,40 @@
 
   <div class="container" id="home-view" style="display:none">
     <h1>✱ SATAMA ✱</h1>
+    <div class="subtitle" id="home-date"></div>
     <hr class="divider">
 
-    <div class="place-link" id="laituri-link">
+    <div class="section-title">⚓ Ankkurit</div>
+    <ul class="list" id="ankkurit-list"></ul>
+    <div class="add-item">
       <span class="prefix">›</span>
-      <span class="place-link-label">Laituri</span>
-      <span class="place-link-badge" id="laituri-badge" style="display:none"></span>
+      <input type="text" id="ankkurit-input" placeholder="uusi ankkuri...">
+      <button id="ankkurit-add-btn">+</button>
     </div>
 
     <hr class="divider">
 
-    <ul class="list" id="home-list"></ul>
+    <div class="section-title">🌅 Horisontissa</div>
+    <p class="section-empty" id="horisontissa-empty">Ei vielä mitään seurattavaa.</p>
+
+    <hr class="divider">
+
+    <div class="sections-grid" id="sections-list"></div>
+
+    <hr class="divider">
+
+    <button id="signout-link">kirjaudu ulos</button>
+  </div>
+
+  <div class="container" id="muistilaput-view" style="display:none">
+    <div class="list-header">
+      <button class="back-btn" id="muistilaput-back-btn">‹</button>
+      <h1>✱ MUISTILAPUT ✱</h1>
+      <span></span>
+    </div>
+    <hr class="divider">
+
+    <ul class="list" id="muistilaput-list"></ul>
 
     <hr class="divider">
 
@@ -40,8 +63,6 @@
       <input type="text" id="new-list-input" placeholder="uusi lista...">
       <button id="new-list-btn">+</button>
     </div>
-
-    <button id="signout-link">kirjaudu ulos</button>
   </div>
 
   <div class="container" id="laituri-view" style="display:none">

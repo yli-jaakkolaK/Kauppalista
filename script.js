@@ -5,32 +5,37 @@ const db = createClient(
   'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVjdG14eGVld29leWRhYnVlcHllIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODI5MjI1NDYsImV4cCI6MjA5ODQ5ODU0Nn0.oJLbtc2BDTqwKu-Ih8ahZMM-s-XpqGvULV5ENGhDYJU'
 );
 
-function showLoginView() {
-  document.getElementById('login-view').style.display = 'flex';
+function piilotaKaikkiNakymat() {
+  document.getElementById('login-view').style.display = 'none';
   document.getElementById('home-view').style.display = 'none';
   document.getElementById('app-view').style.display = 'none';
   document.getElementById('laituri-view').style.display = 'none';
+  document.getElementById('muistilaput-view').style.display = 'none';
+}
+
+function showLoginView() {
+  piilotaKaikkiNakymat();
+  document.getElementById('login-view').style.display = 'flex';
 }
 
 function showHomeView() {
-  document.getElementById('login-view').style.display = 'none';
+  piilotaKaikkiNakymat();
   document.getElementById('home-view').style.display = 'block';
-  document.getElementById('app-view').style.display = 'none';
-  document.getElementById('laituri-view').style.display = 'none';
 }
 
 function showAppView() {
-  document.getElementById('login-view').style.display = 'none';
-  document.getElementById('home-view').style.display = 'none';
+  piilotaKaikkiNakymat();
   document.getElementById('app-view').style.display = 'block';
-  document.getElementById('laituri-view').style.display = 'none';
 }
 
 function showLaituriView() {
-  document.getElementById('login-view').style.display = 'none';
-  document.getElementById('home-view').style.display = 'none';
-  document.getElementById('app-view').style.display = 'none';
+  piilotaKaikkiNakymat();
   document.getElementById('laituri-view').style.display = 'block';
+}
+
+function showMuistilaputView() {
+  piilotaKaikkiNakymat();
+  document.getElementById('muistilaput-view').style.display = 'block';
 }
 
 const input = document.querySelector('#app-view .add-item input');
@@ -91,11 +96,19 @@ function paivitaNakyvyysIkoni() {
   document.getElementById('settings-btn').textContent = currentList.visibility === 'shared' ? '⚓' : '🔒';
 }
 
-// Hakee kaikki listat ja piirtää ne kotinäkymään
+// Lataa etusivun: navigointiruudukko, Ankkurit ja päivämäärä.
+// Listat (nyk. "Muistilaput") EIVÄT enää ole suoraan etusivulla, ks. lataaMuistilaput()
 async function lataaKotinakyma() {
+  lataaOsiot();
+  lataaAnkkurit();
+  paivitaPaivamaara();
+}
+
+// Hakee kaikki listat ja piirtää ne Muistilaput-näkymään
+async function lataaMuistilaput() {
   const { data } = await db.from('lists').select().order('created_at');
-  const homeList = document.getElementById('home-list');
-  homeList.innerHTML = '';
+  const muistilaputList = document.getElementById('muistilaput-list');
+  muistilaputList.innerHTML = '';
 
   (data || []).forEach(function(lista) {
     const item = document.createElement('li');
@@ -125,16 +138,124 @@ async function lataaKotinakyma() {
       item.appendChild(poistoNappi);
     }
 
-    homeList.appendChild(item);
+    muistilaputList.appendChild(item);
+  });
+}
+
+// Näyttää tämänpäiväisen päivämäärän suomeksi etusivun yläosassa
+function paivitaPaivamaara() {
+  const paivat = ['sunnuntai', 'maanantai', 'tiistai', 'keskiviikko', 'torstai', 'perjantai', 'lauantai'];
+  const kuukaudet = ['tammikuuta', 'helmikuuta', 'maaliskuuta', 'huhtikuuta', 'toukokuuta', 'kesäkuuta', 'heinäkuuta', 'elokuuta', 'syyskuuta', 'lokakuuta', 'marraskuuta', 'joulukuuta'];
+  const nyt = new Date();
+  document.getElementById('home-date').textContent = paivat[nyt.getDay()] + ' ' + nyt.getDate() + '. ' + kuukaudet[nyt.getMonth()];
+}
+
+// Hakee päivän kolme tärkeintä tekemätöntä ankkuria järjestyksessä.
+// Kun yksi merkitään tehdyksi, seuraava nousee automaattisesti näkyviin
+// koska kysely suodattaa done=false — ei tarvita erillistä "ylennyslogiikkaa".
+async function lataaAnkkurit() {
+  const { data, error } = await db.from('ankkurit').select().eq('done', false).order('sort_order').limit(3);
+  if (error) {
+    console.error('Ankkureiden haku epäonnistui:', error);
+    return;
+  }
+
+  const listEl = document.getElementById('ankkurit-list');
+  listEl.innerHTML = '';
+
+  (data || []).forEach(function(ankkuri) {
+    const li = document.createElement('li');
+
+    const checkNappi = document.createElement('button');
+    checkNappi.textContent = '○';
+    checkNappi.className = 'check-btn';
+    checkNappi.addEventListener('click', async function() {
+      const { error } = await db.from('ankkurit').update({ done: true, done_at: new Date().toISOString() }).eq('id', ankkuri.id);
+      if (error) {
+        console.error('Ankkurin merkintä epäonnistui:', error);
+      }
+      lataaAnkkurit();
+    });
+    li.appendChild(checkNappi);
+
+    const teksti = document.createElement('span');
+    teksti.textContent = ankkuri.content;
+    li.appendChild(teksti);
+
+    const poistoNappi = document.createElement('button');
+    poistoNappi.textContent = '×';
+    poistoNappi.className = 'delete-btn';
+    poistoNappi.addEventListener('click', async function() {
+      const vahvistus = await naytaVahvistus('Poistetaanko ' + ankkuri.content + '?', null, 'Poista');
+      if (!vahvistus) return;
+      const { error } = await db.from('ankkurit').delete().eq('id', ankkuri.id);
+      if (error) {
+        console.error('Ankkurin poisto epäonnistui:', error);
+      }
+      lataaAnkkurit();
+    });
+    li.appendChild(poistoNappi);
+
+    listEl.appendChild(li);
+  });
+}
+
+// Hakee etusivun osiot (Laituri, Ankkurit, ym.) ja piirtää ne geneerisesti —
+// osiot tulevat tietokannasta (nimi, ikoni, reitti, järjestys), ei kovakoodattuina
+async function lataaOsiot() {
+  const { data, error } = await db.from('home_sections').select().eq('enabled', true).order('sort_order');
+  if (error) {
+    console.error('Osioiden haku epäonnistui:', error);
+    return;
+  }
+
+  const sectionsGrid = document.getElementById('sections-list');
+  sectionsGrid.innerHTML = '';
+
+  (data || []).forEach(function(osio) {
+    const tile = document.createElement('div');
+    tile.className = 'section-tile';
+    tile.addEventListener('click', function() { avaaOsio(osio); });
+
+    const ikoni = document.createElement('span');
+    ikoni.className = 'tile-icon';
+    ikoni.textContent = osio.icon;
+    tile.appendChild(ikoni);
+
+    const nimi = document.createElement('span');
+    nimi.className = 'tile-label';
+    nimi.textContent = osio.name;
+    tile.appendChild(nimi);
+
+    const badge = document.createElement('span');
+    badge.className = 'tile-badge';
+    badge.dataset.osioKey = osio.key;
+    tile.appendChild(badge);
+
+    sectionsGrid.appendChild(tile);
   });
 
   paivitaLaituriBadge();
 }
 
+// Avaa osion sen route-kentän mukaan. Vain 'laituri' on toistaiseksi toiminnallinen.
+function avaaOsio(osio) {
+  if (osio.route === 'laituri') {
+    showLaituriView();
+    lataaLaituri();
+  } else if (osio.route === 'muistilaput') {
+    showMuistilaputView();
+    lataaMuistilaput();
+  } else {
+    alert(osio.name + ' tulossa pian.');
+  }
+}
+
 // Hakee Laiturin uusien (ei vielä sijoitettujen) rivien määrän kotinäkymän merkkiä varten
 async function paivitaLaituriBadge() {
+  const badge = document.querySelector('.tile-badge[data-osio-key="laituri"]');
+  if (!badge) return;
   const { count } = await db.from('laituri').select('id', { count: 'exact', head: true }).eq('status', 'uusi');
-  const badge = document.getElementById('laituri-badge');
   if (count) {
     badge.textContent = count;
     badge.style.display = 'flex';
@@ -237,7 +358,7 @@ function aloitaListanMuokkaus(teksti, lista) {
         logEvent('renamed', 'list', lista.id, uusi, lista.id);
       }
     }
-    lataaKotinakyma();
+    lataaMuistilaput();
   }
 
   inputti.addEventListener('blur', tallenna);
@@ -304,9 +425,8 @@ async function poistaLista(lista) {
   if (currentList && currentList.id === lista.id) {
     localStorage.removeItem(LAST_LIST_KEY);
     currentList = null;
-    showHomeView();
   }
-  lataaKotinakyma();
+  lataaMuistilaput();
 }
 
 // Kirjautumisen jälkeen: palataan viimeisimpään listaan tai näytetään koti
@@ -829,10 +949,10 @@ document.getElementById('eye-btn').addEventListener('click', function() {
   lataaLista();
 });
 
-// Takaisin-nuoli — palaa kotinäkymään
+// Takaisin-nuoli — palaa Muistilaput-näkymään (sieltä listat avataan)
 document.getElementById('back-btn').addEventListener('click', function() {
-  showHomeView();
-  lataaKotinakyma();
+  showMuistilaputView();
+  lataaMuistilaput();
 });
 
 // Listan asetukset — näkyvyyden vaihto
@@ -866,12 +986,33 @@ document.getElementById('visibility-toggle').addEventListener('change', async fu
   logEvent(uusiTila === 'shared' ? 'shared' : 'unshared', 'list', currentList.id, currentList.name, currentList.id);
 });
 
-// Laituri
-document.getElementById('laituri-link').addEventListener('click', function() {
-  showLaituriView();
-  lataaLaituri();
+// Ankkurit
+document.getElementById('ankkurit-add-btn').addEventListener('click', async function() {
+  const ankkuriInput = document.getElementById('ankkurit-input');
+  const teksti = ankkuriInput.value.trim();
+  if (teksti === '') { ankkuriInput.focus(); return; }
+
+  const { error } = await db.from('ankkurit').insert({ content: teksti, user_id: currentUserId, source: 'manual' });
+  if (error) {
+    console.error('Ankkurin lisäys epäonnistui:', error);
+  }
+  ankkuriInput.value = '';
+  lataaAnkkurit();
 });
 
+document.getElementById('ankkurit-input').addEventListener('keydown', function(event) {
+  if (event.key === 'Enter') {
+    document.getElementById('ankkurit-add-btn').click();
+  }
+});
+
+// Muistilaput (linkki renderöidään dynaamisesti lataaOsiot():ssa)
+document.getElementById('muistilaput-back-btn').addEventListener('click', function() {
+  showHomeView();
+  lataaKotinakyma();
+});
+
+// Laituri (linkki renderöidään dynaamisesti lataaOsiot():ssa)
 document.getElementById('laituri-back-btn').addEventListener('click', function() {
   showHomeView();
   lataaKotinakyma();
@@ -903,7 +1044,7 @@ document.getElementById('laituri-search').addEventListener('input', function(e) 
   laituriHakuAjastin = setTimeout(function() { lataaLaituri(hakusana); }, 250);
 });
 
-// Uuden listan lisäys kotinäkymässä
+// Uuden listan lisäys Muistilaput-näkymässä
 document.getElementById('new-list-btn').addEventListener('click', async function() {
   const listInput = document.getElementById('new-list-input');
   const nimi = listInput.value.trim();
@@ -917,7 +1058,7 @@ document.getElementById('new-list-btn').addEventListener('click', async function
     logEvent('created', 'list', data.id, nimi, data.id);
   }
   listInput.value = '';
-  lataaKotinakyma();
+  lataaMuistilaput();
 });
 
 document.getElementById('new-list-input').addEventListener('keydown', function(event) {

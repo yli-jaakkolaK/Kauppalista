@@ -337,14 +337,17 @@ Tehty 2025-07-06:
 Isompi visio: ADHD-päin rakennettu perheen toiminnanohjausjärjestelmä.
 
 **Lukittu rakennusjärjestys:**
-1. **Listat** ← TÄSSÄ NYT
+1. **Listat** (nyk. nimeltään "Muistilaput", oma näkymä — ei enää suoraan etusivulla, ks. "Etusivu"-osio) ← TÄSSÄ NYT
    - Kirjautuminen ✓
    - Monikko (koti + useita listoja, luonti/poisto) ✓ (2026-07-06)
    - Tapahtumaloki ✓ (2026-07-06)
    - Uudelleennimeäminen (✎ kotinäkymässä, ei Kauppalistalle) ✓ (2026-07-06)
    - Väliotsikot listan sisällä (`#`-etuliite tuotteen nimessä → lihavoitu, ei checkboxia, ei osu jäljellä/ostettu-laskuriin) ✓ (2026-07-07)
-   - Näkyvyysmalli + RLS ✓ koodissa, ⏳ SQL ajamatta (ks. TODO) — ks. tarkka kuvaus alla "Pääsynhallinta"-osiossa
-   - Laituri (yhteinen muistilista, oma näkymä kotinäkymän kautta) ✓ koodissa, ⏳ SQL ajamatta
+   - Rivien raahausjärjestys (pitkä painallus, sort_order-sarake) ✓ (2026-07-07)
+   - Otsikon alle kohdistettu lisäys (napauta otsikkoa → uudet rivit sen alle) ✓ (2026-07-07)
+   - Näkyvyysmalli + RLS ✓ koodissa ja ajettu Supabasessa (2026-07-07)
+   - Laituri (yhteinen muistilista, oma näkymä kotinäkymän kautta) ✓ koodissa, ⏳ SQL ajamatta (008/009, ks. TODO)
+   - Etusivun uudelleensuunnittelu: Ankkurit + Horisontissa + 2×3-navigointiruudukko ✓ koodissa, ⏳ SQL ajamatta — ks. "Etusivu"-osio alla
    - Jakaminen kolmansille (list_members + kutsulinkki) — taulu valmiina, EI kuulu E1:n valmiusehtoihin, ei UI:ta vielä
 2. Tehtävät + push-ilmoitukset + kiertoseuranta
 3. Siri-äly (Claude API)
@@ -395,12 +398,26 @@ Yhteinen "keskeneräisten ajatusten" muistilista, aina näkyvissä molemmille (e
 
 E1-versio on kevyt: yksi kenttä + tallennus, lista alle, ei vielä sijoitus-kohteen valintaa listasta (käytetään `prompt()`:ia "minne sijoitit" -kysymykseen). Voi tarkentaa myöhemmin.
 
+## Etusivu (2026-07-07, uudelleensuunniteltu)
+
+Etusivu EI ole navigointivalikko vaan päivittäinen komentokeskus. Rakenne ylhäältä alas:
+
+1. **Otsikko + päivämäärä** (`paivitaPaivamaara()`, suomeksi, ei kovakoodattua kellonaikaa/säätä — säätä ei tarkoituksella ole ollenkaan)
+2. **Ankkurit** — päivän 3 tärkeintä. Oma kevyt taulu `ankkurit` (content, done, sort_order, `source`/`source_ref` valmiina tulevaa automaattista poimintaa varten — Wilma-sähköposti/kalenteri, vaihe 3/Siri-äly, EI rakennettu vielä). Kysely on aina `done=false order by sort_order limit 3` — kun yksi merkitään tehdyksi, seuraava nousee näkyviin ilman erillistä "ylennyslogiikkaa", samaan tapaan kuin ostoslistan rastitetut tuotteet katoavat ja paljastavat seuraavat.
+3. **Horisontissa** — "asiat jotka alkavat kaivata huomiota" (EI kalenterin erääntymislista). Toistaiseksi vain tyhjä tila (`#horisontissa-empty`), koska syöttävät järjestelmät (vuosikello, siivoussuunnitelma) eivät ole vielä älykkäitä. **Tärkeä havainto:** raakadata tähän on jo olemassa — jokainen rastitus kirjautuu `events`-tauluun aikaleimalla, joten "milloin jääkaappi viimeksi pyyhitty" on jo laskettavissa nykyisestä datasta. Päättelylogiikka (opitaan toistuva rytmi normaalin arjen mukaan, ei ideaalin mukaan) on oma myöhempi ongelmansa.
+4. **Navigointiruudukko (2×3)**, data-ohjattu taulusta `home_sections` (key, name, icon, route, enabled, sort_order) — EI kovakoodattuja HTML-lohkoja. Järjestys/nimi/ikoni muutettavissa pelkällä SQL-päivityksellä ilman koodimuutosta. Täyttöjärjestys vasemmalta oikealle, riviltä riville: Laituri | Muistilaput / Varasto | Oma Hytti / Kalenteri | Asetukset. Vain `laituri` ja `muistilaput` ovat toiminnallisia — loput näyttävät `alert("X tulossa pian.")`.
+
+**Tärkeä nimikkeistömuutos:** "Listat" ei ole enää oma käsitteensä — se on nyt **Muistilaput**, oma näkymänsä (`#muistilaput-view`, avataan ruudukon laatasta), EI enää suoraan etusivulla. `lataaKotinakyma()` lataa vain etusivun (ruudukko+Ankkurit+päivämäärä); `lataaMuistilaput()` on eri funktio joka lataa listat Muistilaput-näkymään. Listanäkymän (`app-view`) takaisin-nuoli palaa nyt Muistilaput-näkymään, ei etusivulle — navigointipolku on Etusivu → Muistilaput → yksittäinen lista.
+
+Ankkurit/Horisontissa-otsikot ovat toistaiseksi kiinteitä koodissa (ei omaa data-riviä) — voidaan muuttaa muokattaviksi myöhemmin jos tarpeen, ei ole ison lisätyön takana.
+
 ## TODO ennen etapin 1 valmistumista (määräaika 23.7.2026 — kehityskone palautuu silloin)
 
-- [ ] Aja `sql/003_row_level_security.sql` Supabasessa (näkyvyysmalli + RLS + backfill)
-- [ ] Aja `sql/004_laituri.sql` Supabasessa (Laituri-taulu)
-- [ ] Hae Supabase Dashboard → Project Settings → API → **service_role**-avain (SALAINEN, ei anon-avain)
-- [ ] Lisää se Vercelin ympäristömuuttujaksi `SUPABASE_SERVICE_KEY` (Production + Preview), redeploy
-- [ ] Testaa molemmilla tileillä: yhteinen näkyy kahdelle, yksityinen ei näy toiselle, Siri-lisäys toimii yhä
+- [x] Aja `sql/003_row_level_security.sql`, `005_fix_rls_recursion.sql`, `006_fix_shared_requires_auth.sql` (näkyvyysmalli + RLS, korjattu rekursio ja anon-vuoto) — ajettu 2026-07-07
+- [x] Hae service_role-avain ja aseta `SUPABASE_SERVICE_KEY` Verceliin — tehty, Siri vahvistettu toimivaksi RLS:n kanssa
+- [x] Aja `sql/007_sort_order.sql` (raahausjärjestys) — ajettu
+- [ ] Aja `sql/004_laituri.sql` (Laituri-taulu)
+- [ ] Aja `sql/008_home_sections.sql` (navigointiruudukko) ja `sql/009_ankkurit.sql` (Ankkurit)
+- [ ] Testaa molemmilla tileillä (Katri + Juha): yhteinen lista näkyy kahdelle, yksityinen ei näy toiselle
 - [ ] Suunnitteluperiaate koko loppuprojektille: kaikki säädettävä (välit, kellonajat, rajat) dataan/tauluihin, EI kovakoodata — sovellusta pitää voida muokata ilman koodimuutoksia 23.7. jälkeen
-- [ ] Etusivun tavoitetila (E2+): kalenteri-ikoni, moottoribanneri, Ankkurit (max 3), Muut tänään, paikkalinkit (Laituri/Listat/Ruoka/Muistiinpanot/Hytti) — E1:ssä riittää nykyinen kevytversio, mutta rakennettu niin että lohkot on helppo lisätä myöhemmin
+- [ ] Raahausjärjestys navigointiruudukolle itselleen (home_sections.sort_order on jo olemassa, mutta raahaus-UI on toteutettu toistaiseksi vain listan sisäisille riveille)
