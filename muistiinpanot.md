@@ -341,7 +341,9 @@ Isompi visio: ADHD-päin rakennettu perheen toiminnanohjausjärjestelmä.
    - Kirjautuminen ✓
    - Monikko (koti + useita listoja, luonti/poisto) ✓ (2026-07-06)
    - Tapahtumaloki ✓ (2026-07-06)
-   - Jakaminen (list_members-taulu olemassa, ei vielä käytössä koodissa) ⏳
+   - Uudelleennimeäminen (✎ kotinäkymässä, ei Kauppalistalle) ✓ (2026-07-06)
+   - Jakaminen (list_members-taulu olemassa, ei vielä käytössä koodissa) ⏳ — vaatii oman suunnittelun: kutsulinkki vai sähköposti, kenelle-näkymä per lista
+   - Väliotsikot/alaryhmät listan sisällä ⏳ — idea 2026-07-06: esim. vuosikello-listassa kuukaudet väliotsikoiksi, ettei kuukautta tarvitse toistaa jokaisessa rivissä. Ei suunniteltu vielä: onko väliotsikko vain erikoismerkitty tuotteet-rivi (ei rastitettava, lihavoitu) vai oma rakenteensa — päätettävä ennen toteutusta
    - Laituri (yhteiset keskeneräiset ajatukset) ⏳
    - RLS päälle ⏳ — ks. TODO lopussa
 2. Tehtävät + push-ilmoitukset + kiertoseuranta
