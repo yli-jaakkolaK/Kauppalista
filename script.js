@@ -63,30 +63,38 @@ let cachedTuotteet = [];
 let currentUserId = null;
 let currentList = null;
 let aktiivinenOtsikkoId = null;
-let ankkuroidutIdt = new Set();
+// Avain on "lähde:tunniste" (esim. "muistilaput:42"), koska sama tunniste
+// voi periaatteessa esiintyä eri lähteissä (tuotteet.id vs. kalenterin id)
+let ankkuroidutAvaimet = new Set();
 
-// Hakee mitkä nykyisen listan riveistä on jo nostettu Ankkureihin
-async function paivitaAnkkuroidutIdt() {
-  const { data, error } = await db.from('ankkurit').select('source_ref').eq('source', 'muistilaput');
+// Hakee mitkä rivit (mistä tahansa lähteestä) on jo nostettu Ankkureihin
+async function paivitaAnkkuroidutAvaimet() {
+  const { data, error } = await db.from('ankkurit').select('source, source_ref').not('source_ref', 'is', null);
   if (error) {
     console.error('Ankkurointitilan haku epäonnistui:', error);
     return;
   }
-  ankkuroidutIdt = new Set((data || []).map(function(rivi) { return rivi.source_ref; }));
+  ankkuroidutAvaimet = new Set((data || []).map(function(rivi) { return rivi.source + ':' + rivi.source_ref; }));
 }
 
-// Nostaa/poistaa rivin ankkuroinnin (napautus samasta ⚓-napista listan sisällä)
-async function vaihdaAnkkurointi(tuote) {
-  const idStr = String(tuote.id);
-  if (ankkuroidutIdt.has(idStr)) {
-    const { error } = await db.from('ankkurit').delete().eq('source', 'muistilaput').eq('source_ref', idStr);
+// Nostaa/poistaa rivin ankkuroinnin lähteestä riippumatta (Muistilaput-tuote,
+// kalenteritapahtuma, ym. — kaikki käyttävät samaa mekanismia)
+async function vaihdaAnkkurointiYleinen(source, id, content, jalkeenPaivitys) {
+  const idStr = String(id);
+  if (ankkuroidutAvaimet.has(source + ':' + idStr)) {
+    const { error } = await db.from('ankkurit').delete().eq('source', source).eq('source_ref', idStr);
     if (error) console.error('Ankkuroinnin poisto epäonnistui:', error);
   } else {
-    const { error } = await db.from('ankkurit').insert({ content: tuote.nimi, source: 'muistilaput', source_ref: idStr, user_id: currentUserId });
+    const { error } = await db.from('ankkurit').insert({ content: content, source: source, source_ref: idStr, user_id: currentUserId });
     if (error) console.error('Ankkurointi epäonnistui:', error);
   }
-  await paivitaAnkkuroidutIdt();
-  paivitaNaytto(cachedTuotteet);
+  await paivitaAnkkuroidutAvaimet();
+  jalkeenPaivitys();
+}
+
+// Nostaa/poistaa listan rivin ankkuroinnin (napautus ⚓-napista listan sisällä)
+function vaihdaAnkkurointi(tuote) {
+  return vaihdaAnkkurointiYleinen('muistilaput', tuote.id, tuote.nimi, function() { paivitaNaytto(cachedTuotteet); });
 }
 const LAST_LIST_KEY = 'kauppalista_viimeisin_lista';
 
@@ -142,43 +150,7 @@ function paivitaNakyvyysIkoni() {
 async function lataaKotinakyma() {
   lataaOsiot();
   lataaAnkkurit();
-  lataaAnkkuritTanaan();
   paivitaPaivamaara();
-}
-
-// Näyttää tämän päivän kalenteritapahtumat pienenä, ei-vuorovaikutteisena
-// listana Ankkurit-lohkon yläpuolella. Ei sekoiteta itse ankkureihin, koska
-// kalenteriaika ja päivän kolmen tärkeimmän priorisointi ovat eri asioita.
-async function lataaAnkkuritTanaan() {
-  const tanaan = paivamaaraISO(new Date());
-  const { data, error } = await db.from('kalenteri_tapahtumat')
-    .select()
-    .eq('event_date', tanaan)
-    .order('event_time', { nullsFirst: false });
-
-  const container = document.getElementById('ankkurit-tanaan');
-  container.innerHTML = '';
-
-  if (error) {
-    console.error('Tämän päivän kalenterin haku epäonnistui:', error);
-    return;
-  }
-
-  (data || []).forEach(function(t) {
-    const rivi = document.createElement('div');
-    rivi.className = 'ankkurit-tanaan-rivi';
-
-    const aika = document.createElement('span');
-    aika.className = 'kalenteri-aika';
-    aika.textContent = t.event_time ? t.event_time.slice(0, 5) : '';
-    rivi.appendChild(aika);
-
-    const teksti = document.createElement('span');
-    teksti.textContent = t.title;
-    rivi.appendChild(teksti);
-
-    container.appendChild(rivi);
-  });
 }
 
 // Hakee kategorian listat ja piirtää ne annettuun säiliöön. Käytetään sekä
@@ -271,7 +243,79 @@ function siirraKalenteria(suunta) {
 }
 
 // Piirtää yhden päivän tapahtumat, valinnaisella päiväotsikolla (viikko/kuukausinäkymä)
-function piirraKalenteriPaivaRyhma(container, tapahtumat, otsikkoTeksti) {
+// Piirtää yhden rivin: joko oikea kalenteritapahtuma tai tämän päivän
+// näkymään yhdistetty aktiivinen ankkuri (ks. rivi._tyyppi)
+function piirraKalenteriRivi(rivi) {
+  const li = document.createElement('li');
+
+  if (rivi._tyyppi === 'ankkuri') {
+    const checkNappi = document.createElement('button');
+    checkNappi.textContent = '○';
+    checkNappi.className = 'check-btn';
+    checkNappi.addEventListener('click', async function() {
+      tuntopalauteValmis();
+      const { error } = await db.from('ankkurit').update({ done: true, done_at: new Date().toISOString() }).eq('id', rivi._ankkuriId);
+      if (error) console.error('Ankkurin merkintä epäonnistui:', error);
+      lataaKalenteri();
+    });
+    li.appendChild(checkNappi);
+
+    const aika = document.createElement('span');
+    aika.className = 'kalenteri-aika';
+    aika.textContent = rivi.event_time ? rivi.event_time.slice(0, 5) : '';
+    li.appendChild(aika);
+
+    const teksti = document.createElement('span');
+    teksti.textContent = rivi.title;
+    li.appendChild(teksti);
+
+    const irrotaNappi = document.createElement('button');
+    irrotaNappi.textContent = '⚓';
+    irrotaNappi.className = 'anchor-btn active';
+    irrotaNappi.addEventListener('click', async function() {
+      await vaihdaAnkkurointiYleinen(rivi._source, rivi._sourceRef, rivi.title, function() {});
+      lataaKalenteri();
+    });
+    li.appendChild(irrotaNappi);
+    return li;
+  }
+
+  const aika = document.createElement('span');
+  aika.className = 'kalenteri-aika';
+  aika.textContent = rivi.event_time ? rivi.event_time.slice(0, 5) : '';
+  li.appendChild(aika);
+
+  const teksti = document.createElement('span');
+  teksti.textContent = rivi.title;
+  li.appendChild(teksti);
+
+  const ankkurointiNappi = document.createElement('button');
+  ankkurointiNappi.textContent = '⚓';
+  ankkurointiNappi.className = 'anchor-btn' + (ankkuroidutAvaimet.has('kalenteri:' + rivi.id) ? ' active' : '');
+  ankkurointiNappi.addEventListener('click', async function() {
+    await vaihdaAnkkurointiYleinen('kalenteri', rivi.id, rivi.title, function() {});
+    lataaKalenteri();
+  });
+  li.appendChild(ankkurointiNappi);
+
+  const poistoNappi = document.createElement('button');
+  poistoNappi.textContent = '×';
+  poistoNappi.className = 'delete-btn';
+  poistoNappi.addEventListener('click', async function() {
+    const vahvistus = await naytaVahvistus('Poistetaanko ' + rivi.title + '?', null, 'Poista');
+    if (!vahvistus) return;
+    const { error } = await db.from('kalenteri_tapahtumat').delete().eq('id', rivi.id);
+    if (error) {
+      console.error('Tapahtuman poisto epäonnistui:', error);
+    }
+    lataaKalenteri();
+  });
+  li.appendChild(poistoNappi);
+
+  return li;
+}
+
+function piirraKalenteriPaivaRyhma(container, rivit, otsikkoTeksti) {
   const ryhma = document.createElement('div');
   ryhma.className = 'kalenteri-paiva-ryhma';
 
@@ -282,7 +326,7 @@ function piirraKalenteriPaivaRyhma(container, tapahtumat, otsikkoTeksti) {
     ryhma.appendChild(otsikko);
   }
 
-  if (tapahtumat.length === 0) {
+  if (rivit.length === 0) {
     const tyhja = document.createElement('p');
     tyhja.className = 'kalenteri-tyhja';
     tyhja.textContent = 'Ei tapahtumia.';
@@ -293,38 +337,19 @@ function piirraKalenteriPaivaRyhma(container, tapahtumat, otsikkoTeksti) {
 
   const ul = document.createElement('ul');
   ul.className = 'list';
-
-  tapahtumat.forEach(function(t) {
-    const li = document.createElement('li');
-
-    const aika = document.createElement('span');
-    aika.className = 'kalenteri-aika';
-    aika.textContent = t.event_time ? t.event_time.slice(0, 5) : '';
-    li.appendChild(aika);
-
-    const teksti = document.createElement('span');
-    teksti.textContent = t.title;
-    li.appendChild(teksti);
-
-    const poistoNappi = document.createElement('button');
-    poistoNappi.textContent = '×';
-    poistoNappi.className = 'delete-btn';
-    poistoNappi.addEventListener('click', async function() {
-      const vahvistus = await naytaVahvistus('Poistetaanko ' + t.title + '?', null, 'Poista');
-      if (!vahvistus) return;
-      const { error } = await db.from('kalenteri_tapahtumat').delete().eq('id', t.id);
-      if (error) {
-        console.error('Tapahtuman poisto epäonnistui:', error);
-      }
-      lataaKalenteri();
-    });
-    li.appendChild(poistoNappi);
-
-    ul.appendChild(li);
-  });
-
+  rivit.forEach(function(rivi) { ul.appendChild(piirraKalenteriRivi(rivi)); });
   ryhma.appendChild(ul);
   container.appendChild(ryhma);
+}
+
+function jarjestaAjanMukaan(rivit) {
+  rivit.sort(function(a, b) {
+    if (!a.event_time && !b.event_time) return 0;
+    if (!a.event_time) return 1;
+    if (!b.event_time) return -1;
+    return a.event_time.localeCompare(b.event_time);
+  });
+  return rivit;
 }
 
 async function lataaKalenteri() {
@@ -361,11 +386,28 @@ async function lataaKalenteri() {
     return;
   }
 
+  await paivitaAnkkuroidutAvaimet();
+
   const sisalto = document.getElementById('kalenteri-sisalto');
   sisalto.innerHTML = '';
 
   if (kalenteriTila === 'paiva') {
-    piirraKalenteriPaivaRyhma(sisalto, data || [], null);
+    let rivit = (data || []).map(function(t) {
+      return { _tyyppi: 'tapahtuma', id: t.id, title: t.title, event_time: t.event_time };
+    });
+
+    if (paivamaaraISO(kalenteriPvm) === paivamaaraISO(new Date())) {
+      const { data: ankkuridata, error: ankkuriError } = await db.from('ankkurit').select().eq('done', false);
+      if (ankkuriError) {
+        console.error('Ankkureiden haku kalenteriin epäonnistui:', ankkuriError);
+      } else {
+        (ankkuridata || []).forEach(function(a) {
+          rivit.push({ _tyyppi: 'ankkuri', _ankkuriId: a.id, _source: a.source, _sourceRef: a.source_ref, title: a.content, event_time: a.event_time });
+        });
+      }
+    }
+
+    piirraKalenteriPaivaRyhma(sisalto, jarjestaAjanMukaan(rivit), null);
     return;
   }
 
@@ -1108,7 +1150,7 @@ function paivitaNaytto(tuotteet) {
     // Ankkurointi: nostaa/poistaa rivin päivän Ankkureihin
     const ankkuriNappi = document.createElement('button');
     ankkuriNappi.textContent = '⚓';
-    ankkuriNappi.className = 'anchor-btn' + (ankkuroidutIdt.has(String(tuote.id)) ? ' active' : '');
+    ankkuriNappi.className = 'anchor-btn' + (ankkuroidutAvaimet.has('muistilaput:' + tuote.id) ? ' active' : '');
     ankkuriNappi.addEventListener('click', function() { vaihdaAnkkurointi(tuote); });
     item.appendChild(ankkuriNappi);
 
@@ -1206,7 +1248,7 @@ async function lataaLista() {
     return;
   }
   cachedTuotteet = data || [];
-  await paivitaAnkkuroidutIdt();
+  await paivitaAnkkuroidutAvaimet();
   paivitaNaytto(cachedTuotteet);
   paivitaFooter(cachedTuotteet);
   updateSyncIndicator();
