@@ -124,6 +124,16 @@
   <script>
     if ('serviceWorker' in navigator) {
       navigator.serviceWorker.register('/sw.js');
+
+      // Kun uusi service worker ottaa ohjat (uusi versio deployattu), ladataan
+      // sivu automaattisesti kerran uudelleen sen sijaan että käyttäjän
+      // pitäisi sulkea ja avata PWA moneen kertaan nähdäkseen päivityksen.
+      let paivitysLadattu = false;
+      navigator.serviceWorker.addEventListener('controllerchange', function() {
+        if (paivitysLadattu) return;
+        paivitysLadattu = true;
+        window.location.reload();
+      });
     }
   </script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
