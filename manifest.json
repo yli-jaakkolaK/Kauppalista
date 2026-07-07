@@ -3,6 +3,7 @@
   "short_name": "Kauppalista",
   "start_url": "/",
   "display": "standalone",
+  "orientation": "portrait",
   "background_color": "#f5f0e8",
   "theme_color": "#C9A84C",
   "icons": [

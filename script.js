@@ -41,17 +41,49 @@ let historyOpen = false;
 let cachedTuotteet = [];
 let currentUserId = null;
 let currentList = null;
+let aktiivinenOtsikkoId = null;
 const LAST_LIST_KEY = 'kauppalista_viimeisin_lista';
 
 // Avaa valitun listan ja muistaa sen seuraavaa käynnistystä varten
 function avaaLista(lista) {
   currentList = lista;
   historyOpen = false;
+  aktiivinenOtsikkoId = null;
   localStorage.setItem(LAST_LIST_KEY, lista.id);
   document.getElementById('list-title').textContent = '✱ ' + lista.name + ' ✱';
   paivitaNakyvyysIkoni();
+  paivitaLisaysKohde();
   showAppView();
   lataaLista();
+}
+
+// Laskee mihin kohtaan uusi rivi asetetaan: aktiivisen otsikon alle jos
+// sellainen on valittu, muuten null (jolloin rivi menee listan loppuun)
+function laskeLisaysJarjestys() {
+  if (!aktiivinenOtsikkoId) return null;
+  const jarjestetyt = cachedTuotteet.slice().sort(function(a, b) { return a.sort_order - b.sort_order; });
+  const otsikkoIndex = jarjestetyt.findIndex(function(t) { return t.id === aktiivinenOtsikkoId; });
+  if (otsikkoIndex === -1) return null;
+  const otsikko = jarjestetyt[otsikkoIndex];
+  const seuraava = jarjestetyt[otsikkoIndex + 1];
+  return seuraava ? (otsikko.sort_order + seuraava.sort_order) / 2 : otsikko.sort_order + 1;
+}
+
+// Päivittää lisäyskentän vihjeen näyttämään mihin osioon rivi lisätään
+function paivitaLisaysKohde() {
+  if (!aktiivinenOtsikkoId) {
+    input.placeholder = 'lisää tuote...';
+    return;
+  }
+  const otsikko = cachedTuotteet.find(function(t) { return t.id === aktiivinenOtsikkoId; });
+  input.placeholder = otsikko ? 'lisää kohtaan ' + otsikko.nimi + '...' : 'lisää tuote...';
+}
+
+// Valitsee/poistaa väliotsikon lisäyskohteeksi napautuksesta
+function valitseLisaysKohde(tuote) {
+  aktiivinenOtsikkoId = (aktiivinenOtsikkoId === tuote.id) ? null : tuote.id;
+  paivitaLisaysKohde();
+  paivitaNaytto(cachedTuotteet);
 }
 
 // Päivittää listan asetusnapin ikonin nykyisen näkyvyystilan mukaan
@@ -376,6 +408,11 @@ async function poistaTuote(tuote) {
   const vahvistus = await naytaVahvistus('Poistetaanko ' + tuote.nimi + '?', null, tuote.is_header ? 'Poista' : 'Poista tuote');
   if (!vahvistus) return;
 
+  if (aktiivinenOtsikkoId === tuote.id) {
+    aktiivinenOtsikkoId = null;
+    paivitaLisaysKohde();
+  }
+
   if (navigator.onLine) {
     const { error } = await db.from('tuotteet').delete().eq('id', tuote.id);
     if (error) {
@@ -404,8 +441,12 @@ function alustaRaahaus(li, tuote) {
   let raahausKaynnissa = false;
   let sivuutaSeuraavaKlikkaus = false;
 
+  function pisteesta(e) {
+    return e.touches ? e.touches[0] : e;
+  }
+
   function alkaa(e) {
-    const piste = e.touches ? e.touches[0] : e;
+    const piste = pisteesta(e);
     alkuY = piste.clientY;
     alkuX = piste.clientX;
     ajastin = setTimeout(function() {
@@ -415,10 +456,17 @@ function alustaRaahaus(li, tuote) {
       li.classList.add('dragging');
       if (navigator.vibrate) navigator.vibrate(15);
     }, RAAHAUS_VIIVE_MS);
+
+    // Hiirellä liike/vapautus pitää kuunnella koko dokumentista, koska
+    // hiiri ei "lukitu" alkuperäiseen elementtiin niin kuin kosketus tekee
+    if (!e.touches) {
+      document.addEventListener('mousemove', liikkuu);
+      document.addEventListener('mouseup', loppuu, { once: true });
+    }
   }
 
   function liikkuu(e) {
-    const piste = e.touches ? e.touches[0] : e;
+    const piste = pisteesta(e);
     const dx = Math.abs(piste.clientX - alkuX);
     const dy = Math.abs(piste.clientY - alkuY);
 
@@ -439,18 +487,20 @@ function alustaRaahaus(li, tuote) {
       clearTimeout(ajastin);
       ajastin = null;
     }
+    document.removeEventListener('mousemove', liikkuu);
     if (raahausKaynnissa) {
       raahausKaynnissa = false;
       raahattavaRivi = null;
       li.classList.remove('dragging');
       await tallennaUusiJarjestys(li, tuote);
+      lataaLista();
     }
   }
 
   function estaKlikkausJosRaahattiin(e) {
     if (sivuutaSeuraavaKlikkaus) {
       e.preventDefault();
-      e.stopPropagation();
+      e.stopImmediatePropagation();
       sivuutaSeuraavaKlikkaus = false;
     }
   }
@@ -459,6 +509,7 @@ function alustaRaahaus(li, tuote) {
   li.addEventListener('touchmove', liikkuu, { passive: false });
   li.addEventListener('touchend', loppuu);
   li.addEventListener('touchcancel', loppuu);
+  li.addEventListener('mousedown', alkaa);
   li.addEventListener('click', estaKlikkausJosRaahattiin, true);
 }
 
@@ -513,6 +564,7 @@ async function tallennaUusiJarjestys(li, tuote) {
 
 // Piirtää listan näytölle
 function paivitaNaytto(tuotteet) {
+  if (raahattavaRivi) return;
   list.innerHTML = '';
   const naytettavat = historyOpen ? tuotteet : tuotteet.filter(t => !t.tehty);
 
@@ -521,9 +573,11 @@ function paivitaNaytto(tuotteet) {
     item.dataset.tuoteId = tuote.id;
     alustaRaahaus(item, tuote);
 
-    // Väliotsikko: ei checkboxia, ei muokkausta, vain teksti + poisto
+    // Väliotsikko: ei checkboxia, ei muokkausta, vain teksti + poisto.
+    // Napautus valitsee sen lisäyskohteeksi (uudet rivit menevät sen alle).
     if (tuote.is_header) {
-      item.className = 'header-row';
+      item.className = 'header-row' + (tuote.id === aktiivinenOtsikkoId ? ' active' : '');
+      item.addEventListener('click', function() { valitseLisaysKohde(tuote); });
 
       const spacer = document.createElement('div');
       spacer.className = 'footer-spacer';
@@ -536,7 +590,10 @@ function paivitaNaytto(tuotteet) {
       const otsikkoPoisto = document.createElement('button');
       otsikkoPoisto.textContent = '×';
       otsikkoPoisto.className = 'delete-btn';
-      otsikkoPoisto.addEventListener('click', function() { poistaTuote(tuote); });
+      otsikkoPoisto.addEventListener('click', function(e) {
+        e.stopPropagation();
+        poistaTuote(tuote);
+      });
       item.appendChild(otsikkoPoisto);
 
       list.appendChild(item);
@@ -704,16 +761,20 @@ async function showHistory() {
 
 // Haetaan kaikki tuotteet Supabasesta ja näytetään ne
 async function lataaLista() {
-  if (!currentList) return;
+  if (!currentList || raahattavaRivi) return;
   if (!navigator.onLine) {
     paivitaNaytto(cachedTuotteet);
     paivitaFooter(cachedTuotteet);
     return;
   }
-  const { data } = await db.from('tuotteet').select().eq('list_id', currentList.id).order('sort_order');
-  cachedTuotteet = data;
-  paivitaNaytto(data);
-  paivitaFooter(data);
+  const { data, error } = await db.from('tuotteet').select().eq('list_id', currentList.id).order('sort_order');
+  if (error) {
+    console.error('Listan haku epäonnistui:', error);
+    return;
+  }
+  cachedTuotteet = data || [];
+  paivitaNaytto(cachedTuotteet);
+  paivitaFooter(cachedTuotteet);
   updateSyncIndicator();
 }
 
@@ -728,16 +789,22 @@ button.addEventListener('click', async function() {
   const teksti = onOtsikko ? raakaTeksti.slice(1).trim() : raakaTeksti;
   if (teksti === '') { input.focus(); return; }
 
+  const kohdistettuJarjestys = laskeLisaysJarjestys();
+  const uusiRivi = { nimi: teksti, tehty: false, list_id: listId, is_header: onOtsikko };
+  if (kohdistettuJarjestys !== null) {
+    uusiRivi.sort_order = kohdistettuJarjestys;
+  }
+
   if (navigator.onLine) {
-    const { data, error } = await db.from('tuotteet').insert({ nimi: teksti, tehty: false, list_id: listId, is_header: onOtsikko }).select().single();
+    const { data, error } = await db.from('tuotteet').insert(uusiRivi).select().single();
     if (error) {
       console.error('Lisäys epäonnistui:', error);
     }
     logEvent(onOtsikko ? 'created' : 'added', onOtsikko ? 'header' : 'item', data ? data.id : null, teksti, listId);
     lataaLista();
   } else {
-    addToQueue({ type: 'insert', data: { nimi: teksti, tehty: false, list_id: listId, is_header: onOtsikko } });
-    cachedTuotteet.push({ id: 'temp_' + Date.now(), nimi: teksti, tehty: false, bought_at: null, list_id: listId, is_header: onOtsikko });
+    addToQueue({ type: 'insert', data: uusiRivi });
+    cachedTuotteet.push(Object.assign({ id: 'temp_' + Date.now(), bought_at: null }, uusiRivi));
     paivitaNaytto(cachedTuotteet);
     paivitaFooter(cachedTuotteet);
     logEvent(onOtsikko ? 'created' : 'added', onOtsikko ? 'header' : 'item', null, teksti, listId);

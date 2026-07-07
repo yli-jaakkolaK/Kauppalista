@@ -349,6 +349,11 @@ h1 {
   letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--accent);
+  cursor: pointer;
+}
+
+.list li.header-row.active {
+  background: var(--border);
 }
 
 .check-btn {

@@ -1,4 +1,4 @@
-const CACHE = 'kauppalista-v13';
+const CACHE = 'kauppalista-v14';
 const APP_FILES = ['/', '/index.html', '/style.css', '/script.js', '/manifest.json', '/icon.png'];
 
 self.addEventListener('install', event => {
