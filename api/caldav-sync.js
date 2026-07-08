@@ -101,13 +101,16 @@ function jasennaTapahtumat(icsTeksti, alkuRaja, loppuRaja) {
 
       if (!event.isRecurring()) {
         const pvmAika = pvmJaAika(event.startDate);
-        const loppuAika = event.endDate ? pvmJaAika(event.endDate) : { event_time: null };
+        const loppuAika = event.endDate ? pvmJaAika(event.endDate) : { event_time: null, event_date: pvmAika.event_date };
         tapahtumat.push({
           uid: event.uid,
           title: event.summary || '(nimetön)',
           event_date: pvmAika.event_date,
           event_time: pvmAika.event_time,
           event_end_time: loppuAika.event_time,
+          // NULL kun kestää vain yhden päivän — koodi (script.js:n
+          // tapahtumaKattaaPaivan()) kohtelee NULLia samana kuin event_date.
+          event_end_date: loppuAika.event_date !== pvmAika.event_date ? loppuAika.event_date : null,
           organizer: organizer,
         });
         return;
@@ -132,6 +135,7 @@ function jasennaTapahtumat(icsTeksti, alkuRaja, loppuRaja) {
             event_date: pvmAika.event_date,
             event_time: pvmAika.event_time,
             event_end_time: loppuAika.event_time,
+            event_end_date: loppuAika.event_date !== pvmAika.event_date ? loppuAika.event_date : null,
             organizer: organizer,
           });
         }
@@ -199,6 +203,7 @@ function varattuTapahtumaksi(t) {
     event_date: t.event_date,
     event_time: t.event_time,
     event_end_time: t.event_end_time,
+    event_end_date: t.event_end_date,
     ical_uid: t.uid,
   };
 }
@@ -275,6 +280,7 @@ module.exports = async function handler(req, res) {
           event_date: t.event_date,
           event_time: t.event_time,
           event_end_time: t.event_end_time,
+          event_end_date: t.event_end_date,
           status: 'odottaa',
         });
       }

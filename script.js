@@ -251,6 +251,25 @@ function paivamaaraISO(d) {
   return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
 }
 
+// Kuinka pitkälle taaksepäin haetaan tapahtumia, jotta ennen näkyvää
+// aikaväliä alkanut monipäiväinen tapahtuma (esim. viikon lomajakso) näkyy
+// silti oikein joka päivänä jonka se kattaa, vaikka sen event_date olisi
+// ennen näkyvän välin alkua. Reilusti mitoitettu, ei tarkkuutta vaativa.
+const MONIPAIVAINEN_PUSKURI_PV = 60;
+
+// Kattaako tapahtuma t annetun ISO-päivän (event_date...event_end_date,
+// molemmat päät mukaan lukien)? event_end_date NULL = sama kuin event_date
+// eli tavallinen yksipäiväinen tapahtuma. ISO-päivämäärät (VVVV-KK-PP)
+// vertautuvat oikein merkkijonoina.
+function tapahtumaKattaaPaivan(t, isoPaiva) {
+  const loppu = t.event_end_date || t.event_date;
+  return isoPaiva >= t.event_date && isoPaiva <= loppu;
+}
+
+function onkoMonipaivainen(t) {
+  return !!t.event_end_date && t.event_end_date !== t.event_date;
+}
+
 function viikonAlku(d) {
   const kopio = new Date(d);
   const paiva = kopio.getDay();
@@ -439,12 +458,26 @@ async function lataaKalenteri() {
   document.getElementById('kalenteri-view').dataset.tila = kalenteriTila;
   document.getElementById('kalenteri-add-rivi').style.display = kalenteriTila === 'paiva' ? 'flex' : 'none';
 
+  // Haku ulottuu näkyvää väliä laajemmalle kahdesta syystä: 1) MONIPAIVAINEN_PUSKURI_PV
+  // taaksepäin, jotta ennen väliä alkanut monipäiväinen tapahtuma näkyy silti
+  // oikein; 2) kuukausitilassa ruudukko täydentyy täysiin viikkoihin kuukauden
+  // yli, joten haku ulottuu ruudukon viimeiseen näkyvään päivään asti.
+  // Tarkka näkyvä rajaus tehdään joka tapauksessa aina asiakaspuolella
+  // tapahtumaKattaaPaivan()-funktiolla, joten liikaa haettu data ei haittaa.
+  const haunAlku = new Date(alku);
+  haunAlku.setDate(haunAlku.getDate() - MONIPAIVAINEN_PUSKURI_PV);
+  let haunLoppu = new Date(loppu);
+  if (kalenteriTila === 'kuukausi') {
+    haunLoppu = viikonAlku(loppu);
+    haunLoppu.setDate(haunLoppu.getDate() + 6);
+  }
+
   // kalenteri_syotteet(vari) hakee liitetyn syötteen värin FK-suhteen
   // (syote_id) kautta samassa kyselyssä — null jos käsin lisätty tapahtuma.
   const { data: haetut, error } = await db.from('kalenteri_tapahtumat')
     .select('*, kalenteri_syotteet(vari)')
-    .gte('event_date', paivamaaraISO(alku))
-    .lte('event_date', paivamaaraISO(loppu))
+    .gte('event_date', paivamaaraISO(haunAlku))
+    .lte('event_date', paivamaaraISO(haunLoppu))
     .order('event_date')
     .order('event_time', { nullsFirst: false });
 
@@ -463,11 +496,12 @@ async function lataaKalenteri() {
   sisalto.innerHTML = '';
 
   if (kalenteriTila === 'paiva') {
-    let rivit = (data || []).map(function(t) {
+    const tanaanIso = paivamaaraISO(kalenteriPvm);
+    let rivit = data.filter(function(t) { return tapahtumaKattaaPaivan(t, tanaanIso); }).map(function(t) {
       return { _tyyppi: 'tapahtuma', id: t.id, title: t.title, event_time: t.event_time, _vari: t._vari };
     });
 
-    if (paivamaaraISO(kalenteriPvm) === paivamaaraISO(new Date())) {
+    if (tanaanIso === paivamaaraISO(new Date())) {
       const { data: ankkuridata, error: ankkuriError } = await db.from('ankkurit').select().eq('done', false);
       if (ankkuriError) {
         console.error('Ankkureiden haku kalenteriin epäonnistui:', ankkuriError);
@@ -498,31 +532,162 @@ async function lataaKalenteri() {
     return;
   }
 
-  const ryhmat = {};
-  (data || []).forEach(function(t) {
-    (ryhmat[t.event_date] = ryhmat[t.event_date] || []).push(t);
-  });
-
   if (kalenteriTila === 'viikko') {
     for (let i = 0; i < 7; i++) {
       const pvm = new Date(alku);
       pvm.setDate(pvm.getDate() + i);
       const iso = paivamaaraISO(pvm);
       const otsikkoTeksti = KALENTERI_PAIVAT[pvm.getDay()] + ' ' + pvm.getDate() + '.' + (pvm.getMonth() + 1) + '.';
-      piirraKalenteriPaivaRyhma(sisalto, ryhmat[iso] || [], otsikkoTeksti);
+      const paivanTapahtumat = data.filter(function(t) { return tapahtumaKattaaPaivan(t, iso); });
+      piirraKalenteriPaivaRyhma(sisalto, paivanTapahtumat, otsikkoTeksti);
     }
-  } else {
-    const avaimet = Object.keys(ryhmat).sort();
-    if (avaimet.length === 0) {
-      piirraKalenteriPaivaRyhma(sisalto, [], null);
-    } else {
-      avaimet.forEach(function(iso) {
-        const pvm = new Date(iso + 'T00:00:00');
-        const otsikkoTeksti = KALENTERI_PAIVAT[pvm.getDay()] + ' ' + pvm.getDate() + '.' + (pvm.getMonth() + 1) + '.';
-        piirraKalenteriPaivaRyhma(sisalto, ryhmat[iso], otsikkoTeksti);
-      });
-    }
+    return;
   }
+
+  piirraKuukausiRuudukko(sisalto, data, kalenteriPvm.getMonth());
+}
+
+// === KUUKAUSINÄKYMÄ: RUUDUKKO + MONIPÄIVÄISTEN TAPAHTUMIEN PALKIT ===
+// Aiempi kuukausitila oli vain sama päivälistaus kuin viikkotilassa, ei
+// oikea ruudukko. Nyt oikea 7-sarakkeinen viikkorivi-ruudukko (maanantai
+// ensin), täydennettynä edellisen/seuraavan kuukauden päivillä täysiin
+// viikkoihin. Monipäiväinen tapahtuma (event_end_date asetettu) EI toistu
+// pallukkana joka päivässä vaan näkyy yhtenäisenä värillisenä palkkina
+// jokaisen sen kattaman päivän kohdalla — palkkien "linja" (pystysijainti)
+// lasketaan ERIKSEEN per viikkorivi, ei koko kuukaudelle, jotta yhden viikon
+// päällekkäiset tapahtumat eivät varaa tyhjää tilaa viikoilta joilla ei ole
+// mitään — pieni visuaalinen epätarkkuus (sama tapahtuma voi olla eri
+// linjalla viikkojen välissä) hyväksytty tietoisesti, ei tarvita pikselintarkkuutta.
+const VIIKONPAIVA_LYHENTEET = ['MA', 'TI', 'KE', 'TO', 'PE', 'LA', 'SU'];
+
+// Jakaa annetun viikon (7 Date-oliota) monipäiväiset tapahtumat "linjoihin"
+// (rivin sisäisiin pinoihin) ahneella aikavälialgoritmilla: sama linja
+// käytetään uudelleen heti kun edellinen sillä linjalla oleva tapahtuma on
+// päättynyt. Palauttaa Map:in tapahtuman id -> linjaindeksi (vain viikolla
+// näkyville monipäiväisille tapahtumille).
+function laskeViikonLinjat(viikonTapahtumat) {
+  const linjojenLoppupaivat = [];
+  const linjat = new Map();
+  viikonTapahtumat
+    .slice()
+    .sort(function(a, b) { return a.event_date.localeCompare(b.event_date); })
+    .forEach(function(t) {
+      let linjaIndex = linjojenLoppupaivat.findIndex(function(loppu) { return loppu < t.event_date; });
+      if (linjaIndex === -1) linjaIndex = linjojenLoppupaivat.length;
+      linjojenLoppupaivat[linjaIndex] = t.event_end_date || t.event_date;
+      linjat.set(t.id, linjaIndex);
+    });
+  return linjat;
+}
+
+// Piirtää yhden päiväruudun sisällön: päivänumero, monipäiväisten
+// tapahtumien palkkirivit (linjan mukaisessa järjestyksessä) ja sen jälkeen
+// yksipäiväiset tapahtumat pienenä tekstinä.
+function piirraKuukausiPaiva(pvm, kaikkiTapahtumat, linjat, linjojaViikolla, kuluvaKuukausi) {
+  const iso = paivamaaraISO(pvm);
+  const solu = document.createElement('div');
+  solu.className = 'kalenteri-kuukausi-paiva';
+  if (pvm.getMonth() !== kuluvaKuukausi) solu.classList.add('ulkopuolinen');
+  if (iso === paivamaaraISO(new Date())) solu.classList.add('tanaan');
+
+  const pvmEl = document.createElement('span');
+  pvmEl.className = 'kalenteri-kuukausi-pvm';
+  pvmEl.textContent = pvm.getDate();
+  solu.appendChild(pvmEl);
+
+  const paivanMonipaivaiset = kaikkiTapahtumat.filter(function(t) { return onkoMonipaivainen(t) && tapahtumaKattaaPaivan(t, iso); });
+
+  if (linjojaViikolla > 0) {
+    const palkitEl = document.createElement('div');
+    palkitEl.className = 'kalenteri-kuukausi-palkit';
+    for (let linja = 0; linja < linjojaViikolla; linja++) {
+      const tapahtuma = paivanMonipaivaiset.find(function(t) { return linjat.get(t.id) === linja; });
+      const palkki = document.createElement('div');
+      if (tapahtuma) {
+        palkki.className = 'kalenteri-kuukausi-palkki';
+        palkki.style.backgroundColor = tapahtuma._vari || 'var(--accent)';
+        // Teksti näkyy vain palkin ensimmäisessä näkyvässä ruudussa —
+        // joko tapahtuman todellisena alkupäivänä tai viikon ensimmäisenä
+        // päivänä jos tapahtuma alkoi jo edellisellä viikolla.
+        if (iso === tapahtuma.event_date || pvm.getDay() === 1) {
+          palkki.textContent = tapahtuma.title;
+        }
+      } else {
+        palkki.className = 'kalenteri-kuukausi-palkki-tyhja';
+      }
+      palkitEl.appendChild(palkki);
+    }
+    solu.appendChild(palkitEl);
+  }
+
+  const yksipaivaiset = kaikkiTapahtumat.filter(function(t) { return !onkoMonipaivainen(t) && tapahtumaKattaaPaivan(t, iso); });
+  if (yksipaivaiset.length > 0) {
+    const listaEl = document.createElement('div');
+    listaEl.className = 'kalenteri-kuukausi-tapahtumat';
+    yksipaivaiset.forEach(function(t) {
+      const rivi = document.createElement('div');
+      rivi.className = 'kalenteri-kuukausi-tapahtuma';
+      if (t._vari) rivi.style.color = t._vari;
+      rivi.textContent = (t.event_time ? t.event_time.slice(0, 5) + ' ' : '') + t.title;
+      listaEl.appendChild(rivi);
+    });
+    solu.appendChild(listaEl);
+  }
+
+  solu.addEventListener('click', function() {
+    kalenteriPvm = new Date(pvm);
+    kalenteriTila = 'paiva';
+    document.querySelectorAll('.kalenteri-tila-btn').forEach(function(b) { b.classList.toggle('active', b.dataset.tila === 'paiva'); });
+    lataaKalenteri();
+  });
+
+  return solu;
+}
+
+function piirraKuukausiRuudukko(sisalto, kaikkiTapahtumat, kuluvaKuukausi) {
+  const ruudukko = document.createElement('div');
+  ruudukko.className = 'kalenteri-kuukausi-ruudukko';
+
+  const otsikkorivi = document.createElement('div');
+  otsikkorivi.className = 'kalenteri-kuukausi-viikonpaivat';
+  VIIKONPAIVA_LYHENTEET.forEach(function(lyhenne) {
+    const span = document.createElement('span');
+    span.textContent = lyhenne;
+    otsikkorivi.appendChild(span);
+  });
+  ruudukko.appendChild(otsikkorivi);
+
+  const kuunEnsimmainen = new Date(kalenteriPvm.getFullYear(), kuluvaKuukausi, 1);
+  const kuunViimeinen = new Date(kalenteriPvm.getFullYear(), kuluvaKuukausi + 1, 0);
+  const ruudukonAlku = viikonAlku(kuunEnsimmainen);
+  const ruudukonLoppu = viikonAlku(kuunViimeinen);
+  ruudukonLoppu.setDate(ruudukonLoppu.getDate() + 6);
+
+  let viikonPvm = new Date(ruudukonAlku);
+  while (viikonPvm <= ruudukonLoppu) {
+    const viikonPaivat = [];
+    for (let i = 0; i < 7; i++) {
+      viikonPaivat.push(new Date(viikonPvm));
+      viikonPvm.setDate(viikonPvm.getDate() + 1);
+    }
+
+    const viikonAlkuIso = paivamaaraISO(viikonPaivat[0]);
+    const viikonLoppuIso = paivamaaraISO(viikonPaivat[6]);
+    const viikonMonipaivaiset = kaikkiTapahtumat.filter(function(t) {
+      return onkoMonipaivainen(t) && t.event_date <= viikonLoppuIso && (t.event_end_date || t.event_date) >= viikonAlkuIso;
+    });
+    const linjat = laskeViikonLinjat(viikonMonipaivaiset);
+    const linjojaViikolla = new Set(linjat.values()).size;
+
+    const viikkorivi = document.createElement('div');
+    viikkorivi.className = 'kalenteri-kuukausi-viikko';
+    viikonPaivat.forEach(function(pvm) {
+      viikkorivi.appendChild(piirraKuukausiPaiva(pvm, kaikkiTapahtumat, linjat, linjojaViikolla, kuluvaKuukausi));
+    });
+    ruudukko.appendChild(viikkorivi);
+  }
+
+  sisalto.appendChild(ruudukko);
 }
 
 // === KALENTERISYÖTTEIDEN HYVÄKSYNTÄJONO ===
@@ -592,7 +757,11 @@ function avaaHyvaksyntaOverlay(rivit) {
     const teksti = document.createElement('div');
     teksti.className = 'kalenteri-kortti-teksti';
     const pvm = new Date(rivi.event_date + 'T00:00:00');
-    const pvmTeksti = pvm.getDate() + '.' + (pvm.getMonth() + 1) + '.' + (rivi.event_time ? ' klo ' + rivi.event_time.slice(0, 5) : '');
+    let pvmTeksti = pvm.getDate() + '.' + (pvm.getMonth() + 1) + '.' + (rivi.event_time ? ' klo ' + rivi.event_time.slice(0, 5) : '');
+    if (rivi.event_end_date && rivi.event_end_date !== rivi.event_date) {
+      const loppuPvm = new Date(rivi.event_end_date + 'T00:00:00');
+      pvmTeksti = pvm.getDate() + '.' + (pvm.getMonth() + 1) + '. – ' + loppuPvm.getDate() + '.' + (loppuPvm.getMonth() + 1) + '.';
+    }
     const otsikkoRivi = document.createElement('strong');
     otsikkoRivi.textContent = rivi.title;
     const pvmRivi = document.createElement('span');
@@ -615,6 +784,7 @@ function avaaHyvaksyntaOverlay(rivit) {
         event_date: rivi.event_date,
         event_time: rivi.event_time,
         event_end_time: rivi.event_end_time,
+        event_end_date: rivi.event_end_date,
         ical_uid: rivi.ical_uid,
         syote_id: rivi.syote_id,
       });
