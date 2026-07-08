@@ -416,6 +416,8 @@ Isompi visio: ADHD-päin rakennettu perheen toiminnanohjausjärjestelmä.
 6. Odottaa vastaustani — paluukyselyt
 7. Muistiinpanot — elävät muistiinpanot
 
+**Muistiinpanot (E8) — alustava ideahuomio (kirjattu 2026-07-08, EI suunniteltu tarkemmin, EI toteutettu):** Katrin huomio "muistiinpanot (=varasto)" viittaa siihen että tämä tuleva osio muistuttaa käyttötarkoitukseltaan nykyistä Varastoa (harvemmin tarvittava, elävä sisältö) — ei tarkoita että ne yhdistettäisiin samaksi tekniseksi ratkaisuksi, vaan on vertailukohta. Toivelistalla ainakin: **kopiointitoiminto** (rivin/koko muistiinpanon sisällön kopiointi leikepöydälle) ja **kuvasta tekstiksi** (OCR — esim. valokuva kuitista/lapusta muuttuu muokattavaksi tekstiksi). Katri pyysi myös yleisesti käymään läpi mitä Applen Notes (Muistiinpanot-appi) nykyään osaa ja poimimaan siitä sopivia ideoita tähän osioon ennen kuin sitä aletaan suunnitella tarkemmin — EI ole vielä tehty, tee tämä selvitys ENNEN kuin Muistiinpanot (E8) -osion tarkempaa speksausta aloitetaan.
+
 ---
 
 ## Tunnettuja asioita / historiaa
