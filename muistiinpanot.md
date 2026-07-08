@@ -20,7 +20,7 @@ Tämä osio on lyhyt päiväkirjamainen kooste — tarkka sisältö löytyy aina
 - **2026-07-03:** Korjattu Realtime-yhteyden katkeaminen kun PWA on ollut taustalla, kirjattu Satama 2.0 -kokonaisvisio
 - **2026-07-06:** Google-kirjautuminen, monilistatuki (voi luoda useita listoja pelkän Kauppalistan lisäksi), tapahtumaloki, oma vahvistusdialogi (ei enää selaimen ponnahdusikkunaa)
 - **2026-07-07 (iso päivä):** Väliotsikot listoihin, rivien raahausjärjestys, näkyvyysmalli + tietoturva (RLS) käyttöön KAIKILLE tauluille, Laituri (yhteinen muistilappu), koko etusivu suunniteltu uusiksi (Ankkurit + Horisontissa + navigointiruudukko), Varasto-näkymä, oma sisäinen Kalenteri (päivä/viikko/kuukausi), ⚓-ankkurointinappi, kalenteri ja ankkurit yhdistetty samaan "tänään"-näkymään — ks. "Kalenteri"-osio
-- **2026-07-08:** Isommat kuvakkeet etusivun ruudukossa + kalenterikuvake näyttää päivän numeron, ja iso uusi ominaisuus: ulkoisen kalenterin (iCloud tms.) tuonti Satamaan hyväksyntäjonon kautta — ks. "Kalenterisyötteet"-osio. Kirjattu (ei toteutettu) täysi suunnitelma Horisontti-ominaisuudelle — ks. "Horisontti — suunnitelma" -osio. Toteutettu pakkauslistojen automaattinollaus — ks. "Pakkauslistan automaattinollaus" -osio, ja lisätty ensimmäinen yleiskäyttöinen toast-ilmoitusmekanismi (`naytaIlmoitus()`). Tämä muistiinpanot.md-tiedosto päätetty pitää jatkossa niin tarkkana että Copilot pystyy jatkamaan projektia pelkän tämän tiedoston varassa, koska kehityskone palautuu 2026-07-23
+- **2026-07-08:** Isommat kuvakkeet etusivun ruudukossa + kalenterikuvake näyttää päivän numeron, ja iso uusi ominaisuus: ulkoisen kalenterin (iCloud tms.) tuonti Satamaan hyväksyntäjonon kautta — ks. "Kalenterisyötteet"-osio. Kirjattu (ei toteutettu) täydet suunnitelmat kahdelle tulevalle ominaisuudelle: Horisontti (ks. "Horisontti — suunnitelma") ja Ohjebanneri-järjestelmä (ks. "Ohjebanneri-järjestelmä — suunnitelma", toteutetaan Hytin yhteydessä). Toteutettu pakkauslistojen automaattinollaus — ks. "Pakkauslistan automaattinollaus" -osio, ja lisätty ensimmäinen yleiskäyttöinen toast-ilmoitusmekanismi (`naytaIlmoitus()`). Tämä muistiinpanot.md-tiedosto päätetty pitää jatkossa niin tarkkana että Copilot pystyy jatkamaan projektia pelkän tämän tiedoston varassa, koska kehityskone palautuu 2026-07-23
 
 ---
 
@@ -38,6 +38,7 @@ Näitä nimiä käytetään ympäri tätä tiedostoa ilman että niitä aina sel
 - **Kalenterisyöte** — yksi ulkoinen kalenteri (esim. yksi iCloud-kalenteri tai yksi julkaistu .ics-linkki) jonka Satama lukee sisään. Jokainen syöte on yksi rivi `kalenteri_syotteet`-taulussa, ks. "Kalenterisyötteet"-osio.
 - **E1** — lyhenne "Etapista 1" eli tästä ensimmäisestä rakennusvaiheesta (Listat/Muistilaput-keskeinen), määräaika 23.7.2026.
 - **Oma Hytti, Nostot, Odottaa** — tulevien Satama-vaiheiden nimiä, EI vielä rakennettu mitään näistä, ks. "Satama 2.0 — seuraavat vaiheet" -osio.
+- **Ohjebanneri** — suunniteltu (ei toteutettu) osioiden sisäänrakennettu ohjeteksti-mekanismi, kuittaus tietokantaan, sama sisältö aina myös Asetuksista löydettävissä. Täysi suunnitelma ks. "Ohjebanneri-järjestelmä" -osio.
 
 ---
 
@@ -591,7 +592,27 @@ Oma sisäinen kalenteri Satamassa. Taulu `kalenteri_tapahtumat` (title, event_da
 - Ei keskiarvoa rytmilaskennassa, aina mediaani
 - Ei koskaan käyttäjän puolesta automaattisesti asetettuja käsin-tavoitevälejä (`kasin_vali_pv` on AINA käyttäjän oma tietoinen valinta)
 
-**Mitä tämä vaatii NYKYISELTÄ (jo olemassa olevalta) koodilta jo nyt, ennen kuin Horisontti itse rakennetaan:** `events`-tauluun kirjataan edelleen kattavasti kaikki `'checked'`-tapahtumat eikä sitä KOSKAAN tyhjennetä/arkistoida — se on Horisontin ainoa mahdollinen datalähde tulevaisuudessa, ja historian menettäminen tarkoittaisi ettei rytmiä voisi enää koskaan oppia. Toistuvat kotihommat (esim. tuleva pakkauslistojen automaattinollaus, ks. "Sovittu järjestys"-osion kohta 3) tulee toteuttaa niin että RIVI PYSYY SAMANA ja vain täpätään/nollataan uudelleen — EI poisteta ja luoda uutta riviä — koska `events`-ketjun eheys (`target_name`-täsmäys) nojaa tähän.
+**Mitä tämä vaatii NYKYISELTÄ (jo olemassa olevalta) koodilta jo nyt, ennen kuin Horisontti itse rakennetaan:** `events`-tauluun kirjataan edelleen kattavasti kaikki `'checked'`-tapahtumat eikä sitä KOSKAAN tyhjennetä/arkistoida — se on Horisontin ainoa mahdollinen datalähde tulevaisuudessa, ja historian menettäminen tarkoittaisi ettei rytmiä voisi enää koskaan oppia. Toistuvat kotihommat (esim. pakkauslistojen automaattinollaus, ks. "Pakkauslistan automaattinollaus"-osio — jo toteutettu juuri tällä periaatteella) tulee toteuttaa niin että RIVI PYSYY SAMANA ja vain täpätään/nollataan uudelleen — EI poisteta ja luoda uutta riviä — koska `events`-ketjun eheys (`target_name`-täsmäys) nojaa tähän.
+
+## Ohjebanneri-järjestelmä — suunnitelma (kirjattu 2026-07-08, EI TOTEUTETTU, toteutetaan aikaisintaan Hytin yhteydessä)
+
+**Tämä on suunnitelma, ei koodia** — sama periaate kuin "Horisontti — suunnitelma" -osiolla yllä: ei kuulu 23.7.2026-määräaikaan ELLEI Oma Hytti -runko ehdi mukaan sitä ennen. Kirjattu talteen Copilot-aikaa varten.
+
+**Idea:** kun käyttäjä avaa jonkin osion (esim. Oma Hytti, tai vaikka Kalenterin hyväksyntänäkymän) ensimmäistä kertaa, näkyy kuitti-tyylinen ohjebanneri sisällön yläpuolella (katkoviivalaatikko), jonka voi sulkea ×:llä. Kerran suljettu banneri ei ponnahda enää itsestään uudelleen — mutta sama teksti löytyy aina myös pysyvästi Asetuksista ("Ohjeet"-osio, listattuna per osio). EI modaali, EI pakota mitään lukemaan — banneri väistyy sisällön tieltä kiltisti eikä esimerkiksi estä muun sisällön näkemistä tai käyttöä sillä aikaa kun se on näkyvissä.
+
+**Tietomalli:**
+- Uusi taulu `ohjeet`: `section_key` (esim. `'hytti'`, `'kalenteri_hyvaksynta'` — vapaamuotoinen tunniste, ei viittaa mihinkään toiseen tauluun FK:lla), `title`, `content` (text, rivinvaihdot säilyttäen), `updated_at`. RLS: kaikki kirjautuneet saavat lukea (ei kirjoitusta UI:sta, ylläpidetään Table Editorista käsin — sama "dataa, ei koodia" -periaate kuin muuallakin Satamassa).
+- Uusi taulu `ohje_kuittaukset`: `user_id`, `section_key`, `dismissed_at`. Kuittaus tallennetaan TIETOKANTAAN, EI localStorageen — jottei kuittaus katoa kun PWA asennetaan uudelleen tai vaihdetaan puhelinta.
+
+**Näyttölogiikka:** osion avaus → jos `ohjeet`-taulussa on rivi kyseiselle `section_key`:lle EIKÄ kirjautuneella käyttäjällä ole vastaavaa riviä `ohje_kuittaukset`-taulussa → näytä banneri. ×-napin painallus kirjoittaa uuden `ohje_kuittaukset`-rivin (`dismissed_at = now()`), jonka jälkeen banneri ei näy enää sille käyttäjälle.
+
+**Ohjeen päivittäminen jälkikäteen:** jos `ohjeet`-rivin sisältöä muutetaan merkittävästi ja halutaan että käyttäjät näkevät sen uudelleen, poistetaan käsin vastaavat `ohje_kuittaukset`-rivit Table Editorista — banneri palaa näkyviin kerran. Tietoinen yksinkertaistus: EI rakenneta erillistä versionumerointia ohjeille, tämä riittää harvoin tapahtuvaan tarpeeseen.
+
+**Asetukset-näkymä:** uusi "Ohjeet"-osio joka listaa KAIKKI `ohjeet`-taulun rivit (riippumatta kuittauksista), napautus avaa sisällön luku­tilassa. Tämä on sama sisältö minkä banneritkin näyttävät — pysyvä paikka johon ohjeen voi aina palata riippumatta siitä onko banneri joskus suljettu.
+
+**Ensimmäinen käyttökohde:** Oma Hytin ohje (`section_key` esim. `'hytti_juha'` tai vastaava per-hytti-tunniste, jos hytin käsite on henkilökohtainen). Sisältö otetaan erillisestä "Juhan hytin ohjekortti" -tekstistä (Katrilla olemassa erikseen) — käytetään tätä oikeaa sisältöä banneriin JA Asetusten ohjelistaan, EI mitään placeholder-/siemenkorttia.
+
+**Miksi tämä on hyvä Copilot-kokoinen pala:** pieni, itsenäinen kokonaisuus (kaksi taulua + yksi geneerinen banner-komponentti + yksi Asetukset-alaosio), ei kosketa mihinkään olemassa olevaan toimivaan koodiin, ja sen voi rakentaa ja testata erillään muusta Satamasta. Sopii siis rakennettavaksi silloin kun Oma Hytti muutenkin aloitetaan, ei tarvitse tehdä etukäteen.
 
 ## Sovittu järjestys 23.7.2026 asti (kirjattu 2026-07-08, Katrin oma priorisointi)
 
@@ -615,7 +636,7 @@ Tämä on Katrin itsensä sanelema järjestys — jos joku (Copilot mukaan lukie
 - [ ] **Testaa molemmilla tileillä (Katri + Juha)** — tämä on ollut TODO-listalla koko session ajan, ei vielä vahvistettu. Ks. tarkka testauslista alta
 - [ ] Suunnitteluperiaate koko loppuprojektille: kaikki säädettävä dataan/tauluihin, EI kovakoodata — pääosin toteutunut (home_sections, ankkurit, kalenteri_syotteet ovat data-ohjattuja), mutta pidä mielessä jatkossakin
 - [ ] Horisontissa: oikea päättelylogiikka events-datasta — täysi suunnitelma valmiina "Horisontti — suunnitelma"-osiossa (tietomalli, mediaanilaskenta, V1–V4-vaiheistus), EI aloitettu koodissa. Tarkoitus toteuttaa Copilot-ajalla 23.7. jälkeen, ei kuulu 23.7. mennessä valmistuvaan E1-versioon.
-- [ ] Oma Hytti, Asetukset -näkymät (vielä pelkkiä "tulossa pian" -paikanpitäjiä)
+- [ ] Oma Hytti, Asetukset -näkymät (vielä pelkkiä "tulossa pian" -paikanpitäjiä). Kun Hytti aloitetaan, rakennetaan samalla Ohjebanneri-järjestelmä (ks. oma osio, täysi suunnitelma valmiina) — se on suunniteltu nimenomaan Hytin ensimmäiseksi käyttökohteeksi
 - [ ] Kalenteritapahtuman muokkaus jälkikäteen (nyt voi vain lisätä/poistaa, ei muuttaa nimeä/aikaa)
 - [x] **Pakkauslistojen automaattinollaus** — toteutettu 2026-07-08, ks. "Pakkauslistan automaattinollaus"-osio, EI vielä testattu oikealla laitteella (ks. "Testattavaa seuraavaksi")
 - [ ] **Push-ilmoitusinfra + muistutukset** — EI aloitettu ollenkaan, ks. "Sovittu järjestys"-osion kohdat 4-5
