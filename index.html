@@ -121,6 +121,72 @@
     </div>
   </div>
 
+  <div class="container" id="hytti-view" style="display:none">
+    <div class="list-header">
+      <button class="back-btn" id="hytti-back-btn">‹</button>
+      <h1>✱ OMA HYTTI ✱</h1>
+      <span></span>
+    </div>
+    <hr class="divider">
+
+    <div id="hytti-tehtavat-osio">
+      <div class="section-title">✅ Tehtävät</div>
+      <ul class="list" id="hytti-tehtavat-list"></ul>
+      <p class="section-empty" id="hytti-tehtavat-tyhja" style="display:none">Ei avoimia tehtäviä.</p>
+    </div>
+
+    <div id="hytti-kortit-osio">
+      <div class="section-title">🗂 Kortit</div>
+      <ul class="list" id="hytti-kortit-list"></ul>
+    </div>
+
+    <p class="section-empty" id="hytti-tyhja" style="display:none">Yksi kortti per tilaisuus tai kokonaisuus. Kirjoita muistiinpanot riveiksi, merkkaa toimintaa vaativat tehtäviksi — ne kokoontuvat itsestään ylös Tehtäviin. Ideat kuuluvat Laituriin, työn alla olevat tänne.</p>
+
+    <div class="hytti-tyyppi-valinta">
+      <button class="kalenteri-tila-btn hytti-tyyppi-btn active" data-tyyppi="jatkuva">Jatkuva</button>
+      <button class="kalenteri-tila-btn hytti-tyyppi-btn" data-tyyppi="paattyva">Päättyvä</button>
+    </div>
+    <p class="hytti-tyyppi-selite">Jatkuva = elää pitkään. Päättyvä = valmistuu ja arkistoituu.</p>
+
+    <div class="add-item">
+      <span class="prefix">›</span>
+      <input type="text" id="hytti-uusi-input" placeholder="uuden kortin nimi...">
+      <button id="hytti-uusi-btn">+</button>
+    </div>
+
+    <p class="section-link" id="hytti-arkisto-linkki" style="display:none">Arkisto</p>
+  </div>
+
+  <div class="container" id="hytti-kortti-view" style="display:none">
+    <div class="list-header">
+      <button class="back-btn" id="hytti-kortti-back-btn">‹</button>
+      <h1 id="hytti-kortti-title">✱ KORTTI ✱</h1>
+      <button class="settings-btn" id="hytti-kortti-arkistoi-btn" style="display:none">📦</button>
+    </div>
+
+    <div class="hytti-seuraava-askel" id="hytti-seuraava-askel">seuraava pieni askel...</div>
+
+    <hr class="divider">
+
+    <div class="add-item" id="hytti-rivi-add-rivi">
+      <span class="prefix">›</span>
+      <input type="text" id="hytti-rivi-input" placeholder="lisää rivi...">
+      <button id="hytti-rivi-add-btn">+</button>
+    </div>
+
+    <ul class="list" id="hytti-rivit-list"></ul>
+  </div>
+
+  <div class="dialog-overlay" id="hytti-arkisto-overlay" style="display:none">
+    <div class="dialog-box">
+      <p class="dialog-title">Arkisto</p>
+      <ul class="list" id="hytti-arkisto-lista"></ul>
+      <div class="dialog-buttons">
+        <button class="dialog-btn dialog-btn-cancel" id="hytti-arkisto-sulje">Sulje</button>
+      </div>
+    </div>
+  </div>
+
   <div class="container" id="asetukset-view" style="display:none">
     <div class="list-header">
       <button class="back-btn" id="asetukset-back-btn">‹</button>

@@ -14,6 +14,8 @@ function piilotaKaikkiNakymat() {
   document.getElementById('varasto-view').style.display = 'none';
   document.getElementById('kalenteri-view').style.display = 'none';
   document.getElementById('asetukset-view').style.display = 'none';
+  document.getElementById('hytti-view').style.display = 'none';
+  document.getElementById('hytti-kortti-view').style.display = 'none';
 }
 
 function showLoginView() {
@@ -54,6 +56,16 @@ function showKalenteriView() {
 function showAsetuksetView() {
   piilotaKaikkiNakymat();
   document.getElementById('asetukset-view').style.display = 'block';
+}
+
+function showHyttiView() {
+  piilotaKaikkiNakymat();
+  document.getElementById('hytti-view').style.display = 'block';
+}
+
+function showHyttiKorttiView() {
+  piilotaKaikkiNakymat();
+  document.getElementById('hytti-kortti-view').style.display = 'block';
 }
 
 // Muistaa mistä näkymästä (kategoriasta) nykyinen lista avattiin, jotta
@@ -581,6 +593,544 @@ document.getElementById('kalenteri-hyvaksynta-sulje').addEventListener('click', 
   document.getElementById('kalenteri-hyvaksynta-overlay').style.display = 'none';
 });
 
+// === OMA HYTTI ===
+// Täysin yksityinen henkilökohtainen työtila — EI jakokytkintä, EI shared-
+// haaraa ollenkaan, RLS suodattaa aina vain omistajan rivit (ks.
+// sql/016_hytti.sql ja muistiinpanot.md "Oma Hytti" -osio).
+let currentHyttiKortti = null;
+let cachedHyttiKortit = [];
+let cachedHyttiRivit = [];
+let aktiivinenHyttiOtsikkoId = null;
+let valittuHyttiTyyppi = 'jatkuva';
+
+function hyttiLisaysInput() {
+  return document.getElementById('hytti-rivi-input');
+}
+
+// Muotoilee eräpäivän "4 pv" / "tänään" / "3 pv sitten" -muotoon, aina
+// muted-värillä (EI punaista edes ylittyneelle — tietoinen valinta, jotta
+// tehtävälista ei näytä stressaavalta)
+function hyttiErapaivaTeksti(erapaiva) {
+  if (!erapaiva) return '';
+  const tanaan = new Date();
+  tanaan.setHours(0, 0, 0, 0);
+  const paiva = new Date(erapaiva + 'T00:00:00');
+  const eroPaivat = Math.round((paiva - tanaan) / 86400000);
+  if (eroPaivat === 0) return 'tänään';
+  if (eroPaivat > 0) return eroPaivat + ' pv';
+  return Math.abs(eroPaivat) + ' pv sitten';
+}
+
+// Hakee arkistoitujen korttien määrän ja näyttää/piilottaa Arkisto-linkin
+async function paivitaHyttiArkistoLinkki() {
+  const linkki = document.getElementById('hytti-arkisto-linkki');
+  const { count } = await db.from('hytti_kortit').select('id', { count: 'exact', head: true }).eq('status', 'arkistoitu');
+  linkki.style.display = count ? 'block' : 'none';
+}
+
+// Piirtää yhden tehtävärivin Tehtävät-koosteeseen. Sama tietue kuin kortilla
+// — täppäys tässä täppää saman rivin kortillakin, ei kopiota.
+function piirraHyttiTehtavaRivi(rivi) {
+  const li = document.createElement('li');
+
+  const checkNappi = document.createElement('button');
+  checkNappi.textContent = '○';
+  checkNappi.className = 'check-btn';
+  checkNappi.addEventListener('click', async function() {
+    tuntopalauteValmis();
+    const { error } = await db.from('hytti_rivit').update({ done: true, done_at: new Date().toISOString() }).eq('id', rivi.id);
+    if (error) console.error('Hytti-tehtävän merkintä epäonnistui:', error);
+    lataaHyttiPaanakyma();
+  });
+  li.appendChild(checkNappi);
+
+  const teksti = document.createElement('span');
+  teksti.className = 'hytti-tehtava-teksti';
+  teksti.textContent = rivi.content;
+  li.appendChild(teksti);
+
+  if (rivi.due_date) {
+    const erapaiva = document.createElement('span');
+    erapaiva.className = 'hytti-tehtava-erapaiva';
+    erapaiva.textContent = hyttiErapaivaTeksti(rivi.due_date);
+    li.appendChild(erapaiva);
+  }
+
+  const kortti = document.createElement('span');
+  kortti.className = 'hytti-tehtava-kortti';
+  kortti.textContent = rivi.hytti_kortit ? rivi.hytti_kortit.name : '';
+  li.appendChild(kortti);
+
+  const ankkurointiNappi = document.createElement('button');
+  ankkurointiNappi.textContent = '⚓';
+  ankkurointiNappi.className = 'anchor-btn' + (ankkuroidutAvaimet.has('hytti:' + rivi.id) ? ' active' : '');
+  ankkurointiNappi.addEventListener('click', async function() {
+    await vaihdaAnkkurointiYleinen('hytti', rivi.id, rivi.content, function() {});
+    lataaHyttiPaanakyma();
+  });
+  li.appendChild(ankkurointiNappi);
+
+  return li;
+}
+
+// Piirtää yhden kortin Kortit-listaukseen (nimi + seuraava askel pienellä alla)
+function piirraHyttiKorttiRivi(kortti) {
+  const li = document.createElement('li');
+  li.className = 'hytti-kortti-rivi';
+  li.dataset.tuoteId = kortti.id;
+  alustaRaahaus(li, kortti, { container: document.getElementById('hytti-kortit-list'), cache: cachedHyttiKortit, taulu: 'hytti_kortit', jalkeenPaivitys: lataaHyttiPaanakyma });
+  li.addEventListener('click', function() { avaaHyttiKortti(kortti); });
+
+  const sisalto = document.createElement('div');
+  sisalto.className = 'hytti-kortti-content';
+
+  const nimi = document.createElement('span');
+  nimi.className = 'hytti-kortti-nimi';
+  nimi.textContent = kortti.name;
+  sisalto.appendChild(nimi);
+
+  if (kortti.seuraava_askel) {
+    const askel = document.createElement('span');
+    askel.className = 'hytti-kortti-askel';
+    askel.textContent = kortti.seuraava_askel;
+    sisalto.appendChild(askel);
+  }
+
+  li.appendChild(sisalto);
+  return li;
+}
+
+// Lataa Hytin päänäkymän: Tehtävät-kooste + Kortit-listaus. Jos aktiivisia
+// kortteja ei ole ollenkaan, näytetään tyhjätila-ohje kummankin osion sijaan.
+async function lataaHyttiPaanakyma() {
+  if (raahattavaRivi) return;
+  const { data: kortit, error: korttiError } = await db.from('hytti_kortit').select().eq('status', 'aktiivinen').order('sort_order');
+  if (korttiError) {
+    console.error('Hytin korttien haku epäonnistui:', korttiError);
+    return;
+  }
+  cachedHyttiKortit = kortit || [];
+
+  const tehtavatOsio = document.getElementById('hytti-tehtavat-osio');
+  const kortitOsio = document.getElementById('hytti-kortit-osio');
+  const tyhja = document.getElementById('hytti-tyhja');
+
+  if (cachedHyttiKortit.length === 0) {
+    tehtavatOsio.style.display = 'none';
+    kortitOsio.style.display = 'none';
+    tyhja.style.display = 'block';
+    paivitaHyttiArkistoLinkki();
+    return;
+  }
+
+  tehtavatOsio.style.display = 'block';
+  kortitOsio.style.display = 'block';
+  tyhja.style.display = 'none';
+
+  const kortitListEl = document.getElementById('hytti-kortit-list');
+  kortitListEl.innerHTML = '';
+  cachedHyttiKortit.forEach(function(kortti) { kortitListEl.appendChild(piirraHyttiKorttiRivi(kortti)); });
+
+  await paivitaAnkkuroidutAvaimet();
+
+  // hytti_kortit!inner pakottaa inner joinin, jolloin status-suodatus rajaa
+  // myös pääkyselyn rivejä (ei vain sisäkkäistä objektia) — pelkkä .select
+  // ilman !inner ei suodattaisi arkistoidun kortin tehtäviä pois listalta.
+  const { data: tehtavat, error: tehtavaError } = await db.from('hytti_rivit')
+    .select('*, hytti_kortit!inner(name, status)')
+    .eq('hytti_kortit.status', 'aktiivinen')
+    .eq('is_task', true)
+    .eq('done', false)
+    .order('due_date', { ascending: true, nullsFirst: false });
+  if (tehtavaError) {
+    console.error('Hytin tehtävien haku epäonnistui:', tehtavaError);
+    return;
+  }
+
+  const tehtavatListEl = document.getElementById('hytti-tehtavat-list');
+  tehtavatListEl.innerHTML = '';
+  (tehtavat || []).forEach(function(rivi) { tehtavatListEl.appendChild(piirraHyttiTehtavaRivi(rivi)); });
+  document.getElementById('hytti-tehtavat-tyhja').style.display = (tehtavat || []).length === 0 ? 'block' : 'none';
+
+  paivitaHyttiArkistoLinkki();
+}
+
+// Avaa yhden kortin näkymän (arkistoitu kortti avautuu lukutilaan)
+function avaaHyttiKortti(kortti) {
+  currentHyttiKortti = kortti;
+  aktiivinenHyttiOtsikkoId = null;
+  showHyttiKorttiView();
+  lataaHyttiKortti();
+}
+
+// Laskee mihin kohtaan uusi rivi menee (aktiivisen väliotsikon alle), sama
+// periaate kuin Muistilapuilla (ks. laskeLisaysJarjestys)
+function laskeHyttiLisaysJarjestys() {
+  if (!aktiivinenHyttiOtsikkoId) return null;
+  const jarjestetyt = cachedHyttiRivit.slice().sort(function(a, b) { return a.sort_order - b.sort_order; });
+  const otsikkoIndex = jarjestetyt.findIndex(function(r) { return r.id === aktiivinenHyttiOtsikkoId; });
+  if (otsikkoIndex === -1) return null;
+  const otsikko = jarjestetyt[otsikkoIndex];
+  const seuraava = jarjestetyt[otsikkoIndex + 1];
+  return seuraava ? (otsikko.sort_order + seuraava.sort_order) / 2 : otsikko.sort_order + 1;
+}
+
+function paivitaHyttiLisaysKohde() {
+  const inputEl = hyttiLisaysInput();
+  if (!aktiivinenHyttiOtsikkoId) {
+    inputEl.placeholder = 'lisää rivi...';
+    return;
+  }
+  const otsikko = cachedHyttiRivit.find(function(r) { return r.id === aktiivinenHyttiOtsikkoId; });
+  inputEl.placeholder = otsikko ? 'lisää kohtaan ' + otsikko.content + '...' : 'lisää rivi...';
+}
+
+function valitseHyttiLisaysKohde(rivi) {
+  aktiivinenHyttiOtsikkoId = (aktiivinenHyttiOtsikkoId === rivi.id) ? null : rivi.id;
+  paivitaHyttiLisaysKohde();
+  piirraHyttiRivit();
+}
+
+// Poistaa Hytti-rivin vahvistuksen jälkeen
+async function poistaHyttiRivi(rivi) {
+  const vahvistus = await naytaVahvistus('Poistetaanko ' + rivi.content + '?', null, 'Poista');
+  if (!vahvistus) return;
+  if (aktiivinenHyttiOtsikkoId === rivi.id) {
+    aktiivinenHyttiOtsikkoId = null;
+    paivitaHyttiLisaysKohde();
+  }
+  const { error } = await db.from('hytti_rivit').delete().eq('id', rivi.id);
+  if (error) console.error('Hytti-rivin poisto epäonnistui:', error);
+  lataaHyttiKortti();
+}
+
+// Piirtää yhden rivin korttinäkymään. Lukutilassa (arkistoitu kortti) ei
+// liitetä muokkaus-/poisto-/tehtävätoimintoja, vain staattinen tila.
+function piirraHyttiRivi(rivi, lukutila) {
+  const li = document.createElement('li');
+  li.dataset.tuoteId = rivi.id;
+
+  if (rivi.is_header) {
+    li.className = 'header-row' + (rivi.id === aktiivinenHyttiOtsikkoId ? ' active' : '');
+    if (!lukutila) {
+      alustaRaahaus(li, rivi, { container: document.getElementById('hytti-rivit-list'), cache: cachedHyttiRivit, taulu: 'hytti_rivit', jalkeenPaivitys: lataaHyttiKortti });
+      li.addEventListener('click', function() { valitseHyttiLisaysKohde(rivi); });
+    }
+
+    const spacer = document.createElement('div');
+    spacer.className = 'footer-spacer';
+    li.appendChild(spacer);
+
+    const teksti = document.createElement('span');
+    teksti.textContent = rivi.content;
+    li.appendChild(teksti);
+
+    if (!lukutila) {
+      const poistoNappi = document.createElement('button');
+      poistoNappi.textContent = '×';
+      poistoNappi.className = 'delete-btn';
+      poistoNappi.addEventListener('click', function(e) { e.stopPropagation(); poistaHyttiRivi(rivi); });
+      li.appendChild(poistoNappi);
+    }
+    return li;
+  }
+
+  if (!lukutila) {
+    alustaRaahaus(li, rivi, { container: document.getElementById('hytti-rivit-list'), cache: cachedHyttiRivit, taulu: 'hytti_rivit', jalkeenPaivitys: lataaHyttiKortti });
+  }
+
+  if (rivi.is_task) {
+    const checkNappi = document.createElement('button');
+    checkNappi.textContent = rivi.done ? '✓' : '○';
+    checkNappi.className = 'check-btn';
+    if (lukutila) {
+      checkNappi.disabled = true;
+    } else {
+      checkNappi.addEventListener('click', async function() {
+        const updateData = { done: !rivi.done, done_at: !rivi.done ? new Date().toISOString() : null };
+        if (updateData.done) tuntopalauteValmis();
+        const { error } = await db.from('hytti_rivit').update(updateData).eq('id', rivi.id);
+        if (error) console.error('Hytti-rivin merkintä epäonnistui:', error);
+        lataaHyttiKortti();
+      });
+    }
+    li.appendChild(checkNappi);
+    if (rivi.done) li.classList.add('done');
+  }
+
+  const teksti = document.createElement('span');
+  teksti.textContent = rivi.content;
+  li.appendChild(teksti);
+
+  if (!lukutila) {
+    teksti.addEventListener('click', function() {
+      const inputti = document.createElement('input');
+      inputti.type = 'text';
+      inputti.value = rivi.content;
+      inputti.className = 'edit-input';
+      teksti.replaceWith(inputti);
+      inputti.focus();
+      inputti.select();
+
+      async function tallenna() {
+        const uusi = inputti.value.trim();
+        if (uusi && uusi !== rivi.content) {
+          const { error } = await db.from('hytti_rivit').update({ content: uusi }).eq('id', rivi.id);
+          if (error) console.error('Hytti-rivin muokkaus epäonnistui:', error);
+        }
+        lataaHyttiKortti();
+      }
+
+      inputti.addEventListener('blur', tallenna);
+      inputti.addEventListener('keydown', function(e) {
+        if (e.key === 'Enter') inputti.blur();
+        if (e.key === 'Escape') { inputti.value = rivi.content; inputti.blur(); }
+      });
+    });
+  }
+
+  if (rivi.is_task) {
+    const erapaiva = document.createElement('span');
+    erapaiva.className = 'hytti-rivi-erapaiva';
+    erapaiva.textContent = rivi.due_date ? hyttiErapaivaTeksti(rivi.due_date) : (lukutila ? '' : '+ eräpäivä');
+    if (!lukutila) {
+      erapaiva.addEventListener('click', async function() {
+        const syote = prompt('Eräpäivä (VVVV-KK-PP), tyhjä = ei eräpäivää:', rivi.due_date || '');
+        if (syote === null) return;
+        const uusiPvm = syote.trim() === '' ? null : syote.trim();
+        const { error } = await db.from('hytti_rivit').update({ due_date: uusiPvm }).eq('id', rivi.id);
+        if (error) console.error('Eräpäivän tallennus epäonnistui:', error);
+        lataaHyttiKortti();
+      });
+    }
+    li.appendChild(erapaiva);
+  }
+
+  if (!lukutila) {
+    const tehtavaNappi = document.createElement('button');
+    tehtavaNappi.textContent = '☑';
+    tehtavaNappi.className = 'anchor-btn' + (rivi.is_task ? ' active' : '');
+    tehtavaNappi.title = rivi.is_task ? 'Poista tehtävämerkintä' : 'Merkitse tehtäväksi';
+    tehtavaNappi.addEventListener('click', async function() {
+      const uusiTila = !rivi.is_task;
+      const updateData = uusiTila ? { is_task: true } : { is_task: false, done: false, done_at: null, due_date: null };
+      const { error } = await db.from('hytti_rivit').update(updateData).eq('id', rivi.id);
+      if (error) console.error('Tehtävätilan vaihto epäonnistui:', error);
+      lataaHyttiKortti();
+    });
+    li.appendChild(tehtavaNappi);
+
+    const poistoNappi = document.createElement('button');
+    poistoNappi.textContent = '×';
+    poistoNappi.className = 'delete-btn';
+    poistoNappi.addEventListener('click', function() { poistaHyttiRivi(rivi); });
+    li.appendChild(poistoNappi);
+  }
+
+  return li;
+}
+
+function piirraHyttiRivit() {
+  const listEl = document.getElementById('hytti-rivit-list');
+  if (!listEl || raahattavaRivi) return;
+  const lukutila = currentHyttiKortti.status === 'arkistoitu';
+  listEl.innerHTML = '';
+  cachedHyttiRivit.forEach(function(rivi) { listEl.appendChild(piirraHyttiRivi(rivi, lukutila)); });
+}
+
+// Piirtää korttinäkymän otsikon, seuraava askel -kentän ja arkistoi/palauta-napin
+function piirraHyttiKorttiUI() {
+  const lukutila = currentHyttiKortti.status === 'arkistoitu';
+  document.getElementById('hytti-kortti-title').textContent = '✱ ' + currentHyttiKortti.name.toUpperCase() + ' ✱';
+
+  const askelEl = document.getElementById('hytti-seuraava-askel');
+  askelEl.textContent = currentHyttiKortti.seuraava_askel || (lukutila ? '' : 'seuraava pieni askel...');
+  askelEl.onclick = lukutila ? null : function() { muokkaaHyttiSeuraavaAskel(); };
+  askelEl.style.cursor = lukutila ? 'default' : 'pointer';
+
+  document.getElementById('hytti-rivi-add-rivi').style.display = lukutila ? 'none' : 'flex';
+
+  const arkistoiNappi = document.getElementById('hytti-kortti-arkistoi-btn');
+  if (lukutila) {
+    arkistoiNappi.style.display = 'flex';
+    arkistoiNappi.textContent = '↩';
+    arkistoiNappi.title = 'Palauta aktiiviseksi';
+    arkistoiNappi.onclick = function() { palautaHyttiKortti(); };
+  } else if (currentHyttiKortti.card_type === 'paattyva') {
+    arkistoiNappi.style.display = 'flex';
+    arkistoiNappi.textContent = '📦';
+    arkistoiNappi.title = 'Arkistoi';
+    arkistoiNappi.onclick = function() { arkistoiHyttiKortti(); };
+  } else {
+    arkistoiNappi.style.display = 'none';
+  }
+}
+
+// Seuraava askel -kentän inline-muokkaus, sama periaate kuin listan rivin nimen muokkaus
+function muokkaaHyttiSeuraavaAskel() {
+  const askelEl = document.getElementById('hytti-seuraava-askel');
+  const inputti = document.createElement('input');
+  inputti.type = 'text';
+  inputti.value = currentHyttiKortti.seuraava_askel || '';
+  inputti.placeholder = 'seuraava pieni askel...';
+  inputti.className = 'edit-input';
+  askelEl.replaceWith(inputti);
+  inputti.focus();
+  inputti.select();
+
+  async function tallenna() {
+    const uusi = inputti.value.trim();
+    if (uusi !== (currentHyttiKortti.seuraava_askel || '')) {
+      const { error } = await db.from('hytti_kortit').update({ seuraava_askel: uusi || null }).eq('id', currentHyttiKortti.id);
+      if (error) console.error('Seuraavan askeleen tallennus epäonnistui:', error);
+      currentHyttiKortti.seuraava_askel = uusi || null;
+    }
+    inputti.replaceWith(askelEl);
+    piirraHyttiKorttiUI();
+  }
+
+  inputti.addEventListener('blur', tallenna);
+  inputti.addEventListener('keydown', function(e) {
+    if (e.key === 'Enter') inputti.blur();
+    if (e.key === 'Escape') { inputti.value = currentHyttiKortti.seuraava_askel || ''; inputti.blur(); }
+  });
+}
+
+// Lataa avoinna olevan kortin rivit ja piirtää koko korttinäkymän
+async function lataaHyttiKortti() {
+  if (!currentHyttiKortti || raahattavaRivi) return;
+  const { data, error } = await db.from('hytti_rivit').select().eq('kortti_id', currentHyttiKortti.id).order('sort_order');
+  if (error) {
+    console.error('Hytti-kortin rivien haku epäonnistui:', error);
+    return;
+  }
+  cachedHyttiRivit = data || [];
+  piirraHyttiKorttiUI();
+  piirraHyttiRivit();
+}
+
+async function arkistoiHyttiKortti() {
+  const vahvistus = await naytaVahvistus('Arkistoidaanko ' + currentHyttiKortti.name + '?', null, 'Arkistoi');
+  if (!vahvistus) return;
+  const { error } = await db.from('hytti_kortit').update({ status: 'arkistoitu' }).eq('id', currentHyttiKortti.id);
+  if (error) {
+    console.error('Kortin arkistointi epäonnistui:', error);
+    return;
+  }
+  logEvent('archived', 'hytti_kortti', currentHyttiKortti.id, currentHyttiKortti.name, null);
+  showHyttiView();
+  lataaHyttiPaanakyma();
+}
+
+async function palautaHyttiKortti() {
+  const { error } = await db.from('hytti_kortit').update({ status: 'aktiivinen' }).eq('id', currentHyttiKortti.id);
+  if (error) {
+    console.error('Kortin palautus epäonnistui:', error);
+    return;
+  }
+  logEvent('restored', 'hytti_kortti', currentHyttiKortti.id, currentHyttiKortti.name, null);
+  currentHyttiKortti.status = 'aktiivinen';
+  piirraHyttiKorttiUI();
+  piirraHyttiRivit();
+}
+
+// Näyttää arkistoitujen korttien listan — napautus avaa kortin lukutilaan
+async function avaaHyttiArkistoOverlay() {
+  const { data, error } = await db.from('hytti_kortit').select().eq('status', 'arkistoitu').order('sort_order');
+  if (error) {
+    console.error('Arkiston haku epäonnistui:', error);
+    return;
+  }
+  const lista = document.getElementById('hytti-arkisto-lista');
+  lista.innerHTML = '';
+  (data || []).forEach(function(kortti) {
+    const li = document.createElement('li');
+    li.className = 'hytti-arkisto-rivi';
+    const teksti = document.createElement('span');
+    teksti.textContent = kortti.name;
+    li.appendChild(teksti);
+    li.addEventListener('click', function() {
+      document.getElementById('hytti-arkisto-overlay').style.display = 'none';
+      avaaHyttiKortti(kortti);
+    });
+    lista.appendChild(li);
+  });
+  document.getElementById('hytti-arkisto-overlay').style.display = 'flex';
+}
+
+document.getElementById('hytti-back-btn').addEventListener('click', function() {
+  showHomeView();
+  lataaKotinakyma();
+});
+
+document.getElementById('hytti-kortti-back-btn').addEventListener('click', function() {
+  showHyttiView();
+  lataaHyttiPaanakyma();
+});
+
+document.querySelectorAll('.hytti-tyyppi-btn').forEach(function(btn) {
+  btn.addEventListener('click', function() {
+    valittuHyttiTyyppi = btn.dataset.tyyppi;
+    document.querySelectorAll('.hytti-tyyppi-btn').forEach(function(b) { b.classList.toggle('active', b === btn); });
+  });
+});
+
+document.getElementById('hytti-uusi-btn').addEventListener('click', async function() {
+  const uusiInput = document.getElementById('hytti-uusi-input');
+  const nimi = uusiInput.value.trim();
+  if (nimi === '') { uusiInput.focus(); return; }
+
+  const { data, error } = await db.from('hytti_kortit').insert({ name: nimi, card_type: valittuHyttiTyyppi, owner_id: currentUserId }).select().single();
+  if (error) {
+    console.error('Kortin luonti epäonnistui:', error);
+  } else {
+    logEvent('created', 'hytti_kortti', data.id, nimi, null);
+  }
+  uusiInput.value = '';
+  lataaHyttiPaanakyma();
+});
+
+document.getElementById('hytti-uusi-input').addEventListener('keydown', function(event) {
+  if (event.key === 'Enter') {
+    document.getElementById('hytti-uusi-btn').click();
+  }
+});
+
+document.getElementById('hytti-rivi-add-btn').addEventListener('click', async function() {
+  const inputEl = hyttiLisaysInput();
+  const raakaTeksti = inputEl.value.trim();
+  if (raakaTeksti === '' || !currentHyttiKortti) { inputEl.focus(); return; }
+
+  const onOtsikko = raakaTeksti.startsWith('#');
+  const teksti = onOtsikko ? raakaTeksti.slice(1).trim() : raakaTeksti;
+  if (teksti === '') { inputEl.focus(); return; }
+
+  const kohdistettuJarjestys = laskeHyttiLisaysJarjestys();
+  const uusiRivi = { content: teksti, is_header: onOtsikko, kortti_id: currentHyttiKortti.id };
+  if (kohdistettuJarjestys !== null) uusiRivi.sort_order = kohdistettuJarjestys;
+
+  const { data, error } = await db.from('hytti_rivit').insert(uusiRivi).select().single();
+  if (error) {
+    console.error('Hytti-rivin lisäys epäonnistui:', error);
+  } else {
+    logEvent(onOtsikko ? 'created' : 'added', onOtsikko ? 'header' : 'hytti_rivi', data.id, teksti, null);
+  }
+  inputEl.value = '';
+  inputEl.focus();
+  lataaHyttiKortti();
+});
+
+hyttiLisaysInput().addEventListener('keydown', function(event) {
+  if (event.key === 'Enter') {
+    document.getElementById('hytti-rivi-add-btn').click();
+  }
+});
+
+document.getElementById('hytti-arkisto-linkki').addEventListener('click', avaaHyttiArkistoOverlay);
+document.getElementById('hytti-arkisto-sulje').addEventListener('click', function() {
+  document.getElementById('hytti-arkisto-overlay').style.display = 'none';
+});
+
 // Näyttää tämänpäiväisen päivämäärän suomeksi etusivun yläosassa
 function paivitaPaivamaara() {
   const paivat = ['sunnuntai', 'maanantai', 'tiistai', 'keskiviikko', 'torstai', 'perjantai', 'lauantai'];
@@ -741,6 +1291,9 @@ function avaaOsio(osio) {
   } else if (osio.route === 'asetukset') {
     showAsetuksetView();
     paivitaPushTila();
+  } else if (osio.route === 'hytti') {
+    showHyttiView();
+    lataaHyttiPaanakyma();
   } else {
     alert(osio.name + ' tulossa pian.');
   }
