@@ -1042,6 +1042,46 @@ function tuntopalauteValmis() {
   if (navigator.vibrate) navigator.vibrate([20, 40, 20]);
 }
 
+// Lyhyt itsestään katoava ilmoitus ruudun alareunassa (kuitti-tyylinen banneri)
+function naytaIlmoitus(teksti) {
+  const toast = document.createElement('div');
+  toast.className = 'toast';
+  toast.textContent = teksti;
+  document.body.appendChild(toast);
+  requestAnimationFrame(function() { toast.classList.add('nakyva'); });
+  setTimeout(function() {
+    toast.classList.remove('nakyva');
+    setTimeout(function() { toast.remove(); }, 300);
+  }, 1800);
+}
+
+// Pakkauslistan automaattinollaus: jos avoinna olevan listan nimessä on
+// (missä tahansa muodossa, isoja/pieniä kirjaimia välittämättä) "pakkauslista"
+// ja KAIKKI ei-otsikkorivit on juuri täpätty valmiiksi, nollataan koko lista
+// hetken kuluttua takaisin tyhjäksi — käyttötapaus on sama pakkauslista
+// käytettynä reissu toisensa jälkeen, ei haluta käsin nollata joka kerta.
+// Kutsutaan VAIN sen asiakkaan koodista joka juuri täppäsi viimeisen rivin
+// (ei Realtime-kuuntelijasta) — muuten kaikki avoinna olevat laitteet/
+// välilehdet yrittäisivät nollata saman listan yhtä aikaa.
+function tarkistaPakkauslistanNollaus() {
+  if (!currentList || !currentList.name || currentList.name.toLowerCase().indexOf('pakkauslista') === -1) return;
+
+  const tarkistettavat = cachedTuotteet.filter(function(t) { return !t.is_header; });
+  if (tarkistettavat.length === 0 || !tarkistettavat.every(function(t) { return t.tehty; })) return;
+
+  naytaIlmoitus('✓ ' + currentList.name + ' valmis — nollataan hetken päästä');
+
+  setTimeout(async function() {
+    const idt = tarkistettavat.map(function(t) { return t.id; });
+    const { error } = await db.from('tuotteet').update({ tehty: false, bought_at: null }).in('id', idt);
+    if (error) {
+      console.error('Pakkauslistan automaattinollaus epäonnistui:', error);
+      return;
+    }
+    if (currentList && currentList.id === tarkistettavat[0].list_id) lataaLista();
+  }, 1500);
+}
+
 // === RAAHAUS (pitkä painallus + siirto) ===
 const RAAHAUS_VIIVE_MS = 450;
 const RAAHAUS_PERUUTUS_PX = 10;
@@ -1230,7 +1270,8 @@ function paivitaNaytto(tuotteet) {
           console.error('Tuotteen merkintä epäonnistui:', error);
         }
         logEvent(eventAction, 'item', tuote.id, tuote.nimi, tuote.list_id);
-        lataaLista();
+        await lataaLista();
+        if (!error && updateData.tehty) tarkistaPakkauslistanNollaus();
       } else {
         addToQueue({ type: 'update', data: { id: tuote.id, ...updateData } });
         cachedTuotteet = cachedTuotteet.map(t => t.id === tuote.id ? { ...t, ...updateData } : t);

@@ -20,7 +20,7 @@ Tämä osio on lyhyt päiväkirjamainen kooste — tarkka sisältö löytyy aina
 - **2026-07-03:** Korjattu Realtime-yhteyden katkeaminen kun PWA on ollut taustalla, kirjattu Satama 2.0 -kokonaisvisio
 - **2026-07-06:** Google-kirjautuminen, monilistatuki (voi luoda useita listoja pelkän Kauppalistan lisäksi), tapahtumaloki, oma vahvistusdialogi (ei enää selaimen ponnahdusikkunaa)
 - **2026-07-07 (iso päivä):** Väliotsikot listoihin, rivien raahausjärjestys, näkyvyysmalli + tietoturva (RLS) käyttöön KAIKILLE tauluille, Laituri (yhteinen muistilappu), koko etusivu suunniteltu uusiksi (Ankkurit + Horisontissa + navigointiruudukko), Varasto-näkymä, oma sisäinen Kalenteri (päivä/viikko/kuukausi), ⚓-ankkurointinappi, kalenteri ja ankkurit yhdistetty samaan "tänään"-näkymään — ks. "Kalenteri"-osio
-- **2026-07-08:** Isommat kuvakkeet etusivun ruudukossa + kalenterikuvake näyttää päivän numeron, ja iso uusi ominaisuus: ulkoisen kalenterin (iCloud tms.) tuonti Satamaan hyväksyntäjonon kautta — ks. "Kalenterisyötteet"-osio. Lisäksi kirjattu (ei toteutettu) täysi suunnitelma Horisontti-ominaisuudelle — ks. "Horisontti — suunnitelma" -osio. Tämä muistiinpanot.md-tiedosto päätetty pitää jatkossa niin tarkkana että Copilot pystyy jatkamaan projektia pelkän tämän tiedoston varassa, koska kehityskone palautuu 2026-07-23
+- **2026-07-08:** Isommat kuvakkeet etusivun ruudukossa + kalenterikuvake näyttää päivän numeron, ja iso uusi ominaisuus: ulkoisen kalenterin (iCloud tms.) tuonti Satamaan hyväksyntäjonon kautta — ks. "Kalenterisyötteet"-osio. Kirjattu (ei toteutettu) täysi suunnitelma Horisontti-ominaisuudelle — ks. "Horisontti — suunnitelma" -osio. Toteutettu pakkauslistojen automaattinollaus — ks. "Pakkauslistan automaattinollaus" -osio, ja lisätty ensimmäinen yleiskäyttöinen toast-ilmoitusmekanismi (`naytaIlmoitus()`). Tämä muistiinpanot.md-tiedosto päätetty pitää jatkossa niin tarkkana että Copilot pystyy jatkamaan projektia pelkän tämän tiedoston varassa, koska kehityskone palautuu 2026-07-23
 
 ---
 
@@ -124,7 +124,7 @@ kauppalista/
 ├── style.css         — kuitti-tyyli, tumma/vaalea automaattisesti
 ├── script.js         — kaikki logiikka (Supabase, listat, auth, offline)
 ├── manifest.json     — PWA: nimi "Kauppalista", teema #C9A84C, icon.png, orientation "portrait"
-├── sw.js             — service worker, välimuisti v27, offline-tuki, auto-reload uudesta versiosta
+├── sw.js             — service worker, välimuisti v28, offline-tuki, auto-reload uudesta versiosta
 ├── icon.png          — 512×512 PWA-ikoni
 ├── package.json      — VAIN api/-kansion serverless-funktioiden npm-riippuvuudet (tsdav, ical.js). Etusivun vanilla-JS-puoli (index.html/script.js) EI käytä näitä eikä vaadi build-vaihetta — Vercel asentaa nämä automaattisesti vain funktioita ajaessaan.
 ├── api/
@@ -213,6 +213,7 @@ Kuitti-tyyli (Courier New), automaattinen tumma/vaalea `prefers-color-scheme`-me
 - `.eye-btn` — 52×52px SVG-silmäikoni, accent
 - `.login-btn` — kirjautumisnappi, dashed border accent, hover täyttää
 - `#signout-link` — "kirjaudu ulos", 11px, muted, opacity 0.5
+- `.toast` — itsestään katoava ilmoitusbanneri ruudun alareunassa (lisätty 2026-07-08, `naytaIlmoitus()` script.js:ssä luo elementin dynaamisesti, ei valmiina HTML:ssä), `.nakyva`-luokka ohjaa fade in/out -siirtymän
 
 ---
 
@@ -367,7 +368,7 @@ Tehty 2025-07-06:
 ## PWA
 
 - manifest.json: name "Kauppalista", theme_color "#C9A84C", `orientation: "portrait"` (2026-07-07 — iOS Safari ei kuitenkaan tue suunnan ohjelmallista lukitusta luotettavasti, joten tämä ei ole taattu toimimaan)
-- sw.js: cache version **v27** (2026-07-08) — nostettava aina kun index.html/style.css/script.js/icon.png muuttuu. **HUOM:** `/api/`-polut on tietoisesti jätetty POIS cachesta kokonaan (ks. "Kalenterisyötteet"-osio, "sw.js piti korjata tätä varten") — vain APP_FILES-listan tiedostot ja muut samaperäiset staattiset pyynnöt cachetetaan.
+- sw.js: cache version **v28** (2026-07-08) — nostettava aina kun index.html/style.css/script.js/icon.png muuttuu. **HUOM:** `/api/`-polut on tietoisesti jätetty POIS cachesta kokonaan (ks. "Kalenterisyötteet"-osio, "sw.js piti korjata tätä varten") — vain APP_FILES-listan tiedostot ja muut samaperäiset staattiset pyynnöt cachetetaan.
 - **Automaattinen päivitys** (2026-07-07): kun uusi service worker aktivoituu (`controllerchange`-tapahtuma), sivu lataa itsensä kerran uudelleen — ei enää tarvitse sulkea/avata PWA:ta moneen kertaan nähdäkseen uusimman version
 - iPhone: kotinäytöltä aukeaa kuin natiivi appi
 
@@ -459,6 +460,17 @@ Harvemmin tarvittavat listat (pakkauslistat, toistuvat pohjat) — käyttää T�
 **Listan siirto Muistilaput ↔ Varasto:** listan omista asetuksista (🔒/👥-napin takana) "Siirrä Varastoon"/"Siirrä Muistilappuihin" -nappi vaihtaa `category`-kentän. Käyttötapaus: pakkauslista siirtyy Varastosta Muistilappuihin viikkoa ennen reissua kun siitä tulee aktiivisesti hoidettava asia, takaisin Varastoon kun reissu on ohi.
 
 Esimerkkilistat siemennetty (010): Telttaretken pakkauslista, Viikon reissun pakkauslista (molemmat jaettuja, omistaja Katri).
+
+## Pakkauslistan automaattinollaus (2026-07-08)
+
+Kun minkä tahansa listan (Muistilaput TAI Varasto, sama `tuotteet`-rakenne) nimessä on sana "pakkauslista" missä tahansa muodossa (isot/pienet kirjaimet ei väliä, sana voi olla osana pidempää nimeä kuten "Telttaretken pakkauslista") JA käyttäjä täppää listan viimeisenkin rivin valmiiksi niin että KAIKKI ei-otsikkorivit ovat nyt `tehty=true`, lista nollautuu automaattisesti n. 1,5 sekunnin kuluttua takaisin tyhjäksi (`tehty=false`, `bought_at=null` kaikilla riveillä). Käyttötapaus: pakkauslistaa käytetään uudelleen joka reissulla, ei haluta täpätä kaikkea auki käsin ennen seuraavaa matkaa.
+
+**Toteutus (`script.js`):**
+- `naytaIlmoitus(teksti)` — yleiskäyttöinen, itsestään katoava ilmoitusbanneri ruudun alareunassa (`.toast`-luokka, kuitti-tyylinen). Ensimmäinen kerta kun tällainen "toast"-mekanismi on lisätty sovellukseen — voi käyttää myöhemminkin muualla, ei sidottu pakkauslistoihin.
+- `tarkistaPakkauslistanNollaus()` — kutsutaan `checkNappi`:n click-handlerista (listan tuoteriveillä, `#app-view`) HETI kun `lataaLista()` on ehtinyt päivittää `cachedTuotteet`:n tuoreella datalla. Tarkistaa nimiehdon (`currentList.name.toLowerCase().indexOf('pakkauslista') !== -1`) ja että kaikki ei-otsikko (`is_header=false`) rivit ovat `tehty=true`. Jos molemmat ehdot täyttyvät: näyttää ilmoituksen, odottaa 1500ms (`setTimeout`), sitten päivittää KAIKKI listan rivit kerralla (`.update({tehty:false, bought_at:null}).in('id', idt)`).
+- **Tarkoituksellinen suunnitteluvalinta:** laukaisu tapahtuu VIIMEISEN TÄPÄN PAINANEEN käyttäjän omassa selaimessa/koodipolussa, EI Realtime-kuuntelijana. Jos nollaus laukeaisi Realtime-tapahtumasta, KAIKKI avoinna olevat laitteet/välilehdet (myös toisen perheenjäsenen) yrittäisivät nollata saman listan samaan aikaan, ja käyttäjä voisi nähdä nollauksen tapahtuvan laitteellaan ilman että hän itse teki mitään sillä hetkellä. Nyt nollaus tapahtuu vain sen yhden käyttäjän toimesta joka fyysisesti täppäsi viimeisen rivin.
+- **Rajaus:** toimii vain, kun laite on online (`navigator.onLine`) — offline-jonon kautta tehty viimeinen täppäys ei laukaise nollausta, koska nollauksen DB-kirjoitus vaatisi oman jonologiikkansa eikä sitä ole toteutettu. Realistisesti pakkauslistaa täytetään kotona verkon kanssa, joten tätä ei pidetty tärkeänä rajoittaa enempää.
+- Väliotsikkorivit (`is_header=true`) EIVÄT lasketa mukaan "onko kaikki täpätty" -tarkistukseen eivätkä nollaudu (niillä ei ole checkboxia ollenkaan).
 
 ## Kalenteri (2026-07-07, iCloud-synkka lisätty 2026-07-08)
 
@@ -587,7 +599,7 @@ Tämä on Katrin itsensä sanelema järjestys — jos joku (Copilot mukaan lukie
 
 1. **Kahden tilin RLS-testi (Katri + Juha)** + koko "Testattavaa seuraavaksi" -lista alta — ennen tai rinnan seuraavan kanssa, EI SAA UNOHTUA
 2. **Kalenterisyötteet** (tämä osio, yllä) — max 4 päivää aikabudjetti
-3. **Pakkauslistojen automaattinollaus** — HUOM tämä oli pudonnut TODO-listalta kokonaan ennen 2026-07-08, ei ole vielä koodattu ollenkaan. Alkuperäinen toive: jos listan nimessä on "pakkauslista", ja käyttäjä täppää listan VIIMEISEN rivin (kaikki muut jo täpättyinä) → näytä ilmoitus + n. 1,5 sekunnin viive → nollaa kaikki rivit takaisin tehty=false/bought_at=null automaattisesti (käyttötapaus: pakkauslista käytetään uudelleen joka reissulla, ei haluta käsin nollata). Laukaisu pitää tehdä VIIMEISEN TÄPÄN PAINANEEN ASIAKKAAN OMASSA KOODISSA (siinä samassa funktiossa/event-handlerissa joka merkitsee rivin tehdyksi), EI erillisenä Realtime-kuuntelijana — koska Realtime laukeaisi kaikilla avoinna olevilla laitteilla/välilehdillä yhtä aikaa ja nollaus voisi täten tapahtua monta kertaa tai väärän käyttäjän laitteella ilman että hän tiesi mitä juuri tapahtui. Väliotsikkorivejä (is_header=true) EI lasketa mukaan "onko kaikki täpätty" -tarkistukseen.
+3. **Pakkauslistojen automaattinollaus** — ✓ TOTEUTETTU 2026-07-08, ks. "Pakkauslistan automaattinollaus"-osio alempana täydelle kuvaukselle.
 4. **Push-ilmoitusinfra** (VAPID-avaimet, service workerin push-kytkennät, Supabase-puolen ajastus/lähetyslogiikka) — riskialttein osa-alue teknisesti, EI saa jäädä viimeiseksi illaksi ennen 23.7.
 5. **Muistutusten perusversio** push-infran päälle rakennettuna
 6. **Oma Hytti -runko** vain jos aikaa jää — ei kriittinen 23.7. mennessä
@@ -605,7 +617,7 @@ Tämä on Katrin itsensä sanelema järjestys — jos joku (Copilot mukaan lukie
 - [ ] Horisontissa: oikea päättelylogiikka events-datasta — täysi suunnitelma valmiina "Horisontti — suunnitelma"-osiossa (tietomalli, mediaanilaskenta, V1–V4-vaiheistus), EI aloitettu koodissa. Tarkoitus toteuttaa Copilot-ajalla 23.7. jälkeen, ei kuulu 23.7. mennessä valmistuvaan E1-versioon.
 - [ ] Oma Hytti, Asetukset -näkymät (vielä pelkkiä "tulossa pian" -paikanpitäjiä)
 - [ ] Kalenteritapahtuman muokkaus jälkikäteen (nyt voi vain lisätä/poistaa, ei muuttaa nimeä/aikaa)
-- [ ] **Pakkauslistojen automaattinollaus** — EI koodattu vielä ollenkaan, ks. tarkka kuvaus yllä "Sovittu järjestys"-osion kohdassa 3
+- [x] **Pakkauslistojen automaattinollaus** — toteutettu 2026-07-08, ks. "Pakkauslistan automaattinollaus"-osio, EI vielä testattu oikealla laitteella (ks. "Testattavaa seuraavaksi")
 - [ ] **Push-ilmoitusinfra + muistutukset** — EI aloitettu ollenkaan, ks. "Sovittu järjestys"-osion kohdat 4-5
 - [ ] **Ulkoisen kalenterin tuonti Satamaan** (koodi valmis 2026-07-08, EI vielä käytetty kertaakaan oikeasti). Näin otetaan käyttöön: 1) Aja tiedosto `sql/014_kalenteri_syotteet.sql` Supabasen SQL Editorissa — tämä luo tarvittavat taulut. 2) Vercelin salasanat on jo laitettu. 3) Lisää Supabasen Table Editorista uusi rivi tauluun `kalenteri_syotteet` — tämä rivi KERTOO sovellukselle mistä kalenterista tapahtumia haetaan. Tarkat ohjeet ja mitä pitäisi näkyä, ks. "Testattavaa seuraavaksi" -osion vastaava kohta alempana.
 
@@ -613,6 +625,7 @@ Tämä on Katrin itsensä sanelema järjestys — jos joku (Copilot mukaan lukie
 
 Iso liuta uutta toiminnallisuutta kasautunut ilman kattavaa käsin-testausta oikealla laitteella/tilillä. Käy läpi:
 
+- [ ] **Pakkauslistan automaattinollaus:** avaa "Telttaretken pakkauslista" tai "Viikon reissun pakkauslista" (molemmat valmiina, ks. Varasto-osio), täppää KAIKKI rivit valmiiksi — viimeisen täpän jälkeen pitäisi näkyä ruudun alareunassa ilmoitusbanneri, ja n. 1,5 sekunnin päästä kaikkien rivien pitäisi palautua täppäämättömäksi automaattisesti. Testaa myös ettei tavallinen lista (esim. Kauppalista) nollaudu vaikka kaikki täpättäisiin
 - [ ] **Kahden tilin testi** (Katri + Juha): yhteinen lista näkyy molemmille, yksityinen lista EI näy toiselle, Kauppalista/Siivouslista/Vuosikello näkyvät kummallekin
 - [ ] Muistilaput/Varasto-listarivien raahaus (011) — pitkä painallus, järjestys pysyy uudelleenkäynnistyksen jälkeen
 - [ ] Listan siirto Muistilaput ↔ Varasto asetuksista, ja että takaisin-nuoli osuu oikeaan näkymään siirron jälkeen
