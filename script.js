@@ -237,6 +237,16 @@ let kalenteriPvm = new Date();
 const KALENTERI_KUUKAUDET = ['tammikuuta', 'helmikuuta', 'maaliskuuta', 'huhtikuuta', 'toukokuuta', 'kesäkuuta', 'heinäkuuta', 'elokuuta', 'syyskuuta', 'lokakuuta', 'marraskuuta', 'joulukuuta'];
 const KALENTERI_PAIVAT = ['sunnuntai', 'maanantai', 'tiistai', 'keskiviikko', 'torstai', 'perjantai', 'lauantai'];
 
+// Näytetäänkö Oma Hytin tänään erääntyvät tehtävät Kalenterin päivänäkymän
+// tänään-agendassa. Laitekohtainen asetus (ei synkattu Supabaseen, kuten ei
+// muutkaan tämän appin laitekohtaiset asetukset) — kytkin Asetukset-näkymässä.
+// Oletus päällä, koska tämä on nimenomaan mitä pyydettiin: näkyy kunnes
+// erikseen laitetaan pois.
+const HYTTI_KALENTERISSA_KEY = 'kauppalista_hytti_kalenterissa';
+function hyttiNakyyKalenterissa() {
+  return localStorage.getItem(HYTTI_KALENTERISSA_KEY) !== 'false';
+}
+
 function paivamaaraISO(d) {
   return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
 }
@@ -265,6 +275,36 @@ function siirraKalenteria(suunta) {
 // näkymään yhdistetty aktiivinen ankkuri (ks. rivi._tyyppi)
 function piirraKalenteriRivi(rivi) {
   const li = document.createElement('li');
+
+  // Oma Hytin tänään erääntyvä tehtävä, sulautettu tänään-agendaan (ks.
+  // hyttiNakyyKalenterissa() -asetuskytkin). Sama tietue kuin kortilla —
+  // täppäys tässä täppää sen myös kortin sisällä, ei kopiota.
+  if (rivi._tyyppi === 'hytti') {
+    const checkNappi = document.createElement('button');
+    checkNappi.textContent = '○';
+    checkNappi.className = 'check-btn';
+    checkNappi.addEventListener('click', async function() {
+      tuntopalauteValmis();
+      const { error } = await db.from('hytti_rivit').update({ done: true, done_at: new Date().toISOString() }).eq('id', rivi.id);
+      if (error) console.error('Hytti-tehtävän merkintä epäonnistui:', error);
+      lataaKalenteri();
+    });
+    li.appendChild(checkNappi);
+
+    const teksti = document.createElement('span');
+    teksti.textContent = rivi.title;
+    li.appendChild(teksti);
+
+    const ankkurointiNappi = document.createElement('button');
+    ankkurointiNappi.textContent = '⚓';
+    ankkurointiNappi.className = 'anchor-btn' + (ankkuroidutAvaimet.has('hytti:' + rivi.id) ? ' active' : '');
+    ankkurointiNappi.addEventListener('click', async function() {
+      await vaihdaAnkkurointiYleinen('hytti', rivi.id, rivi.title, function() {});
+      lataaKalenteri();
+    });
+    li.appendChild(ankkurointiNappi);
+    return li;
+  }
 
   if (rivi._tyyppi === 'ankkuri') {
     const checkNappi = document.createElement('button');
@@ -435,6 +475,22 @@ async function lataaKalenteri() {
         (ankkuridata || []).forEach(function(a) {
           rivit.push({ _tyyppi: 'ankkuri', _ankkuriId: a.id, _source: a.source, _sourceRef: a.source_ref, title: a.content, event_time: a.event_time });
         });
+      }
+
+      if (hyttiNakyyKalenterissa()) {
+        const { data: hyttiTehtavat, error: hyttiError } = await db.from('hytti_rivit')
+          .select('*, hytti_kortit!inner(status)')
+          .eq('hytti_kortit.status', 'aktiivinen')
+          .eq('is_task', true)
+          .eq('done', false)
+          .eq('due_date', paivamaaraISO(new Date()));
+        if (hyttiError) {
+          console.error('Hytin tänään-tehtävien haku kalenteriin epäonnistui:', hyttiError);
+        } else {
+          (hyttiTehtavat || []).forEach(function(r) {
+            rivit.push({ _tyyppi: 'hytti', id: r.id, title: '🚪 ' + r.content, event_time: null });
+          });
+        }
       }
     }
 
@@ -1291,6 +1347,7 @@ function avaaOsio(osio) {
   } else if (osio.route === 'asetukset') {
     showAsetuksetView();
     paivitaPushTila();
+    document.getElementById('hytti-kalenteri-toggle').checked = hyttiNakyyKalenterissa();
   } else if (osio.route === 'hytti') {
     showHyttiView();
     lataaHyttiPaanakyma();
@@ -2231,6 +2288,10 @@ document.getElementById('asetukset-back-btn').addEventListener('click', function
 });
 document.getElementById('push-lupa-btn').addEventListener('click', pyydaIlmoitusLupa);
 document.getElementById('push-testi-btn').addEventListener('click', laheteTestipush);
+document.getElementById('hytti-kalenteri-toggle').addEventListener('change', function(e) {
+  localStorage.setItem(HYTTI_KALENTERISSA_KEY, e.target.checked ? 'true' : 'false');
+  naytaIlmoitus(e.target.checked ? 'Hytin tehtävät näkyvät nyt Kalenterissa' : 'Hytin tehtävät piilotettu Kalenterista');
+});
 
 document.querySelectorAll('.kalenteri-tila-btn').forEach(function(btn) {
   btn.addEventListener('click', function() {
