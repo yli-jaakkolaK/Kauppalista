@@ -11,6 +11,35 @@ Projekti on myös **Satama-sovelluksen vaihe 1** — myöhemmin kasvaa isommaksi
 
 ---
 
+## Muutosloki (mitä tehty minäkin päivänä)
+
+Tämä osio on lyhyt päiväkirjamainen kooste — tarkka sisältö löytyy aina viitatusta osiosta alempaa. Pidetään ajan tasalla jatkossa jokaisen työskentelykerran lopuksi, jotta kuka tahansa (myös Copilot ilman pääsyä tähän keskusteluun) näkee nopeasti missä järjestyksessä asiat on rakennettu.
+
+- **2026-06-09 – 2026-07-01:** Projektin aloitus, ensimmäinen toimiva versio kauppalistasta
+- **2026-07-02:** Siirto Supabaseen (oli aluksi localStorage), kuitti-ilme, PWA-tuki (asennettava kotinäytölle), offline-toiminta, Siri-integraatio (`/api/add`)
+- **2026-07-03:** Korjattu Realtime-yhteyden katkeaminen kun PWA on ollut taustalla, kirjattu Satama 2.0 -kokonaisvisio
+- **2026-07-06:** Google-kirjautuminen, monilistatuki (voi luoda useita listoja pelkän Kauppalistan lisäksi), tapahtumaloki, oma vahvistusdialogi (ei enää selaimen ponnahdusikkunaa)
+- **2026-07-07 (iso päivä):** Väliotsikot listoihin, rivien raahausjärjestys, näkyvyysmalli + tietoturva (RLS) käyttöön KAIKILLE tauluille, Laituri (yhteinen muistilappu), koko etusivu suunniteltu uusiksi (Ankkurit + Horisontissa + navigointiruudukko), Varasto-näkymä, oma sisäinen Kalenteri (päivä/viikko/kuukausi), ⚓-ankkurointinappi, kalenteri ja ankkurit yhdistetty samaan "tänään"-näkymään — ks. "Kalenteri"-osio
+- **2026-07-08:** Isommat kuvakkeet etusivun ruudukossa + kalenterikuvake näyttää päivän numeron, ja iso uusi ominaisuus: ulkoisen kalenterin (iCloud tms.) tuonti Satamaan hyväksyntäjonon kautta — ks. "Kalenterisyötteet"-osio. Tämä muistiinpanot.md-tiedosto päätetty pitää jatkossa niin tarkkana että Copilot pystyy jatkamaan projektia pelkän tämän tiedoston varassa, koska kehityskone palautuu 2026-07-23
+
+---
+
+## Sanasto — Saman omat käsitteet
+
+Näitä nimiä käytetään ympäri tätä tiedostoa ilman että niitä aina selitetään uudelleen — jos joku (Copilot mukaan lukien) törmää johonkin näistä ensimmäistä kertaa, tästä löytyy nopea selitys. Tarkempi kuvaus löytyy aina omasta osiostaan.
+
+- **Satama** — koko projektin lopullinen nimi/visio: perheen toiminnanohjaussovellus. Tämä repo (`kauppalista`) on sen **vaihe 1 (E1)**.
+- **Muistilaput** — käyttäjän omat/jaetut tekstilistat (entinen "Listat"), esim. Kauppalista. Oma näkymänsä, ei enää suoraan etusivulla.
+- **Varasto** — samat kuin Muistilaput teknisesti, mutta harvemmin tarvittavat listat (esim. pakkauslistat). Listan voi siirtää näiden kahden välillä.
+- **Laituri** — yhteinen "keskeneräisten ajatusten" muistilista, aina näkyvissä molemmille perheenjäsenille.
+- **Ankkurit** — etusivun "tämän päivän 3 tärkeintä" -lohko. Rivit voivat tulla käsin kirjoitettuna, Muistilapuilta tai Kalenterista ⚓-napilla nostettuna.
+- **Horisontissa** — etusivun lohko "asioille jotka alkavat kaivata huomiota" (esim. milloin joku kotityö viimeksi tehty). Ei vielä toiminnallinen, vain paikkavaraus.
+- **Kalenterisyöte** — yksi ulkoinen kalenteri (esim. yksi iCloud-kalenteri tai yksi julkaistu .ics-linkki) jonka Satama lukee sisään. Jokainen syöte on yksi rivi `kalenteri_syotteet`-taulussa, ks. "Kalenterisyötteet"-osio.
+- **E1** — lyhenne "Etapista 1" eli tästä ensimmäisestä rakennusvaiheesta (Listat/Muistilaput-keskeinen), määräaika 23.7.2026.
+- **Oma Hytti, Nostot, Odottaa** — tulevien Satama-vaiheiden nimiä, EI vielä rakennettu mitään näistä, ks. "Satama 2.0 — seuraavat vaiheet" -osio.
+
+---
+
 ## Tekninen kokonaisuus
 
 - **Frontend:** Vanilla HTML/CSS/JS (ei frameworkia), PWA
@@ -521,7 +550,7 @@ Tämä on Katrin itsensä sanelema järjestys — jos joku (Copilot mukaan lukie
 - [ ] Kalenteritapahtuman muokkaus jälkikäteen (nyt voi vain lisätä/poistaa, ei muuttaa nimeä/aikaa)
 - [ ] **Pakkauslistojen automaattinollaus** — EI koodattu vielä ollenkaan, ks. tarkka kuvaus yllä "Sovittu järjestys"-osion kohdassa 3
 - [ ] **Push-ilmoitusinfra + muistutukset** — EI aloitettu ollenkaan, ks. "Sovittu järjestys"-osion kohdat 4-5
-- [ ] **Kalenterisyötteet** (014, api/caldav-sync.js) — koodi valmis, EI ajettu/testattu ollenkaan: 1) aja sql/014_kalenteri_syotteet.sql Supabaseen, 2) ympäristömuuttujat (SUPABASE_SERVICE_KEY, ICLOUD_USERNAME, ICLOUD_APP_PASSWORD) on jo asetettu Verceliin (2026-07-08), 3) lisää ensimmäinen rivi `kalenteri_syotteet`-tauluun Table Editorista (suositus: aloita `tyyppi='ics_url'` testikalenterilla, ks. "Kalenterisyötteet"-osion "Testaus ilman oikeaa työkalenteria" -kappale, ennen kuin kokeilee oikeaa iCloud-kalenteria), 4) testaa toistuva tapahtuma erikseen, ks. "Testattavaa seuraavaksi" alta
+- [ ] **Ulkoisen kalenterin tuonti Satamaan** (koodi valmis 2026-07-08, EI vielä käytetty kertaakaan oikeasti). Näin otetaan käyttöön: 1) Aja tiedosto `sql/014_kalenteri_syotteet.sql` Supabasen SQL Editorissa — tämä luo tarvittavat taulut. 2) Vercelin salasanat on jo laitettu. 3) Lisää Supabasen Table Editorista uusi rivi tauluun `kalenteri_syotteet` — tämä rivi KERTOO sovellukselle mistä kalenterista tapahtumia haetaan. Tarkat ohjeet ja mitä pitäisi näkyä, ks. "Testattavaa seuraavaksi" -osion vastaava kohta alempana.
 
 ## Testattavaa seuraavaksi (koottu 2026-07-07 session lopussa)
 
@@ -541,4 +570,10 @@ Iso liuta uutta toiminnallisuutta kasautunut ilman kattavaa käsin-testausta oik
 - [ ] Väliotsikot + otsikon-alle-kohdistettu lisäys (`#`-etuliite, napauta otsikkoa) — testattu kerran aiemmin, hyvä varmistaa ettei mikään myöhempi muutos rikkonut
 - [ ] Siri-lisäys (`/api/add`) toimii yhä RLS:n ja service_role-avaimen kanssa oikeasta puhelimesta (Shortcut), ei vain curlilla
 - [ ] Etusivun Kalenteri-laatta: isompi kuvake (34px) ja kuukausi+päivänumero näkyy oikein, myös kuun vaihtuessa
-- [ ] **Kalenterisyötteet kokonaan** (ks. "Kalenterisyötteet"-osio yllä) — ympäristömuuttujat on jo asetettu (2026-07-08), mutta sql/014 ei ole ajettu eikä yhtään syote-riviä lisätty: 1) aja sql/014_kalenteri_syotteet.sql; 2) lisää testikalenteri `tyyppi='ics_url'`, `mode='vain_varattu'` Table Editorista ja tarkista että "🔒 Varattu HH–HH" näkyy agendassa ilman mitään muuta tietoa tapahtumasta; 3) lisää oikea iCloud-kalenteri `tyyppi='icloud'`, `mode='taysi'` ja tarkista että se päätyy hyväksyntäjonoon (badge + "⏳ N odottaa" -linkki + kortit); 4) hyväksyntäkortin Ok/Hylkää-napit — Ok:n jälkeen tapahtuma näkyy agendassa värillä, Hylkää-napin painamisen jälkeen sama tapahtuma EI palaa jonoon seuraavassa synkassa; 5) toistuva tapahtuma (esim. viikoittainen harrastus) — tarkista että KAIKKI seuraavan 30 päivän esiintymät tulevat, ei vain ensimmäinen; 6) jos CalDAV-kirjautuminen epäonnistuu (401), kokeile ICLOUD_USERNAME-muuttujan vaihtamista @icloud.com-muotoon
+- [ ] **Ulkoisen kalenterin tuonti, koko putki läpi.** "Syöte" tarkoittaa tässä yhtä ulkoista kalenteria jonka Satama lukee (esim. yksi iCloud-kalenteri, tai yksi julkaistu .ics-linkki) — jokainen syöte on yksi rivi `kalenteri_syotteet`-taulussa. Testaa tässä järjestyksessä:
+  - **Vaihe 0 — pohjatyö:** aja `sql/014_kalenteri_syotteet.sql` Supabasen SQL Editorissa, jos ei vielä tehty.
+  - **Vaihe 1 — turvallinen testi ilman oikeaa dataa:** luo mikä tahansa testikalenteri (esim. uusi kalenteri omaan iCloudiin tai Google Kalenteriin), julkaise se ("Julkinen kalenteri" / "Jaa julkinen linkki" -asetus, tuottaa nettiosoitteen joka päättyy `.ics`). Lisää Supabasen Table Editorista `kalenteri_syotteet`-tauluun uusi rivi: `name` = vapaa nimi (esim. "Testi"), `tyyppi` = `ics_url`, `tunniste` = se .ics-osoite, `mode` = `vain_varattu`, `enabled` = tosi/true. Avaa sovelluksessa Kalenteri-näkymä (tämä käynnistää haun automaattisesti) ja tarkista että testikalenterin tapahtuma ilmestyy agendaan tekstillä "🔒 Varattu 18–20" (tai vastaava kellonaika) — EI näy otsikkoa, paikkaa eikä mitään muuta tietoa, vain kellonaika. Tämä todistaa että yksityisyyssuoja toimii, ennen kuin kukaan oikea työkalenteri on edes mukana.
+  - **Vaihe 2 — oikea iCloud-kalenteri, koko nimellä näkyväksi:** lisää toinen rivi `kalenteri_syotteet`-tauluun: `tyyppi` = `icloud`, `tunniste` = TÄSMÄLLEEN se nimi millä kalenteri näkyy iCloudissa (esim. "Yhteinen"), `mode` = `taysi`. Avaa Kalenteri-näkymä uudelleen. Tapahtuman EI pitäisi ilmestyä suoraan agendaan, vaan Kalenteri-näkymän yläreunaan pitäisi ilmestyä teksti "⏳ 1 odottaa hyväksyntää — näytä", ja etusivun Kalenteri-laatan kulmaan pieni numeromerkki. Tämä on tarkoituksellista — kaikki `taysi`-tilan tapahtumat pitää ensin hyväksyä käsin.
+  - **Vaihe 3 — hyväksyntä:** paina "näytä"-linkkiä, tarkista että avautuu kortti jossa tapahtuman nimi + aika + Ok/Hylkää-napit. Paina Ok → tapahtuman pitäisi ilmestyä agendaan normaalisti (nimellä, ei "Varattu"-tekstillä) ja hävitä jonosta. Kokeile toisella tapahtumalla Hylkää-nappia → tapahtuma katoaa jonosta EIKÄ saa ilmestyä sinne uudelleen kun avaat Kalenteri-näkymän myöhemmin uudelleen (tämä on tärkeä tarkistus — jos se ilmestyy takaisin, jotain on rikki).
+  - **Vaihe 4 — toistuva tapahtuma:** jos jommassakummassa testikalenterissa on viikoittain toistuva tapahtuma (esim. harrastus), tarkista että KAIKKI seuraavan 30 päivän kerrat näkyvät kalenterissa erikseen, ei vain ensimmäinen kerta.
+  - **Jos mikään ei toimi / kirjautuminen epäonnistuu:** avaa selaimen kehittäjätyökaluista tai Vercelin lokeista virheilmoitus. Jos virhe mainitsee "401" (kirjautuminen hylätty), kokeile ensin vaihtaa Vercelin `ICLOUD_USERNAME`-arvo muotoon joka päättyy `@icloud.com`.
