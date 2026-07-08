@@ -20,7 +20,7 @@ Tämä osio on lyhyt päiväkirjamainen kooste — tarkka sisältö löytyy aina
 - **2026-07-03:** Korjattu Realtime-yhteyden katkeaminen kun PWA on ollut taustalla, kirjattu Satama 2.0 -kokonaisvisio
 - **2026-07-06:** Google-kirjautuminen, monilistatuki (voi luoda useita listoja pelkän Kauppalistan lisäksi), tapahtumaloki, oma vahvistusdialogi (ei enää selaimen ponnahdusikkunaa)
 - **2026-07-07 (iso päivä):** Väliotsikot listoihin, rivien raahausjärjestys, näkyvyysmalli + tietoturva (RLS) käyttöön KAIKILLE tauluille, Laituri (yhteinen muistilappu), koko etusivu suunniteltu uusiksi (Ankkurit + Horisontissa + navigointiruudukko), Varasto-näkymä, oma sisäinen Kalenteri (päivä/viikko/kuukausi), ⚓-ankkurointinappi, kalenteri ja ankkurit yhdistetty samaan "tänään"-näkymään — ks. "Kalenteri"-osio
-- **2026-07-08:** Isommat kuvakkeet etusivun ruudukossa + kalenterikuvake näyttää päivän numeron, ja iso uusi ominaisuus: ulkoisen kalenterin (iCloud tms.) tuonti Satamaan hyväksyntäjonon kautta — ks. "Kalenterisyötteet"-osio. Tämä muistiinpanot.md-tiedosto päätetty pitää jatkossa niin tarkkana että Copilot pystyy jatkamaan projektia pelkän tämän tiedoston varassa, koska kehityskone palautuu 2026-07-23
+- **2026-07-08:** Isommat kuvakkeet etusivun ruudukossa + kalenterikuvake näyttää päivän numeron, ja iso uusi ominaisuus: ulkoisen kalenterin (iCloud tms.) tuonti Satamaan hyväksyntäjonon kautta — ks. "Kalenterisyötteet"-osio. Lisäksi kirjattu (ei toteutettu) täysi suunnitelma Horisontti-ominaisuudelle — ks. "Horisontti — suunnitelma" -osio. Tämä muistiinpanot.md-tiedosto päätetty pitää jatkossa niin tarkkana että Copilot pystyy jatkamaan projektia pelkän tämän tiedoston varassa, koska kehityskone palautuu 2026-07-23
 
 ---
 
@@ -33,7 +33,8 @@ Näitä nimiä käytetään ympäri tätä tiedostoa ilman että niitä aina sel
 - **Varasto** — samat kuin Muistilaput teknisesti, mutta harvemmin tarvittavat listat (esim. pakkauslistat). Listan voi siirtää näiden kahden välillä.
 - **Laituri** — yhteinen "keskeneräisten ajatusten" muistilista, aina näkyvissä molemmille perheenjäsenille.
 - **Ankkurit** — etusivun "tämän päivän 3 tärkeintä" -lohko. Rivit voivat tulla käsin kirjoitettuna, Muistilapuilta tai Kalenterista ⚓-napilla nostettuna.
-- **Horisontissa** — etusivun lohko "asioille jotka alkavat kaivata huomiota" (esim. milloin joku kotityö viimeksi tehty). Ei vielä toiminnallinen, vain paikkavaraus.
+- **Horisontissa** — etusivun lohko "asioille jotka alkavat kaivata huomiota" (esim. milloin joku kotityö viimeksi tehty). Ei vielä toiminnallinen, vain paikkavaraus — täysi suunnitelma ks. "Horisontti — suunnitelma" -osio.
+- **Nosto/Nostot** — yksittäinen toistuva kotihomma (esim. "imuroi", "pakastimen sulatus") jonka rytmiä Horisontti seuraa; myös tulevan Satama-vaiheen "Nostot" (kodin huoltokirja) nimi — sama data, kaksi eri käyttöliittymää.
 - **Kalenterisyöte** — yksi ulkoinen kalenteri (esim. yksi iCloud-kalenteri tai yksi julkaistu .ics-linkki) jonka Satama lukee sisään. Jokainen syöte on yksi rivi `kalenteri_syotteet`-taulussa, ks. "Kalenterisyötteet"-osio.
 - **E1** — lyhenne "Etapista 1" eli tästä ensimmäisestä rakennusvaiheesta (Listat/Muistilaput-keskeinen), määräaika 23.7.2026.
 - **Oma Hytti, Nostot, Odottaa** — tulevien Satama-vaiheiden nimiä, EI vielä rakennettu mitään näistä, ks. "Satama 2.0 — seuraavat vaiheet" -osio.
@@ -100,6 +101,8 @@ Kauppalista-rivi on olemassa alusta asti (nimi tarkalleen `'Kauppalista'`) — S
 | duration_seconds | int | ei vielä käytössä |
 
 ⚠️ **FK-ansa:** `events.list_id` viittaa `lists(id)` ilman ON DELETE -sääntöä. Kun lista poistetaan, sovellus poistaa ensin sen `events`-rivit manuaalisesti (`poistaLista()` script.js:ssä) — muuten Postgres estäisi listan poiston FK-rikkomuksena. "Poistettu"-tapahtuma itse kirjataan `list_id: null`.
+
+⚠️ **`events`-taulua EI SAA KOSKAAN tyhjentää/arkistoida/siivota vanhoja rivejä pois** (esim. "siivotaan yli vuoden vanhat tapahtumat" -tyylinen kevennys), vaikka se voisi joskus houkutella taulun kasvaessa. Syy: tuleva **Horisontti**-ominaisuus (ks. "Horisontti — suunnitelma" -osio) laskee kotihommien rytmin NIMENOMAAN tästä historiasta (`action='checked'`-rivien aikaleimoista, `target_name`-täsmäyksellä) — historian menettäminen tarkoittaisi ettei rytmiä voisi enää koskaan oppia uudelleen.
 
 **Taulu: `laituri`** — yhteinen muistilista (004), ks. Laituri-osio alla.
 
@@ -442,7 +445,7 @@ Etusivu EI ole navigointivalikko vaan päivittäinen komentokeskus. Rakenne ylh�
 
 1. **Otsikko + päivämäärä** (`paivitaPaivamaara()`, suomeksi, ei kellonaikaa/säätä — säätä ei tarkoituksella ole ollenkaan, ks. alkuperäinen visio "EI pysyvää sääruutua")
 2. **Ankkurit** — päivän 3 tärkeintä. Oma kevyt taulu `ankkurit` (content, done, sort_order, event_time, `source`/`source_ref`). Kysely `done=false order by sort_order limit 3` — kun yksi merkitään tehdyksi, seuraava nousee näkyviin ilman erillistä "ylennyslogiikkaa". Jos aktiivisia on yli 3, "+N muuta odottaa — näytä kaikki" -linkki laajentaa näkymän täyteen listaan jota voi raahata priorisoidakseen (sama yleistetty raahauslogiikka). Rivit voivat tulla kolmesta lähteestä (`source`-kenttä): `'manual'` (kirjoitettu suoraan), `'muistilaput'` (nostettu listan riviltä ⚓-napilla), `'kalenteri'` (nostettu kalenteritapahtumasta ⚓-napilla)
-3. **Horisontissa** — "asiat jotka alkavat kaivata huomiota" (EI kalenterin erääntymislista). Toistaiseksi vain tyhjä tila (`#horisontissa-empty`), koska syöttävät järjestelmät (vuosikello, siivoussuunnitelma) eivät ole vielä älykkäitä. **Tärkeä havainto:** raakadata tähän on jo olemassa — jokainen rastitus kirjautuu `events`-tauluun aikaleimalla, joten "milloin jääkaappi viimeksi pyyhitty" on jo laskettavissa. Päättelylogiikka (opitaan toistuva rytmi normaalin arjen mukaan, ei ideaalin mukaan) on oma myöhempi ongelmansa.
+3. **Horisontissa** — "asiat jotka alkavat kaivata huomiota" (EI kalenterin erääntymislista). Toistaiseksi vain tyhjä tila (`#horisontissa-empty`), koska syöttävät järjestelmät (vuosikello, siivoussuunnitelma) eivät ole vielä älykkäitä. **Täysi toteutussuunnitelma valmiina** (tietomalli, mediaanilaskenta, ehdotuslogiikka, V1–V4-vaiheistus) omassa "Horisontti — suunnitelma"-osiossaan alempana, EI vielä toteutettu koodissa.
 4. **Navigointiruudukko (2×3)**, data-ohjattu taulusta `home_sections` (key, name, icon, route, enabled, sort_order) — EI kovakoodattuja HTML-lohkoja, raahattavissa (sama yleistetty logiikka). Täyttöjärjestys: Laituri | Muistilaput / Varasto | Oma Hytti / Kalenteri / Asetukset. Toiminnallisia: `laituri`, `muistilaput`, `varasto`, `kalenteri`. Loput (`hytti`, `asetukset`) näyttävät `alert("X tulossa pian.")`.
 
 **Tärkeä nimikkeistömuutos:** "Listat" ei ole enää oma käsitteensä — se on **Muistilaput**, oma näkymänsä, EI enää suoraan etusivulla. `lataaKotinakyma()` lataa vain etusivun; `lataaListatNakymaan(containerId, kategoria)` on yleinen funktio jota sekä Muistilaput (`lataaMuistilaput()`) että Varasto (`lataaVarasto()`) käyttävät eri `category`-suodatuksella. Navigointipolku: Etusivu → Muistilaput/Varasto → yksittäinen lista, ja listanäkymän takaisin-nuoli muistaa kummasta tultiin (`listanAvausLahde`).
@@ -524,6 +527,60 @@ Oma sisäinen kalenteri Satamassa. Taulu `kalenteri_tapahtumat` (title, event_da
 - Katrin oman iCloud-tilan täyttymisen aiheuttamaa katkoa ei ratkaista koodilla
 - Ei testattu oikealla laitteella/datalla ollenkaan tätä kirjoittaessa (ympäristömuuttujat asetettu, mutta `sql/014_kalenteri_syotteet.sql` ei ole vielä ajettu eikä yhtäkään riviä `kalenteri_syotteet`-tauluun lisätty) — ks. "Testattavaa seuraavaksi" -osio lopussa
 
+## Horisontti — suunnitelma (kirjattu 2026-07-08, EI TOTEUTETTU, tarkoitus rakentaa Copilot-ajalla 23.7.2026 jälkeen)
+
+**Tämä on suunnitelma, ei koodia.** Mitään tästä osiosta ei ole vielä toteutettu — ei taulua, ei UI:ta, ei laskentaa. Katri saneli tämän tarkkana ohjeistuksena tulevaa toteutusta varten, koska hän ei itse enää ole rakentamassa tätä (kehityskone palautuu 23.7., loppuosa tehdään Copilotilla). Kirjattu tähän sanasta sanaan säilyttäen, jotta yksikään yksityiskohta (varsinkaan "MITÄ EI TEHDÄ" -kohta) ei katoa matkalla.
+
+**Yhteys "Nostot"-visioon:** taulun nimi on tarkoituksella `nostot`, ei `horisontti_ehdotukset` tms. — tämä sama data on myös se pohja jolle Satama 2.0:n tuleva **Nostot**-osio (koko "kodin huoltokirja + vuosikello", ks. "Satama 2.0 — seuraavat vaiheet" -osio, kohta 4 seitsemän paikan listassa) rakentuu myöhemmin. Horisontti (etusivun ehdotuslohko) on siis vain tämän saman datan yksi näkymä/käyttöliittymä, ei erillinen järjestelmä.
+
+**Tavoite:** Horisontti näyttää etusivulla enintään YHDEN lempeän ehdotuksen kerrallaan asiasta joka alkaa kaivata huomiota. Ehdottaa, ei vaadi — sävy on "voisiko tänään olla hyvä hetki...", EI KOSKAAN "myöhässä" tai punaista väriä. Vertailukohta on perheen oma toteutunut rytmi (opittu datasta), ei mikään ulkoinen ideaali tai siivousoppaan suositus.
+
+**Tietomalli — uusi taulu `nostot`:**
+- `id`
+- `name` (text) — TÄMÄ on avain `events`-dataan: rytmi ketjutetaan täsmäyksellä `events.target_name = nostot.name`
+- `oletus_vali_pv` (int) — siemenarvaus päivinä, käytössä kunnes dataa kertyy tarpeeksi
+- `kasin_vali_pv` (int, null = ei asetettu) — jos käyttäjä asettaa tämän käsin, se YLIKIRJOITTAA opitun välin, EIKÄ data koskaan ylikirjoita tätä takaisin
+- `kausi_alku_kk` / `kausi_loppu_kk` (int, null = ympärivuotinen) — esim. pakastimen sulatus vain syys–huhtikuu; jos jokin homma pitää tehdä kahdesti eri kausina (esim. renkaanvaihto keväällä JA syksyllä), siitä tehdään KAKSI ERI RIVIÄ, ei yhtä kahden kauden riviä
+- `snoozed_until` (date) — asetetaan kun käyttäjä painaa "ei nyt"
+- `hylkaykset_putkeen` (int, default 0)
+- `enabled` (bool)
+- ei tarvita erillistä järjestys-saraketta, Horisontti valitsee itse mikä näytetään (ks. alla)
+
+**Rytmilaskenta:**
+- Lähdedata: `events` -taulun rivit joilla `action='checked' AND target_name = nostot.name`, lasketaan peräkkäisten aikaleimojen välit päivinä
+- Opittu väli = näiden välien **MEDIAANI**, EI keskiarvo — yksi unohtunut täppäys tai poikkeuksellisen pitkä väli ei saa vääristää koko rytmiä
+- Opittu väli astuu voimaan vasta kun välejä (datapisteitä) on vähintään **3** — sitä ennen käytetään `oletus_vali_pv`:tä
+- Voimassa oleva väli = `kasin_vali_pv` ?? opittu väli ?? `oletus_vali_pv` (ensimmäinen joka ei ole null, tässä järjestyksessä)
+- **Tärkeä periaate:** kirjaamattomuus ei ole signaali mistään. Satama oppii VAIN siitä minkä se näkee (eli minkä käyttäjä on täpännyt Satamassa) eikä koskaan tulkitse hiljaisuutta "ei ole tehty" -merkiksi. Arki joka elää sovelluksen ulkopuolella on täysin ok, ei syyllistetä siitä.
+
+**Ehdotuslogiikka (etusivun Horisontti-lohko):**
+- Ehdokas = `enabled=true`, kausi voimassa (jos asetettu), ei snoozattu (`snoozed_until` mennyt tai null), kulunut aika ≥ 80 % voimassa olevasta välistä
+- Näytetään VAIN YKSI kerrallaan: se jolla `kulunut/väli`-suhde on suurin
+- **Armollisuussääntö:** jos yli n. 70 % KAIKISTA aktiivisista hommista on ylittänyt oman välinsä samaan aikaan (esim. koko perhe on ollut lomalla tai sairaana) → Horisontti hiljenee kokonaan, näyttää tyhjän tilan ilman mitään syyllistävää viestiä. Tämä estää sen että lomalta paluu näyttäisi 10 hälytystä kerralla.
+- Rivin toiminnot: ⚓ (nostaa päivän Ankkuriksi, `source='horisontti'` samalla yleisellä ankkurointimekanismilla kuin muillakin lähteillä) | "ei nyt" (snooze: siirtää `snoozed_until`:n +25 % välistä eteenpäin, minimissään 3 päivää, `hylkaykset_putkeen += 1`) | täppäys tehdyksi (kirjaa `events`-riviin `action='checked'`, jolloin rytmi karttuu ja `hylkaykset_putkeen` nollautuu)
+- Jos jokin homma saa **3 hylkäystä putkeen** ilman yhtään välissä ollutta täppäystä → se hiljenee kokonaan ehdotuksista (`enabled=false` automaattisesti), näkyy sen jälkeen VAIN Nostot-hallintanäkymässä josta sen voi herättää takaisin
+
+**Nostot-hallintanäkymä** (ei omaa etusivunappia — pääsy esim. Asetusten kautta): lista kaikista hommista, kunkin kohdalla näkyy nimi, voimassa oleva väli JA sen lähde tekstinä ("arvaus" / "opittu ~X pv" / "asetettu X pv"), kausi, enabled-kytkin. Käsin annetun välin kentän tyhjentäminen palauttaa takaisin opittuun (tai arvaukseen jos opittua ei vielä ole). Uusien hommien lisäys tässä vaiheessa VAIN tämän hallintanäkymän kautta käsin — automaattinen tunnistus (ks. V4 alla) on myöhempi asia.
+
+**Siemenpankki** (dataa, ei koodia): SQL-migraatio joka lisää n. 10–20 yleistä kotihommaa oletusväleineen ja kausineen — KAIKKI `enabled=false` OLETUKSENA, käyttäjä herättää hallintanäkymästä ne jotka koskevat omaa kotia. EI yhtään valmiiksi asetettua käsin annettua väliä (`kasin_vali_pv` aina null siemendatassa).
+
+**Peilaus, ei häpeä:** kun opittu ja käsin annettu väli eroavat selvästi toisistaan (esim. toteuma 12 päivää, käsin asetettu tavoite 7 päivää) — harvakseltaan, enintään kerran kuussa per homma — näytetään neutraali kysymys: "Tavoite X, toteuma noin Y — säädetäänkö tavoitetta vai pidetäänkö ennallaan?" Tavoite on peili johon arkea verrataan, ei häpeäkeppi jolla sitä lyödään.
+
+**Toteutusjärjestys (Copilot-vaiheistus — pieninä erillisinä paloina, tässä järjestyksessä):**
+- **V1:** `nostot`-taulu + hallintanäkymä + pelkkä "X pv edellisestä" -näyttö (ei vielä mitään ehdotuslogiikkaa etusivulla)
+- **V2:** mediaanilaskenta `events`-datasta + 80 %:n kynnyksellä ehdotus etusivun Horisontti-lohkoon + ⚓/"ei nyt"/täppäys-toiminnot
+- **V3:** siemenpankki + kausisäännöt + armollisuussääntö + 3 hylkäyksen automaattihiljennys
+- **V4** (vaatii E3:n Claude-älyn, EI tehdä ennen sitä): Laituri-kautta tulevat säännöt/kuittausmurut ("imuroin tänään" tekstinä → tunnistetaan sumealla nimiyhdistyksellä oikeaksi `nostot`-riviksi ja kirjataan `events`-tapahtumaksi automaattisesti). Jos äly on epävarma osumasta, se EI ARVAA — murun jää `'uusi'`-tilaan ihmisen käsiteltäväksi, ei koskaan väärää automaattista kirjausta.
+
+**MITÄ EI TEHDÄ TÄSSÄ OMINAISUUDESSA MISSÄÄN VAIHEESSA** (tietoisia rajoja, ei unohduksia):
+- Ei "myöhässä"-punaista tai mitään häpeämittaria
+- Ei koskaan useampaa kuin yksi ehdotus kerralla etusivulla
+- Ei pakollista kirjaamista — käyttäjä ei ole velvollinen käyttämään Horisonttia
+- Ei keskiarvoa rytmilaskennassa, aina mediaani
+- Ei koskaan käyttäjän puolesta automaattisesti asetettuja käsin-tavoitevälejä (`kasin_vali_pv` on AINA käyttäjän oma tietoinen valinta)
+
+**Mitä tämä vaatii NYKYISELTÄ (jo olemassa olevalta) koodilta jo nyt, ennen kuin Horisontti itse rakennetaan:** `events`-tauluun kirjataan edelleen kattavasti kaikki `'checked'`-tapahtumat eikä sitä KOSKAAN tyhjennetä/arkistoida — se on Horisontin ainoa mahdollinen datalähde tulevaisuudessa, ja historian menettäminen tarkoittaisi ettei rytmiä voisi enää koskaan oppia. Toistuvat kotihommat (esim. tuleva pakkauslistojen automaattinollaus, ks. "Sovittu järjestys"-osion kohta 3) tulee toteuttaa niin että RIVI PYSYY SAMANA ja vain täpätään/nollataan uudelleen — EI poisteta ja luoda uutta riviä — koska `events`-ketjun eheys (`target_name`-täsmäys) nojaa tähän.
+
 ## Sovittu järjestys 23.7.2026 asti (kirjattu 2026-07-08, Katrin oma priorisointi)
 
 Tämä on Katrin itsensä sanelema järjestys — jos joku (Copilot mukaan lukien) miettii mitä tehdä seuraavaksi, tämä lista on ensisijainen totuus, ei alempien osioiden TODO-listaus (ne ovat tarkempi sisältö kunkin kohdan alle, ei prioriteetti):
@@ -545,7 +602,7 @@ Tämä on Katrin itsensä sanelema järjestys — jos joku (Copilot mukaan lukie
 - [x] Laituri (004), navigointiruudukko (008), Ankkurit (009, 013), Varasto (010), Kalenteri (012) — kaikki ajettu
 - [ ] **Testaa molemmilla tileillä (Katri + Juha)** — tämä on ollut TODO-listalla koko session ajan, ei vielä vahvistettu. Ks. tarkka testauslista alta
 - [ ] Suunnitteluperiaate koko loppuprojektille: kaikki säädettävä dataan/tauluihin, EI kovakoodata — pääosin toteutunut (home_sections, ankkurit, kalenteri_syotteet ovat data-ohjattuja), mutta pidä mielessä jatkossakin
-- [ ] Horisontissa: oikea päättelylogiikka events-datasta (ei aloitettu)
+- [ ] Horisontissa: oikea päättelylogiikka events-datasta — täysi suunnitelma valmiina "Horisontti — suunnitelma"-osiossa (tietomalli, mediaanilaskenta, V1–V4-vaiheistus), EI aloitettu koodissa. Tarkoitus toteuttaa Copilot-ajalla 23.7. jälkeen, ei kuulu 23.7. mennessä valmistuvaan E1-versioon.
 - [ ] Oma Hytti, Asetukset -näkymät (vielä pelkkiä "tulossa pian" -paikanpitäjiä)
 - [ ] Kalenteritapahtuman muokkaus jälkikäteen (nyt voi vain lisätä/poistaa, ei muuttaa nimeä/aikaa)
 - [ ] **Pakkauslistojen automaattinollaus** — EI koodattu vielä ollenkaan, ks. tarkka kuvaus yllä "Sovittu järjestys"-osion kohdassa 3
