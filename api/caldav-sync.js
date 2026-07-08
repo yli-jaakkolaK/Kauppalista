@@ -12,17 +12,31 @@
 // lisäämään Cron-varmistus, se vaatii Vercel Pro -tason, ks. muistiinpanot.md).
 //
 // Vaatii Vercelin ympäristömuuttujat:
-//   SUPABASE_SERVICE_KEY   (sama kuin api/add.js:ssä, ohittaa RLS:n)
-//   ICLOUD_USERNAME        (Apple ID -kirjautumisosoite — jos CalDAV-login
-//                           palauttaa 401, kokeile @icloud.com-muotoa)
-//   ICLOUD_APP_PASSWORD    (appleid.apple.com:ista luotu sovelluskohtainen
-//                           salasana, EI oikea iCloud-salasana)
+//   SUPABASE_SERVICE_KEY        (sama kuin api/add.js:ssä, ohittaa RLS:n)
+//   ICLOUD_USERNAME             (Katrin Apple ID -kirjautumisosoite — jos
+//                                CalDAV-login palauttaa 401, kokeile
+//                                @icloud.com-muotoa)
+//   ICLOUD_APP_PASSWORD         (Katrin sovelluskohtainen salasana,
+//                                appleid.apple.com:ista, EI oikea iCloud-salasana)
+//   ICLOUD_USERNAME_JUHA        (sama periaate, Juhan tili)
+//   ICLOUD_APP_PASSWORD_JUHA    (sama periaate, Juhan tili)
+//
+// Useampi tili tarvitaan koska osa perheen tapahtumista elää Juhan
+// henkilökohtaisissa kalentereissa, joita Katrin tunnukset eivät näe.
+// kalenteri_syotteet.account_key ('katri'/'juha', ks. sql/017_kalenteri_tilit.sql)
+// kertoo per syöte kumman tilin tunnuksilla se haetaan — itse salasanat
+// pysyvät AINA ympäristömuuttujissa, tauluun tulee vain viittausavain.
 
 const { DAVClient } = require('tsdav');
 const ICAL = require('ical.js');
 
 const SUPABASE_URL = 'https://uctmxxeewoeydabuepye.supabase.co';
 const SUPABASE_KEY = process.env.SUPABASE_SERVICE_KEY;
+
+const TILIT = {
+  katri: { username: process.env.ICLOUD_USERNAME, password: process.env.ICLOUD_APP_PASSWORD },
+  juha: { username: process.env.ICLOUD_USERNAME_JUHA, password: process.env.ICLOUD_APP_PASSWORD_JUHA },
+};
 
 // Kuinka monta päivää eteenpäin haetaan, ja kuinka moneksi yksittäiseksi
 // esiintymäksi yksi toistuva tapahtuma puretaan enintään (aikabudjetin
@@ -131,10 +145,18 @@ function jasennaTapahtumat(icsTeksti, alkuRaja, loppuRaja) {
   return tapahtumat;
 }
 
-async function haeIcloudSyote(kalenterinNimi, alkuISO, loppuISO) {
+// accountKey ('katri'/'juha') valitsee minkä tilin ympäristömuuttujilla
+// kirjaudutaan — validoidaan tässä (per syöte, ei koko funktion alussa)
+// jotta yhden tilin puuttuvat tunnukset näkyvät VAIN sen syötteen omana
+// virheenä (Promise.allSettled) eivätkä kaada koko synkkausta.
+async function haeIcloudSyote(kalenterinNimi, alkuISO, loppuISO, accountKey) {
+  const tili = TILIT[accountKey];
+  if (!tili || !tili.username || !tili.password) {
+    throw new Error('Tilin "' + accountKey + '" iCloud-tunnukset (ICLOUD_USERNAME' + (accountKey === 'juha' ? '_JUHA' : '') + '/ICLOUD_APP_PASSWORD' + (accountKey === 'juha' ? '_JUHA' : '') + ') puuttuvat Vercelin ympäristömuuttujista');
+  }
   const client = new DAVClient({
     serverUrl: 'https://caldav.icloud.com',
-    credentials: { username: process.env.ICLOUD_USERNAME, password: process.env.ICLOUD_APP_PASSWORD },
+    credentials: { username: tili.username, password: tili.password },
     authMethod: 'Basic',
     defaultAccountType: 'caldav',
   });
@@ -185,9 +207,9 @@ module.exports = async function handler(req, res) {
   if (!SUPABASE_KEY) {
     return res.status(500).json({ error: 'SUPABASE_SERVICE_KEY puuttuu Vercelin ympäristömuuttujista' });
   }
-  if (!process.env.ICLOUD_USERNAME || !process.env.ICLOUD_APP_PASSWORD) {
-    return res.status(500).json({ error: 'ICLOUD_USERNAME/ICLOUD_APP_PASSWORD puuttuvat Vercelin ympäristömuuttujista' });
-  }
+  // Tilikohtaiset ICLOUD_*-muuttujat validoidaan per syöte haeIcloudSyote():ssa,
+  // EI tässä — jos vain toisen tilin tunnukset puuttuvat, toisen tilin
+  // syötteet silti synkkautuvat normaalisti (Promise.allSettled alla).
 
   const syotteetVastaus = await supabaseFetch('kalenteri_syotteet?select=*&enabled=eq.true');
   const syotteet = await syotteetVastaus.json();
@@ -204,6 +226,11 @@ module.exports = async function handler(req, res) {
   const alkuRaja = ICAL.Time.fromJSDate(alku, true);
   const loppuRaja = ICAL.Time.fromJSDate(loppu, true);
 
+  // Sama UID-pohjainen tunnetut-joukko toimii myös monen tilin duplikaattisuojana:
+  // jaettu perhekalenteri voi näkyä sekä Katrin että Juhan tilillä, mutta koska
+  // molemmat syötteet tuottavat saman tapahtuman UID:n, se tallentuu vain kerran
+  // — ical_uid-sarakkeen UNIQUE-rajoite + "ignore-duplicates" varmistaa tämän
+  // tietokantatasolla vaikka kaksi syötettä käsiteltäisiin samanaikaisesti.
   const tunnetutVastaus = await Promise.all([
     supabaseFetch('kalenteri_tapahtumat?select=ical_uid&ical_uid=not.is.null').then(function(r) { return r.json(); }),
     supabaseFetch('kalenteri_odottavat?select=ical_uid').then(function(r) { return r.json(); }),
@@ -218,7 +245,7 @@ module.exports = async function handler(req, res) {
   const kaikki = await Promise.allSettled(syotteet.map(async function(syote) {
     let icsTekstit;
     if (syote.tyyppi === 'icloud') {
-      icsTekstit = await haeIcloudSyote(syote.tunniste, alkuISO, loppuISO);
+      icsTekstit = await haeIcloudSyote(syote.tunniste, alkuISO, loppuISO, syote.account_key || 'katri');
     } else if (syote.tyyppi === 'ics_url') {
       icsTekstit = await haeIcsUrlSyote(syote.tunniste);
     } else {
