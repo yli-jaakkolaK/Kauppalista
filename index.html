@@ -104,9 +104,21 @@
       <button id="kalenteri-add-btn">+</button>
     </div>
 
+    <p class="section-link" id="kalenteri-odottaa-linkki" style="display:none"></p>
+
     <hr class="divider">
 
     <div id="kalenteri-sisalto"></div>
+  </div>
+
+  <div class="dialog-overlay" id="kalenteri-hyvaksynta-overlay" style="display:none">
+    <div class="dialog-box">
+      <p class="dialog-title">Uudet kalenterimerkinnät</p>
+      <div id="kalenteri-hyvaksynta-lista"></div>
+      <div class="dialog-buttons">
+        <button class="dialog-btn dialog-btn-cancel" id="kalenteri-hyvaksynta-sulje">Sulje</button>
+      </div>
+    </div>
   </div>
 
   <div class="container" id="laituri-view" style="display:none">

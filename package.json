@@ -1,0 +1,9 @@
+{
+  "name": "kauppalista",
+  "private": true,
+  "description": "Vercel serverless -funktioiden riippuvuudet (etusivun vanilla-JS-puoli ei tarvitse näitä)",
+  "dependencies": {
+    "tsdav": "^2.3.0",
+    "ical.js": "^2.2.1"
+  }
+}

@@ -342,7 +342,7 @@ h1 {
   align-items: center;
   justify-content: center;
   gap: 6px;
-  min-height: 84px;
+  min-height: 96px;
   border: 1px dashed var(--border-dash);
   margin: 0 0 -1px -1px;
   cursor: pointer;
@@ -351,7 +351,36 @@ h1 {
 }
 
 .section-tile .tile-icon {
-  font-size: 26px;
+  font-size: 34px;
+  line-height: 1;
+}
+
+.section-tile .tile-icon.tile-icon-kalenteri {
+  display: flex;
+  flex-direction: column;
+  width: 34px;
+  border: 1px solid var(--accent);
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.tile-icon-kalenteri .kal-kk {
+  display: block;
+  background: var(--accent);
+  color: var(--ground);
+  font-size: 8px;
+  letter-spacing: 0.05em;
+  text-align: center;
+  line-height: 1.6;
+}
+
+.tile-icon-kalenteri .kal-pv {
+  display: block;
+  font-size: 17px;
+  font-weight: bold;
+  line-height: 1.25;
+  text-align: center;
+  color: var(--text);
 }
 
 .section-tile .tile-label {
@@ -813,6 +842,68 @@ h1 {
 .dialog-btn-danger:active {
   background: #E24B4A;
   color: var(--ground);
+}
+
+/* Kalenterisyötteen väri: sama pallo sekä agendan riveillä (.kalenteri-vari)
+   että hyväksyntäkorteissa (.kalenteri-kortti-vari). Väri tulee data-ohjatusti
+   kalenteri_syotteet.vari-sarakkeesta (JS asettaa background-colorin inline-
+   tyylillä, ei kovakoodattuja väriluokkia) — ks. muistiinpanot.md. */
+.kalenteri-vari {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  margin-right: 8px;
+  flex-shrink: 0;
+}
+
+#kalenteri-hyvaksynta-lista {
+  max-height: 50vh;
+  overflow-y: auto;
+  margin-top: 12px;
+}
+
+.kalenteri-kortti {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 0;
+  border-bottom: 1px dashed var(--border-dash);
+}
+
+.kalenteri-kortti:last-child {
+  border-bottom: none;
+}
+
+.kalenteri-kortti-vari {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.kalenteri-kortti-teksti {
+  flex: 1;
+  font-size: 13px;
+  color: var(--text);
+  min-width: 0;
+}
+
+.kalenteri-kortti-pvm {
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.kalenteri-kortti-napit {
+  display: flex;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.kalenteri-kortti-napit .dialog-btn {
+  flex: none;
+  padding: 6px 10px;
+  font-size: 11px;
 }
 
 /* === LOGIN VIEW === */

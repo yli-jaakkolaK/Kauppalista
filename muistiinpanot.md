@@ -92,10 +92,12 @@ kauppalista/
 ├── style.css         — kuitti-tyyli, tumma/vaalea automaattisesti
 ├── script.js         — kaikki logiikka (Supabase, listat, auth, offline)
 ├── manifest.json     — PWA: nimi "Kauppalista", teema #C9A84C, icon.png, orientation "portrait"
-├── sw.js             — service worker, välimuisti v24, offline-tuki, auto-reload uudesta versiosta
+├── sw.js             — service worker, välimuisti v27, offline-tuki, auto-reload uudesta versiosta
 ├── icon.png          — 512×512 PWA-ikoni
+├── package.json      — VAIN api/-kansion serverless-funktioiden npm-riippuvuudet (tsdav, ical.js). Etusivun vanilla-JS-puoli (index.html/script.js) EI käytä näitä eikä vaadi build-vaihetta — Vercel asentaa nämä automaattisesti vain funktioita ajaessaan.
 ├── api/
-│   └── add.js        — Vercel serverless, lisää tuotteen Kauppalistaan (service_role-avain)
+│   ├── add.js          — Vercel serverless, lisää tuotteen Kauppalistaan (service_role-avain), Siri-Shortcutin käyttämä
+│   └── caldav-sync.js  — Vercel serverless, geneerinen kalenterisyötteiden veto (ks. "Kalenterisyötteet"-osio alla)
 ├── sql/
 │   ├── 001_multilist_and_events.sql   — lists/list_members/events + tuotteet.list_id
 │   ├── 002_item_headers.sql           — tuotteet.is_header (väliotsikot)
@@ -109,7 +111,8 @@ kauppalista/
 │   ├── 010_varasto.sql                — lists.category + 2 esimerkkilistaa
 │   ├── 011_lists_sort_order.sql       — lists.sort_order (raahaus)
 │   ├── 012_kalenteri.sql              — kalenteri_tapahtumat-taulu
-│   └── 013_ankkuri_aika.sql           — ankkurit.event_time
+│   ├── 013_ankkuri_aika.sql           — ankkurit.event_time
+│   └── 014_kalenteri_syotteet.sql     — kalenteri_syotteet-taulu (geneerinen ulkoisen kalenterin veto) + kalenteri_tapahtumat.syote_id/ical_uid/event_end_time + kalenteri_odottavat-taulu
 └── muistiinpanot.md  — tämä tiedosto
 ```
 
@@ -119,7 +122,7 @@ SQL-migraatiot ajetaan aina käsin Supabasen SQL Editorissa — Claude ei aja ni
 
 ## index.html — rakenne
 
-Yhdeksän näkymää/elementtiä, kaikki `display:none` alussa. Yksi yhteinen apufunktio piilottaa kaikki (`piilotaKaikkiNakymat()`), ja jokainen `showXView()` kutsuu sitä ja näyttää vain omansa — helpompi pitää synkassa kuin toistaa piilotuslogiikka joka funktiossa:
+Kymmenen näkymää/elementtiä, kaikki `display:none` alussa. Yksi yhteinen apufunktio piilottaa kaikki (`piilotaKaikkiNakymat()`), ja jokainen `showXView()` kutsuu sitä ja näyttää vain omansa — helpompi pitää synkassa kuin toistaa piilotuslogiikka joka funktiossa:
 
 1. `#login-view` — kirjautumaton, "Kirjaudu Googlella"
 2. `#home-view` — etusivu: päivämäärä, Ankkurit, Horisontissa, navigointiruudukko (`#sections-list`). Listat EIVÄT ole täällä (ks. Etusivu-osio)
@@ -130,6 +133,7 @@ Yhdeksän näkymää/elementtiä, kaikki `display:none` alussa. Yksi yhteinen ap
 7. `#app-view` — geneerinen listanäkymä, toimii millä tahansa list_id:llä (Kauppalista, Siivouslista, mikä tahansa Muistilaput/Varasto-lista)
 8. `#dialog-overlay` — kuitti-tyylinen vahvistusdialogi (poistot)
 9. `#settings-overlay` — listan omat asetukset (näkyvyyskytkin + kategorian vaihto)
+10. `#kalenteri-hyvaksynta-overlay` — kalenterisyötteistä tulleiden tapahtumien hyväksyntäkortit (ks. "Kalenterisyötteet"-osio), sama dialog-overlay/dialog-box-rakenne kuin kohdilla 8-9, mutta sisältää dynaamisesti piirretyn listan kortteja yhden kiinteän tekstin sijaan
 
 ⚠️ **DOM-järjestys on merkityksellinen:** useat näkymät jakavat samoja CSS-luokkia (`.add-item`, `.list`). `script.js` hakee `app-view`:n input/button/list-elementit `document.querySelector('#app-view .add-item input')` -tyylillä (rajattu kontekstiin) — jos rajaus joskus katoaa refaktoroinnissa, valitsin osuu vahingossa väärän näkymän ensimmäiseen samannimiseen elementtiin (tämä oli oikea bugi 2026-07-06, ks. historia-osio). Muiden näkymien omat listat/inputit on nimetty uniikeilla id:illä (`#muistilaput-list`, `#varasto-list`, `#ankkurit-list`, `#laituri-list`) juuri tämän luokkatörmäyksen välttämiseksi.
 
@@ -331,7 +335,7 @@ Tehty 2025-07-06:
 ## PWA
 
 - manifest.json: name "Kauppalista", theme_color "#C9A84C", `orientation: "portrait"` (2026-07-07 — iOS Safari ei kuitenkaan tue suunnan ohjelmallista lukitusta luotettavasti, joten tämä ei ole taattu toimimaan)
-- sw.js: cache version **v24** (2026-07-07) — nostettava aina kun index.html/style.css/script.js/icon.png muuttuu
+- sw.js: cache version **v27** (2026-07-08) — nostettava aina kun index.html/style.css/script.js/icon.png muuttuu. **HUOM:** `/api/`-polut on tietoisesti jätetty POIS cachesta kokonaan (ks. "Kalenterisyötteet"-osio, "sw.js piti korjata tätä varten") — vain APP_FILES-listan tiedostot ja muut samaperäiset staattiset pyynnöt cachetetaan.
 - **Automaattinen päivitys** (2026-07-07): kun uusi service worker aktivoituu (`controllerchange`-tapahtuma), sivu lataa itsensä kerran uudelleen — ei enää tarvitse sulkea/avata PWA:ta moneen kertaan nähdäkseen uusimman version
 - iPhone: kotinäytöltä aukeaa kuin natiivi appi
 
@@ -424,15 +428,85 @@ Harvemmin tarvittavat listat (pakkauslistat, toistuvat pohjat) — käyttää T�
 
 Esimerkkilistat siemennetty (010): Telttaretken pakkauslista, Viikon reissun pakkauslista (molemmat jaettuja, omistaja Katri).
 
-## Kalenteri (2026-07-07)
+## Kalenteri (2026-07-07, iCloud-synkka lisätty 2026-07-08)
 
-Oma sisäinen kalenteri, EI ulkoista synkkaa (perhe käyttää iOS/iCloud-kalenteria, mutta sen lukeminen webistä vaatisi CalDAV+sovelluskohtaisen salasanan — päätetty jättää myöhemmäksi, ei osa E1:tä). Taulu `kalenteri_tapahtumat` (title, event_date, event_time — ei timestamptz, ei aikavyöhykemonimutkaisuutta).
+Oma sisäinen kalenteri Satamassa. Taulu `kalenteri_tapahtumat` (title, event_date, event_time — ei timestamptz, ei aikavyöhykemonimutkaisuutta; `syote_id`/`ical_uid`/`event_end_time` lisätty 014:ssä, ks. "Kalenterisyötteet"-osio alla).
 
 - **Kolme näkymää** (`kalenteriTila`: 'paiva'/'viikko'/'kuukausi'), kaikki agenda-tyylisiä listoja (EI perinteistä ruudukkoa — sopii kapealle puhelinnäytölle ja koko sovelluksen kuitti-estetiikkaan paremmin)
 - Päivänäkymässä voi lisätä tapahtumia; viikko/kuukausi ovat selailunäkymiä jotka ryhmittävät päivän mukaan (kuukausi näyttää vain päivät joilla on tapahtumia, ei tyhjiä)
 - ‹ › -napit siirtävät edelliseen/seuraavaan päivään/viikkoon/kuukauteen
 - **Vaakatilan CSS** (ei JS-pakotus): viikkonäkymä näyttää 7 pystysaraketta rinnakkain vaakatilassa (`@media (orientation: landscape)`, `grid-template-columns: repeat(7, 1fr)`), kuukausi kahtena palstana. Käyttäjän pitää itse kääntää puhelin — **iOS Safari ei tue `screen.orientation.lock()`:ia**, joten automaattista per-näkymä-suunnanlukitusta ei voi toteuttaa luotettavasti (tunnettu, pitkäaikainen WebKit-puute)
 - **Yhdistetty tänään-agenda:** kun päivänäkymässä katsotaan TÄTÄ päivää, näkyvät sekä oikeat kalenteritapahtumat että kaikki aktiiviset (done=false) ankkurit yhdessä, ajan mukaan järjestettynä (`jarjestaAjanMukaan()`, ei-ajalliset viimeisenä). Muut päivät näyttävät vain oikeat tapahtumat. Kalenteritapahtumilla on oma ⚓-nappi joka nostaa/poistaa ne Ankkureihin samalla `vaihdaAnkkurointiYleinen()`-mekanismilla kuin Muistilaput-rivit
+
+## Kalenterisyötteet — geneerinen ulkoisen kalenterin veto (2026-07-08, uudelleensuunniteltu samana päivänä)
+
+**HUOM tälle osiolle on ollut kaksi eri suunnitelmaa saman päivän aikana** — ensimmäinen versio (kahden Apple-tilin CalDAV-pull, kolme hardkoodattua kalenterinimeä "Yhteinen"/"Sininen"/"Punainen") korvattiin heti alla kuvatulla geneerisellä syötemallilla ennen kuin ensimmäistä versiota ehdittiin ajaa Supabaseen asti. Jos jostain vanhasta muistista/viestistä löytyy mainintoja `icloud_odottavat`-taulusta, `lahde_kalenteri`-sarakkeesta tai kahdesta erillisestä Apple-tunnuksesta (APPLE_EMAIL_KATRI/APPLE_EMAIL_JUHA) — ne ovat VANHENTUNEITA, ei näy koodissa enää.
+
+**Tausta** (kontekstiksi jos joku myöhemmin miettii miksi ulkoinen kalenteriveto on ylipäätään tarpeen): perhe käyttää iCloud-kalenteria arjessa, ja siihen on ollut satunnaisia synkkakatkoja toisen lisäyksen näkymisessä toiselle. Todennäköisin syy: Katrin iCloud-tallennustila on toistuvasti lähes täynnä (kasvavat kuvat), ja Apple dokumentoi että "iCloud Calendar requires free storage before it can sync your calendar's data". Tätä ei ratkaista koodilla — ratkaisu on tallennustilan hallinta Katrin puolelta, tietoisesti jätetty auki, ei pakollinen ehto tälle ominaisuudelle.
+
+**Valittu arkkitehtuuri: YKSI yleinen syötekoneisto, ei erillisiä himmeleitä per kalenteri.** Uusi taulu `kalenteri_syotteet` listaa jokaisen ulkoisen kalenterin DATANA (nimi, tyyppi, tunniste, tila, väri, enabled) — uuden kalenterin lisääminen on Table Editor -rivinlisäys, EI koodimuutos. Tämä on tietoisesti tehty ennen kaikkea siksi että kehityskone palautuu 23.7.2026, jonka jälkeen projektia jatketaan pelkällä Copilotilla eikä sen pitäisi tarvita koskaan koskea `api/caldav-sync.js`-tiedostoon uutta kalenteria lisätessä.
+
+**Kaksi syötetyyppiä** (`kalenteri_syotteet.tyyppi`):
+- `'icloud'` — haetaan CalDAV:illa yhdellä yhteisellä Apple-tilillä (ympäristömuuttujat `ICLOUD_USERNAME`/`ICLOUD_APP_PASSWORD`). `tunniste`-sarake on tällöin CalDAV-kalenterin TARKKA näyttönimi iCloudissa (esim. "Yhteinen") — täytyy täsmätä kirjain kirjaimelta.
+- `'ics_url'` — haetaan suoraan HTTP GET:llä julkaistusta `.ics`-tiedostosta, EI vaadi mitään kirjautumista. `tunniste`-sarake on tällöin se https-osoite. Tätä käytetään mm. testaamiseen (ks. alla) ja tulevaisuudessa mahdollisesti Juhan työkalenteriin, jos työnantaja tarjoaa ICS-julkaisulinkin.
+
+**Kaksi tilaa** (`kalenteri_syotteet.mode`):
+- `'taysi'` — koko tapahtuma (nimi + aika) menee AINA hyväksyntäjonoon (`kalenteri_odottavat`-tauluun), ei koskaan suoraan läpi. **Tietoinen yksinkertaistus:** ensimmäisessä (hylätyssä) suunnitelmassa oli VEVENTin ORGANIZER-kenttään perustuva automaattihyväksyntä omille tapahtumille — tämä poistettiin, koska "yksi yleinen koneisto" -periaate voitti. Jos myöhemmin halutaan jonkun oman kalenterin ohittavan hyväksynnän aina, looginen tapa olisi lisätä kolmas mode-arvo (esim. `'taysi_auto'`) — EI ole tehty, ei pyydetty.
+- `'vain_varattu'` — yksityisyyssuoja esim. toisen työkalenterille: KAIKKI paitsi alku/loppuaika riisutaan JO TUONNISSA `api/caldav-sync.js`:ssä (funktio `varattuTapahtumaksi()`) — otsikko, paikka, osallistujat eivät koskaan päädy edes väliaikaiseen muuttujaan saati tietokantaan. Tallennettu tapahtuma näkyy agendassa suoraan tekstillä `"🔒 Varattu 18–20"` (tai `"🔒 Varattu (koko päivä)"` koko päivän tapahtumille). Ohittaa hyväksyntäjonon kokonaan koska mitään hyväksyttävää sisältöä ei ole — menee suoraan `kalenteri_tapahtumat`-tauluun.
+
+**Tietokanta (`sql/014_kalenteri_syotteet.sql`):**
+- Uusi taulu `kalenteri_syotteet` (id, name, tyyppi, tunniste, mode, vari, enabled, last_synced_at, created_at) — `vari` on hex-merkkijono (esim. `'#9B7FD4'`) jota käytetään agendan värimerkintään; jos null, JS käyttää `var(--muted)`-oletusta
+- `kalenteri_tapahtumat.syote_id` — viittaa `kalenteri_syotteet(id)`:hen, NULL jos käsin lisätty Satamassa suoraan
+- `kalenteri_tapahtumat.ical_uid` (text, unique, nullable) — iCalendarin UID (+ `#`-liite toistuvan tapahtuman yksittäiselle esiintymälle, ks. alla), estää saman tapahtuman tuomisen kahdesti. Nimetty `ical_uid` eikä `icloud_uid`, koska UID on iCalendar-formaatin oma kenttä, ei icloud-spesifinen — sama pätee ics_url-syötteisiin.
+- `kalenteri_tapahtumat.event_end_time` — tarvitaan `vain_varattu`-tilan "18–20"-näytölle, mutta käytettävissä yleisemminkin
+- Uusi taulu `kalenteri_odottavat` (id, ical_uid, syote_id, title, event_date, event_time, event_end_time, status `'odottaa'`/`'hylatty'`) — hyväksyntää odottavat `taysi`-tilan tuonnit. Pidetty ERILLÄÄN `kalenteri_tapahtumat`-taulusta, jottei tarvinnut koskea mihinkään jo toimivaan agendan hakulogiikkaan (`lataaKalenteri()` script.js:ssä suodattaa aina vain `kalenteri_tapahtumat`-taulua).
+
+**Ympäristömuuttujat** (Vercel Project Settings → Environment Variables, Production + Preview) — **jo asetettu Katrin toimesta 2026-07-08:**
+- `SUPABASE_SERVICE_KEY` — sama kuin `api/add.js`:llä jo on
+- `ICLOUD_USERNAME` — Apple ID -kirjautumisosoite. **Jos CalDAV-login palauttaa 401:** ensimmäinen kokeiltava korjaus on vaihtaa tämä `@icloud.com`-muotoon.
+- `ICLOUD_APP_PASSWORD` — appleid.apple.com:ista (Kirjautuminen ja suojaus → Sovelluskohtaiset salasanat) luotu salasana, EI oikea iCloud-salasana. Merkitty Vercelissä sensitiiviseksi.
+
+**Aikabudjetti ja tietoiset rajaukset** (max 4 päivää koko tälle ominaisuudelle sovittu, "toimiva suppea voittaa keskeneräisen täydellisen"):
+- Haetaan vain seuraavat `PAIVIA_ETEENPAIN = 30` päivää (vakio `api/caldav-sync.js`:n alussa, helppo säätää)
+- **Toistuvat tapahtumat (RRULE) puretaan itse ICAL.js:n `event.iterator()`:lla**, EI luoteta CalDAV-palvelimen valinnaiseen server-side expand -ominaisuuteen (joka oli ensimmäisessä suunnitelmassa, mutta ei toimisi `ics_url`-syötteillä joissa ei ole CalDAV-palvelinta ollenkaan) — tämä toimii YHTENÄISESTI molemmilla syötetyypeillä. Testattu käsin ennen tätä kirjoitusta esimerkki-ICS:llä (kertaluontoinen + koko päivän + viikoittain toistuva tapahtuma) — kaikki kolme tapausta tuottivat oikeat päivämäärät/kellonajat.
+- Turvaraja `MAX_ESIINTYMAA_SARJASSA = 60` per toistuva sarja, ettei viallinen/loputon RRULE voi jumittaa funktiota
+- **Ei kirjoiteta mitään takaisin iCloudiin** (pull-only) — kaksisuuntaisuus vasta kun yksisuuntainen veto on todistetusti luotettava, tämä oli eksplisiittinen päätös
+
+**Tekniset kiemurat:**
+- `api/caldav-sync.js` käyttää kirjastoja `tsdav` (CalDAV-yhteys) ja `ical.js` (iCal-jäsennys + toistuvuuden purku) — ensimmäiset npm-riippuvuudet koko projektissa, siksi `package.json`/`package-lock.json` ovat nyt olemassa juuressa. Koskevat VAIN Vercelin serverless-funktioita, eivät etusivun vanilla-JS-koodia (ei build-vaihetta index.html/script.js/style.css:lle).
+- **Aikavyöhyke hoidettu tarkoituksella erikoistapauksena:** Vercel ajaa funktiot UTC-aikavyöhykkeellä. Koko päivän tapahtumille (`ICAL.Time.isDate === true`) päivämäärä luetaan suoraan `.year`/`.month`/`.day`-kentistä, EI koskaan `toJSDate()` + paikallinen `getDate()`-reitin kautta, koska se siirtäisi päivän yhdellä taaksepäin UTC-palvelimella (todennettu käsin testillä ennen koodin kirjoittamista). Ajallisille tapahtumille kellonaika muunnetaan `Intl.DateTimeFormat('fi-FI', { timeZone: 'Europe/Helsinki', hourCycle: 'h23' })`:lla — HUOM `hourCycle: 'h23'` eikä `hour12: false`, koska jälkimmäinen tuottaa joissain ICU-versioissa "24" eikä "00" keskiyöllä.
+- `on_conflict=ical_uid` + `Prefer: resolution=ignore-duplicates` Supabase-lisäyksissä tekevät synkasta turvallisen ajaa useasti peräkkäin/päällekkäin ilman virheitä.
+- **sw.js piti korjata tätä varten:** service workerin cache-first-logiikka olisi cachennut `/api/caldav-sync`:n GET-vastauksen ensimmäisen kutsun jälkeen ja tarjoillut täsmälleen saman vastauksen ikuisesti sen jälkeen (GET-pyynnöt jäävät kiinni `caches.match()`:iin, POST-pyynnöt eivät — siksi `api/add.js` ei koskaan kärsinyt tästä). Korjattu lisäämällä `/api/`-polut samaan poikkeukseen kuin `supabase.co`-kutsuilla jo oli (`sw.js`, `fetch`-tapahtumankuuntelija) — kattaa automaattisesti kaikki tulevatkin `/api/`-endpointit.
+- **Vercel Cron ei ole käytössä:** Hobby-tason cron-jobit toimivat vain kerran vuorokaudessa eivätkä täsmällisesti (Vercel voi ajaa milloin tahansa ilmoitetun tunnin sisällä) — liian harvoin. Sen sijaan `/api/caldav-sync` kutsutaan sovelluksesta (`script.js`: `synkkaaICloud()`) aina kun Kalenteri-näkymä avataan. Jos Verceliin joskus lisätään Pro-taso ja halutaan taustalla ajastettu varmistus (esim. 5 min välein), se vaatisi `vercel.json`:iin cron-määrityksen — EI tehty, koska ei ole varmuutta onko Vercel-tilaus Pro-tasolla.
+
+**UI:**
+- Kalenteri-laatan merkki etusivulla (`.tile-badge[data-osio-key="kalenteri"]`, sama yleinen mekanismi kuin Laiturin uusien-merkillä) näyttää `kalenteri_odottavat`-rivien määrän (`status='odottaa'`), päivittyy `paivitaKalenteriBadge()`:llä
+- Kalenteri-näkymän yläosaan ilmestyy "⏳ N odottaa hyväksyntää — näytä" -linkki (`#kalenteri-odottaa-linkki`) kun jotain odottaa
+- Linkin klikkaus avaa `#kalenteri-hyvaksynta-overlay`-dialogin: yksi kortti per odottava tapahtuma, värillinen pallo (`kalenteri_syotteet.vari`, haettu FK-yhdistelmällä) kertoo lähdesyötteen, Ok siirtää `kalenteri_tapahtumat`-tauluun (ja pois odottavista), Hylkää merkitsee `status='hylatty'` — EI POISTETA, muuten sama tapahtuma tuotaisiin seuraavassa synkkauksessa uudelleen koska `ical_uid` unohtuisi
+- Agendan riveillä (`piirraKalenteriRivi()`) sama värillinen pallo (`rivi._vari`, inline `style.backgroundColor`, EI kovakoodattuja väriluokkia) kertoo minkä syötteen tapahtuma on — `lataaKalenteri()` hakee värin `kalenteri_syotteet(vari)`-upotuksella samassa kyselyssä (`select('*, kalenteri_syotteet(vari)')`)
+
+**Testaus ilman oikeaa työkalenteria — todistettu putki ennen oikeaa dataa:** koska Juhan oikeaa työkalenteria ei ole vielä olemassa/tiedossa, koko `vain_varattu`-anonymisointiputki voidaan todistaa toimivaksi jo etukäteen: luo mikä tahansa testikalenteri (iCloud tai Google Kalenteri käy), julkaise se julkiseksi ICS-linkiksi, lisää se `kalenteri_syotteet`-tauluun `tyyppi='ics_url'`, `mode='vain_varattu'`. Kun oikea työkalenteri joskus tulee, jäljellä on vain yksi datarivin lisäys — EI koodimuutosta.
+
+**Varasuunnitelma jos työnantajan kalenteri ei tue ICS-julkaisua:** monet yritykset käyttävät Microsoft Exchange/Outlookia, joka ei aina salli julkisen ICS-linkin julkaisua. Jos näin käy, vaihtoehto on Microsoft Graph API -integraatio (OAuth-kirjautuminen Juhan työtilille, ei julkinen linkki) — tämä on selvästi isompi työ (OAuth-flow, tokenin uusinta, eri API-muoto kokonaan) eikä kuulu tähän E1-versioon. Kirjattu tähän ettei unohdu jos ICS-linkki osoittautuu mahdottomaksi saada.
+
+**Tunnetut rajoitukset / ei tehty tässä vaiheessa:**
+- Ei kirjoiteta mitään takaisin iCloudiin (pull-only), ks. yllä
+- Ei organizer-pohjaista automaattihyväksyntää (tietoinen yksinkertaistus, ks. yllä "Kaksi tilaa")
+- Katrin oman iCloud-tilan täyttymisen aiheuttamaa katkoa ei ratkaista koodilla
+- Ei testattu oikealla laitteella/datalla ollenkaan tätä kirjoittaessa (ympäristömuuttujat asetettu, mutta `sql/014_kalenteri_syotteet.sql` ei ole vielä ajettu eikä yhtäkään riviä `kalenteri_syotteet`-tauluun lisätty) — ks. "Testattavaa seuraavaksi" -osio lopussa
+
+## Sovittu järjestys 23.7.2026 asti (kirjattu 2026-07-08, Katrin oma priorisointi)
+
+Tämä on Katrin itsensä sanelema järjestys — jos joku (Copilot mukaan lukien) miettii mitä tehdä seuraavaksi, tämä lista on ensisijainen totuus, ei alempien osioiden TODO-listaus (ne ovat tarkempi sisältö kunkin kohdan alle, ei prioriteetti):
+
+1. **Kahden tilin RLS-testi (Katri + Juha)** + koko "Testattavaa seuraavaksi" -lista alta — ennen tai rinnan seuraavan kanssa, EI SAA UNOHTUA
+2. **Kalenterisyötteet** (tämä osio, yllä) — max 4 päivää aikabudjetti
+3. **Pakkauslistojen automaattinollaus** — HUOM tämä oli pudonnut TODO-listalta kokonaan ennen 2026-07-08, ei ole vielä koodattu ollenkaan. Alkuperäinen toive: jos listan nimessä on "pakkauslista", ja käyttäjä täppää listan VIIMEISEN rivin (kaikki muut jo täpättyinä) → näytä ilmoitus + n. 1,5 sekunnin viive → nollaa kaikki rivit takaisin tehty=false/bought_at=null automaattisesti (käyttötapaus: pakkauslista käytetään uudelleen joka reissulla, ei haluta käsin nollata). Laukaisu pitää tehdä VIIMEISEN TÄPÄN PAINANEEN ASIAKKAAN OMASSA KOODISSA (siinä samassa funktiossa/event-handlerissa joka merkitsee rivin tehdyksi), EI erillisenä Realtime-kuuntelijana — koska Realtime laukeaisi kaikilla avoinna olevilla laitteilla/välilehdillä yhtä aikaa ja nollaus voisi täten tapahtua monta kertaa tai väärän käyttäjän laitteella ilman että hän tiesi mitä juuri tapahtui. Väliotsikkorivejä (is_header=true) EI lasketa mukaan "onko kaikki täpätty" -tarkistukseen.
+4. **Push-ilmoitusinfra** (VAPID-avaimet, service workerin push-kytkennät, Supabase-puolen ajastus/lähetyslogiikka) — riskialttein osa-alue teknisesti, EI saa jäädä viimeiseksi illaksi ennen 23.7.
+5. **Muistutusten perusversio** push-infran päälle rakennettuna
+6. **Oma Hytti -runko** vain jos aikaa jää — ei kriittinen 23.7. mennessä
+
+**21.–22.7.2026 rauhoitetaan kokonaan:** ei enää uusia ominaisuuksia, pelkkä koko testauslistan läpikäynti MOLEMMILLA tileillä (Katri + Juha) + tämän muistiinpanot.md-tiedoston loppupäivitys niin että Copilot pystyy jatkamaan siitä ilman mitään muuta kontekstia.
 
 ## TODO ennen etapin 1 valmistumista (määräaika 23.7.2026 — kehityskone palautuu silloin)
 
@@ -441,10 +515,13 @@ Oma sisäinen kalenteri, EI ulkoista synkkaa (perhe käyttää iOS/iCloud-kalent
 - [x] Raahausjärjestys: tuotteet (007), lists (011) — molemmat ajettu
 - [x] Laituri (004), navigointiruudukko (008), Ankkurit (009, 013), Varasto (010), Kalenteri (012) — kaikki ajettu
 - [ ] **Testaa molemmilla tileillä (Katri + Juha)** — tämä on ollut TODO-listalla koko session ajan, ei vielä vahvistettu. Ks. tarkka testauslista alta
-- [ ] Suunnitteluperiaate koko loppuprojektille: kaikki säädettävä dataan/tauluihin, EI kovakoodata — pääosin toteutunut (home_sections, ankkurit ovat data-ohjattuja), mutta pidä mielessä jatkossakin
+- [ ] Suunnitteluperiaate koko loppuprojektille: kaikki säädettävä dataan/tauluihin, EI kovakoodata — pääosin toteutunut (home_sections, ankkurit, kalenteri_syotteet ovat data-ohjattuja), mutta pidä mielessä jatkossakin
 - [ ] Horisontissa: oikea päättelylogiikka events-datasta (ei aloitettu)
 - [ ] Oma Hytti, Asetukset -näkymät (vielä pelkkiä "tulossa pian" -paikanpitäjiä)
 - [ ] Kalenteritapahtuman muokkaus jälkikäteen (nyt voi vain lisätä/poistaa, ei muuttaa nimeä/aikaa)
+- [ ] **Pakkauslistojen automaattinollaus** — EI koodattu vielä ollenkaan, ks. tarkka kuvaus yllä "Sovittu järjestys"-osion kohdassa 3
+- [ ] **Push-ilmoitusinfra + muistutukset** — EI aloitettu ollenkaan, ks. "Sovittu järjestys"-osion kohdat 4-5
+- [ ] **Kalenterisyötteet** (014, api/caldav-sync.js) — koodi valmis, EI ajettu/testattu ollenkaan: 1) aja sql/014_kalenteri_syotteet.sql Supabaseen, 2) ympäristömuuttujat (SUPABASE_SERVICE_KEY, ICLOUD_USERNAME, ICLOUD_APP_PASSWORD) on jo asetettu Verceliin (2026-07-08), 3) lisää ensimmäinen rivi `kalenteri_syotteet`-tauluun Table Editorista (suositus: aloita `tyyppi='ics_url'` testikalenterilla, ks. "Kalenterisyötteet"-osion "Testaus ilman oikeaa työkalenteria" -kappale, ennen kuin kokeilee oikeaa iCloud-kalenteria), 4) testaa toistuva tapahtuma erikseen, ks. "Testattavaa seuraavaksi" alta
 
 ## Testattavaa seuraavaksi (koottu 2026-07-07 session lopussa)
 
@@ -463,3 +540,5 @@ Iso liuta uutta toiminnallisuutta kasautunut ilman kattavaa käsin-testausta oik
 - [ ] Automaattinen sivun päivitys uuden servicewaorkerin jälkeen — ei enää tarvitse sulkea/avata PWA:ta moneen kertaan
 - [ ] Väliotsikot + otsikon-alle-kohdistettu lisäys (`#`-etuliite, napauta otsikkoa) — testattu kerran aiemmin, hyvä varmistaa ettei mikään myöhempi muutos rikkonut
 - [ ] Siri-lisäys (`/api/add`) toimii yhä RLS:n ja service_role-avaimen kanssa oikeasta puhelimesta (Shortcut), ei vain curlilla
+- [ ] Etusivun Kalenteri-laatta: isompi kuvake (34px) ja kuukausi+päivänumero näkyy oikein, myös kuun vaihtuessa
+- [ ] **Kalenterisyötteet kokonaan** (ks. "Kalenterisyötteet"-osio yllä) — ympäristömuuttujat on jo asetettu (2026-07-08), mutta sql/014 ei ole ajettu eikä yhtään syote-riviä lisätty: 1) aja sql/014_kalenteri_syotteet.sql; 2) lisää testikalenteri `tyyppi='ics_url'`, `mode='vain_varattu'` Table Editorista ja tarkista että "🔒 Varattu HH–HH" näkyy agendassa ilman mitään muuta tietoa tapahtumasta; 3) lisää oikea iCloud-kalenteri `tyyppi='icloud'`, `mode='taysi'` ja tarkista että se päätyy hyväksyntäjonoon (badge + "⏳ N odottaa" -linkki + kortit); 4) hyväksyntäkortin Ok/Hylkää-napit — Ok:n jälkeen tapahtuma näkyy agendassa värillä, Hylkää-napin painamisen jälkeen sama tapahtuma EI palaa jonoon seuraavassa synkassa; 5) toistuva tapahtuma (esim. viikoittainen harrastus) — tarkista että KAIKKI seuraavan 30 päivän esiintymät tulevat, ei vain ensimmäinen; 6) jos CalDAV-kirjautuminen epäonnistuu (401), kokeile ICLOUD_USERNAME-muuttujan vaihtamista @icloud.com-muotoon

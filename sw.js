@@ -1,4 +1,4 @@
-const CACHE = 'kauppalista-v24';
+const CACHE = 'kauppalista-v27';
 const APP_FILES = ['/', '/index.html', '/style.css', '/script.js', '/manifest.json', '/icon.png'];
 
 self.addEventListener('install', event => {
@@ -16,8 +16,11 @@ self.addEventListener('activate', event => {
 });
 
 self.addEventListener('fetch', event => {
-  // Supabase API-kutsut: ei cacheta, menee suoraan verkkoon
-  if (event.request.url.includes('supabase.co')) return;
+  // Supabase- ja omat /api/-kutsut: ei cacheta, menee suoraan verkkoon.
+  // /api/caldav-sync on GET-pyyntö, joka muuten jäisi kiinni alla olevaan
+  // cache-first-logiikkaan ensimmäisen kutsun jälkeen ja tarjoilisi täysin
+  // saman vastauksen loputtomiin sen sijaan että hakisi tuoretta dataa.
+  if (event.request.url.includes('supabase.co') || event.request.url.includes('/api/')) return;
 
   // Appitiedostot: cache ensin, verkko varalla
   event.respondWith(

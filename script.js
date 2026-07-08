@@ -285,6 +285,13 @@ function piirraKalenteriRivi(rivi) {
   aika.textContent = rivi.event_time ? rivi.event_time.slice(0, 5) : '';
   li.appendChild(aika);
 
+  if (rivi._vari) {
+    const vari = document.createElement('span');
+    vari.className = 'kalenteri-vari';
+    vari.style.backgroundColor = rivi._vari;
+    li.appendChild(vari);
+  }
+
   const teksti = document.createElement('span');
   teksti.textContent = rivi.title;
   li.appendChild(teksti);
@@ -374,8 +381,10 @@ async function lataaKalenteri() {
   document.getElementById('kalenteri-view').dataset.tila = kalenteriTila;
   document.getElementById('kalenteri-add-rivi').style.display = kalenteriTila === 'paiva' ? 'flex' : 'none';
 
-  const { data, error } = await db.from('kalenteri_tapahtumat')
-    .select()
+  // kalenteri_syotteet(vari) hakee liitetyn syötteen värin FK-suhteen
+  // (syote_id) kautta samassa kyselyssä — null jos käsin lisätty tapahtuma.
+  const { data: haetut, error } = await db.from('kalenteri_tapahtumat')
+    .select('*, kalenteri_syotteet(vari)')
     .gte('event_date', paivamaaraISO(alku))
     .lte('event_date', paivamaaraISO(loppu))
     .order('event_date')
@@ -386,6 +395,10 @@ async function lataaKalenteri() {
     return;
   }
 
+  const data = (haetut || []).map(function(t) {
+    return Object.assign({}, t, { _vari: t.kalenteri_syotteet ? t.kalenteri_syotteet.vari : null });
+  });
+
   await paivitaAnkkuroidutAvaimet();
 
   const sisalto = document.getElementById('kalenteri-sisalto');
@@ -393,7 +406,7 @@ async function lataaKalenteri() {
 
   if (kalenteriTila === 'paiva') {
     let rivit = (data || []).map(function(t) {
-      return { _tyyppi: 'tapahtuma', id: t.id, title: t.title, event_time: t.event_time };
+      return { _tyyppi: 'tapahtuma', id: t.id, title: t.title, event_time: t.event_time, _vari: t._vari };
     });
 
     if (paivamaaraISO(kalenteriPvm) === paivamaaraISO(new Date())) {
@@ -437,6 +450,130 @@ async function lataaKalenteri() {
     }
   }
 }
+
+// === KALENTERISYÖTTEIDEN HYVÄKSYNTÄJONO ===
+// Geneerinen kalenteri_syotteet-pohjainen pull (icloud/ics_url, taysi/vain_varattu),
+// ks. api/caldav-sync.js ja sql/014_kalenteri_syotteet.sql. Kutsutaan aina kun
+// Kalenteri-näkymä avataan — EI Vercel Cronia, koska Hobby-tason cron toimii
+// vain kerran vuorokaudessa. Virheet vaietaan (fire-and-forget, kuten
+// logEvent()) — synkan epäonnistuminen ei saa koskaan estää kalenterin käyttöä.
+function synkkaaICloud() {
+  fetch('/api/caldav-sync').then(function() {
+    paivitaOdottaaLinkki();
+    paivitaKalenteriBadge();
+  }).catch(function() {});
+}
+
+// Hakee kalenteri_odottavat-taulusta hyväksyntää odottavat rivit (+ liitetyn
+// syötteen väri/nimi FK:n kautta) ja päivittää Kalenteri-näkymän yläosan
+// linkin ("N odottaa hyväksyntää")
+async function paivitaOdottaaLinkki() {
+  const linkki = document.getElementById('kalenteri-odottaa-linkki');
+  const { data, error } = await db.from('kalenteri_odottavat')
+    .select('*, kalenteri_syotteet(vari, name)')
+    .eq('status', 'odottaa')
+    .order('event_date');
+  if (error) {
+    console.error('Odottavien kalenteritapahtumien haku epäonnistui:', error);
+    return;
+  }
+  if (!data || data.length === 0) {
+    linkki.style.display = 'none';
+    return;
+  }
+  linkki.style.display = 'block';
+  linkki.textContent = '⏳ ' + data.length + ' odottaa hyväksyntää — näytä';
+  linkki.onclick = function() { avaaHyvaksyntaOverlay(data); };
+}
+
+// Hakee etusivun Kalenteri-laatan merkin (odottavien määrä), sama mekanismi
+// kuin paivitaLaituriBadge()
+async function paivitaKalenteriBadge() {
+  const badge = document.querySelector('.tile-badge[data-osio-key="kalenteri"]');
+  if (!badge) return;
+  const { count } = await db.from('kalenteri_odottavat').select('id', { count: 'exact', head: true }).eq('status', 'odottaa');
+  if (count) {
+    badge.textContent = count;
+    badge.style.display = 'flex';
+  } else {
+    badge.style.display = 'none';
+  }
+}
+
+// Piirtää hyväksyntäkortit (otsikko + pvm/aika + värillinen lähdemerkintä +
+// Ok/Hylkää) ja avaa overlayn
+function avaaHyvaksyntaOverlay(rivit) {
+  const lista = document.getElementById('kalenteri-hyvaksynta-lista');
+  lista.innerHTML = '';
+
+  rivit.forEach(function(rivi) {
+    const kortti = document.createElement('div');
+    kortti.className = 'kalenteri-kortti';
+
+    const vari = document.createElement('span');
+    vari.className = 'kalenteri-kortti-vari';
+    vari.style.backgroundColor = rivi.kalenteri_syotteet ? (rivi.kalenteri_syotteet.vari || 'var(--muted)') : 'var(--muted)';
+    kortti.appendChild(vari);
+
+    const teksti = document.createElement('div');
+    teksti.className = 'kalenteri-kortti-teksti';
+    const pvm = new Date(rivi.event_date + 'T00:00:00');
+    const pvmTeksti = pvm.getDate() + '.' + (pvm.getMonth() + 1) + '.' + (rivi.event_time ? ' klo ' + rivi.event_time.slice(0, 5) : '');
+    const otsikkoRivi = document.createElement('strong');
+    otsikkoRivi.textContent = rivi.title;
+    const pvmRivi = document.createElement('span');
+    pvmRivi.className = 'kalenteri-kortti-pvm';
+    pvmRivi.textContent = pvmTeksti;
+    teksti.appendChild(otsikkoRivi);
+    teksti.appendChild(document.createElement('br'));
+    teksti.appendChild(pvmRivi);
+    kortti.appendChild(teksti);
+
+    const napit = document.createElement('div');
+    napit.className = 'kalenteri-kortti-napit';
+
+    const okNappi = document.createElement('button');
+    okNappi.className = 'dialog-btn dialog-btn-cancel';
+    okNappi.textContent = 'Ok';
+    okNappi.addEventListener('click', async function() {
+      await db.from('kalenteri_tapahtumat').insert({
+        title: rivi.title,
+        event_date: rivi.event_date,
+        event_time: rivi.event_time,
+        event_end_time: rivi.event_end_time,
+        ical_uid: rivi.ical_uid,
+        syote_id: rivi.syote_id,
+      });
+      await db.from('kalenteri_odottavat').delete().eq('id', rivi.id);
+      kortti.remove();
+      paivitaOdottaaLinkki();
+      paivitaKalenteriBadge();
+      lataaKalenteri();
+    });
+    napit.appendChild(okNappi);
+
+    const hylkaaNappi = document.createElement('button');
+    hylkaaNappi.className = 'dialog-btn';
+    hylkaaNappi.textContent = 'Hylkää';
+    hylkaaNappi.addEventListener('click', async function() {
+      const { error } = await db.from('kalenteri_odottavat').update({ status: 'hylatty' }).eq('id', rivi.id);
+      if (error) console.error('Kalenteritapahtuman hylkäys epäonnistui:', error);
+      kortti.remove();
+      paivitaOdottaaLinkki();
+      paivitaKalenteriBadge();
+    });
+    napit.appendChild(hylkaaNappi);
+
+    kortti.appendChild(napit);
+    lista.appendChild(kortti);
+  });
+
+  document.getElementById('kalenteri-hyvaksynta-overlay').style.display = 'flex';
+}
+
+document.getElementById('kalenteri-hyvaksynta-sulje').addEventListener('click', function() {
+  document.getElementById('kalenteri-hyvaksynta-overlay').style.display = 'none';
+});
 
 // Näyttää tämänpäiväisen päivämäärän suomeksi etusivun yläosassa
 function paivitaPaivamaara() {
@@ -549,7 +686,14 @@ async function lataaOsiot() {
 
     const ikoni = document.createElement('span');
     ikoni.className = 'tile-icon';
-    ikoni.textContent = osio.icon;
+    if (osio.key === 'kalenteri') {
+      ikoni.classList.add('tile-icon-kalenteri');
+      const tanaan = new Date();
+      const kk = KALENTERI_KUUKAUDET[tanaan.getMonth()].slice(0, 3).toUpperCase();
+      ikoni.innerHTML = '<span class="kal-kk">' + kk + '</span><span class="kal-pv">' + tanaan.getDate() + '</span>';
+    } else {
+      ikoni.textContent = osio.icon;
+    }
     tile.appendChild(ikoni);
 
     const nimi = document.createElement('span');
@@ -566,6 +710,7 @@ async function lataaOsiot() {
   });
 
   paivitaLaituriBadge();
+  paivitaKalenteriBadge();
 }
 
 // Avaa osion sen route-kentän mukaan. Vain 'laituri' on toistaiseksi toiminnallinen.
@@ -585,6 +730,8 @@ function avaaOsio(osio) {
     kalenteriPvm = new Date();
     document.querySelectorAll('.kalenteri-tila-btn').forEach(function(b) { b.classList.toggle('active', b.dataset.tila === 'paiva'); });
     lataaKalenteri();
+    paivitaOdottaaLinkki();
+    synkkaaICloud();
   } else {
     alert(osio.name + ' tulossa pian.');
   }
