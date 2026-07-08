@@ -966,6 +966,12 @@ h1 {
   color: var(--ground);
 }
 
+.settings-action-btn {
+  display: block;
+  width: 100%;
+  margin-top: 12px;
+}
+
 #signout-link {
   font-family: 'Courier New', Courier, monospace;
   font-size: 11px;

@@ -13,6 +13,7 @@ function piilotaKaikkiNakymat() {
   document.getElementById('muistilaput-view').style.display = 'none';
   document.getElementById('varasto-view').style.display = 'none';
   document.getElementById('kalenteri-view').style.display = 'none';
+  document.getElementById('asetukset-view').style.display = 'none';
 }
 
 function showLoginView() {
@@ -48,6 +49,11 @@ function showVarastoView() {
 function showKalenteriView() {
   piilotaKaikkiNakymat();
   document.getElementById('kalenteri-view').style.display = 'block';
+}
+
+function showAsetuksetView() {
+  piilotaKaikkiNakymat();
+  document.getElementById('asetukset-view').style.display = 'block';
 }
 
 // Muistaa mistä näkymästä (kategoriasta) nykyinen lista avattiin, jotta
@@ -732,6 +738,9 @@ function avaaOsio(osio) {
     lataaKalenteri();
     paivitaOdottaaLinkki();
     synkkaaICloud();
+  } else if (osio.route === 'asetukset') {
+    showAsetuksetView();
+    paivitaPushTila();
   } else {
     alert(osio.name + ' tulossa pian.');
   }
@@ -1662,6 +1671,14 @@ document.getElementById('kalenteri-back-btn').addEventListener('click', function
   lataaKotinakyma();
 });
 
+// Asetukset
+document.getElementById('asetukset-back-btn').addEventListener('click', function() {
+  showHomeView();
+  lataaKotinakyma();
+});
+document.getElementById('push-lupa-btn').addEventListener('click', pyydaIlmoitusLupa);
+document.getElementById('push-testi-btn').addEventListener('click', laheteTestipush);
+
 document.querySelectorAll('.kalenteri-tila-btn').forEach(function(btn) {
   btn.addEventListener('click', function() {
     kalenteriTila = btn.dataset.tila;
@@ -1722,6 +1739,120 @@ document.addEventListener('visibilitychange', function() {
 window.addEventListener('focus', function() {
   lataaLista();
 });
+
+// === PUSH-ILMOITUKSET ===
+// Yleiskäyttöinen web push -infra, ei sidottu mihinkään yksittäiseen
+// ominaisuuteen — perusta tuleville muistutuksille. VAPID_PUBLIC_KEY saa
+// näkyä tässä suoraan koodissa, koska julkinen avain on tarkoitettu
+// julkiseksi — vain yksityinen avain on salainen, se on vain Vercelin
+// ympäristömuuttujissa palvelinpuolella (api/push-test.js).
+const VAPID_PUBLIC_KEY = 'BBnARMtYtTabRROSxmKux3RG3LBcWsWTBhFB805RJgUKcROtJFdX6mQfUa1U2jxXBDcHK4GgkI9ZkJ8o_udhspg';
+
+function urlBase64ToUint8Array(base64String) {
+  const padding = '='.repeat((4 - base64String.length % 4) % 4);
+  const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
+  const rawData = atob(base64);
+  const outputArray = new Uint8Array(rawData.length);
+  for (let i = 0; i < rawData.length; i++) {
+    outputArray[i] = rawData.charCodeAt(i);
+  }
+  return outputArray;
+}
+
+// Päivittää Asetukset-näkymän ilmoitustekstin ja nappien näkyvyyden.
+async function paivitaPushTila() {
+  const teksti = document.getElementById('push-tila-teksti');
+  const lupaNappi = document.getElementById('push-lupa-btn');
+  const testiNappi = document.getElementById('push-testi-btn');
+
+  if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
+    teksti.textContent = 'Tämä selain ei tue ilmoituksia.';
+    lupaNappi.style.display = 'none';
+    testiNappi.style.display = 'none';
+    return;
+  }
+
+  if (Notification.permission === 'denied') {
+    teksti.textContent = 'Ilmoitukset on estetty. Salli ne puhelimen omista asetuksista (Safari/Satama-appi) ja avaa tämä näkymä uudelleen.';
+    lupaNappi.style.display = 'none';
+    testiNappi.style.display = 'none';
+    return;
+  }
+
+  const rekisterointi = await navigator.serviceWorker.ready;
+  const tilaus = await rekisterointi.pushManager.getSubscription();
+
+  if (Notification.permission === 'granted' && tilaus) {
+    teksti.textContent = 'Ilmoitukset ovat käytössä tällä laitteella.';
+    lupaNappi.style.display = 'none';
+    testiNappi.style.display = 'block';
+  } else {
+    teksti.textContent = 'Ilmoitukset eivät ole vielä käytössä tällä laitteella.';
+    lupaNappi.style.display = 'block';
+    testiNappi.style.display = 'none';
+  }
+}
+
+// Kutsutaan VAIN napin klikkauksesta — iOS vaatii että lupakysely lähtee
+// suoraan käyttäjän omasta eleestä, ei koskaan automaattisesti sivun
+// avautuessa (Notification.requestPermission() hylätään hiljaa jos sitä
+// yritetään kutsua ilman tuoretta käyttäjän eleitä).
+async function pyydaIlmoitusLupa() {
+  const lupa = await Notification.requestPermission();
+  if (lupa !== 'granted') {
+    await paivitaPushTila();
+    return;
+  }
+
+  const rekisterointi = await navigator.serviceWorker.ready;
+  const tilaus = await rekisterointi.pushManager.subscribe({
+    userVisibleOnly: true,
+    applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY),
+  });
+
+  const json = tilaus.toJSON();
+  const { error } = await db.from('push_tilaukset').upsert({
+    user_id: currentUserId,
+    endpoint: json.endpoint,
+    p256dh: json.keys.p256dh,
+    auth: json.keys.auth,
+  }, { onConflict: 'endpoint' });
+
+  if (error) {
+    console.error('Push-tilauksen tallennus epäonnistui:', error);
+    document.getElementById('push-tila-teksti').textContent = 'Tilauksen tallennus epäonnistui, yritä uudelleen.';
+    return;
+  }
+
+  await paivitaPushTila();
+}
+
+async function laheteTestipush() {
+  const testiNappi = document.getElementById('push-testi-btn');
+  testiNappi.disabled = true;
+  const alkuperainenTeksti = testiNappi.textContent;
+  testiNappi.textContent = 'Lähetetään...';
+
+  try {
+    const { data: sessioData } = await db.auth.getSession();
+    const token = sessioData.session ? sessioData.session.access_token : null;
+    const response = await fetch('/api/push-test', {
+      method: 'POST',
+      headers: { Authorization: 'Bearer ' + token },
+    });
+    const tulos = await response.json();
+    if (!response.ok) {
+      naytaIlmoitus('Testipush epäonnistui: ' + (tulos.error || response.status));
+    } else {
+      naytaIlmoitus('Testipush lähetetty (' + tulos.lahetetty + ' laitteelle)');
+    }
+  } catch (e) {
+    naytaIlmoitus('Testipush epäonnistui: ' + e.message);
+  }
+
+  testiNappi.disabled = false;
+  testiNappi.textContent = alkuperainenTeksti;
+}
 
 // === AUTH ===
 

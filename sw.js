@@ -1,4 +1,4 @@
-const CACHE = 'kauppalista-v28';
+const CACHE = 'kauppalista-v29';
 const APP_FILES = ['/', '/index.html', '/style.css', '/script.js', '/manifest.json', '/icon.png'];
 
 self.addEventListener('install', event => {
@@ -31,6 +31,40 @@ self.addEventListener('fetch', event => {
         }
         return response;
       });
+    })
+  );
+});
+
+// Yleiskäyttöinen push-käsittelijä — ei sidottu mihinkään yksittäiseen
+// ominaisuuteen (testipush, tulevat muistutukset ym. käyttävät samaa).
+// Payload on aina JSON: { title, body }. Jos jäsennys epäonnistuu jostain
+// syystä, näytetään silti geneerinen ilmoitus ettei push katoa hiljaa.
+self.addEventListener('push', event => {
+  let data = { title: 'Satama', body: '' };
+  try {
+    if (event.data) data = Object.assign(data, event.data.json());
+  } catch (e) {
+    data.body = event.data ? event.data.text() : '';
+  }
+  event.waitUntil(
+    self.registration.showNotification(data.title, {
+      body: data.body,
+      icon: '/icon.png',
+      badge: '/icon.png',
+    })
+  );
+});
+
+// Ilmoituksen napautus: fokusoi jo auki oleva PWA-ikkuna jos sellainen on,
+// muuten avaa uuden.
+self.addEventListener('notificationclick', event => {
+  event.notification.close();
+  event.waitUntil(
+    self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then(clientList => {
+      for (const client of clientList) {
+        if ('focus' in client) return client.focus();
+      }
+      if (self.clients.openWindow) return self.clients.openWindow('/');
     })
   );
 });

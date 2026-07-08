@@ -20,7 +20,7 @@ Tämä osio on lyhyt päiväkirjamainen kooste — tarkka sisältö löytyy aina
 - **2026-07-03:** Korjattu Realtime-yhteyden katkeaminen kun PWA on ollut taustalla, kirjattu Satama 2.0 -kokonaisvisio
 - **2026-07-06:** Google-kirjautuminen, monilistatuki (voi luoda useita listoja pelkän Kauppalistan lisäksi), tapahtumaloki, oma vahvistusdialogi (ei enää selaimen ponnahdusikkunaa)
 - **2026-07-07 (iso päivä):** Väliotsikot listoihin, rivien raahausjärjestys, näkyvyysmalli + tietoturva (RLS) käyttöön KAIKILLE tauluille, Laituri (yhteinen muistilappu), koko etusivu suunniteltu uusiksi (Ankkurit + Horisontissa + navigointiruudukko), Varasto-näkymä, oma sisäinen Kalenteri (päivä/viikko/kuukausi), ⚓-ankkurointinappi, kalenteri ja ankkurit yhdistetty samaan "tänään"-näkymään — ks. "Kalenteri"-osio
-- **2026-07-08:** Isommat kuvakkeet etusivun ruudukossa + kalenterikuvake näyttää päivän numeron, ja iso uusi ominaisuus: ulkoisen kalenterin (iCloud tms.) tuonti Satamaan hyväksyntäjonon kautta — ks. "Kalenterisyötteet"-osio. Kirjattu (ei toteutettu) täydet suunnitelmat kahdelle tulevalle ominaisuudelle: Horisontti (ks. "Horisontti — suunnitelma") ja Ohjebanneri-järjestelmä (ks. "Ohjebanneri-järjestelmä — suunnitelma", toteutetaan Hytin yhteydessä). Toteutettu pakkauslistojen automaattinollaus — ks. "Pakkauslistan automaattinollaus" -osio, ja lisätty ensimmäinen yleiskäyttöinen toast-ilmoitusmekanismi (`naytaIlmoitus()`). Tämä muistiinpanot.md-tiedosto päätetty pitää jatkossa niin tarkkana että Copilot pystyy jatkamaan projektia pelkän tämän tiedoston varassa, koska kehityskone palautuu 2026-07-23
+- **2026-07-08:** Isommat kuvakkeet etusivun ruudukossa + kalenterikuvake näyttää päivän numeron, ja iso uusi ominaisuus: ulkoisen kalenterin (iCloud tms.) tuonti Satamaan hyväksyntäjonon kautta — ks. "Kalenterisyötteet"-osio. Kirjattu (ei toteutettu) täydet suunnitelmat kahdelle tulevalle ominaisuudelle: Horisontti (ks. "Horisontti — suunnitelma") ja Ohjebanneri-järjestelmä (ks. "Ohjebanneri-järjestelmä — suunnitelma", toteutetaan Hytin yhteydessä). Toteutettu pakkauslistojen automaattinollaus — ks. "Pakkauslistan automaattinollaus" -osio, ja lisätty ensimmäinen yleiskäyttöinen toast-ilmoitusmekanismi (`naytaIlmoitus()`). Toteutettu web push -infra (VAPID-avaimet, tilaus, testilähetys, ensimmäinen kevyt Asetukset-näkymä) — ks. "Push-ilmoitukset"-osio, valmisteltu illan kahden puhelimen testisessiota varten. Tämä muistiinpanot.md-tiedosto päätetty pitää jatkossa niin tarkkana että Copilot pystyy jatkamaan projektia pelkän tämän tiedoston varassa, koska kehityskone palautuu 2026-07-23
 
 ---
 
@@ -39,6 +39,7 @@ Näitä nimiä käytetään ympäri tätä tiedostoa ilman että niitä aina sel
 - **E1** — lyhenne "Etapista 1" eli tästä ensimmäisestä rakennusvaiheesta (Listat/Muistilaput-keskeinen), määräaika 23.7.2026.
 - **Oma Hytti, Nostot, Odottaa** — tulevien Satama-vaiheiden nimiä, EI vielä rakennettu mitään näistä, ks. "Satama 2.0 — seuraavat vaiheet" -osio.
 - **Ohjebanneri** — suunniteltu (ei toteutettu) osioiden sisäänrakennettu ohjeteksti-mekanismi, kuittaus tietokantaan, sama sisältö aina myös Asetuksista löydettävissä. Täysi suunnitelma ks. "Ohjebanneri-järjestelmä" -osio.
+- **VAPID-avaimet** — web push -ilmoitusten vaatima avainpari (julkinen avain koodissa, yksityinen Vercelin ympäristömuuttujissa), todistaa push-palvelulle että viesti tulee oikealta lähettäjältä. Ks. "Push-ilmoitukset" -osio.
 
 ---
 
@@ -125,12 +126,13 @@ kauppalista/
 ├── style.css         — kuitti-tyyli, tumma/vaalea automaattisesti
 ├── script.js         — kaikki logiikka (Supabase, listat, auth, offline)
 ├── manifest.json     — PWA: nimi "Kauppalista", teema #C9A84C, icon.png, orientation "portrait"
-├── sw.js             — service worker, välimuisti v28, offline-tuki, auto-reload uudesta versiosta
+├── sw.js             — service worker, välimuisti v29, offline-tuki, auto-reload uudesta versiosta, push-käsittelijät
 ├── icon.png          — 512×512 PWA-ikoni
-├── package.json      — VAIN api/-kansion serverless-funktioiden npm-riippuvuudet (tsdav, ical.js). Etusivun vanilla-JS-puoli (index.html/script.js) EI käytä näitä eikä vaadi build-vaihetta — Vercel asentaa nämä automaattisesti vain funktioita ajaessaan.
+├── package.json      — VAIN api/-kansion serverless-funktioiden npm-riippuvuudet (tsdav, ical.js, web-push). Etusivun vanilla-JS-puoli (index.html/script.js) EI käytä näitä eikä vaadi build-vaihetta — Vercel asentaa nämä automaattisesti vain funktioita ajaessaan.
 ├── api/
 │   ├── add.js          — Vercel serverless, lisää tuotteen Kauppalistaan (service_role-avain), Siri-Shortcutin käyttämä
-│   └── caldav-sync.js  — Vercel serverless, geneerinen kalenterisyötteiden veto (ks. "Kalenterisyötteet"-osio alla)
+│   ├── caldav-sync.js  — Vercel serverless, geneerinen kalenterisyötteiden veto (ks. "Kalenterisyötteet"-osio alla)
+│   └── push-test.js    — Vercel serverless, lähettää testi-push-ilmoituksen kirjautuneen käyttäjän tilauksiin (ks. "Push-ilmoitukset"-osio alla)
 ├── sql/
 │   ├── 001_multilist_and_events.sql   — lists/list_members/events + tuotteet.list_id
 │   ├── 002_item_headers.sql           — tuotteet.is_header (väliotsikot)
@@ -145,7 +147,8 @@ kauppalista/
 │   ├── 011_lists_sort_order.sql       — lists.sort_order (raahaus)
 │   ├── 012_kalenteri.sql              — kalenteri_tapahtumat-taulu
 │   ├── 013_ankkuri_aika.sql           — ankkurit.event_time
-│   └── 014_kalenteri_syotteet.sql     — kalenteri_syotteet-taulu (geneerinen ulkoisen kalenterin veto) + kalenteri_tapahtumat.syote_id/ical_uid/event_end_time + kalenteri_odottavat-taulu
+│   ├── 014_kalenteri_syotteet.sql     — kalenteri_syotteet-taulu (geneerinen ulkoisen kalenterin veto) + kalenteri_tapahtumat.syote_id/ical_uid/event_end_time + kalenteri_odottavat-taulu
+│   └── 015_push_tilaukset.sql         — push_tilaukset-taulu (web push -tilaukset)
 └── muistiinpanot.md  — tämä tiedosto
 ```
 
@@ -155,7 +158,7 @@ SQL-migraatiot ajetaan aina käsin Supabasen SQL Editorissa — Claude ei aja ni
 
 ## index.html — rakenne
 
-Kymmenen näkymää/elementtiä, kaikki `display:none` alussa. Yksi yhteinen apufunktio piilottaa kaikki (`piilotaKaikkiNakymat()`), ja jokainen `showXView()` kutsuu sitä ja näyttää vain omansa — helpompi pitää synkassa kuin toistaa piilotuslogiikka joka funktiossa:
+Yksitoista näkymää/elementtiä, kaikki `display:none` alussa. Yksi yhteinen apufunktio piilottaa kaikki (`piilotaKaikkiNakymat()`), ja jokainen `showXView()` kutsuu sitä ja näyttää vain omansa — helpompi pitää synkassa kuin toistaa piilotuslogiikka joka funktiossa:
 
 1. `#login-view` — kirjautumaton, "Kirjaudu Googlella"
 2. `#home-view` — etusivu: päivämäärä, Ankkurit, Horisontissa, navigointiruudukko (`#sections-list`). Listat EIVÄT ole täällä (ks. Etusivu-osio)
@@ -167,6 +170,7 @@ Kymmenen näkymää/elementtiä, kaikki `display:none` alussa. Yksi yhteinen apu
 8. `#dialog-overlay` — kuitti-tyylinen vahvistusdialogi (poistot)
 9. `#settings-overlay` — listan omat asetukset (näkyvyyskytkin + kategorian vaihto)
 10. `#kalenteri-hyvaksynta-overlay` — kalenterisyötteistä tulleiden tapahtumien hyväksyntäkortit (ks. "Kalenterisyötteet"-osio), sama dialog-overlay/dialog-box-rakenne kuin kohdilla 8-9, mutta sisältää dynaamisesti piirretyn listan kortteja yhden kiinteän tekstin sijaan
+11. `#asetukset-view` — ensimmäinen kevyt Asetukset-runko (2026-07-08), toistaiseksi vain Ilmoitukset-lohko (ks. "Push-ilmoitukset"-osio)
 
 ⚠️ **DOM-järjestys on merkityksellinen:** useat näkymät jakavat samoja CSS-luokkia (`.add-item`, `.list`). `script.js` hakee `app-view`:n input/button/list-elementit `document.querySelector('#app-view .add-item input')` -tyylillä (rajattu kontekstiin) — jos rajaus joskus katoaa refaktoroinnissa, valitsin osuu vahingossa väärän näkymän ensimmäiseen samannimiseen elementtiin (tämä oli oikea bugi 2026-07-06, ks. historia-osio). Muiden näkymien omat listat/inputit on nimetty uniikeilla id:illä (`#muistilaput-list`, `#varasto-list`, `#ankkurit-list`, `#laituri-list`) juuri tämän luokkatörmäyksen välttämiseksi.
 
@@ -215,6 +219,7 @@ Kuitti-tyyli (Courier New), automaattinen tumma/vaalea `prefers-color-scheme`-me
 - `.login-btn` — kirjautumisnappi, dashed border accent, hover täyttää
 - `#signout-link` — "kirjaudu ulos", 11px, muted, opacity 0.5
 - `.toast` — itsestään katoava ilmoitusbanneri ruudun alareunassa (lisätty 2026-07-08, `naytaIlmoitus()` script.js:ssä luo elementin dynaamisesti, ei valmiina HTML:ssä), `.nakyva`-luokka ohjaa fade in/out -siirtymän
+- `.settings-action-btn` — täysleveä toimintonappi Asetukset-näkymässä (lisätty 2026-07-08), käytetään yhdessä `.login-btn`:n kanssa (`class="login-btn settings-action-btn"`) samalla ulkoasulla mutta koko leveydellä pinottuna
 
 ---
 
@@ -369,7 +374,8 @@ Tehty 2025-07-06:
 ## PWA
 
 - manifest.json: name "Kauppalista", theme_color "#C9A84C", `orientation: "portrait"` (2026-07-07 — iOS Safari ei kuitenkaan tue suunnan ohjelmallista lukitusta luotettavasti, joten tämä ei ole taattu toimimaan)
-- sw.js: cache version **v28** (2026-07-08) — nostettava aina kun index.html/style.css/script.js/icon.png muuttuu. **HUOM:** `/api/`-polut on tietoisesti jätetty POIS cachesta kokonaan (ks. "Kalenterisyötteet"-osio, "sw.js piti korjata tätä varten") — vain APP_FILES-listan tiedostot ja muut samaperäiset staattiset pyynnöt cachetetaan.
+- sw.js: cache version **v29** (2026-07-08) — nostettava aina kun index.html/style.css/script.js/icon.png muuttuu. **HUOM:** `/api/`-polut on tietoisesti jätetty POIS cachesta kokonaan (ks. "Kalenterisyötteet"-osio, "sw.js piti korjata tätä varten") — vain APP_FILES-listan tiedostot ja muut samaperäiset staattiset pyynnöt cachetetaan.
+- sw.js sisältää myös `push`- ja `notificationclick`-tapahtumankuuntelijat (2026-07-08) — ks. "Push-ilmoitukset"-osio.
 - **Automaattinen päivitys** (2026-07-07): kun uusi service worker aktivoituu (`controllerchange`-tapahtuma), sivu lataa itsensä kerran uudelleen — ei enää tarvitse sulkea/avata PWA:ta moneen kertaan nähdäkseen uusimman version
 - iPhone: kotinäytöltä aukeaa kuin natiivi appi
 
@@ -540,6 +546,40 @@ Oma sisäinen kalenteri Satamassa. Taulu `kalenteri_tapahtumat` (title, event_da
 - Katrin oman iCloud-tilan täyttymisen aiheuttamaa katkoa ei ratkaista koodilla
 - Ei testattu oikealla laitteella/datalla ollenkaan tätä kirjoittaessa (ympäristömuuttujat asetettu, mutta `sql/014_kalenteri_syotteet.sql` ei ole vielä ajettu eikä yhtäkään riviä `kalenteri_syotteet`-tauluun lisätty) — ks. "Testattavaa seuraavaksi" -osio lopussa
 
+## Push-ilmoitukset (2026-07-08)
+
+Yleiskäyttöinen web push -infra — EI sidottu mihinkään yksittäiseen ominaisuuteen, vaan perusta kaikelle tulevalle joka tarvitsee ilmoituksia (muistutukset, Horisontti-ehdotukset, kalenterisyötteiden hyväksyntäjonon herätteet ym.). Tässä vaiheessa rakennettu VAIN tilaus + manuaalinen testilähetys — AJASTETTUA lähetystä (esim. cron joka tarkistaa erääntyviä muistutuksia) EI ole vielä, se tulee omana myöhempänä palasenaan kun ensimmäinen oikea muistutusominaisuus rakennetaan.
+
+**VAPID-avainpari** generoitu `web-push`-kirjastolla 2026-07-08. Julkinen avain on suoraan `script.js`:ssä koodissa (`VAPID_PUBLIC_KEY`-vakio) — tämä on tarkoituksellista, julkinen avain SAA näkyä selaimelle, vain yksityinen avain on salainen. Yksityinen avain on Vercelin ympäristömuuttujissa:
+- `VAPID_PUBLIC_KEY` / `VAPID_PRIVATE_KEY` (sensitive) / `VAPID_SUBJECT` (muotoa `mailto:joku@osoite.fi` — mikä tahansa toimiva sähköposti kelpaa, push-palvelut käyttävät tätä vain hätätapauksessa ottaakseen yhteyttä lähettäjään)
+- **Nämä on jo asetettu Vercelin puolella 2026-07-08** — jos joskus generoidaan uusi avainpari (esim. vanha vuotaa), KAIKKI olemassa olevat `push_tilaukset`-rivit lakkaavat toimimasta ja käyttäjien pitää tilata ilmoitukset uudelleen, koska selaimen tilaus on sidottu siihen avainpariin jolla se luotiin.
+
+**Tietokanta (`sql/015_push_tilaukset.sql`):** taulu `push_tilaukset` (user_id, endpoint UNIQUE, p256dh, auth, failed_count). RLS: käyttäjä hallitsee vain omia rivejään (select/insert/update/delete kaikki `auth.uid() = user_id`) — UPDATE-policy tarvitaan koska frontend käyttää `upsert`:ia (sama laite voi tilata uudelleen, silloin `ON CONFLICT (endpoint) DO UPDATE` -haara vaatii UPDATE-oikeuden RLS:ssä, ei riitä pelkkä INSERT-policy). Itse lähetys (`api/push-test.js`) käyttää service_role-avainta ja ohittaa RLS:n kokonaan — tavallinen käyttäjä ei koskaan lähetä pushia suoraan.
+
+**sw.js:** kaksi uutta tapahtumankuuntelijaa:
+- `push` — näyttää ilmoituksen (`self.registration.showNotification`). Payload on aina JSON `{title, body}`; jos JSON-jäsennys epäonnistuu, näytetään silti geneerinen ilmoitus tekstillä ettei push katoa täysin hiljaa.
+- `notificationclick` — sulkee ilmoituksen ja joko fokusoi jo auki olevan PWA-ikkunan tai avaa uuden. Ei reititä mihinkään tiettyyn näkymään (esim. suoraan Kalenteriin) — tämä on tarkoituksellista yksinkertaisuutta ensimmäisessä versiossa, voidaan tarkentaa myöhemmin jos tarpeen.
+
+**Frontend (`script.js`, uusi "PUSH-ILMOITUKSET"-osio):**
+- `paivitaPushTila()` — tarkistaa selaintuen, `Notification.permission`-tilan (`'granted'`/`'denied'`/`'default'`) ja onko `pushManager.getSubscription()` jo olemassa, päivittää Asetukset-näkymän tekstin ja nappien näkyvyyden sen mukaan
+- `pyydaIlmoitusLupa()` — kutsutaan VAIN "Salli ilmoitukset" -napin klikkauksesta, EI koskaan automaattisesti sivun latautuessa. Tämä on iOS:n vaatimus: `Notification.requestPermission()` pitää laueta suoraan käyttäjän omasta napinpainalluksesta, muuten selain hylkää pyynnön hiljaisesti. Onnistuneen luvan jälkeen tilataan `pushManager.subscribe(...)` ja tallennetaan tilaus (`endpoint`/`p256dh`/`auth`) Supabaseen `upsert`:illa (`onConflict: 'endpoint'`, jottei sama laite luo tuplariviä jos se tilaa uudelleen).
+- `laheteTestipush()` — "Lähetä testi-ilmoitus" -napin handleri, hakee oman istunnon `access_token`:n (`db.auth.getSession()`) ja lähettää sen `Authorization: Bearer`-headerissa `/api/push-test`:lle, joka tunnistaa käyttäjän sillä (ks. alla). Tulos näytetään `naytaIlmoitus()`-toastilla (sama mekanismi kuin pakkauslistan nollauksessa).
+- `urlBase64ToUint8Array()` — vakioapufunktio VAPID-julkisen avaimen muuntamiseksi `pushManager.subscribe()`:n vaatimaan `Uint8Array`-muotoon, ei mitään Satama-spesifistä.
+
+**Asetukset-näkymä (`#asetukset-view`, UUSI, `index.html`):** ensimmäinen kevyt runko Asetukset-osiolle (aiemmin pelkkä "tulossa pian" -alert). Toistaiseksi vain "🔔 Ilmoitukset" -lohko: tilateksti + "Salli ilmoitukset" / "Lähetä testi-ilmoitus" -napit (`.settings-action-btn`-luokka, täysleveä nappi, tyylillisesti sama kuin `.login-btn`). `avaaOsio()`:n `route === 'asetukset'` -haara avaa tämän näkymän `alert()`:n sijaan.
+
+**`api/push-test.js`:** tunnistaa kutsujan `Authorization: Bearer <access_token>` -headerista kutsumalla Supabasen `/auth/v1/user`-endpointia (EI service_role-tunnistusta, oikea käyttäjä-JWT) — näin funktio ei koskaan voi vahingossa lähettää pushia väärälle käyttäjälle. Hakee vain SEN käyttäjän `push_tilaukset`-rivit, lähettää jokaiseen `web-push`:lla. Jos push-palvelu vastaa 404/410 (tilaus ei ole enää voimassa, esim. appi poistettu laitteelta), rivi poistetaan automaattisesti `push_tilaukset`-taulusta. Muun virheen sattuessa `failed_count`-sarake kasvaa (ei vielä käytössä mihinkään logiikkaan, kerää dataa mahdollista myöhempää "poista jos epäonnistunut N kertaa" -siivousta varten).
+
+**iOS-reunaehdot (tärkeitä muistaa testatessa):**
+- Push toimii VAIN kotinäytölle asennetussa PWA:ssa, ei tavallisessa Safari-välilehdessä, ja vaatii iOS 16.4+
+- Ilmoitus on tavallinen järjestelmäilmoitus, EI herätyskellomainen kriittinen hälytys (ei toimi jos puhelin on Älä häiritse -tilassa/mykistetty, ei omaa erillistä lupatasoa)
+- Jos käyttäjä on joskus evännyt luvan, sitä EI voi enää kysyä uudelleen `Notification.requestPermission()`:lla — täytyy mennä puhelimen omiin asetuksiin (Safarin PWA-asetukset per sivusto) ja sallia sieltä käsin. `paivitaPushTila()` näyttää tästä selkeän tekstin (`Notification.permission === 'denied'` -haara) sen sijaan että nappi vain ei tekisi mitään
+
+**Ei vielä tehty / seuraava askel (oma myöhempi työnsä, ei tässä):**
+- Ajastettu lähetys (esim. Vercel-funktio joka tarkistaa erääntyviä muistutuksia ja lähettää automaattisesti) — vaatii saman Hobby-cron-rajoitteen huomioimisen kuin Kalenterisyötteissä (ks. sen osion "Vercel Cron ei ole käytössä" -kohta)
+- Ilmoituksen napautuksen reitittäminen tiettyyn näkymään (nyt vain fokusoi/avaa appin etusivulle)
+- `failed_count`:in käyttö automaattiseen tilauksen poistoon toistuvien epäonnistumisten jälkeen
+
 ## Horisontti — suunnitelma (kirjattu 2026-07-08, EI TOTEUTETTU, tarkoitus rakentaa Copilot-ajalla 23.7.2026 jälkeen)
 
 **Tämä on suunnitelma, ei koodia.** Mitään tästä osiosta ei ole vielä toteutettu — ei taulua, ei UI:ta, ei laskentaa. Katri saneli tämän tarkkana ohjeistuksena tulevaa toteutusta varten, koska hän ei itse enää ole rakentamassa tätä (kehityskone palautuu 23.7., loppuosa tehdään Copilotilla). Kirjattu tähän sanasta sanaan säilyttäen, jotta yksikään yksityiskohta (varsinkaan "MITÄ EI TEHDÄ" -kohta) ei katoa matkalla.
@@ -621,7 +661,7 @@ Tämä on Katrin itsensä sanelema järjestys — jos joku (Copilot mukaan lukie
 1. **Kahden tilin RLS-testi (Katri + Juha)** + koko "Testattavaa seuraavaksi" -lista alta — ennen tai rinnan seuraavan kanssa, EI SAA UNOHTUA
 2. **Kalenterisyötteet** (tämä osio, yllä) — max 4 päivää aikabudjetti
 3. **Pakkauslistojen automaattinollaus** — ✓ TOTEUTETTU 2026-07-08, ks. "Pakkauslistan automaattinollaus"-osio alempana täydelle kuvaukselle.
-4. **Push-ilmoitusinfra** (VAPID-avaimet, service workerin push-kytkennät, Supabase-puolen ajastus/lähetyslogiikka) — riskialttein osa-alue teknisesti, EI saa jäädä viimeiseksi illaksi ennen 23.7.
+4. **Push-ilmoitusinfra** — ✓ TOTEUTETTU 2026-07-08 (tilaus + manuaalinen testilähetys, ks. "Push-ilmoitukset"-osio). EI vielä testattu oikeilla laitteilla — tämä on illan testisession pääasia. Ajastettu lähetys (muistutukset) on oma myöhempi työnsä, ei kuulu tähän.
 5. **Muistutusten perusversio** push-infran päälle rakennettuna
 6. **Oma Hytti -runko** vain jos aikaa jää — ei kriittinen 23.7. mennessä
 
@@ -639,13 +679,15 @@ Tämä on Katrin itsensä sanelema järjestys — jos joku (Copilot mukaan lukie
 - [ ] Oma Hytti, Asetukset -näkymät (vielä pelkkiä "tulossa pian" -paikanpitäjiä). Kun Hytti aloitetaan, rakennetaan samalla Ohjebanneri-järjestelmä (ks. oma osio, täysi suunnitelma valmiina) — se on suunniteltu nimenomaan Hytin ensimmäiseksi käyttökohteeksi
 - [ ] Kalenteritapahtuman muokkaus jälkikäteen (nyt voi vain lisätä/poistaa, ei muuttaa nimeä/aikaa)
 - [x] **Pakkauslistojen automaattinollaus** — toteutettu 2026-07-08, ks. "Pakkauslistan automaattinollaus"-osio, EI vielä testattu oikealla laitteella (ks. "Testattavaa seuraavaksi")
-- [ ] **Push-ilmoitusinfra + muistutukset** — EI aloitettu ollenkaan, ks. "Sovittu järjestys"-osion kohdat 4-5
+- [x] **Push-ilmoitusinfra** (tilaus + testilähetys) — toteutettu 2026-07-08, ks. "Push-ilmoitukset"-osio, EI vielä testattu oikeilla laitteilla (ks. "Testattavaa seuraavaksi")
+- [ ] **Muistutukset** (ajastettu push push-infran päälle) — EI aloitettu, ks. "Sovittu järjestys"-osion kohta 5
 - [ ] **Ulkoisen kalenterin tuonti Satamaan** (koodi valmis 2026-07-08, EI vielä käytetty kertaakaan oikeasti). Näin otetaan käyttöön: 1) Aja tiedosto `sql/014_kalenteri_syotteet.sql` Supabasen SQL Editorissa — tämä luo tarvittavat taulut. 2) Vercelin salasanat on jo laitettu. 3) Lisää Supabasen Table Editorista uusi rivi tauluun `kalenteri_syotteet` — tämä rivi KERTOO sovellukselle mistä kalenterista tapahtumia haetaan. Tarkat ohjeet ja mitä pitäisi näkyä, ks. "Testattavaa seuraavaksi" -osion vastaava kohta alempana.
 
 ## Testattavaa seuraavaksi (koottu 2026-07-07 session lopussa)
 
 Iso liuta uutta toiminnallisuutta kasautunut ilman kattavaa käsin-testausta oikealla laitteella/tilillä. Käy läpi:
 
+- [ ] **Push-ilmoitukset, illan pääkohde:** aja `sql/015_push_tilaukset.sql` ensin. Avaa Satama molemmilla puhelimilla (KOTINÄYTÖLLE ASENNETTUNA, ei Safarissa suoraan — muuten ei toimi). Avaa Asetukset-osio (etusivun ruudukko), paina "Salli ilmoitukset" — iOS kysyy luvan, hyväksy. Napin pitäisi vaihtua "Lähetä testi-ilmoitus" -napiksi. Paina sitä ja tarkista että ilmoitus tulee näkyviin PUHELIMEN ILMOITUSKESKUKSEEN, myös kun sovellus on kokonaan suljettu taustalla (ei vain auki selaimessa). Testaa molemmilla puhelimilla erikseen — kummankin pitäisi saada oma ilmoituksensa riippumatta toisesta. Jos "Salli ilmoitukset" ei tee mitään tai virhe tulee, tarkista onko puhelimen omissa asetuksissa (Asetukset → Safari → [sivuston] ilmoitukset tai kotinäytön appin omat asetukset) ilmoitukset jo aiemmin evätty — silloin täytyy sallia sieltä käsin ensin
 - [ ] **Pakkauslistan automaattinollaus:** avaa "Telttaretken pakkauslista" tai "Viikon reissun pakkauslista" (molemmat valmiina, ks. Varasto-osio), täppää KAIKKI rivit valmiiksi — viimeisen täpän jälkeen pitäisi näkyä ruudun alareunassa ilmoitusbanneri, ja n. 1,5 sekunnin päästä kaikkien rivien pitäisi palautua täppäämättömäksi automaattisesti. Testaa myös ettei tavallinen lista (esim. Kauppalista) nollaudu vaikka kaikki täpättäisiin
 - [ ] **Kahden tilin testi** (Katri + Juha): yhteinen lista näkyy molemmille, yksityinen lista EI näy toiselle, Kauppalista/Siivouslista/Vuosikello näkyvät kummallekin
 - [ ] Muistilaput/Varasto-listarivien raahaus (011) — pitkä painallus, järjestys pysyy uudelleenkäynnistyksen jälkeen
