@@ -373,6 +373,23 @@ function piirraKalenteriRivi(rivi) {
   teksti.textContent = rivi.title;
   li.appendChild(teksti);
 
+  // "Yksi totuus, kaksi ikkunaa": tapahtuma näkyy AINA agendassa, mutta jos
+  // sen on tuonut toinen käyttäjä (tai tekijää ei tunnistettu) eikä minä ole
+  // vielä kuitannut, pieni merkki muistuttaa siitä — napautus kuittaa suoraan
+  // agendasta, ei pakota kuittausjono-overlayn kautta kulkemaan.
+  if (onkoUusiMinulle(rivi)) {
+    const uusiMerkki = document.createElement('span');
+    uusiMerkki.className = 'kalenteri-uusi-merkki';
+    uusiMerkki.textContent = 'uusi';
+    uusiMerkki.title = 'Kuittaa nähdyksi';
+    uusiMerkki.addEventListener('click', async function() {
+      await kuittaa(rivi.ical_uid);
+      lataaKalenteri();
+      paivitaKuittausTila();
+    });
+    li.appendChild(uusiMerkki);
+  }
+
   const ankkurointiNappi = document.createElement('button');
   ankkurointiNappi.textContent = '⚓';
   ankkurointiNappi.className = 'anchor-btn' + (ankkuroidutAvaimet.has('kalenteri:' + rivi.id) ? ' active' : '');
@@ -498,7 +515,7 @@ async function lataaKalenteri() {
   if (kalenteriTila === 'paiva') {
     const tanaanIso = paivamaaraISO(kalenteriPvm);
     let rivit = data.filter(function(t) { return tapahtumaKattaaPaivan(t, tanaanIso); }).map(function(t) {
-      return { _tyyppi: 'tapahtuma', id: t.id, title: t.title, event_time: t.event_time, _vari: t._vari };
+      return { _tyyppi: 'tapahtuma', id: t.id, title: t.title, event_time: t.event_time, _vari: t._vari, ical_uid: t.ical_uid, user_id: t.user_id };
     });
 
     if (tanaanIso === paivamaaraISO(new Date())) {
@@ -690,59 +707,95 @@ function piirraKuukausiRuudukko(sisalto, kaikkiTapahtumat, kuluvaKuukausi) {
   sisalto.appendChild(ruudukko);
 }
 
-// === KALENTERISYÖTTEIDEN HYVÄKSYNTÄJONO ===
-// Geneerinen kalenteri_syotteet-pohjainen pull (icloud/ics_url, taysi/vain_varattu),
-// ks. api/caldav-sync.js ja sql/014_kalenteri_syotteet.sql. Kutsutaan aina kun
-// Kalenteri-näkymä avataan — EI Vercel Cronia, koska Hobby-tason cron toimii
-// vain kerran vuorokaudessa. Virheet vaietaan (fire-and-forget, kuten
-// logEvent()) — synkan epäonnistuminen ei saa koskaan estää kalenterin käyttöä.
+// === KALENTERIN KUITTAUSJONO ===
+// "Yksi totuus, kaksi ikkunaa" (2026-07-08 illalla, ks. muistiinpanot.md
+// omalla otsikolla): kaikki synkatut tapahtumat (icloud/ics_url,
+// taysi/vain_varattu) ovat AINA suoraan näkyvissä agendassa — EI enää
+// erillistä hyväksyntäjonoa joka piilottaisi ne. Toisen käyttäjän lisäämät
+// (tai tekijää ei tunnistettu, ks. sql/021_kalenteri_kuittausjono.sql)
+// saavat "uusi"-merkinnän kunnes KUITATAAN — kuittaus on "nähty", ei portti,
+// EI koskaan poista tapahtumaa (jos meno on väärässä kalenterissa, se
+// siirretään iPhonen Kalenterissa, synkka peilaa muutoksen tänne).
 function synkkaaICloud() {
   fetch('/api/caldav-sync').then(function() {
-    paivitaOdottaaLinkki();
-    paivitaKalenteriBadge();
+    paivitaKuittausTila();
   }).catch(function() {});
 }
 
-// Hakee kalenteri_odottavat-taulusta hyväksyntää odottavat rivit (+ liitetyn
-// syötteen väri/nimi FK:n kautta) ja päivittää Kalenteri-näkymän yläosan
-// linkin ("N odottaa hyväksyntää")
-async function paivitaOdottaaLinkki() {
-  const linkki = document.getElementById('kalenteri-odottaa-linkki');
-  const { data, error } = await db.from('kalenteri_odottavat')
+// Kirjautuneen käyttäjän omat kuittaukset — sama Set-pohjainen kuvio kuin
+// ankkuroidutAvaimet.
+let kuitatutUidt = new Set();
+async function paivitaKuitatutUidt() {
+  const { data, error } = await db.from('kalenteri_kuittaukset').select('ical_uid');
+  if (error) {
+    console.error('Kuittausten haku epäonnistui:', error);
+    return;
+  }
+  kuitatutUidt = new Set((data || []).map(function(r) { return r.ical_uid; }));
+}
+
+// Onko tapahtuma "uusi minulle": synkattu (ical_uid asetettu), tekijä on joku
+// muu kuin minä TAI tekijää ei tunnistettu (user_id NULL, turvallinen
+// oletus), ja en ole vielä kuitannut sitä. Käsin lisätyt (ical_uid null)
+// eivät voi olla "uusia" — ne ovat aina omia, kuittausjono ei koske niitä.
+function onkoUusiMinulle(rivi) {
+  if (!rivi.ical_uid) return false;
+  if (rivi.user_id === currentUserId) return false;
+  return !kuitatutUidt.has(rivi.ical_uid);
+}
+
+async function kuittaa(icalUid) {
+  const { error } = await db.from('kalenteri_kuittaukset').upsert(
+    { ical_uid: icalUid, user_id: currentUserId },
+    { onConflict: 'ical_uid,user_id' }
+  );
+  if (error) console.error('Kuittaus epäonnistui:', error);
+  kuitatutUidt.add(icalUid);
+}
+
+// Kaikki tällä hetkellä "uudet minulle" -rivit — tallennettu tähän "Kuittaa
+// kaikki" -napin käyttöön, jottei tarvitse hakea uudelleen.
+let kuittausjonoUudet = [];
+
+// Hakee kaikki synkatut tapahtumat, suodattaa "uudet minulle" -rivit ja
+// päivittää Kalenteri-näkymän yläosan linkin + etusivun Kalenteri-laatan merkin.
+async function paivitaKuittausTila() {
+  await paivitaKuitatutUidt();
+  const { data, error } = await db.from('kalenteri_tapahtumat')
     .select('*, kalenteri_syotteet(vari, name)')
-    .eq('status', 'odottaa')
+    .not('ical_uid', 'is', null)
     .order('event_date');
   if (error) {
-    console.error('Odottavien kalenteritapahtumien haku epäonnistui:', error);
+    console.error('Kuittausjonon haku epäonnistui:', error);
     return;
   }
-  if (!data || data.length === 0) {
+  kuittausjonoUudet = (data || []).filter(onkoUusiMinulle);
+
+  const linkki = document.getElementById('kalenteri-kuittaus-linkki');
+  if (kuittausjonoUudet.length === 0) {
     linkki.style.display = 'none';
-    return;
-  }
-  linkki.style.display = 'block';
-  linkki.textContent = '⏳ ' + data.length + ' odottaa hyväksyntää — näytä';
-  linkki.onclick = function() { avaaHyvaksyntaOverlay(data); };
-}
-
-// Hakee etusivun Kalenteri-laatan merkin (odottavien määrä), sama mekanismi
-// kuin paivitaLaituriBadge()
-async function paivitaKalenteriBadge() {
-  const badge = document.querySelector('.tile-badge[data-osio-key="kalenteri"]');
-  if (!badge) return;
-  const { count } = await db.from('kalenteri_odottavat').select('id', { count: 'exact', head: true }).eq('status', 'odottaa');
-  if (count) {
-    badge.textContent = count;
-    badge.style.display = 'flex';
   } else {
-    badge.style.display = 'none';
+    linkki.style.display = 'block';
+    linkki.textContent = '🆕 ' + kuittausjonoUudet.length + ' uutta — näytä';
+    linkki.onclick = function() { avaaKuittausOverlay(kuittausjonoUudet); };
+  }
+
+  const badge = document.querySelector('.tile-badge[data-osio-key="kalenteri"]');
+  if (badge) {
+    if (kuittausjonoUudet.length) {
+      badge.textContent = kuittausjonoUudet.length;
+      badge.style.display = 'flex';
+    } else {
+      badge.style.display = 'none';
+    }
   }
 }
 
-// Piirtää hyväksyntäkortit (otsikko + pvm/aika + värillinen lähdemerkintä +
-// Ok/Hylkää) ja avaa overlayn
-function avaaHyvaksyntaOverlay(rivit) {
-  const lista = document.getElementById('kalenteri-hyvaksynta-lista');
+// Piirtää kuittauskortit (otsikko + pvm/aika + värillinen lähdemerkintä +
+// yksi "✓ Kuittaa" -nappi, EI Hylkää-nappia — kuittaus ei koskaan poista
+// tapahtumaa) ja avaa overlayn.
+function avaaKuittausOverlay(rivit) {
+  const lista = document.getElementById('kalenteri-kuittaus-lista');
   lista.innerHTML = '';
 
   rivit.forEach(function(rivi) {
@@ -775,48 +828,41 @@ function avaaHyvaksyntaOverlay(rivit) {
     const napit = document.createElement('div');
     napit.className = 'kalenteri-kortti-napit';
 
-    const okNappi = document.createElement('button');
-    okNappi.className = 'dialog-btn dialog-btn-cancel';
-    okNappi.textContent = 'Ok';
-    okNappi.addEventListener('click', async function() {
-      await db.from('kalenteri_tapahtumat').insert({
-        title: rivi.title,
-        event_date: rivi.event_date,
-        event_time: rivi.event_time,
-        event_end_time: rivi.event_end_time,
-        event_end_date: rivi.event_end_date,
-        ical_uid: rivi.ical_uid,
-        syote_id: rivi.syote_id,
-      });
-      await db.from('kalenteri_odottavat').delete().eq('id', rivi.id);
+    const kuittaaNappi = document.createElement('button');
+    kuittaaNappi.className = 'dialog-btn dialog-btn-cancel';
+    kuittaaNappi.textContent = '✓ Kuittaa';
+    kuittaaNappi.addEventListener('click', async function() {
+      await kuittaa(rivi.ical_uid);
       kortti.remove();
-      paivitaOdottaaLinkki();
-      paivitaKalenteriBadge();
+      paivitaKuittausTila();
       lataaKalenteri();
     });
-    napit.appendChild(okNappi);
-
-    const hylkaaNappi = document.createElement('button');
-    hylkaaNappi.className = 'dialog-btn';
-    hylkaaNappi.textContent = 'Hylkää';
-    hylkaaNappi.addEventListener('click', async function() {
-      const { error } = await db.from('kalenteri_odottavat').update({ status: 'hylatty' }).eq('id', rivi.id);
-      if (error) console.error('Kalenteritapahtuman hylkäys epäonnistui:', error);
-      kortti.remove();
-      paivitaOdottaaLinkki();
-      paivitaKalenteriBadge();
-    });
-    napit.appendChild(hylkaaNappi);
+    napit.appendChild(kuittaaNappi);
 
     kortti.appendChild(napit);
     lista.appendChild(kortti);
   });
 
-  document.getElementById('kalenteri-hyvaksynta-overlay').style.display = 'flex';
+  document.getElementById('kalenteri-kuittaus-overlay').style.display = 'flex';
 }
 
-document.getElementById('kalenteri-hyvaksynta-sulje').addEventListener('click', function() {
-  document.getElementById('kalenteri-hyvaksynta-overlay').style.display = 'none';
+document.getElementById('kalenteri-kuittaus-sulje').addEventListener('click', function() {
+  document.getElementById('kalenteri-kuittaus-overlay').style.display = 'none';
+});
+
+document.getElementById('kalenteri-kuittaa-kaikki').addEventListener('click', async function() {
+  if (kuittausjonoUudet.length === 0) return;
+  const rivitInsert = kuittausjonoUudet.map(function(r) { return { ical_uid: r.ical_uid, user_id: currentUserId }; });
+  const { error } = await db.from('kalenteri_kuittaukset').upsert(rivitInsert, { onConflict: 'ical_uid,user_id' });
+  if (error) {
+    console.error('Kuittaa kaikki epäonnistui:', error);
+    return;
+  }
+  const maara = kuittausjonoUudet.length;
+  document.getElementById('kalenteri-kuittaus-overlay').style.display = 'none';
+  await paivitaKuittausTila();
+  lataaKalenteri();
+  naytaIlmoitus('Kuitattu ' + maara + ' merkintää');
 });
 
 // === OMA HYTTI ===
@@ -1492,7 +1538,7 @@ async function lataaOsiot() {
   });
 
   paivitaLaituriBadge();
-  paivitaKalenteriBadge();
+  paivitaKuittausTila();
 }
 
 // Avaa osion sen route-kentän mukaan. Vain 'laituri' on toistaiseksi toiminnallinen.
@@ -1512,7 +1558,7 @@ function avaaOsio(osio) {
     kalenteriPvm = new Date();
     document.querySelectorAll('.kalenteri-tila-btn').forEach(function(b) { b.classList.toggle('active', b.dataset.tila === 'paiva'); });
     lataaKalenteri();
-    paivitaOdottaaLinkki();
+    paivitaKuittausTila();
     synkkaaICloud();
   } else if (osio.route === 'asetukset') {
     showAsetuksetView();

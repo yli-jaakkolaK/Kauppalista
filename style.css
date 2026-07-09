@@ -974,6 +974,21 @@ h1 {
   flex-shrink: 0;
 }
 
+/* "Uusi minulle" -merkki agendan rivillä (kuittausjono, ks. muistiinpanot.md
+   "Kalenterin periaate: yksi totuus, kaksi ikkunaa") — napautus kuittaa. */
+.kalenteri-uusi-merkki {
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--accent);
+  border: 1px dashed var(--accent);
+  border-radius: 3px;
+  padding: 2px 5px;
+  margin-right: 4px;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
 #kalenteri-hyvaksynta-lista {
   max-height: 50vh;
   overflow-y: auto;
@@ -1167,6 +1182,14 @@ h1 {
   position: absolute;
   left: 0;
   color: var(--accent);
+}
+
+.vinkki-alaotsikko {
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin: 4px 0 8px;
 }
 
 #signout-link {

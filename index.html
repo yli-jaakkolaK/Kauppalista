@@ -104,19 +104,22 @@
       <button id="kalenteri-add-btn">+</button>
     </div>
 
-    <p class="section-link" id="kalenteri-odottaa-linkki" style="display:none"></p>
+    <p class="section-link" id="kalenteri-kuittaus-linkki" style="display:none"></p>
 
     <hr class="divider">
 
     <div id="kalenteri-sisalto"></div>
   </div>
 
-  <div class="dialog-overlay" id="kalenteri-hyvaksynta-overlay" style="display:none">
+  <div class="dialog-overlay" id="kalenteri-kuittaus-overlay" style="display:none">
     <div class="dialog-box">
       <p class="dialog-title">Uudet kalenterimerkinnät</p>
-      <div id="kalenteri-hyvaksynta-lista"></div>
+      <div id="kalenteri-kuittaus-lista"></div>
       <div class="dialog-buttons">
-        <button class="dialog-btn dialog-btn-cancel" id="kalenteri-hyvaksynta-sulje">Sulje</button>
+        <button class="dialog-btn dialog-btn-cancel" id="kalenteri-kuittaa-kaikki">Kuittaa kaikki</button>
+      </div>
+      <div class="dialog-buttons">
+        <button class="dialog-btn dialog-btn-cancel" id="kalenteri-kuittaus-sulje">Sulje</button>
       </div>
     </div>
   </div>
@@ -219,6 +222,15 @@
       <div class="vinkki-rivi">Sano Sirille: "lisää kauppalistaan maito" — toimii vaikka appi olisi kiinni</div>
       <div class="vinkki-rivi">Silmänapista näet ostetut/tehdyt aikaleimoineen</div>
       <div class="vinkki-rivi">Uusi lista syntyy aina yksityisenä — mikään ei näy toiselle ennen kuin itse jaat</div>
+    </div>
+
+    <div class="vinkki-alaotsikko">Missä muokataan mitäkin</div>
+    <div class="vinkki-lista">
+      <div class="vinkki-rivi">Menot ja tapahtumat: lisää ja muokkaa aina iPhonen Kalenterissa — Satama hakee ne itsestään hetken sisällä</div>
+      <div class="vinkki-rivi">Satama näyttää kaikki tapahtumat, mutta ei muokkaa niitä — jos meno on väärässä kalenterissa, siirrä se iPhonen Kalenterissa, Satama päivittyy perässä</div>
+      <div class="vinkki-rivi">Toisen lisäämät menot odottavat kuittaustasi ("N uutta") — kuittaus tarkoittaa "nähty", tapahtuma näkyy kalenterissa joka tapauksessa</div>
+      <div class="vinkki-rivi">Muistutukset, ankkurit ja Hytin tehtävät ovat Sataman omia — ne luodaan ja muokataan Satamassa</div>
+      <div class="vinkki-rivi">Listat, Laituri ja Varasto elävät aina Satamassa — kauppalistalle voi lisätä myös Sirillä</div>
     </div>
 
     <hr class="divider">

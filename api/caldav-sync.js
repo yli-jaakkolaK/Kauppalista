@@ -3,10 +3,32 @@
 // koneisto kahdelle syötetyypille (icloud/ics_url) ja kahdelle tilalle
 // (taysi/vain_varattu) — uusi kalenteri lisätään Table Editorista, ei tähän
 // tiedostoon koodaamalla. Ks. sql/014_kalenteri_syotteet.sql yläkommentti ja
-// muistiinpanot.md "Kalenterisyötteet"-osio täydelle selitykselle.
+// muistiinpanot.md "Kalenterisyötteet"- ja "Kalenterin periaate: yksi totuus,
+// kaksi ikkunaa" -osiot täydelle selitykselle.
 //
-// Yksisuuntainen pull (iCloud/ics-url -> Satama), EI kirjoiteta mitään
-// takaisin. Kutsutaan sovelluksesta aina kun Kalenteri-näkymä avataan
+// ARKKITEHTUURI 2026-07-08 illasta: "yksi totuus, kaksi ikkunaa". Kaikki
+// synkatut tapahtumat kirjoitetaan SUORAAN kalenteri_tapahtumat-tauluun —
+// EI enää erillistä hyväksyntäjonoa (kalenteri_odottavat, käytöstä poistunut,
+// jätetty tauluna paikoillaan mutta ei enää kirjoiteta). Toisen käyttäjän
+// lisäämät saavat "uusi"-merkinnän UI:ssa (kalenteri_kuittaukset-taulu,
+// script.js) kunnes KUITATAAN — kuittaus on "nähty", ei portti, EI koskaan
+// poista tapahtumaa. mode='taysi'/'vain_varattu' vaikuttaa VAIN siihen
+// riisutaanko tapahtuman tiedot (ks. varattuTapahtumaksi()), ei enää siihen
+// näkyykö tapahtuma ollenkaan.
+//
+// PEILISÄÄNTÖ: yksisuuntainen pull (iCloud/ics-url -> Satama), EI kirjoiteta
+// mitään takaisin iCloudiin — MUTTA muutokset/poistot iCloudin päässä PITÄÄ
+// peilautua Satamaan, muuten "kaksi ikkunaa" eriävät ajan myötä:
+//   - MUUTOS: kirjoitus kalenteri_tapahtumat-tauluun käyttää
+//     `resolution=merge-duplicates` (ei enää `ignore-duplicates`) — sama
+//     ical_uid PÄIVITTÄÄ olemassa olevan rivin, ei vain ohita sitä.
+//   - POISTO: joka synkkauskerta laskee per syöte MITKÄ ical_uid:t löytyivät
+//     TÄLLÄ kertaa haetulta aikaväliltä, ja poistaa kalenteri_tapahtumat-
+//     riveistä (samalta syötteeltä, samalta aikaväliltä) ne joita EI löytynyt
+//     — ks. siivoaPoistetut(). Rajattu tarkistetun aikavälin sisään, jottei
+//     poisteta rivejä joita ei tällä kertaa edes yritetty hakea.
+//
+// Kutsutaan sovelluksesta aina kun Kalenteri-näkymä avataan
 // (script.js: synkkaaICloud()) — EI Vercel Cronia, koska Hobby-tason cron
 // toimii vain kerran vuorokaudessa eikä täsmällisesti (jos päädytään
 // lisäämään Cron-varmistus, se vaatii Vercel Pro -tason, ks. muistiinpanot.md).
@@ -241,6 +263,31 @@ async function haeIcsUrlSyote(url) {
   return [await vastaus.text()];
 }
 
+// Hakee kalenteri_tekijat-kartan (organizer_tunniste -> Satama-käyttäjän
+// user_id) kerran per synkkauskerta. Jos jonkin tapahtuman organizeria ei
+// löydy tästä kartasta, sen user_id jää NULLiksi tietokannassa — silloin
+// tapahtuma näkyy "uutena" KAIKILLE käyttäjille (turvallinen oletus).
+async function haeTekijaKartta() {
+  const vastaus = await supabaseFetch('kalenteri_tekijat?select=*');
+  const rivit = await vastaus.json();
+  const kartta = {};
+  (rivit || []).forEach(function(r) { kartta[r.organizer_tunniste] = r.user_id; });
+  return kartta;
+}
+
+// Muotoilee täyden ('taysi'-tilan) tapahtuman kalenteri_tapahtumat-riviksi —
+// symmetrinen varattuTapahtumaksi()-funktion kanssa alla, ei riisu mitään.
+function taydeksiTapahtumaksi(t) {
+  return {
+    title: t.title,
+    event_date: t.event_date,
+    event_time: t.event_time,
+    event_end_time: t.event_end_time,
+    event_end_date: t.event_end_date,
+    ical_uid: t.uid,
+  };
+}
+
 // Riisuu vain_varattu-tilan tapahtuman kaikesta paitsi ajasta jo tässä
 // vaiheessa — nimi/paikka/osallistujat eivät koskaan päädy tämän jälkeen
 // mihinkään muuttujaan eivätkä tietokantaan.
@@ -261,6 +308,27 @@ function varattuTapahtumaksi(t) {
   };
 }
 
+// PEILISÄÄNTÖ, poisto-osuus: hakee TÄMÄN syötteen olemassa olevat rivit
+// tarkistetulta aikaväliltä ja poistaa ne joiden ical_uid EI löytynyt tällä
+// synkkauskerralla (nahdytUidit) — eli tapahtuma on poistettu/siirtynyt pois
+// iCloudin päässä. Rajattu syote_id:hen ja samaan aikaväliin joka tällä
+// kertaa oikeasti haettiin, jottei poisteta rivejä joita ei yritetty hakea.
+async function siivoaPoistetut(syoteId, alkuPvm, loppuPvm, nahdytUidit) {
+  const vastaus = await supabaseFetch(
+    'kalenteri_tapahtumat?select=id,ical_uid&syote_id=eq.' + syoteId +
+    '&event_date=gte.' + alkuPvm + '&event_date=lte.' + loppuPvm + '&ical_uid=not.is.null'
+  );
+  const olemassaOlevat = await vastaus.json();
+  const poistettavat = (olemassaOlevat || []).filter(function(r) { return !nahdytUidit.has(r.ical_uid); });
+  if (poistettavat.length === 0) return 0;
+  const idLista = poistettavat.map(function(r) { return r.id; }).join(',');
+  await supabaseFetch('kalenteri_tapahtumat?id=in.(' + idLista + ')', {
+    method: 'DELETE',
+    headers: { Prefer: 'return=minimal' },
+  });
+  return poistettavat.length;
+}
+
 module.exports = async function handler(req, res) {
   // Diagnostiikka: /api/caldav-sync?listaa=katri (tai ?listaa=juha) palauttaa
   // sen tilin kalentereiden TÄSMÄLLISET näyttönimet, ei synkkaa mitään. Näin
@@ -278,6 +346,42 @@ module.exports = async function handler(req, res) {
   if (!SUPABASE_KEY) {
     return res.status(500).json({ error: 'SUPABASE_SERVICE_KEY puuttuu Vercelin ympäristömuuttujista' });
   }
+
+  // Diagnostiikka: /api/caldav-sync?esikatsele=1 hakee+jäsentää kaikki
+  // syötteet ja palauttaa tulokset (title, event_date, organizer, uid) JSON:ina
+  // KIRJOITTAMATTA MITÄÄN tietokantaan. Tehty nimenomaan sen selvittämiseksi
+  // löytyykö ORGANIZER-kenttä oikeista jaetuista iCloud-kalentereista — jos
+  // "organizer" on aina null tuloksessa, kalenteri_tekijat-kartta ei koskaan
+  // tunnista tekijää ja kaikki tapahtumat näkyvät "uutena" kaikille (turvallinen
+  // varasuunnitelma, ks. muistiinpanot.md "Tekijän tunnistus").
+  if (req.query && req.query.esikatsele) {
+    try {
+      const syotteetVastaus = await supabaseFetch('kalenteri_syotteet?select=*&enabled=eq.true');
+      const syotteet = await syotteetVastaus.json();
+      const alku = new Date();
+      alku.setDate(alku.getDate() - PAIVIA_TAAKSEPAIN);
+      const loppu = new Date();
+      loppu.setDate(loppu.getDate() + PAIVIA_ETEENPAIN);
+      const alkuRaja = ICAL.Time.fromJSDate(alku, true);
+      const loppuRaja = ICAL.Time.fromJSDate(loppu, true);
+
+      const tulokset = await Promise.all((syotteet || []).map(async function(syote) {
+        const icsTekstit = syote.tyyppi === 'icloud'
+          ? await haeIcloudSyote(syote.tunniste, alku.toISOString(), loppu.toISOString(), syote.account_key || 'katri')
+          : await haeIcsUrlSyote(syote.tunniste);
+        let tapahtumat = [];
+        icsTekstit.forEach(function(teksti) { tapahtumat = tapahtumat.concat(jasennaTapahtumat(teksti, alkuRaja, loppuRaja)); });
+        return {
+          syote: syote.name,
+          tapahtumat: tapahtumat.map(function(t) { return { title: t.title, event_date: t.event_date, organizer: t.organizer, uid: t.uid }; }),
+        };
+      }));
+      return res.status(200).json({ esikatselu: true, syotteet: tulokset });
+    } catch (e) {
+      return res.status(500).json({ error: e.message });
+    }
+  }
+
   // Tilikohtaiset ICLOUD_*-muuttujat validoidaan per syöte haeIcloudSyote():ssa,
   // EI tässä — jos vain toisen tilin tunnukset puuttuvat, toisen tilin
   // syötteet silti synkkautuvat normaalisti (Promise.allSettled alla).
@@ -295,24 +399,17 @@ module.exports = async function handler(req, res) {
   loppu.setDate(loppu.getDate() + PAIVIA_ETEENPAIN);
   const alkuISO = alku.toISOString();
   const loppuISO = loppu.toISOString();
+  // Päivämäärä-merkkijono siivouksen aikavälirajaukseen — muutaman tunnin
+  // epätarkkuus puskurin reunalla ei haittaa (ks. MONIPAIVAINEN_PUSKURI_PV-
+  // tyylinen reilu mitoitus), tarkka päivä ratkeaa aina jasennaTapahtumat():ssa.
+  const alkuPvm = alkuISO.slice(0, 10);
+  const loppuPvm = loppuISO.slice(0, 10);
   const alkuRaja = ICAL.Time.fromJSDate(alku, true);
   const loppuRaja = ICAL.Time.fromJSDate(loppu, true);
 
-  // Sama UID-pohjainen tunnetut-joukko toimii myös monen tilin duplikaattisuojana:
-  // jaettu perhekalenteri voi näkyä sekä Katrin että Juhan tilillä, mutta koska
-  // molemmat syötteet tuottavat saman tapahtuman UID:n, se tallentuu vain kerran
-  // — ical_uid-sarakkeen UNIQUE-rajoite + "ignore-duplicates" varmistaa tämän
-  // tietokantatasolla vaikka kaksi syötettä käsiteltäisiin samanaikaisesti.
-  const tunnetutVastaus = await Promise.all([
-    supabaseFetch('kalenteri_tapahtumat?select=ical_uid&ical_uid=not.is.null').then(function(r) { return r.json(); }),
-    supabaseFetch('kalenteri_odottavat?select=ical_uid').then(function(r) { return r.json(); }),
-  ]);
-  const tunnetut = new Set();
-  tunnetutVastaus.forEach(function(rivit) { (rivit || []).forEach(function(r) { tunnetut.add(r.ical_uid); }); });
-
-  const uudetHyvaksytyt = [];
-  const uudetOdottavat = [];
+  const tekijaKartta = await haeTekijaKartta();
   const tulokset = [];
+  const kaikkiUudetRivit = [];
 
   const kaikki = await Promise.allSettled(syotteet.map(async function(syote) {
     let icsTekstit;
@@ -329,29 +426,26 @@ module.exports = async function handler(req, res) {
       tapahtumat = tapahtumat.concat(jasennaTapahtumat(teksti, alkuRaja, loppuRaja));
     });
 
-    let uusia = 0;
-    tapahtumat.forEach(function(t) {
-      if (tunnetut.has(t.uid)) return;
-      tunnetut.add(t.uid); // sama syöte voi muuten palauttaa saman esiintymän kahdesti
-      uusia++;
-
-      if (syote.mode === 'vain_varattu') {
-        const varattu = varattuTapahtumaksi(t);
-        varattu.syote_id = syote.id;
-        uudetHyvaksytyt.push(varattu);
-      } else {
-        uudetOdottavat.push({
-          ical_uid: t.uid,
-          syote_id: syote.id,
-          title: t.title,
-          event_date: t.event_date,
-          event_time: t.event_time,
-          event_end_time: t.event_end_time,
-          event_end_date: t.event_end_date,
-          status: 'odottaa',
-        });
-      }
+    // "yksi totuus, kaksi ikkunaa": KAIKKI tämän syötteen tapahtumat kirjoitetaan
+    // suoraan kalenteri_tapahtumat-tauluun (ei enää hyväksyntäjonoa). mode
+    // vaikuttaa VAIN riisutaanko tiedot (vain_varattu) vai ei (taysi).
+    // user_id tulee kalenteri_tekijat-kartasta organizerin perusteella — NULL
+    // jos organizeria ei löydy kartasta, jolloin tapahtuma näkyy "uutena"
+    // kaikille käyttäjille script.js:n kuittausjono-logiikassa.
+    const nahdytUidit = new Set();
+    const uudetRivit = tapahtumat.map(function(t) {
+      nahdytUidit.add(t.uid);
+      const rivi = syote.mode === 'vain_varattu' ? varattuTapahtumaksi(t) : taydeksiTapahtumaksi(t);
+      rivi.syote_id = syote.id;
+      rivi.user_id = t.organizer && tekijaKartta[t.organizer] ? tekijaKartta[t.organizer] : null;
+      return rivi;
     });
+    kaikkiUudetRivit.push.apply(kaikkiUudetRivit, uudetRivit);
+
+    // PEILISÄÄNTÖ, poisto-osuus: tällä kertaa löytymättömät (poistettu/siirtynyt
+    // pois iCloudissa) poistuvat myös Satamasta, rajattuna tälle syötteelle
+    // tarkistettuun aikaväliin.
+    const poistettuja = await siivoaPoistetut(syote.id, alkuPvm, loppuPvm, nahdytUidit);
 
     await supabaseFetch('kalenteri_syotteet?id=eq.' + syote.id, {
       method: 'PATCH',
@@ -359,7 +453,7 @@ module.exports = async function handler(req, res) {
       body: JSON.stringify({ last_synced_at: new Date().toISOString() }),
     });
 
-    return { syote: syote.name, loydettyja: tapahtumat.length, uusia: uusia };
+    return { syote: syote.name, loydettyja: tapahtumat.length, poistettuja: poistettuja };
   }));
 
   kaikki.forEach(function(tulos, i) {
@@ -371,28 +465,20 @@ module.exports = async function handler(req, res) {
     }
   });
 
-  // on_conflict + ignore-duplicates: jos synkka juoksee päällekkäin (esim.
-  // kalenteri avataan kahdesti nopeasti), sama ical_uid ei kaadu koko
-  // lisäykseen vaan hypätään yli hiljaisesti.
-  if (uudetHyvaksytyt.length) {
+  // PEILISÄÄNTÖ, muutos-osuus: merge-duplicates (EI ignore-duplicates) —
+  // sama ical_uid PÄIVITTÄÄ olemassa olevan rivin (esim. iCloudissa siirretty
+  // aika tai muokattu otsikko), ei vain ohita sitä hiljaa.
+  if (kaikkiUudetRivit.length) {
     await supabaseFetch('kalenteri_tapahtumat?on_conflict=ical_uid', {
       method: 'POST',
-      headers: { Prefer: 'return=minimal,resolution=ignore-duplicates' },
-      body: JSON.stringify(uudetHyvaksytyt),
-    });
-  }
-  if (uudetOdottavat.length) {
-    await supabaseFetch('kalenteri_odottavat?on_conflict=ical_uid', {
-      method: 'POST',
-      headers: { Prefer: 'return=minimal,resolution=ignore-duplicates' },
-      body: JSON.stringify(uudetOdottavat),
+      headers: { Prefer: 'return=minimal,resolution=merge-duplicates' },
+      body: JSON.stringify(kaikkiUudetRivit),
     });
   }
 
   return res.status(200).json({
     success: true,
     syotteet: tulokset,
-    suoraanLapi: uudetHyvaksytyt.length,
-    odottamaan: uudetOdottavat.length,
+    kirjoitettuja: kaikkiUudetRivit.length,
   });
 };
