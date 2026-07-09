@@ -1516,7 +1516,9 @@ function avaaOsio(osio) {
     synkkaaICloud();
   } else if (osio.route === 'asetukset') {
     showAsetuksetView();
+    paivitaTiliTiedot();
     paivitaPushTila();
+    paivitaSovellusTiedot();
     document.getElementById('hytti-kalenteri-toggle').checked = hyttiNakyyKalenterissa();
   } else if (osio.route === 'hytti') {
     showHyttiView();
@@ -2637,6 +2639,102 @@ async function laheteTestipush() {
   testiNappi.disabled = false;
   testiNappi.textContent = alkuperainenTeksti;
 }
+
+// === ASETUKSET: TILI + SOVELLUS (2026-07-08) ===
+
+// Näyttää kirjautuneen käyttäjän sähköpostin Asetusten Tili-osiossa
+async function paivitaTiliTiedot() {
+  const { data } = await db.auth.getSession();
+  const sposti = data.session ? data.session.user.email : null;
+  document.getElementById('tili-sposti').textContent = sposti ? 'Kirjautunut: ' + sposti : 'Ei kirjautunut';
+}
+
+// Muotoilee ISO-aikaleiman suhteelliseksi ("N min"/"N h"/"N pv") — riittävä
+// tarkkuus "milloin viimeksi synkattu" -ilmoitukseen, ei tarvitse tarkkaa kelloa
+function suhteellinenAika(isoAika) {
+  const eroMs = Date.now() - new Date(isoAika).getTime();
+  const minuutit = Math.round(eroMs / 60000);
+  if (minuutit < 1) return 'alle minuutti sitten';
+  if (minuutit < 60) return minuutit + ' min sitten';
+  const tunnit = Math.round(minuutit / 60);
+  if (tunnit < 24) return tunnit + ' h sitten';
+  const paivat = Math.round(tunnit / 24);
+  return paivat + ' pv sitten';
+}
+
+// Näyttää sw-välimuistin version (caches.keys() — ei tarvitse pitää samaa
+// versionumeroa käsin synkassa kahdessa eri tiedostossa) ja kalenterisynkan
+// viimeisimmän onnistuneen hakuajan (kalenteri_syotteet.last_synced_at)
+async function paivitaSovellusTiedot() {
+  const versioEl = document.getElementById('sovellus-versio');
+  if ('caches' in window) {
+    const avaimet = await caches.keys();
+    const kauppalistaAvain = avaimet.find(function(k) { return k.indexOf('kauppalista-v') === 0; });
+    versioEl.textContent = 'Versio: ' + (kauppalistaAvain ? kauppalistaAvain.replace('kauppalista-', '') : 'tuntematon');
+  } else {
+    versioEl.textContent = 'Versio: tuntematon';
+  }
+
+  const synkkaEl = document.getElementById('sovellus-synkka-tila');
+  const { data, error } = await db.from('kalenteri_syotteet')
+    .select('last_synced_at')
+    .not('last_synced_at', 'is', null)
+    .order('last_synced_at', { ascending: false })
+    .limit(1);
+  if (error) {
+    console.error('Synkan tilan haku epäonnistui:', error);
+    synkkaEl.textContent = 'Kalenterisynkan tila ei selvinnyt.';
+  } else if (!data || data.length === 0) {
+    synkkaEl.textContent = 'Kalenteria ei ole vielä synkattu.';
+  } else {
+    synkkaEl.textContent = 'Kalenteri haettu viimeksi ' + suhteellinenAika(data[0].last_synced_at) + '.';
+  }
+}
+
+// "Päivitä sovellus" — PWA-jumien hätävara: tyhjentää koko sw-välimuistin ja
+// poistaa service workerin rekisteröinnin, jotta uudelleenlataus asentaa
+// varmasti tuoreimman version puhtaalta pöydältä
+async function paivitaSovellusValimuisti() {
+  if ('caches' in window) {
+    const avaimet = await caches.keys();
+    await Promise.all(avaimet.map(function(k) { return caches.delete(k); }));
+  }
+  if ('serviceWorker' in navigator) {
+    const rekisterointi = await navigator.serviceWorker.getRegistration();
+    if (rekisterointi) await rekisterointi.unregister();
+  }
+  window.location.reload();
+}
+
+// "Hae kalenteri nyt" — laukaisee /api/caldav-sync:n käsin, säästää
+// "odotellaan cronia" -ihmettelyn koska Vercel Hobby-cron ei ole käytössä
+// (ks. muistiinpanot.md "Kalenterisyötteet"-osio)
+async function synkkaaKalenteriNyt() {
+  const nappi = document.getElementById('sovellus-synkkaa-btn');
+  nappi.disabled = true;
+  const alkuperainenTeksti = nappi.textContent;
+  nappi.textContent = 'Haetaan...';
+  try {
+    const vastaus = await fetch('/api/caldav-sync');
+    const tulos = await vastaus.json();
+    if (!vastaus.ok) {
+      naytaIlmoitus('Kalenterisynkka epäonnistui: ' + (tulos.error || vastaus.status));
+    } else {
+      naytaIlmoitus('Kalenterisynkka käyty läpi (' + (tulos.suoraanLapi || 0) + ' uutta, ' + (tulos.odottamaan || 0) + ' odottaa hyväksyntää)');
+    }
+  } catch (e) {
+    naytaIlmoitus('Kalenterisynkka epäonnistui: ' + e.message);
+  }
+  await paivitaSovellusTiedot();
+  nappi.disabled = false;
+  nappi.textContent = alkuperainenTeksti;
+}
+
+document.getElementById('asetukset-signout-btn').addEventListener('click', function() {
+  db.auth.signOut();
+});
+document.getElementById('sovellus-paivita-btn').addEventListener('click', paivitaSovellusValimuisti);
+document.getElementById('sovellus-synkkaa-btn').addEventListener('click', synkkaaKalenteriNyt);
 
 // === AUTH ===
 
