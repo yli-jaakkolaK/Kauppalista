@@ -38,11 +38,21 @@ const TILIT = {
   juha: { username: process.env.ICLOUD_USERNAME_JUHA, password: process.env.ICLOUD_APP_PASSWORD_JUHA },
 };
 
-// Kuinka monta päivää eteenpäin haetaan, ja kuinka moneksi yksittäiseksi
-// esiintymäksi yksi toistuva tapahtuma puretaan enintään (aikabudjetin
-// turvaraja — viallinen/loputon RRULE ei saa jumittaa funktiota).
-const PAIVIA_ETEENPAIN = 30;
-const MAX_ESIINTYMAA_SARJASSA = 60;
+// Hakuikkuna: kuinka pitkälle taaksepäin/eteenpäin tapahtumia haetaan.
+// Säädettävä tästä — EI haudattu syvemmälle koodiin. Aiemmin haku alkoi
+// suoraan nyt-hetkestä (ei taaksepäin ollenkaan) ja ulottui vain 30 päivää
+// eteenpäin, minkä takia kauempana tulevaisuudessa olevat tapahtumat
+// (esim. joulukuun tapahtuma heinäkuussa haettuna) jäivät kokonaan
+// löytymättä — korjattu 2026-07-08 illalla laajemmaksi.
+const PAIVIA_TAAKSEPAIN = 30;   // ~1 kk
+const PAIVIA_ETEENPAIN = 365;   // ~12 kk
+
+// Turvaraja kuinka moneksi yksittäiseksi esiintymäksi yksi toistuva
+// tapahtuma puretaan enintään (viallinen/loputon RRULE ei saa jumittaa
+// funktiota). Mitoitettu kattamaan PÄIVITTÄINEN toistuva tapahtuma koko
+// hakuikkunan ajalta + reilu marginaali — jos tätä pienennetään, päivittäiset
+// toistot voivat katketa kesken hakuikkunan.
+const MAX_ESIINTYMAA_SARJASSA = PAIVIA_TAAKSEPAIN + PAIVIA_ETEENPAIN + 30;
 
 async function supabaseFetch(polku, valinnat) {
   valinnat = valinnat || {};
@@ -88,12 +98,31 @@ function pvmJaAika(hetki) {
 // server-side expand -tukeen, koska sitä ei voitu varmistaa ilman oikeaa
 // dataa (ics_url-syötteillä ei ole CalDAV-palvelinta ollenkaan, joten tämä
 // on ainoa tapa joka toimii molemmilla syötetyypeillä yhtenäisesti).
+//
+// TOISTUVAN TAPAHTUMAN YKSITTÄINEN KERTA VOI OLLA KORVATTU (siirretty toiseen
+// päivään tai peruttu) — iCalendarissa tämä näkyy erillisenä VEVENTinä, jolla
+// on SAMA UID mutta oma RECURRENCE-ID. ical.js liittää tällaiset "poikkeukset"
+// automaattisesti masterin ICAL.Event-olioon konstruktorissa (koska vevent.parent
+// osoittaa koko VCALENDAR-komponenttiin) — MUTTA vain jos niitä käytetään
+// event.getOccurrenceDetails(esiintymä):n kautta iteroinnissa. Aiemmin tämä
+// koodi käytti iteraattorin palauttamaa RAAKAA (aina alkuperäistä, ei koskaan
+// korvattua) aikaa suoraan, jolloin siirretty/peruttu kerta tuotti HAAMU-
+// esiintymän vanhaan päivään SEN LISÄKSI että korvaava VEVENT muutenkin
+// tuotiin omana tapahtumanaan — sama asia näkyi jonossa kahdesti/kolmesti eri
+// päivillä. Korjattu 2026-07-08 illalla: poikkeus-VEVENTejä ei enää käsitellä
+// erikseen (`vevent.hasProperty('recurrence-id')` ohitetaan yllä), ja masterin
+// iteroinnissa käytetään AINA getOccurrenceDetails():n palauttamaa
+// (mahdollisesti korvattua) päivää/aikaa/otsikkoa, ei raakaa iteraattorin arvoa.
 function jasennaTapahtumat(icsTeksti, alkuRaja, loppuRaja) {
   const jcal = ICAL.parse(icsTeksti);
   const comp = new ICAL.Component(jcal);
   const tapahtumat = [];
 
   comp.getAllSubcomponents('vevent').forEach(function(vevent) {
+    // Poikkeus-VEVENT (siirretty/muokattu yksittäinen kerta) käsitellään
+    // AINA masterin getOccurrenceDetails()-kutsun kautta alla, ei erikseen.
+    if (vevent.hasProperty('recurrence-id')) return;
+
     try {
       const event = new ICAL.Event(vevent);
       const organizerRaaka = vevent.getFirstPropertyValue('organizer');
@@ -123,15 +152,25 @@ function jasennaTapahtumat(icsTeksti, alkuRaja, loppuRaja) {
         turvalaskuri++;
         if (esiintyma.compare(loppuRaja) > 0) break;
         if (esiintyma.compare(alkuRaja) >= 0) {
-          const loppuHetki = esiintyma.clone();
-          loppuHetki.addDuration(event.duration);
-          const pvmAika = pvmJaAika(esiintyma);
-          const loppuAika = pvmJaAika(loppuHetki);
+          // esiintyma on AINA RRULE:n alkuperäinen aika — getOccurrenceDetails
+          // palauttaa todellisen (mahdollisesti korvatun) päivän/ajan/otsikon
+          // jos tälle nimenomaiselle kerralle on poikkeus, muuten palauttaa
+          // saman ajan takaisin muuttumattomana.
+          const tiedot = event.getOccurrenceDetails(esiintyma);
+          const tila = tiedot.item.component.getFirstPropertyValue('status');
+          if (tila && String(tila).toUpperCase() === 'CANCELLED') {
+            esiintyma = iteraattori.next();
+            continue;
+          }
+          const pvmAika = pvmJaAika(tiedot.startDate);
+          const loppuAika = tiedot.endDate ? pvmJaAika(tiedot.endDate) : { event_time: null, event_date: pvmAika.event_date };
           tapahtumat.push({
-            // Sama UID toistuu joka esiintymällä — yhdistetään esiintymän
-            // omaan alkuhetkeen uniikin avaimen saamiseksi.
+            // Käytetään AINA alkuperäistä (esiintyma), EI korvattua aikaa,
+            // UID:n loppuosana — recurrence-id pysyy vakiona vaikka kerta
+            // siirtyisi toiseen päivään, muuten samasta kerrasta syntyisi
+            // eri UID jokaisella synkkauksella kun se joskus siirretään.
             uid: event.uid + '#' + esiintyma.toString(),
-            title: event.summary || '(nimetön)',
+            title: tiedot.item.summary || '(nimetön)',
             event_date: pvmAika.event_date,
             event_time: pvmAika.event_time,
             event_end_time: loppuAika.event_time,
@@ -251,6 +290,7 @@ module.exports = async function handler(req, res) {
   }
 
   const alku = new Date();
+  alku.setDate(alku.getDate() - PAIVIA_TAAKSEPAIN);
   const loppu = new Date();
   loppu.setDate(loppu.getDate() + PAIVIA_ETEENPAIN);
   const alkuISO = alku.toISOString();
