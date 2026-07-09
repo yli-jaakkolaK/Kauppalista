@@ -153,7 +153,7 @@ function jasennaTapahtumat(icsTeksti, alkuRaja, loppuRaja) {
 // kirjaudutaan — validoidaan tässä (per syöte, ei koko funktion alussa)
 // jotta yhden tilin puuttuvat tunnukset näkyvät VAIN sen syötteen omana
 // virheenä (Promise.allSettled) eivätkä kaada koko synkkausta.
-async function haeIcloudSyote(kalenterinNimi, alkuISO, loppuISO, accountKey) {
+async function kirjauduIcloudiin(accountKey) {
   const tili = TILIT[accountKey];
   if (!tili || !tili.username || !tili.password) {
     throw new Error('Tilin "' + accountKey + '" iCloud-tunnukset (ICLOUD_USERNAME' + (accountKey === 'juha' ? '_JUHA' : '') + '/ICLOUD_APP_PASSWORD' + (accountKey === 'juha' ? '_JUHA' : '') + ') puuttuvat Vercelin ympäristömuuttujista');
@@ -165,6 +165,20 @@ async function haeIcloudSyote(kalenterinNimi, alkuISO, loppuISO, accountKey) {
     defaultAccountType: 'caldav',
   });
   await client.login();
+  return client;
+}
+
+// Diagnostiikka kalenteri_syotteet.tunniste-arvon selvittämiseen: palauttaa
+// tililtä löytyvien kalenterien TÄSMÄLLISET näyttönimet, ei synkkaa mitään.
+// Kutsutaan handlerista ?listaa=katri / ?listaa=juha -parametrilla.
+async function listaaKalenterit(accountKey) {
+  const client = await kirjauduIcloudiin(accountKey);
+  const kalenterit = await client.fetchCalendars();
+  return kalenterit.map(function(k) { return k.displayName; });
+}
+
+async function haeIcloudSyote(kalenterinNimi, alkuISO, loppuISO, accountKey) {
+  const client = await kirjauduIcloudiin(accountKey);
 
   const kalenterit = await client.fetchCalendars();
   const kalenteri = kalenterit.find(function(k) { return k.displayName === kalenterinNimi; });
@@ -209,6 +223,19 @@ function varattuTapahtumaksi(t) {
 }
 
 module.exports = async function handler(req, res) {
+  // Diagnostiikka: /api/caldav-sync?listaa=katri (tai ?listaa=juha) palauttaa
+  // sen tilin kalentereiden TÄSMÄLLISET näyttönimet, ei synkkaa mitään. Näin
+  // saa selville mikä arvo kalenteri_syotteet.tunniste-sarakkeeseen pitää
+  // kirjoittaa icloud-tyyppisille syötteille (pitää täsmätä kirjain kirjaimelta).
+  if (req.query && req.query.listaa) {
+    try {
+      const nimet = await listaaKalenterit(req.query.listaa);
+      return res.status(200).json({ tili: req.query.listaa, kalenterit: nimet });
+    } catch (e) {
+      return res.status(500).json({ error: e.message });
+    }
+  }
+
   if (!SUPABASE_KEY) {
     return res.status(500).json({ error: 'SUPABASE_SERVICE_KEY puuttuu Vercelin ympäristömuuttujista' });
   }
