@@ -349,6 +349,20 @@ h1 {
   color: var(--text);
 }
 
+.settings-numero-input {
+  width: 52px;
+  flex-shrink: 0;
+  background: none;
+  border: none;
+  border-bottom: 1px solid var(--accent);
+  outline: none;
+  font-family: 'Courier New', Courier, monospace;
+  font-size: 16px;
+  color: var(--accent);
+  text-align: center;
+  padding: 4px 0;
+}
+
 .toggle {
   position: relative;
   display: inline-block;
@@ -989,7 +1003,20 @@ h1 {
   flex-shrink: 0;
 }
 
-#kalenteri-hyvaksynta-lista {
+/* Kuormavahti-merkki päiväotsikossa (agenda + viikko) — sama neutraali tyyli
+   kuin "uusi"-merkillä, ei punaista, ei syyllistävää. Ei klikattava (vain
+   tieto), joten ei cursor:pointeria eikä flex-shrinkiä (ei rivin sisällä). */
+.kalenteri-kuorma-merkki {
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  color: var(--accent);
+  border: 1px dashed var(--accent);
+  border-radius: 3px;
+  padding: 2px 5px;
+  margin-left: 6px;
+}
+
+#kalenteri-kuittaus-lista {
   max-height: 50vh;
   overflow-y: auto;
   margin-top: 12px;
@@ -1023,6 +1050,11 @@ h1 {
 
 .kalenteri-kortti-pvm {
   color: var(--muted);
+  font-size: 11px;
+}
+
+.kalenteri-kortti-kuorma {
+  color: var(--accent);
   font-size: 11px;
 }
 

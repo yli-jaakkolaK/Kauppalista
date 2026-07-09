@@ -247,6 +247,47 @@ function hyttiNakyyKalenterissa() {
   return localStorage.getItem(HYTTI_KALENTERISSA_KEY) !== 'false';
 }
 
+// === YLEISET ASETUKSET (avain-arvo, `asetukset`-taulu, sql/023_asetukset.sql) ===
+// Data-ohjattu, uudelleenkäytettävä (Kuormavahdin lisäksi tulevat sääajat ym.)
+// — uusi avain on Table Editor -rivinlisäys, ei koodimuutos. Ladataan kerran
+// per Kalenteri-näkymän avaus, tarpeeksi tuore pienelle taululle.
+let asetuksetKartta = {};
+async function paivitaAsetukset() {
+  const { data, error } = await db.from('asetukset').select('*');
+  if (error) {
+    console.error('Asetusten haku epäonnistui:', error);
+    return;
+  }
+  asetuksetKartta = {};
+  (data || []).forEach(function(r) { asetuksetKartta[r.key] = r.value; });
+}
+function haeAsetusNumero(key, oletus) {
+  const n = parseInt(asetuksetKartta[key], 10);
+  return isNaN(n) ? oletus : n;
+}
+
+// Kuormavahti: laskee kellonaikaan sidottujen (koko päivän kestävät, esim.
+// synttarit, EIVÄT kerrytä) tapahtumien määrän annetulta riviltä. Ankkurit ja
+// Hytin tehtävät EIVÄT lasketa mukaan — kyse on kalenterin kuormasta
+// (kiinteät ulkoiset menot), ei omista tehtävälistoista.
+function laskeMenoja(rivit) {
+  return rivit.filter(function(r) { return (!r._tyyppi || r._tyyppi === 'tapahtuma') && r.event_time; }).length;
+}
+
+// Piirtää otsikkotekstin ja lisää perään pienen kuormamerkin (sama neutraali
+// tyyli kuin "uusi"-merkillä, accent-väri, ei punaista) jos päivän menomäärä
+// on saavuttanut/ylittänyt asetetun rajan.
+function paivitaOtsikkoKuormamerkilla(otsikkoEl, teksti, maara, raja) {
+  otsikkoEl.textContent = teksti;
+  if (maara >= raja) {
+    const merkki = document.createElement('span');
+    merkki.className = 'kalenteri-kuorma-merkki';
+    merkki.textContent = '⚑ ' + maara;
+    merkki.title = maara + ' kellonaikamenoa tänä päivänä';
+    otsikkoEl.appendChild(merkki);
+  }
+}
+
 function paivamaaraISO(d) {
   return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
 }
@@ -416,14 +457,14 @@ function piirraKalenteriRivi(rivi) {
   return li;
 }
 
-function piirraKalenteriPaivaRyhma(container, rivit, otsikkoTeksti) {
+function piirraKalenteriPaivaRyhma(container, rivit, otsikkoTeksti, kuormaraja) {
   const ryhma = document.createElement('div');
   ryhma.className = 'kalenteri-paiva-ryhma';
 
   if (otsikkoTeksti) {
     const otsikko = document.createElement('div');
     otsikko.className = 'kalenteri-paiva-otsikko';
-    otsikko.textContent = otsikkoTeksti;
+    paivitaOtsikkoKuormamerkilla(otsikko, otsikkoTeksti, laskeMenoja(rivit), kuormaraja || Infinity);
     ryhma.appendChild(otsikko);
   }
 
@@ -508,6 +549,7 @@ async function lataaKalenteri() {
   });
 
   await paivitaAnkkuroidutAvaimet();
+  await paivitaAsetukset();
 
   const sisalto = document.getElementById('kalenteri-sisalto');
   sisalto.innerHTML = '';
@@ -517,6 +559,16 @@ async function lataaKalenteri() {
     let rivit = data.filter(function(t) { return tapahtumaKattaaPaivan(t, tanaanIso); }).map(function(t) {
       return { _tyyppi: 'tapahtuma', id: t.id, title: t.title, event_time: t.event_time, _vari: t._vari, ical_uid: t.ical_uid, user_id: t.user_id };
     });
+
+    // Kuormavahti: lasketaan ENNEN ankkurit/Hytti-rivien lisäystä, koska ne
+    // eivät kuulu kalenterin kuormaan (laskeMenoja suodattaa ne pois joka
+    // tapauksessa, mutta selkeämpi laskea juuri tässä kohdassa).
+    paivitaOtsikkoKuormamerkilla(
+      document.getElementById('kalenteri-otsikko'),
+      otsikko,
+      laskeMenoja(rivit),
+      haeAsetusNumero('paivan_menoraja', 5)
+    );
 
     if (tanaanIso === paivamaaraISO(new Date())) {
       const { data: ankkuridata, error: ankkuriError } = await db.from('ankkurit').select().eq('done', false);
@@ -556,7 +608,7 @@ async function lataaKalenteri() {
       const iso = paivamaaraISO(pvm);
       const otsikkoTeksti = KALENTERI_PAIVAT[pvm.getDay()] + ' ' + pvm.getDate() + '.' + (pvm.getMonth() + 1) + '.';
       const paivanTapahtumat = data.filter(function(t) { return tapahtumaKattaaPaivan(t, iso); });
-      piirraKalenteriPaivaRyhma(sisalto, paivanTapahtumat, otsikkoTeksti);
+      piirraKalenteriPaivaRyhma(sisalto, paivanTapahtumat, otsikkoTeksti, haeAsetusNumero('paivan_menoraja', 5));
     }
     return;
   }
@@ -794,11 +846,29 @@ async function paivitaKuittausTila() {
 // Piirtää kuittauskortit (otsikko + pvm/aika + värillinen lähdemerkintä +
 // yksi "✓ Kuittaa" -nappi, EI Hylkää-nappia — kuittaus ei koskaan poista
 // tapahtumaa) ja avaa overlayn.
-function avaaKuittausOverlay(rivit) {
+// Kuormavahti-kytkös kuittausjonoon: kertoo per rivi kuinka monta MUUTA
+// kellonaikamenoa samalla päivällä on, jotta uuden tapahtuman kuittaajalle
+// näkyy heti jos se osuu jo kuormitetulle päivälle.
+async function laskeMuutaMenoaPaivalle(pvm, oma_id) {
+  const { count, error } = await db.from('kalenteri_tapahtumat')
+    .select('id', { count: 'exact', head: true })
+    .eq('event_date', pvm)
+    .not('event_time', 'is', null)
+    .neq('id', oma_id);
+  if (error) {
+    console.error('Kuormavahdin laskenta epäonnistui:', error);
+    return 0;
+  }
+  return count || 0;
+}
+
+async function avaaKuittausOverlay(rivit) {
   const lista = document.getElementById('kalenteri-kuittaus-lista');
   lista.innerHTML = '';
+  const kuormaraja = haeAsetusNumero('paivan_menoraja', 5);
+  const muutaMenoa = await Promise.all(rivit.map(function(rivi) { return laskeMuutaMenoaPaivalle(rivi.event_date, rivi.id); }));
 
-  rivit.forEach(function(rivi) {
+  rivit.forEach(function(rivi, index) {
     const kortti = document.createElement('div');
     kortti.className = 'kalenteri-kortti';
 
@@ -823,6 +893,15 @@ function avaaKuittausOverlay(rivit) {
     teksti.appendChild(otsikkoRivi);
     teksti.appendChild(document.createElement('br'));
     teksti.appendChild(pvmRivi);
+
+    if (muutaMenoa[index] >= kuormaraja) {
+      const kuormaHuomio = document.createElement('span');
+      kuormaHuomio.className = 'kalenteri-kortti-kuorma';
+      kuormaHuomio.textContent = 'huom: päivällä jo ' + muutaMenoa[index] + ' muuta menoa';
+      teksti.appendChild(document.createElement('br'));
+      teksti.appendChild(kuormaHuomio);
+    }
+
     kortti.appendChild(teksti);
 
     const napit = document.createElement('div');
@@ -1566,6 +1645,9 @@ function avaaOsio(osio) {
     paivitaPushTila();
     paivitaSovellusTiedot();
     document.getElementById('hytti-kalenteri-toggle').checked = hyttiNakyyKalenterissa();
+    paivitaAsetukset().then(function() {
+      document.getElementById('kuormaraja-input').value = haeAsetusNumero('paivan_menoraja', 5);
+    });
   } else if (osio.route === 'hytti') {
     showHyttiView();
     lataaHyttiPaanakyma();
@@ -2509,6 +2591,24 @@ document.getElementById('push-testi-btn').addEventListener('click', laheteTestip
 document.getElementById('hytti-kalenteri-toggle').addEventListener('change', function(e) {
   localStorage.setItem(HYTTI_KALENTERISSA_KEY, e.target.checked ? 'true' : 'false');
   naytaIlmoitus(e.target.checked ? 'Hytin tehtävät näkyvät nyt Kalenterissa' : 'Hytin tehtävät piilotettu Kalenterista');
+});
+
+// Kuormavahdin raja tallennetaan koko perheelle yhteiseen `asetukset`-tauluun
+// (EI laitekohtaisesti, toisin kuin Hytti-kytkin yllä) — kumpikin käyttäjä
+// näkee saman rajan, koska kyse on kalenterin yhteisestä kuormasta.
+document.getElementById('kuormaraja-input').addEventListener('change', async function(e) {
+  const uusiRaja = parseInt(e.target.value, 10);
+  if (isNaN(uusiRaja) || uusiRaja < 1) {
+    e.target.value = haeAsetusNumero('paivan_menoraja', 5);
+    return;
+  }
+  const { error } = await db.from('asetukset').upsert({ key: 'paivan_menoraja', value: String(uusiRaja) }, { onConflict: 'key' });
+  if (error) {
+    console.error('Kuormarajan tallennus epäonnistui:', error);
+    return;
+  }
+  asetuksetKartta.paivan_menoraja = String(uusiRaja);
+  naytaIlmoitus('Kuormaraja tallennettu: ' + uusiRaja);
 });
 
 document.querySelectorAll('.kalenteri-tila-btn').forEach(function(btn) {
