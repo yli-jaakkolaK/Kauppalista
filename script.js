@@ -1634,6 +1634,7 @@ function avaaOsio(osio) {
     showLaituriView();
     lataaLaituri();
     palautaLaituriLuonnos();
+    merkitseLaituriNahdyksi();
   } else if (osio.route === 'muistilaput') {
     showMuistilaputView();
     lataaMuistilaput();
@@ -1665,11 +1666,22 @@ function avaaOsio(osio) {
   }
 }
 
-// Hakee Laiturin uusien (ei vielä sijoitettujen) rivien määrän kotinäkymän merkkiä varten
+// Etusivun Laituri-merkki on "nähty"-pohjainen (ei "käsittelemätön"-pohjainen):
+// laskee montako riviä on lisätty sen jälkeen kun TÄMÄ laite viimeksi avasi
+// Laiturin, laitekohtainen localStorage-aikaleima (kuten Hytti-kalenteri-
+// kytkin) koska Katrilla ja Juhalla on omat puhelimensa. Nollaantuu siis
+// Laiturin avaamisesta, toisin kuin sijoittamattomien rivien määrä (joka
+// näkyy erikseen ITSE Laituri-näkymässä, ks. paivitaLaituriSijoittamattaTeksti).
+const LAITURI_NAHTY_KEY = 'satama_laituri_viimeksi_avattu';
+function merkitseLaituriNahdyksi() {
+  localStorage.setItem(LAITURI_NAHTY_KEY, new Date().toISOString());
+}
+
 async function paivitaLaituriBadge() {
   const badge = document.querySelector('.tile-badge[data-osio-key="laituri"]');
   if (!badge) return;
-  const { count } = await db.from('laituri').select('id', { count: 'exact', head: true }).eq('status', 'uusi');
+  const viimeksiAvattu = localStorage.getItem(LAITURI_NAHTY_KEY) || '1970-01-01T00:00:00.000Z';
+  const { count } = await db.from('laituri').select('id', { count: 'exact', head: true }).gt('created_at', viimeksiAvattu);
   if (count) {
     badge.textContent = count;
     badge.style.display = 'flex';
@@ -1678,8 +1690,20 @@ async function paivitaLaituriBadge() {
   }
 }
 
+// Näyttää Laituri-näkymän sisällä kuinka monta riviä odottaa yhä sijoittamista
+// (status='uusi') — riippumaton hakusanasuodatuksesta ja etusivun "nähty"-
+// pohjaisesta merkistä, koska nämä kaksi lukua vastaavat eri kysymykseen
+// ("mitä ei ole vielä nähty" vs. "mitä ei ole vielä käsitelty").
+async function paivitaLaituriSijoittamattaTeksti() {
+  const teksti = document.getElementById('laituri-sijoittamatta');
+  if (!teksti) return;
+  const { count } = await db.from('laituri').select('id', { count: 'exact', head: true }).eq('status', 'uusi');
+  teksti.textContent = count ? count + ' sijoittamatta' : 'kaikki sijoitettu';
+}
+
 // Hakee ja piirtää Laiturin rivit, valinnaisesti hakusanalla suodatettuna
 async function lataaLaituri(hakusana) {
+  paivitaLaituriSijoittamattaTeksti();
   let kysely = db.from('laituri').select().order('created_at', { ascending: false });
   if (hakusana) {
     kysely = kysely.ilike('content', '%' + hakusana + '%');
