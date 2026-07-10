@@ -440,19 +440,27 @@ function piirraKalenteriRivi(rivi) {
   });
   li.appendChild(ankkurointiNappi);
 
-  const poistoNappi = document.createElement('button');
-  poistoNappi.textContent = '×';
-  poistoNappi.className = 'delete-btn';
-  poistoNappi.addEventListener('click', async function() {
-    const vahvistus = await naytaVahvistus('Poistetaanko ' + rivi.title + '?', null, 'Poista');
-    if (!vahvistus) return;
-    const { error } = await db.from('kalenteri_tapahtumat').delete().eq('id', rivi.id);
-    if (error) {
-      console.error('Tapahtuman poisto epäonnistui:', error);
-    }
-    lataaKalenteri();
-  });
-  li.appendChild(poistoNappi);
+  // Synkatulla rivillä (ical_uid asetettu) EI näytetä poistonappia lainkaan:
+  // "yksi totuus, kaksi ikkunaa" -periaatteen mukaan poisto kuuluu tehdä
+  // iPhonen Kalenterissa, ja peilisääntö (siivoaPoistetut, api/caldav-sync.js)
+  // poistaa rivin täältä automaattisesti seuraavassa synkassa. Ilman tätä
+  // rajausta poistonappi näytti poistavan tapahtuman "kokonaan", vaikka se
+  // vain katosi Satamasta hetkeksi ja synkka olisi tuonut sen takaisin.
+  if (!rivi.ical_uid) {
+    const poistoNappi = document.createElement('button');
+    poistoNappi.textContent = '×';
+    poistoNappi.className = 'delete-btn';
+    poistoNappi.addEventListener('click', async function() {
+      const vahvistus = await naytaVahvistus('Poistetaanko ' + rivi.title + '?', null, 'Poista');
+      if (!vahvistus) return;
+      const { error } = await db.from('kalenteri_tapahtumat').delete().eq('id', rivi.id);
+      if (error) {
+        console.error('Tapahtuman poisto epäonnistui:', error);
+      }
+      lataaKalenteri();
+    });
+    li.appendChild(poistoNappi);
+  }
 
   return li;
 }
@@ -1625,6 +1633,7 @@ function avaaOsio(osio) {
   if (osio.route === 'laituri') {
     showLaituriView();
     lataaLaituri();
+    palautaLaituriLuonnos();
   } else if (osio.route === 'muistilaput') {
     showMuistilaputView();
     lataaMuistilaput();
@@ -2515,6 +2524,7 @@ document.getElementById('laituri-add-btn').addEventListener('click', async funct
     console.error('Laituri-lisäys epäonnistui:', error);
   }
   laituriInput.value = '';
+  tyhjennaLaituriLuonnos();
   lataaLaituri(document.getElementById('laituri-search').value.trim());
 });
 
@@ -2523,6 +2533,32 @@ document.getElementById('laituri-input').addEventListener('keydown', function(ev
     document.getElementById('laituri-add-btn').click();
   }
 });
+
+// Varmuusverkko kesken kirjoituksen tapahtuvaa uudelleenpiirtoa/sivun
+// uudelleenlatausta vastaan (havaittu: näytön kääntö saattoi tyhjentää kentän
+// ennen tallennusta). Luonnos talteen joka näppäimenpainalluksella, palautus
+// kun Laituri-näkymä avataan uudelleen. Laituriin kirjoitettu ei saa KOSKAAN
+// kadota, vaikka juurisyytä uudelleenpiirtoon ei korjattaisikaan.
+const LAITURI_LUONNOS_KEY = 'satama_laituri_luonnos';
+document.getElementById('laituri-input').addEventListener('input', function(e) {
+  if (e.target.value) {
+    localStorage.setItem(LAITURI_LUONNOS_KEY, e.target.value);
+  } else {
+    localStorage.removeItem(LAITURI_LUONNOS_KEY);
+  }
+});
+
+function palautaLaituriLuonnos() {
+  const luonnos = localStorage.getItem(LAITURI_LUONNOS_KEY);
+  const laituriInput = document.getElementById('laituri-input');
+  if (luonnos && !laituriInput.value) {
+    laituriInput.value = luonnos;
+  }
+}
+
+function tyhjennaLaituriLuonnos() {
+  localStorage.removeItem(LAITURI_LUONNOS_KEY);
+}
 
 let laituriHakuAjastin = null;
 document.getElementById('laituri-search').addEventListener('input', function(e) {
