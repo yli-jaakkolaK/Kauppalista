@@ -114,14 +114,11 @@ async function vaihdaAnkkurointiYleinen(source, id, content, jalkeenPaivitys) {
 function vaihdaAnkkurointi(tuote) {
   return vaihdaAnkkurointiYleinen('muistilaput', tuote.id, tuote.nimi, function() { paivitaNaytto(cachedTuotteet); });
 }
-const LAST_LIST_KEY = 'kauppalista_viimeisin_lista';
-
-// Avaa valitun listan ja muistaa sen seuraavaa käynnistystä varten
+// Avaa valitun listan
 function avaaLista(lista) {
   currentList = lista;
   historyOpen = false;
   aktiivinenOtsikkoId = null;
-  localStorage.setItem(LAST_LIST_KEY, lista.id);
   document.getElementById('list-title').textContent = '✱ ' + lista.name + ' ✱';
   paivitaNakyvyysIkoni();
   paivitaLisaysKohde();
@@ -1861,24 +1858,13 @@ async function poistaLista(lista, paivitaNakyma) {
   logEvent('deleted', 'list', lista.id, lista.name, null);
 
   if (currentList && currentList.id === lista.id) {
-    localStorage.removeItem(LAST_LIST_KEY);
     currentList = null;
   }
   paivitaNakyma();
 }
 
-// Kirjautumisen jälkeen: palataan viimeisimpään listaan tai näytetään koti
-async function siirryKirjautumisenJalkeen() {
-  const viimeisinId = localStorage.getItem(LAST_LIST_KEY);
-  if (viimeisinId) {
-    const { data } = await db.from('lists').select().eq('id', viimeisinId).single();
-    if (data) {
-      listanAvausLahde = data.category || 'muistilaput';
-      avaaLista(data);
-      return;
-    }
-    localStorage.removeItem(LAST_LIST_KEY);
-  }
+// Kirjautumisen jälkeen: näytetään aina Etusivu
+function siirryKirjautumisenJalkeen() {
   showHomeView();
   lataaKotinakyma();
 }
