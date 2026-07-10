@@ -4,13 +4,29 @@
   padding: 0;
 }
 
+/* Värit: --muted ja --accent-text on tarkistettu WCAG AA -kontrastisuhdetta
+   (>=4.5:1) vasten --ground-taustaa käyttävälle leipätekstille — aiempi
+   --muted (#B0AA9E vaaleassa) jäi vain n. 2,1:1:een, ei riittänyt ulkona
+   auringossa luettavaksi (Katrin havainto 2026-07-10 testissä). --accent
+   itse pysyy ennallaan (käytössä isoissa/lihavoiduissa otsikoissa ja
+   ikoneina, joilla lievemmät kontrastivaatimukset) — --accent-text on oma,
+   tummempi versio nimenomaan leipätekstikäyttöön (esim. kalenterin
+   kellonaika-teksti). --huomio ja --vaara ovat kolmiportaisen
+   merkkikielen kaksi muuta sävyä, ks. "Kalenterin merkkikieli"
+   muistiinpanot.md:ssä: kulta/--accent = neutraali tieto, meripihka/--huomio
+   = huomaa tämä (ei koskaan syyllistävä), punainen/--vaara = mahdotonta,
+   vaatii reaktion — VARATTU YKSINOMAAN päällekkäisyysmerkille. */
 :root {
   --ground: #F8F5EF;
   --text: #1A1A1A;
   --accent: #C8941A;
-  --muted: #B0AA9E;
+  --accent-text: #8C6512;
+  --muted: #756F62;
   --border: #E0DDD6;
   --border-dash: #C8C3B8;
+  --huomio: #A85A1A;
+  --vaara: #A83636;
+  --vaara-ground: #F5DCDC;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -18,9 +34,13 @@
     --ground: #1A2928;
     --text: #F0EDE8;
     --accent: #E8B84B;
-    --muted: #4D6B69;
+    --accent-text: #E8B84B;
+    --muted: #7FA19E;
     --border: #2D4140;
     --border-dash: #3A5250;
+    --huomio: #E0954D;
+    --vaara: #E88484;
+    --vaara-ground: #4A2626;
   }
 }
 
@@ -162,7 +182,10 @@ h1 {
 }
 
 .kalenteri-paiva-otsikko {
-  font-size: 13px;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  font-size: 15px;
   letter-spacing: 0.1em;
   text-transform: uppercase;
   color: var(--muted);
@@ -174,14 +197,14 @@ h1 {
 }
 
 .kalenteri-tyhja {
-  font-size: 13px;
+  font-size: 14px;
   color: var(--muted);
   padding: 4px 0 16px;
 }
 
 .kalenteri-aika {
-  font-size: 13px;
-  color: var(--muted);
+  font-size: 14px;
+  color: var(--accent-text);
   min-width: 48px;
   padding-left: 4px;
 }
@@ -214,13 +237,19 @@ h1 {
 
   #kalenteri-view[data-tila="viikko"] .kalenteri-paiva-otsikko {
     margin-top: 0;
-    font-size: 10px;
+    font-size: 12px;
     letter-spacing: 0.02em;
     overflow-wrap: break-word;
   }
 
+  #kalenteri-view[data-tila="viikko"] .paiva-merkki {
+    font-size: 10px;
+    padding: 2px 5px;
+    margin-left: 3px;
+  }
+
   #kalenteri-view[data-tila="viikko"] .kalenteri-tyhja {
-    font-size: 11px;
+    font-size: 12px;
     padding: 0;
   }
 
@@ -234,7 +263,7 @@ h1 {
     align-items: flex-start;
     min-height: auto;
     padding: 4px 0;
-    font-size: 12px;
+    font-size: 14px;
   }
 
   #kalenteri-view[data-tila="viikko"] .list li .delete-btn {
@@ -260,7 +289,7 @@ h1 {
 }
 
 .kalenteri-kuukausi-viikonpaivat span {
-  font-size: 10px;
+  font-size: 11px;
   letter-spacing: 0.06em;
   color: var(--muted);
   text-align: center;
@@ -277,7 +306,7 @@ h1 {
 }
 
 .kalenteri-kuukausi-paiva {
-  min-height: 44px;
+  min-height: 46px;
   padding: 3px 2px;
   border-right: 1px solid var(--border);
   cursor: pointer;
@@ -296,11 +325,37 @@ h1 {
   background: var(--border);
 }
 
+.kalenteri-kuukausi-pvm-rivi {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+}
+
 .kalenteri-kuukausi-pvm {
   display: block;
-  font-size: 12px;
+  font-size: 13px;
   color: var(--text);
   text-align: center;
+}
+
+/* Kuukausinäkymän ruutu on liian pieni täydelle merkkipillerille (ks.
+   .paiva-merkki alempana) — sama kolmiportainen väriohjaus tiivistettynä
+   pieneksi pisteeksi päivänumeron viereen, ks. "Kalenterin merkkikieli". */
+.kalenteri-kuukausi-piste {
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.kalenteri-kuukausi-piste--kuorma {
+  background: var(--huomio);
+}
+
+.kalenteri-kuukausi-piste--ristiriita {
+  background: var(--vaara);
 }
 
 .kalenteri-kuukausi-palkit {
@@ -331,7 +386,7 @@ h1 {
 }
 
 .kalenteri-kuukausi-tapahtuma {
-  font-size: 8px;
+  font-size: 9px;
   line-height: 1.3;
   color: var(--muted);
   white-space: nowrap;
@@ -1009,17 +1064,41 @@ h1 {
   flex-shrink: 0;
 }
 
-/* Kuormavahti-merkki päiväotsikossa (agenda + viikko) — sama neutraali tyyli
-   kuin "uusi"-merkillä, ei punaista, ei syyllistävää. Ei klikattava (vain
-   tieto), joten ei cursor:pointeria eikä flex-shrinkiä (ei rivin sisällä). */
-.kalenteri-kuorma-merkki {
-  font-size: 10px;
-  letter-spacing: 0.06em;
+/* Yhtenäinen päivätason pilleri-komponentti (kolmiportainen merkkikieli, ks.
+   muistiinpanot.md "Kalenterin merkkikieli") — kuorma, päällekkäisyys ja
+   tuleva "keskustellaan"-lippu jakavat saman pohjan, vain sävy vaihtuu.
+   Isompi ja itsestään selittävämpi kuin aiempi .kalenteri-kuorma-merkki
+   (Katrin testipalaute 2026-07-10: liian huomaamaton, "ei varmaan tarvitse
+   huomiota"). Ei klikattava (vain tieto), ei cursor:pointeria. */
+.paiva-merkki {
+  display: inline-flex;
+  align-items: center;
+  font-size: 12px;
+  font-weight: bold;
+  letter-spacing: 0.02em;
+  border-radius: 4px;
+  padding: 3px 7px;
+  margin-left: 6px;
+  white-space: nowrap;
+}
+
+.paiva-merkki--kuorma {
+  color: var(--huomio);
+  border: 1px dashed var(--huomio);
+}
+
+/* Punainen on varattu YKSINOMAAN tälle — täytetty tausta + yhtenäinen reuna
+   tekevät siitä muita vahvemman, "ei saa mennä ohi silmää" (Katrin vaatimus). */
+.paiva-merkki--ristiriita {
+  color: var(--vaara);
+  background: var(--vaara-ground);
+  border: 1px solid var(--vaara);
+  text-transform: uppercase;
+}
+
+.paiva-merkki--keskustellaan {
   color: var(--accent);
   border: 1px dashed var(--accent);
-  border-radius: 3px;
-  padding: 2px 5px;
-  margin-left: 6px;
 }
 
 #kalenteri-kuittaus-lista {

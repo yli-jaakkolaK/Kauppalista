@@ -262,6 +262,16 @@ function haeAsetusNumero(key, oletus) {
   const n = parseInt(asetuksetKartta[key], 10);
   return isNaN(n) ? oletus : n;
 }
+function haeAsetusTeksti(key, oletus) {
+  return asetuksetKartta[key] || oletus;
+}
+function haeAsetusJSON(key, oletus) {
+  try {
+    return JSON.parse(asetuksetKartta[key]);
+  } catch (e) {
+    return oletus;
+  }
+}
 
 // Kuormavahti: laskee kellonaikaan sidottujen (koko päivän kestävät, esim.
 // synttarit, EIVÄT kerrytä) tapahtumien määrän annetulta riviltä. Ankkurit ja
@@ -271,17 +281,107 @@ function laskeMenoja(rivit) {
   return rivit.filter(function(r) { return (!r._tyyppi || r._tyyppi === 'tapahtuma') && r.event_time; }).length;
 }
 
-// Piirtää otsikkotekstin ja lisää perään pienen kuormamerkin (sama neutraali
-// tyyli kuin "uusi"-merkillä, accent-väri, ei punaista) jos päivän menomäärä
-// on saavuttanut/ylittänyt asetetun rajan.
-function paivitaOtsikkoKuormamerkilla(otsikkoEl, teksti, maara, raja) {
+// === PÄÄLLEKKÄISYYSMERKKI (2026-07-10, ks. muistiinpanot.md "Ristiriitamerkki") ===
+// Kaksi kellonaikaan sidottua tapahtumaa menevät päällekkäin samana päivänä.
+// Vain kalenteritapahtumat (ei ankkurit/Hytti) osallistuvat vertailuun.
+function onkoAjallisestiPaallekkainen(a, b) {
+  if (!a.event_time || !b.event_time) return false;
+  const aLoppu = a.event_end_time || a.event_time;
+  const bLoppu = b.event_end_time || b.event_time;
+  return a.event_time < bLoppu && b.event_time < aLoppu;
+}
+
+// Onko annettu ISO-päivä ylipäätään "rauhoitettu päivä" (kausi + arkipäivä +
+// ei loma-aikaa)? Pelkkä päivätason kelpoisuus — kellonaikaikkuna (klo 9-15)
+// tarkistetaan ERIKSEEN paallekkaisyysVakavuus():ssa itse päällekkäisyyden
+// ajankohdalle, ei koko päivälle. Kaikki asetuksina asetukset-taulussa
+// (sql/024), ei mitään kovakoodattua.
+function onkoRauhoitettuPaiva(isoPvm) {
+  const osat = isoPvm.split('-').map(Number);
+  const d = new Date(osat[0], osat[1] - 1, osat[2]);
+  const viikonpaivat = haeAsetusTeksti('ristiriita_viikonpaivat', '1,2,3,4,5').split(',').map(Number);
+  const isoViikonpaiva = d.getDay() === 0 ? 7 : d.getDay(); // 1=ma...7=su
+  if (viikonpaivat.indexOf(isoViikonpaiva) === -1) return false;
+
+  const kausiAlkaa = haeAsetusTeksti('ristiriita_kausi_alkaa', '08-01'); // MM-DD
+  const kausiLoppuu = haeAsetusTeksti('ristiriita_kausi_loppuu', '05-31');
+  const kkPv = isoPvm.slice(5); // "MM-DD"
+  // Kausi voi kiertää vuodenvaihteen yli (esim. elokuusta toukokuuhun).
+  const kausiVoimassa = kausiAlkaa <= kausiLoppuu
+    ? (kkPv >= kausiAlkaa && kkPv <= kausiLoppuu)
+    : (kkPv >= kausiAlkaa || kkPv <= kausiLoppuu);
+  if (!kausiVoimassa) return false;
+
+  const lomaValit = haeAsetusJSON('ristiriita_loma_valit', []);
+  const lomalla = (lomaValit || []).some(function(vali) { return isoPvm >= vali.alku && isoPvm <= vali.loppu; });
+  return !lomalla;
+}
+
+// Vakavuus kahden päällekkäisen tapahtuman välillä:
+//  - 'aina'       saman syötteen (kalenterin) sisäinen päällekkäisyys —
+//                 merkitään AINA, myös rauhoitetun ikkunan aikana (Poikkeus A)
+//  - 'ei_koskaan' kaksi ERI henkilön OMAA henkilökohtaista kalenteria (esim.
+//                 Katri vs. Juha) — kaksi aikuista, kaksi paikkaa on normaalia,
+//                 EI automaattimerkkiä koskaan (tuleva "keskustellaan"-lippu
+//                 koskee näitä, ei tätä merkkiä)
+//  - 'merkitse'/'rauhoitettu' kaikki muu (jaettu perhekalenteri mukana,
+//                 tai käsin lisätty ilman syötettä) — merkitään PAITSI jos
+//                 PÄÄLLEKKÄISYYDEN OMA ajanjakso mahtuu kokonaan rauhoitetun
+//                 päivän klo 9-15 -ikkunaan (jos päällekkäisyys ulottuu vaikka
+//                 vain hetkeksi ikkunan ulkopuolelle, se silti merkitään —
+//                 turvallisempi oletus kuin hiljentää osittain).
+// Käsin lisätyt tapahtumat (ei syote_id, ei henkilo) osuvat oletuksena
+// 'merkitse'/'rauhoitettu'-haaraan — tietoinen yksinkertaistus, ei koskaan
+// 'ei_koskaan' koska emme tiedä kenen ne ovat.
+function paallekkaisyysVakavuus(a, b, isoPvm) {
+  if (a.syote_id && b.syote_id && a.syote_id === b.syote_id) return 'aina';
+  if (a._henkilo && b._henkilo && a._henkilo !== b._henkilo) return 'ei_koskaan';
+  if (!onkoRauhoitettuPaiva(isoPvm)) return 'merkitse';
+
+  const aLoppu = a.event_end_time || a.event_time;
+  const bLoppu = b.event_end_time || b.event_time;
+  const paallekkaisAlku = a.event_time > b.event_time ? a.event_time : b.event_time;
+  const paallekkaisLoppu = aLoppu < bLoppu ? aLoppu : bLoppu;
+  const kloAlkaa = haeAsetusTeksti('ristiriita_klo_alkaa', '09:00');
+  const kloLoppuu = haeAsetusTeksti('ristiriita_klo_loppuu', '15:00');
+  const kokoPaallekkaisyysIkkunassa = paallekkaisAlku.slice(0, 5) >= kloAlkaa && paallekkaisLoppu.slice(0, 5) <= kloLoppuu;
+  return kokoPaallekkaisyysIkkunassa ? 'rauhoitettu' : 'merkitse';
+}
+
+// Onko annetulla päivällä vähintään yksi todellinen (ei suodatettu) ristiriita?
+function onkoPaivanRistiriita(rivit, isoPvm) {
+  const tapahtumat = rivit.filter(function(r) { return (!r._tyyppi || r._tyyppi === 'tapahtuma') && r.event_time; });
+  for (let i = 0; i < tapahtumat.length; i++) {
+    for (let j = i + 1; j < tapahtumat.length; j++) {
+      if (!onkoAjallisestiPaallekkainen(tapahtumat[i], tapahtumat[j])) continue;
+      const vakavuus = paallekkaisyysVakavuus(tapahtumat[i], tapahtumat[j], isoPvm);
+      if (vakavuus === 'aina' || vakavuus === 'merkitse') return true;
+    }
+  }
+  return false;
+}
+
+// Luo yhtenäisen päivätason merkkipillerin (ks. muistiinpanot.md "Kalenterin
+// merkkikieli") — savy on 'kuorma' | 'ristiriita' | 'keskustellaan'.
+function luoPaivaMerkki(savy, teksti, title) {
+  const merkki = document.createElement('span');
+  merkki.className = 'paiva-merkki paiva-merkki--' + savy;
+  merkki.textContent = teksti;
+  if (title) merkki.title = title;
+  return merkki;
+}
+
+// Piirtää päiväotsikon tekstin ja lisää perään ristiriita- (jos on) ja
+// kuorma- (jos raja täyttyy) -merkit tässä järjestyksessä, koska
+// päällekkäisyys on kiireellisempi huomata.
+function paivitaPaivanOtsikko(otsikkoEl, teksti, rivit, isoPvm, kuormaraja) {
   otsikkoEl.textContent = teksti;
-  if (maara >= raja) {
-    const merkki = document.createElement('span');
-    merkki.className = 'kalenteri-kuorma-merkki';
-    merkki.textContent = '⚑ ' + maara;
-    merkki.title = maara + ' kellonaikamenoa tänä päivänä';
-    otsikkoEl.appendChild(merkki);
+  if (onkoPaivanRistiriita(rivit, isoPvm)) {
+    otsikkoEl.appendChild(luoPaivaMerkki('ristiriita', 'päällekkäin', 'Kaksi tapahtumaa menee päällekkäin tänä päivänä'));
+  }
+  const maara = laskeMenoja(rivit);
+  if (maara >= kuormaraja) {
+    otsikkoEl.appendChild(luoPaivaMerkki('kuorma', maara + ' menoa', maara + ' kellonaikamenoa tänä päivänä'));
   }
 }
 
@@ -462,14 +562,14 @@ function piirraKalenteriRivi(rivi) {
   return li;
 }
 
-function piirraKalenteriPaivaRyhma(container, rivit, otsikkoTeksti, kuormaraja) {
+function piirraKalenteriPaivaRyhma(container, rivit, otsikkoTeksti, kuormaraja, isoPvm) {
   const ryhma = document.createElement('div');
   ryhma.className = 'kalenteri-paiva-ryhma';
 
   if (otsikkoTeksti) {
     const otsikko = document.createElement('div');
     otsikko.className = 'kalenteri-paiva-otsikko';
-    paivitaOtsikkoKuormamerkilla(otsikko, otsikkoTeksti, laskeMenoja(rivit), kuormaraja || Infinity);
+    paivitaPaivanOtsikko(otsikko, otsikkoTeksti, rivit, isoPvm, kuormaraja || Infinity);
     ryhma.appendChild(otsikko);
   }
 
@@ -535,10 +635,12 @@ async function lataaKalenteri() {
     haunLoppu.setDate(haunLoppu.getDate() + 6);
   }
 
-  // kalenteri_syotteet(vari) hakee liitetyn syötteen värin FK-suhteen
-  // (syote_id) kautta samassa kyselyssä — null jos käsin lisätty tapahtuma.
+  // kalenteri_syotteet(vari, henkilo) hakee liitetyn syötteen värin ja
+  // omistajan FK-suhteen (syote_id) kautta samassa kyselyssä — molemmat null
+  // jos käsin lisätty tapahtuma. henkilo tarvitaan päällekkäisyysmerkin
+  // vakavuusluokitteluun (ks. paallekkaisyysVakavuus()).
   const { data: haetut, error } = await db.from('kalenteri_tapahtumat')
-    .select('*, kalenteri_syotteet(vari)')
+    .select('*, kalenteri_syotteet(vari, henkilo)')
     .gte('event_date', paivamaaraISO(haunAlku))
     .lte('event_date', paivamaaraISO(haunLoppu))
     .order('event_date')
@@ -550,7 +652,10 @@ async function lataaKalenteri() {
   }
 
   const data = (haetut || []).map(function(t) {
-    return Object.assign({}, t, { _vari: t.kalenteri_syotteet ? t.kalenteri_syotteet.vari : null });
+    return Object.assign({}, t, {
+      _vari: t.kalenteri_syotteet ? t.kalenteri_syotteet.vari : null,
+      _henkilo: t.kalenteri_syotteet ? t.kalenteri_syotteet.henkilo : null,
+    });
   });
 
   await paivitaAnkkuroidutAvaimet();
@@ -562,16 +667,22 @@ async function lataaKalenteri() {
   if (kalenteriTila === 'paiva') {
     const tanaanIso = paivamaaraISO(kalenteriPvm);
     let rivit = data.filter(function(t) { return tapahtumaKattaaPaivan(t, tanaanIso); }).map(function(t) {
-      return { _tyyppi: 'tapahtuma', id: t.id, title: t.title, event_time: t.event_time, _vari: t._vari, ical_uid: t.ical_uid, user_id: t.user_id };
+      return {
+        _tyyppi: 'tapahtuma', id: t.id, title: t.title, event_time: t.event_time,
+        event_end_time: t.event_end_time, syote_id: t.syote_id, _henkilo: t._henkilo,
+        _vari: t._vari, ical_uid: t.ical_uid, user_id: t.user_id,
+      };
     });
 
-    // Kuormavahti: lasketaan ENNEN ankkurit/Hytti-rivien lisäystä, koska ne
-    // eivät kuulu kalenterin kuormaan (laskeMenoja suodattaa ne pois joka
-    // tapauksessa, mutta selkeämpi laskea juuri tässä kohdassa).
-    paivitaOtsikkoKuormamerkilla(
+    // Kuormavahti + ristiriitamerkki: lasketaan ENNEN ankkurit/Hytti-rivien
+    // lisäystä, koska ne eivät kuulu kalenterin kuormaan/ristiriitoihin
+    // (molemmat suodattavat ne pois joka tapauksessa, mutta selkeämpi laskea
+    // juuri tässä kohdassa).
+    paivitaPaivanOtsikko(
       document.getElementById('kalenteri-otsikko'),
       otsikko,
-      laskeMenoja(rivit),
+      rivit,
+      tanaanIso,
       haeAsetusNumero('paivan_menoraja', 5)
     );
 
@@ -613,7 +724,7 @@ async function lataaKalenteri() {
       const iso = paivamaaraISO(pvm);
       const otsikkoTeksti = KALENTERI_PAIVAT[pvm.getDay()] + ' ' + pvm.getDate() + '.' + (pvm.getMonth() + 1) + '.';
       const paivanTapahtumat = data.filter(function(t) { return tapahtumaKattaaPaivan(t, iso); });
-      piirraKalenteriPaivaRyhma(sisalto, paivanTapahtumat, otsikkoTeksti, haeAsetusNumero('paivan_menoraja', 5));
+      piirraKalenteriPaivaRyhma(sisalto, paivanTapahtumat, otsikkoTeksti, haeAsetusNumero('paivan_menoraja', 5), iso);
     }
     return;
   }
@@ -657,17 +768,39 @@ function laskeViikonLinjat(viikonTapahtumat) {
 // Piirtää yhden päiväruudun sisällön: päivänumero, monipäiväisten
 // tapahtumien palkkirivit (linjan mukaisessa järjestyksessä) ja sen jälkeen
 // yksipäiväiset tapahtumat pienenä tekstinä.
-function piirraKuukausiPaiva(pvm, kaikkiTapahtumat, linjat, linjojaViikolla, kuluvaKuukausi) {
+function piirraKuukausiPaiva(pvm, kaikkiTapahtumat, linjat, linjojaViikolla, kuluvaKuukausi, kuormaraja) {
   const iso = paivamaaraISO(pvm);
   const solu = document.createElement('div');
   solu.className = 'kalenteri-kuukausi-paiva';
   if (pvm.getMonth() !== kuluvaKuukausi) solu.classList.add('ulkopuolinen');
   if (iso === paivamaaraISO(new Date())) solu.classList.add('tanaan');
 
+  const paivanKaikki = kaikkiTapahtumat.filter(function(t) { return tapahtumaKattaaPaivan(t, iso); });
+
+  const pvmRivi = document.createElement('div');
+  pvmRivi.className = 'kalenteri-kuukausi-pvm-rivi';
+
   const pvmEl = document.createElement('span');
   pvmEl.className = 'kalenteri-kuukausi-pvm';
   pvmEl.textContent = pvm.getDate();
-  solu.appendChild(pvmEl);
+  pvmRivi.appendChild(pvmEl);
+
+  // Kuukausiruutu on liian pieni täydelle merkkipillerille (ks. Kuormavahti/
+  // ristiriitamerkki agenda- ja viikkonäkymässä) — sama kolmiportainen
+  // väriohjaus tiivistettynä pieneksi pisteeksi päivänumeron viereen.
+  if (onkoPaivanRistiriita(paivanKaikki, iso)) {
+    const piste = document.createElement('span');
+    piste.className = 'kalenteri-kuukausi-piste kalenteri-kuukausi-piste--ristiriita';
+    piste.title = 'Päällekkäin';
+    pvmRivi.appendChild(piste);
+  } else if (laskeMenoja(paivanKaikki) >= kuormaraja) {
+    const piste = document.createElement('span');
+    piste.className = 'kalenteri-kuukausi-piste kalenteri-kuukausi-piste--kuorma';
+    piste.title = laskeMenoja(paivanKaikki) + ' menoa';
+    pvmRivi.appendChild(piste);
+  }
+
+  solu.appendChild(pvmRivi);
 
   const paivanMonipaivaiset = kaikkiTapahtumat.filter(function(t) { return onkoMonipaivainen(t) && tapahtumaKattaaPaivan(t, iso); });
 
@@ -719,6 +852,7 @@ function piirraKuukausiPaiva(pvm, kaikkiTapahtumat, linjat, linjojaViikolla, kul
 }
 
 function piirraKuukausiRuudukko(sisalto, kaikkiTapahtumat, kuluvaKuukausi) {
+  const kuormaraja = haeAsetusNumero('paivan_menoraja', 5);
   const ruudukko = document.createElement('div');
   ruudukko.className = 'kalenteri-kuukausi-ruudukko';
 
@@ -756,7 +890,7 @@ function piirraKuukausiRuudukko(sisalto, kaikkiTapahtumat, kuluvaKuukausi) {
     const viikkorivi = document.createElement('div');
     viikkorivi.className = 'kalenteri-kuukausi-viikko';
     viikonPaivat.forEach(function(pvm) {
-      viikkorivi.appendChild(piirraKuukausiPaiva(pvm, kaikkiTapahtumat, linjat, linjojaViikolla, kuluvaKuukausi));
+      viikkorivi.appendChild(piirraKuukausiPaiva(pvm, kaikkiTapahtumat, linjat, linjojaViikolla, kuluvaKuukausi, kuormaraja));
     });
     ruudukko.appendChild(viikkorivi);
   }
