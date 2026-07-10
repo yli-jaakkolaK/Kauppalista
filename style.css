@@ -837,6 +837,105 @@ h1 {
   transition: opacity 0.25s ease;
 }
 
+/* Muistutukset (2026-07-10) — kello-nappi samalla tyylillä kuin ⚓, plus
+   pieni oheisteksti kun muistutus on jo asetettu. */
+.muistutus-wrap {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.reminder-btn {
+  min-width: 44px;
+  min-height: 44px;
+  background: none;
+  border: none;
+  outline: none;
+  appearance: none;
+  -webkit-appearance: none;
+  font-size: 18px;
+  color: var(--muted);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  -webkit-tap-highlight-color: transparent;
+  opacity: 0.4;
+}
+
+.reminder-btn:hover,
+.reminder-btn:active {
+  opacity: 1;
+}
+
+.reminder-btn.active {
+  color: var(--accent);
+  opacity: 1;
+}
+
+.muistutus-aika {
+  font-size: 11px;
+  color: var(--muted);
+  margin-right: 4px;
+  white-space: nowrap;
+}
+
+.muistutus-rivi {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--border);
+  font-size: 14px;
+}
+
+.muistutus-rivi:last-child {
+  border-bottom: none;
+}
+
+.muistutus-pikanapit {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 10px 0;
+}
+
+.muistutus-pikanapit button {
+  flex: 1 1 auto;
+  font-size: 12px;
+  padding: 8px 6px;
+}
+
+.muistutus-rulla-rivi {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.muistutus-rulla-rivi select {
+  font-family: 'Courier New', Courier, monospace;
+  font-size: 15px;
+  color: var(--text);
+  background: var(--ground);
+  border: 1px solid var(--border-dash);
+  border-radius: 4px;
+  padding: 8px 4px;
+}
+
+#muistutus-maara {
+  width: 56px;
+}
+
+#muistutus-yksikko {
+  flex: 1;
+}
+
+.muistutus-rulla-rivi #muistutus-lisaa-btn {
+  flex-shrink: 0;
+}
+
 .edit-btn {
   min-width: 52px;
   min-height: 52px;

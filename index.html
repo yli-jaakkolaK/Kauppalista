@@ -324,6 +324,43 @@
     </div>
   </div>
 
+  <div class="dialog-overlay" id="muistutus-overlay" style="display:none">
+    <div class="dialog-box">
+      <p class="dialog-title" id="muistutus-otsikko"></p>
+
+      <p class="section-empty" id="muistutus-ei-pushia" style="display:none">
+        Ilmoitukset eivät ole vielä käytössä tällä laitteella. Käy sallimassa ne Asetuksista ennen muistutuksen asettamista.
+        <br><br>
+        <button class="dialog-btn" id="muistutus-asetuksiin-btn">Asetuksiin</button>
+      </p>
+
+      <div id="muistutus-lomake">
+        <div id="muistutus-lista"></div>
+
+        <div class="muistutus-pikanapit" id="muistutus-pikanapit" style="display:none">
+          <button class="dialog-btn dialog-btn-cancel" data-min="15">15 min ennen</button>
+          <button class="dialog-btn dialog-btn-cancel" data-min="60">1 h ennen</button>
+          <button class="dialog-btn dialog-btn-cancel" data-min="1440">1 vrk ennen</button>
+        </div>
+
+        <div class="muistutus-rulla-rivi">
+          <select id="muistutus-maara"></select>
+          <select id="muistutus-yksikko">
+            <option value="min">min</option>
+            <option value="tunti">tunti</option>
+            <option value="vrk">vrk</option>
+            <option value="viikko">viikko</option>
+          </select>
+          <button class="dialog-btn" id="muistutus-lisaa-btn">+ Lisää</button>
+        </div>
+      </div>
+
+      <div class="dialog-buttons">
+        <button class="dialog-btn dialog-btn-cancel" id="muistutus-sulje">Sulje</button>
+      </div>
+    </div>
+  </div>
+
   <div class="dialog-overlay" id="settings-overlay" style="display:none">
     <div class="dialog-box">
       <p class="dialog-title">Listan asetukset</p>

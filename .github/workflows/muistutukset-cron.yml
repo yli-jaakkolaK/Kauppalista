@@ -1,0 +1,28 @@
+name: Muistutusten ja kalenterisynkan ajastin
+
+# Vercel Hobby-cron ei riitä (ajaa vain kerran vrk:ssa epätarkasti, ks.
+# muistiinpanot.md "Kalenterisyötteet"-osion "Vercel Cron ei ole käytössä").
+# GitHub Actions -scheduled workflow toimii ulkoisena 5 min -pingaajana
+# ilmaiseksi: kutsuu /api/muistutukset-laheta (lähettää erääntyneet
+# muistutukset) ja /api/caldav-sync (pitää kalenterisynkan tuoreena myös
+# silloin kun kukaan ei ole avannut sovellusta).
+#
+# HUOM: GitHub Actionsin cron-aikataulu on "parhaan yrityksen" periaatteella
+# — GitHub voi viivästyttää ajoa ruuhka-aikoina. Muistutusten ±5 min
+# tarkkuustavoite on tästä syystä suuntaa-antava, ei taattu.
+
+on:
+  schedule:
+    - cron: '*/5 * * * *'
+  workflow_dispatch: {}
+
+jobs:
+  pingaa:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Lähetä erääntyneet muistutukset
+        run: |
+          curl -fsS "https://kauppalista-nine.vercel.app/api/muistutukset-laheta?avain=${{ secrets.MUISTUTUKSET_CRON_SECRET }}" || true
+      - name: Synkkaa kalenteri
+        run: |
+          curl -fsS "https://kauppalista-nine.vercel.app/api/caldav-sync" || true

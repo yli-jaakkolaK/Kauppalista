@@ -537,6 +537,8 @@ function piirraKalenteriRivi(rivi) {
   });
   li.appendChild(ankkurointiNappi);
 
+  li.appendChild(luoMuistutusNappi('kalenteri', rivi.id, rivi.title, rivi.event_date, rivi.event_time, lataaKalenteri));
+
   // Synkatulla rivillä (ical_uid asetettu) EI näytetä poistonappia lainkaan:
   // "yksi totuus, kaksi ikkunaa" -periaatteen mukaan poisto kuuluu tehdä
   // iPhonen Kalenterissa, ja peilisääntö (siivoaPoistetut, api/caldav-sync.js)
@@ -554,6 +556,7 @@ function piirraKalenteriRivi(rivi) {
       if (error) {
         console.error('Tapahtuman poisto epäonnistui:', error);
       }
+      await db.from('muistutukset').delete().eq('source', 'kalenteri').eq('source_ref', String(rivi.id));
       lataaKalenteri();
     });
     li.appendChild(poistoNappi);
@@ -660,6 +663,7 @@ async function lataaKalenteri() {
 
   await paivitaAnkkuroidutAvaimet();
   await paivitaAsetukset();
+  await paivitaMuistutuksetKartta();
 
   const sisalto = document.getElementById('kalenteri-sisalto');
   sisalto.innerHTML = '';
@@ -668,7 +672,7 @@ async function lataaKalenteri() {
     const tanaanIso = paivamaaraISO(kalenteriPvm);
     let rivit = data.filter(function(t) { return tapahtumaKattaaPaivan(t, tanaanIso); }).map(function(t) {
       return {
-        _tyyppi: 'tapahtuma', id: t.id, title: t.title, event_time: t.event_time,
+        _tyyppi: 'tapahtuma', id: t.id, title: t.title, event_date: t.event_date, event_time: t.event_time,
         event_end_time: t.event_end_time, syote_id: t.syote_id, _henkilo: t._henkilo,
         _vari: t._vari, ical_uid: t.ical_uid, user_id: t.user_id,
       };
@@ -1646,6 +1650,7 @@ async function lataaAnkkurit() {
   }
 
   cachedAnkkurit = data || [];
+  await paivitaMuistutuksetKartta();
   const nayta = ankkuritKaikkiNakyvissa ? cachedAnkkurit : cachedAnkkurit.slice(0, 3);
   const piilossa = cachedAnkkurit.length - nayta.length;
 
@@ -1690,10 +1695,13 @@ async function lataaAnkkurit() {
         if (error) {
           console.error('Ankkurin irrotus epäonnistui:', error);
         }
+        await db.from('muistutukset').delete().eq('source', 'ankkuri').eq('source_ref', String(ankkuri.id));
         lataaAnkkurit();
       }, 250);
     });
     li.appendChild(irrotaNappi);
+
+    li.appendChild(luoMuistutusNappi('ankkuri', ankkuri.id, ankkuri.content, null, ankkuri.event_time, lataaAnkkurit));
 
     listEl.appendChild(li);
   });
@@ -2097,6 +2105,7 @@ async function poistaTuote(tuote) {
     if (error) {
       console.error('Poisto epäonnistui:', error);
     }
+    await db.from('muistutukset').delete().eq('source', 'rivi').eq('source_ref', String(tuote.id));
     logEvent('deleted', tuote.is_header ? 'header' : 'item', tuote.id, tuote.nimi, tuote.list_id);
     lataaLista();
   } else {
@@ -2414,6 +2423,8 @@ function paivitaNaytto(tuotteet) {
     ankkuriNappi.addEventListener('click', function() { vaihdaAnkkurointi(tuote); });
     item.appendChild(ankkuriNappi);
 
+    item.appendChild(luoMuistutusNappi('rivi', tuote.id, tuote.nimi, null, null, lataaLista));
+
     // Oikealla: poistaminen
     const nappi = document.createElement('button');
     nappi.textContent = '×';
@@ -2509,6 +2520,7 @@ async function lataaLista() {
   }
   cachedTuotteet = data || [];
   await paivitaAnkkuroidutAvaimet();
+  await paivitaMuistutuksetKartta();
   paivitaNaytto(cachedTuotteet);
   paivitaFooter(cachedTuotteet);
   updateSyncIndicator();
@@ -2791,6 +2803,45 @@ document.getElementById('kuormaraja-input').addEventListener('change', async fun
   naytaIlmoitus('Kuormaraja tallennettu: ' + uusiRaja);
 });
 
+// === MUISTUTUSPANEELIN NAPIT JA RULLAT ===
+// Numerorulla 1-59 täytetään kerran sivun latauksessa — kevein iOS:ssä
+// rullalta tuntuva toteutus on natiivi <select>, ei mikään erillinen kirjasto.
+(function() {
+  const maaraSelect = document.getElementById('muistutus-maara');
+  for (let i = 1; i <= 59; i++) {
+    const optio = document.createElement('option');
+    optio.value = i;
+    optio.textContent = i;
+    maaraSelect.appendChild(optio);
+  }
+})();
+
+const MUISTUTUS_YKSIKKO_MS = { min: 60 * 1000, tunti: 60 * 60 * 1000, vrk: 24 * 60 * 60 * 1000, viikko: 7 * 24 * 60 * 60 * 1000 };
+
+document.getElementById('muistutus-lisaa-btn').addEventListener('click', function() {
+  const maara = parseInt(document.getElementById('muistutus-maara').value, 10);
+  const yksikko = document.getElementById('muistutus-yksikko').value;
+  lisaaMuistutus(new Date(Date.now() + maara * MUISTUTUS_YKSIKKO_MS[yksikko]));
+});
+
+document.querySelectorAll('#muistutus-pikanapit button').forEach(function(btn) {
+  btn.addEventListener('click', function() {
+    if (!muistutusKohde || !muistutusKohde.eventDate || !muistutusKohde.eventTime) return;
+    const tapahtumanHetki = new Date(muistutusKohde.eventDate + 'T' + muistutusKohde.eventTime).getTime();
+    const offsetMs = parseInt(btn.dataset.min, 10) * 60 * 1000;
+    lisaaMuistutus(new Date(tapahtumanHetki - offsetMs));
+  });
+});
+
+document.getElementById('muistutus-sulje').addEventListener('click', suljeMuistutusPaneeli);
+document.getElementById('muistutus-overlay').addEventListener('click', function(e) {
+  if (e.target === document.getElementById('muistutus-overlay')) suljeMuistutusPaneeli();
+});
+document.getElementById('muistutus-asetuksiin-btn').addEventListener('click', function() {
+  suljeMuistutusPaneeli();
+  avaaOsio({ route: 'asetukset' });
+});
+
 document.querySelectorAll('.kalenteri-tila-btn').forEach(function(btn) {
   btn.addEventListener('click', function() {
     kalenteriTila = btn.dataset.tila;
@@ -2964,6 +3015,176 @@ async function laheteTestipush() {
 
   testiNappi.disabled = false;
   testiNappi.textContent = alkuperainenTeksti;
+}
+
+// === MUISTUTUKSET (2026-07-10) ===
+// Henkilökohtainen push-muistutus listan riville, kalenteritapahtumalle tai
+// ankkurille. Rakentuu push-infran päälle (VAPID_PUBLIC_KEY, push_tilaukset
+// yllä) — lähetys tapahtuu palvelimella (api/muistutukset-laheta.js), jota
+// kutsuu ulkoinen GitHub Actions -cron 5 min välein (ks. .github/workflows/).
+// Ks. muistiinpanot.md "Muistutukset"-osio täydelle suunnittelulle.
+
+// Onko push käytössä TÄLLÄ laitteella (lupa myönnetty + tilaus tallennettu)?
+// Käytetään porttina muistutuspaneelissa — muistutuksen asettaminen ilman
+// pushia olisi näennäinen ominaisuus joka ei koskaan herättäisi ketään.
+async function onkoPushKaytossa() {
+  if (!('serviceWorker' in navigator) || !('PushManager' in window)) return false;
+  if (Notification.permission !== 'granted') return false;
+  const rekisterointi = await navigator.serviceWorker.ready;
+  const tilaus = await rekisterointi.pushManager.getSubscription();
+  return !!tilaus;
+}
+
+function muistutusAvain(source, sourceRef) {
+  return source + ':' + String(sourceRef);
+}
+
+// Kaikki KIRJAUTUNEEN käyttäjän omat, vielä lähettämättömät muistutukset,
+// ryhmiteltynä "source:source_ref"-avaimen mukaan — sama Set/Map-pohjainen
+// "mitä on jo asetettu" -kuvio kuin ankkuroidutAvaimet ja kuitatutUidt.
+let muistutuksetKartta = {};
+async function paivitaMuistutuksetKartta() {
+  const { data, error } = await db.from('muistutukset').select('id, source, source_ref, remind_at').is('sent_at', null);
+  if (error) {
+    console.error('Muistutusten haku epäonnistui:', error);
+    return;
+  }
+  muistutuksetKartta = {};
+  (data || []).forEach(function(m) {
+    const avain = muistutusAvain(m.source, m.source_ref);
+    if (!muistutuksetKartta[avain]) muistutuksetKartta[avain] = [];
+    muistutuksetKartta[avain].push(m);
+  });
+}
+
+// "ke 14.7. klo 14:30" -tyylinen lyhyt muotoilu — sama henki kuin
+// avaaKuittausOverlay():n pvmTeksti.
+function muotoileMuistutusAika(isoAika) {
+  const d = new Date(isoAika);
+  return d.getDate() + '.' + (d.getMonth() + 1) + '. klo ' +
+    d.getHours().toString().padStart(2, '0') + ':' + d.getMinutes().toString().padStart(2, '0');
+}
+
+// Luo rivin perään liitettävän kello-napin (+ mahdollisen aikamerkin) —
+// käytetään identtisesti listariveillä, kalenteritapahtumilla ja
+// ankkureilla. eventDate/eventTime annetaan VAIN kalenteritapahtumille
+// (pikanappien "N ennen" -laskentaan), muille null.
+function luoMuistutusNappi(source, sourceRef, content, eventDate, eventTime, jalkeenPaivitys) {
+  const wrap = document.createElement('span');
+  wrap.className = 'muistutus-wrap';
+
+  const omat = muistutuksetKartta[muistutusAvain(source, sourceRef)] || [];
+
+  const nappi = document.createElement('button');
+  nappi.textContent = '⏰';
+  nappi.className = 'reminder-btn' + (omat.length > 0 ? ' active' : '');
+  nappi.addEventListener('click', function() {
+    avaaMuistutusPaneeli(source, sourceRef, content, eventDate, eventTime, jalkeenPaivitys);
+  });
+  wrap.appendChild(nappi);
+
+  if (omat.length === 1) {
+    const aika = document.createElement('span');
+    aika.className = 'muistutus-aika';
+    aika.textContent = muotoileMuistutusAika(omat[0].remind_at);
+    wrap.appendChild(aika);
+  } else if (omat.length > 1) {
+    const aika = document.createElement('span');
+    aika.className = 'muistutus-aika';
+    aika.textContent = '×' + omat.length;
+    wrap.appendChild(aika);
+  }
+
+  return wrap;
+}
+
+// Paneelin nykyinen kohde — asetetaan avattaessa, tyhjennetään suljettaessa.
+let muistutusKohde = null;
+
+async function avaaMuistutusPaneeli(source, sourceRef, content, eventDate, eventTime, jalkeenPaivitys) {
+  muistutusKohde = {
+    source: source, sourceRef: String(sourceRef), content: content,
+    eventDate: eventDate, eventTime: eventTime, jalkeenPaivitys: jalkeenPaivitys,
+  };
+  document.getElementById('muistutus-otsikko').textContent = 'Muistutus: ' + content;
+
+  const pushiaEiOle = !(await onkoPushKaytossa());
+  document.getElementById('muistutus-ei-pushia').style.display = pushiaEiOle ? 'block' : 'none';
+  document.getElementById('muistutus-lomake').style.display = pushiaEiOle ? 'none' : 'block';
+  document.getElementById('muistutus-pikanapit').style.display = (source === 'kalenteri' && eventDate && eventTime) ? 'flex' : 'none';
+
+  await paivitaMuistutusLista();
+  document.getElementById('muistutus-overlay').style.display = 'flex';
+}
+
+function suljeMuistutusPaneeli() {
+  document.getElementById('muistutus-overlay').style.display = 'none';
+  muistutusKohde = null;
+}
+
+async function paivitaMuistutusLista() {
+  if (!muistutusKohde) return;
+  const { data, error } = await db.from('muistutukset').select('*')
+    .eq('source', muistutusKohde.source).eq('source_ref', muistutusKohde.sourceRef)
+    .is('sent_at', null).order('remind_at');
+  if (error) {
+    console.error('Muistutusten haku epäonnistui:', error);
+    return;
+  }
+
+  const listaEl = document.getElementById('muistutus-lista');
+  listaEl.innerHTML = '';
+
+  if (!data || data.length === 0) {
+    const tyhja = document.createElement('p');
+    tyhja.className = 'section-empty';
+    tyhja.textContent = 'Ei muistutuksia vielä.';
+    listaEl.appendChild(tyhja);
+    return;
+  }
+
+  data.forEach(function(m) {
+    const rivi = document.createElement('div');
+    rivi.className = 'muistutus-rivi';
+
+    const teksti = document.createElement('span');
+    teksti.textContent = muotoileMuistutusAika(m.remind_at);
+    rivi.appendChild(teksti);
+
+    const poisto = document.createElement('button');
+    poisto.className = 'delete-btn';
+    poisto.textContent = '×';
+    poisto.addEventListener('click', async function() {
+      const { error: poistoError } = await db.from('muistutukset').delete().eq('id', m.id);
+      if (poistoError) console.error('Muistutuksen poisto epäonnistui:', poistoError);
+      await paivitaMuistutuksetKartta();
+      await paivitaMuistutusLista();
+      if (muistutusKohde && muistutusKohde.jalkeenPaivitys) muistutusKohde.jalkeenPaivitys();
+    });
+    rivi.appendChild(poisto);
+
+    listaEl.appendChild(rivi);
+  });
+}
+
+async function lisaaMuistutus(remindAtDate) {
+  if (!muistutusKohde) return;
+  const { error } = await db.from('muistutukset').insert({
+    user_id: currentUserId,
+    source: muistutusKohde.source,
+    source_ref: muistutusKohde.sourceRef,
+    content: muistutusKohde.content,
+    remind_at: remindAtDate.toISOString(),
+  });
+  if (error) {
+    console.error('Muistutuksen tallennus epäonnistui:', error);
+    naytaIlmoitus('Muistutuksen tallennus epäonnistui');
+    return;
+  }
+  naytaIlmoitus('Muistutus asetettu');
+  await paivitaMuistutuksetKartta();
+  await paivitaMuistutusLista();
+  if (muistutusKohde.jalkeenPaivitys) muistutusKohde.jalkeenPaivitys();
 }
 
 // === ASETUKSET: TILI + SOVELLUS (2026-07-08) ===
