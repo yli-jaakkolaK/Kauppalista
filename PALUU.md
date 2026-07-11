@@ -1,6 +1,6 @@
 # Paluu tauolta — tee nämä järjestyksessä
 
-Tervetuloa takaisin! Tässä kaikki mitä pitää tehdä käsin ennen kuin testaat mitään. Tehty työ: Muistutukset v1 (push-muistutukset) ja Hytti v1 + opiskelulaajennus + ICS-syötekoneisto — molemmat on rakennettu valmiiksi koodiin, mutta Supabase/Vercel/GitHub-puolen asetukset ja migraatiot pitää tehdä käsin, koska Claude ei koskaan aja niitä itse.
+Tervetuloa takaisin! Tässä kaikki mitä pitää tehdä käsin ennen kuin testaat mitään. Tehty työ: Muistutukset v1 (push-muistutukset), Hytti v1 + opiskelulaajennus + ICS-syötekoneisto, ja Ankkurit henkilökohtaisiksi — kaikki kolme on rakennettu valmiiksi koodiin, mutta Supabase/Vercel/GitHub-puolen asetukset ja migraatiot pitää tehdä käsin, koska Claude ei koskaan aja niitä itse.
 
 ---
 
@@ -47,6 +47,7 @@ Supabase-projektin sivulta: vasemmalta **SQL Editor** → **New query** → liim
 2. `sql/026_hytti_v1_respec.sql` — Hytin uusi kalenterisuodatin-kenttä + muistutukset laajennettu koskemaan Hytin rivejä
 3. `sql/027_kalenteri_syotteet_scope.sql` — kalenterisyötteiden perhe/hytti-erottelu + yksityisyyssuoja tietokantatasolla
 4. `sql/028_hytti_ics_syotteet_data.sql` — Itslearning + Lukkarikone -syötteet Hyttiin
+5. `sql/029_ankkurit_henkilokohtaiset.sql` — tekee Ankkureista henkilökohtaisia (ks. OSA D alla) — TÄYSIN ERILLINEN Muistutuksista/Hytistä, voit ajaa tämän vaikka jättäisit muut väliin
 
 **Tärkeä käsin täytettävä kohta migraation 027 jälkeen:** se luo uuden `hytti_omistajat`-taulun jonka pitää tietää KUKA on 'katri' ja KUKA on 'juha' (oikeat käyttäjätunnukset). Katrin rivi on jo mukana valmiina migraatiossa. **Juhan rivi puuttuu — lisää se itse Table Editorista:**
 - Supabase → **Table Editor** → etsi taulu `hytti_omistajat`
@@ -80,7 +81,7 @@ Ilman tätä Juhan opiskelu-/työkalenteri (kun se joskus lisätään samaan kon
 Täysi tausta ja tekniset yksityiskohdat ovat muistiinpanot.md:n osiossa **"Hytti v1 + opiskelulaajennus + ICS-syötekoneisto"** — tässä vain lyhyt testipolku:
 
 1. Avaa Oma Hytti. Luo kortti "Projektikurssi", aseta sille kalenterisuodatin (esim. sana joka esiintyy jonkin oikean kurssitapahtuman nimessä, jos sellainen on lukujärjestyksessä — kesällä voi olla tyhjä, se on odotettua).
-2. Lisää muistiinpanoja + 2 tehtävää eräpäivillä kortin sisälle (pitkä painallus rivillä avaa "merkitse tehtäväksi" -valikon).
+2. Lisää muistiinpanoja + 2 tehtävää eräpäivillä kortin sisälle (☑-nappi rivin oikealla puolella merkitsee sen tehtäväksi, sama nappi kuin ennenkin — pitkä painallus -valikkoa ei rakennettu, olemassa oleva nappi riitti).
 3. Tarkista Tehtävät-koosteessa että molemmat näkyvät päivinä laskettuna.
 4. Täppää yksi koosteesta — tarkista että se näkyy täpättynä myös kortin sisällä (ei katoa, jää yliviivattuna).
 5. Nosta toinen ⚓-napilla Ankkureihin — tarkista se näkyy etusivulla.
@@ -88,6 +89,20 @@ Täysi tausta ja tekniset yksityiskohdat ovat muistiinpanot.md:n osiossa **"Hytt
 7. Käännä Työ/vapaa-kytkin pois — tarkista opiskelu katoaa Etusivulta/perhekalenterista mutta näkyy yhä Hytin sisällä.
 8. **Kirjaudu Juhan tilillä** — Juha EI saa nähdä MITÄÄN Katrin Hytistä: ei korttia, ei tehtävää, ei Itslearning/Lukkarikone-tapahtumia missään, ei edes jos hän yrittäisi kalenterinäkymän kautta.
 9. **Kausiluontoinen muistutus:** Itslearning/Lukkarikone ovat kesällä todennäköisesti tyhjiä tai lähes tyhjiä — tämä on odotettua, testaa vain että haku ei kaadu virheeseen (0 tapahtumaa on hyväksytty tulos nyt). Oikea sisältötesti pitää tehdä UUDELLEEN elokuussa kun lukukausi on käynnissä.
+
+---
+
+## OSA D — Testaa Ankkurit henkilökohtaisina (riippumaton A/B/C:stä, voi tehdä milloin tahansa)
+
+Ankkurit olivat tähän asti käytännössä yhteiset (kumpikin näki ja pystyi täppäämään/poistamaan toisenkin ankkurit) — tämä esti Juhaa aloittamasta Sataman oikeaa käyttöä. Korjattu `sql/029_ankkurit_henkilokohtaiset.sql`:llä (aja se, ks. yllä kohta A.3 lista, sijainti 5).
+
+1. Kirjaudu Katrin tilillä — kaikki Katrin VANHAT ankkurit näkyvät edelleen hänellä ennallaan (ne on automaattisesti merkitty hänen omikseen migraatiossa).
+2. Kirjaudu Juhan tilillä — hänen ankkurinsa alkavat TYHJÄSTÄ (ei näy mitään Katrin vanhoista).
+3. Juha nostaa jonkin listarivin tai kalenteritapahtuman ⚓-napilla Ankkureihin — se näkyy VAIN Juhan etusivulla.
+4. Kirjaudu takaisin Katrin tilillä samaan aikaan (esim. toisella puhelimella) — Katri EI näe Juhan äsken nostamaa ankkuria ollenkaan.
+5. Kumpikin täppää oman ankkurinsa valmiiksi — tarkista ettei kumpikaan vahingossa täppää tai poista toisen ankkuria (napit eivät edes näytä toisen ankkureita, joten tätä ei pitäisi voida edes yrittää).
+
+**Ei vielä tässä paketissa (kirjattu myöhemmäksi, älä ihmettele jos puuttuu):** ankkurin lähettäminen toiselle käyttäjälle ("Katrilta"-merkintä + push-ilmoitus), ja ristiriitalipun automaattiset ankkuriehdotukset — molemmat rakentuvat tämän henkilökohtaisen mallin päälle myöhemmin.
 
 ---
 

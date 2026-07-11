@@ -85,9 +85,13 @@ let aktiivinenOtsikkoId = null;
 // voi periaatteessa esiintyä eri lähteissä (tuotteet.id vs. kalenterin id)
 let ankkuroidutAvaimet = new Set();
 
-// Hakee mitkä rivit (mistä tahansa lähteestä) on jo nostettu Ankkureihin
+// Hakee mitkä rivit (mistä tahansa lähteestä) KIRJAUTUNUT ITSE on jo
+// nostanut Ankkureihin — ankkurit ovat henkilökohtaisia (2026-07-11), joten
+// tämä on aina rajattava omaan user_id:hen, muuten toisen käyttäjän ankkuri
+// näkyisi virheellisesti "jo nostettuna" ja sen poistonappi poistaisi
+// TOISEN käyttäjän rivin.
 async function paivitaAnkkuroidutAvaimet() {
-  const { data, error } = await db.from('ankkurit').select('source, source_ref').not('source_ref', 'is', null);
+  const { data, error } = await db.from('ankkurit').select('source, source_ref').not('source_ref', 'is', null).eq('user_id', currentUserId);
   if (error) {
     console.error('Ankkurointitilan haku epäonnistui:', error);
     return;
@@ -96,11 +100,14 @@ async function paivitaAnkkuroidutAvaimet() {
 }
 
 // Nostaa/poistaa rivin ankkuroinnin lähteestä riippumatta (Muistilaput-tuote,
-// kalenteritapahtuma, ym. — kaikki käyttävät samaa mekanismia)
+// kalenteritapahtuma, ym. — kaikki käyttävät samaa mekanismia). Ankkurit ovat
+// henkilökohtaisia — poisto rajataan omaan user_id:hen, jottei sama
+// source/source_ref (esim. kaksi käyttäjää nostaa saman kalenteritapahtuman)
+// voi koskaan poistaa toisen käyttäjän ankkuria.
 async function vaihdaAnkkurointiYleinen(source, id, content, jalkeenPaivitys) {
   const idStr = String(id);
   if (ankkuroidutAvaimet.has(source + ':' + idStr)) {
-    const { error } = await db.from('ankkurit').delete().eq('source', source).eq('source_ref', idStr);
+    const { error } = await db.from('ankkurit').delete().eq('source', source).eq('source_ref', idStr).eq('user_id', currentUserId);
     if (error) console.error('Ankkuroinnin poisto epäonnistui:', error);
   } else {
     const { error } = await db.from('ankkurit').insert({ content: content, source: source, source_ref: idStr, user_id: currentUserId });
@@ -706,7 +713,7 @@ async function lataaKalenteri() {
     );
 
     if (tanaanIso === paivamaaraISO(new Date())) {
-      const { data: ankkuridata, error: ankkuriError } = await db.from('ankkurit').select().eq('done', false);
+      const { data: ankkuridata, error: ankkuriError } = await db.from('ankkurit').select().eq('done', false).eq('user_id', currentUserId);
       if (ankkuriError) {
         console.error('Ankkureiden haku kalenteriin epäonnistui:', ankkuriError);
       } else {
@@ -1786,14 +1793,16 @@ function paivitaPaivamaara() {
 let cachedAnkkurit = [];
 let ankkuritKaikkiNakyvissa = false;
 
-// Hakee päivän tärkeimmät tekemättömät ankkurit järjestyksessä. Oletuksena
-// vain 3 näkyy (loput piilossa "+ N muuta" -linkin takana), mutta käyttäjä
-// voi laajentaa näkymän nähdäkseen ja priorisoidakseen kaikki raahaamalla.
-// Kun yksi merkitään tehdyksi, seuraava nousee automaattisesti näkyviin
-// koska kysely suodattaa done=false — ei tarvita erillistä "ylennyslogiikkaa".
+// Hakee päivän tärkeimmät tekemättömät ankkurit järjestyksessä — VAIN
+// kirjautuneen OMAT (ankkurit henkilökohtaisiksi 2026-07-11, ks.
+// sql/029_ankkurit_henkilokohtaiset.sql). Oletuksena vain 3 näkyy (loput
+// piilossa "+ N muuta" -linkin takana), mutta käyttäjä voi laajentaa
+// näkymän nähdäkseen ja priorisoidakseen kaikki raahaamalla. Kun yksi
+// merkitään tehdyksi, seuraava nousee automaattisesti näkyviin koska
+// kysely suodattaa done=false — ei tarvita erillistä "ylennyslogiikkaa".
 async function lataaAnkkurit() {
   if (raahattavaRivi) return;
-  const { data, error } = await db.from('ankkurit').select().eq('done', false).order('sort_order');
+  const { data, error } = await db.from('ankkurit').select().eq('done', false).eq('user_id', currentUserId).order('sort_order');
   if (error) {
     console.error('Ankkureiden haku epäonnistui:', error);
     return;
