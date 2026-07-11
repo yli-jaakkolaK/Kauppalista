@@ -1,6 +1,24 @@
 # Paluu tauolta — tee nämä järjestyksessä
 
-Tervetuloa takaisin! Tässä kaikki mitä pitää tehdä käsin ennen kuin testaat mitään. Tehty työ: Muistutukset v1 (push-muistutukset), Hytti v1 + opiskelulaajennus + ICS-syötekoneisto, ja Ankkurit henkilökohtaisiksi — kaikki kolme on rakennettu valmiiksi koodiin, mutta Supabase/Vercel/GitHub-puolen asetukset ja migraatiot pitää tehdä käsin, koska Claude ei koskaan aja niitä itse.
+Tervetuloa takaisin! Tässä kaikki mitä pitää tehdä käsin ennen kuin testaat mitään. Tehty työ: Muistutukset v1 (push-muistutukset), Hytti v1 + opiskelulaajennus + ICS-syötekoneisto, Ankkurit henkilökohtaisiksi, Juhan kalenteritilin syöterivit, ja varmuuskopiointi — kaikki on rakennettu valmiiksi koodiin, mutta Supabase/Vercel/GitHub-puolen asetukset ja migraatiot pitää tehdä käsin, koska Claude ei koskaan aja niitä itse.
+
+---
+
+## OSA 0 — Ota ENSIMMÄINEN varmuuskopio ENNEN mitään muuta
+
+Tee tämä ihan ensimmäisenä, ennen kuin ajat yhtäkään migraatiota tai testaat mitään — jos jokin seuraavista askelista menisi jotenkin pieleen, haluat pystyä palaamaan tähän hetkeen.
+
+Täysi ohje (kertaluontoinen asennus + mistä yhteysosoite löytyy + itse komento) on **BACKUP.md**-tiedostossa — tässä vain lyhyt tiivistelmä:
+
+1. Asenna `pg_dump` (vain kerran, ks. BACKUP.md "Kertaluontoinen asennus"): `brew install libpq && brew link --force libpq`
+2. Hae tietokannan yhteysosoite Supabasesta (ks. BACKUP.md "Mistä SUPABASE_DB_URL löytyy") — Project Settings → Database → Connection string → URI.
+3. Aja projektin juuresta:
+   ```
+   SUPABASE_DB_URL="liimaa_osoite_tähän" ./scripts/varmuuskopio.sh
+   ```
+4. Tarkista tulostuksesta minne kopio tallentui (iCloud Drive -kansioon jos sellainen löytyy koneelta, muuten `~/Documents/Satama-varmuuskopiot/` — jälkimmäisessä tapauksessa siirrä kansio itse johonkin pilveen, ks. BACKUP.md).
+
+Kun ensimmäinen kopio on olemassa, jatka alla oleviin osiin. Ota uusi kopio myös aina kun olet ajanut ison joukon migraatioita (esim. tämän listan lopuksi, kun kaikki alla on tehty ja testattu).
 
 ---
 
@@ -48,6 +66,7 @@ Supabase-projektin sivulta: vasemmalta **SQL Editor** → **New query** → liim
 3. `sql/027_kalenteri_syotteet_scope.sql` — kalenterisyötteiden perhe/hytti-erottelu + yksityisyyssuoja tietokantatasolla
 4. `sql/028_hytti_ics_syotteet_data.sql` — Itslearning + Lukkarikone -syötteet Hyttiin
 5. `sql/029_ankkurit_henkilokohtaiset.sql` — tekee Ankkureista henkilökohtaisia (ks. OSA D alla) — TÄYSIN ERILLINEN Muistutuksista/Hytistä, voit ajaa tämän vaikka jättäisit muut väliin
+6. `sql/030_kalenteri_syotteet_data_juha.sql` — Juhan CalDAV-tilin syöterivit (ks. OSA E alla) — **TARKISTA ENSIN** `GET /api/caldav-sync?listaa=juha` selaimessa (korvaa domain: `https://kauppalista-nine.vercel.app/api/caldav-sync?listaa=juha`) ja vertaa tulosta migraatiotiedoston `tunniste`-arvoihin (Perhekalenteri/Juha/Katri) — jos nimet eivät täsmää kirjain kirjaimelta, älä aja migraatiota vielä, kerro Claudelle/Copilotille mitkä nimet oikeasti tulivat
 
 **Tärkeä käsin täytettävä kohta migraation 027 jälkeen:** se luo uuden `hytti_omistajat`-taulun jonka pitää tietää KUKA on 'katri' ja KUKA on 'juha' (oikeat käyttäjätunnukset). Katrin rivi on jo mukana valmiina migraatiossa. **Juhan rivi puuttuu — lisää se itse Table Editorista:**
 - Supabase → **Table Editor** → etsi taulu `hytti_omistajat`
@@ -103,6 +122,17 @@ Ankkurit olivat tähän asti käytännössä yhteiset (kumpikin näki ja pystyi 
 5. Kumpikin täppää oman ankkurinsa valmiiksi — tarkista ettei kumpikaan vahingossa täppää tai poista toisen ankkuria (napit eivät edes näytä toisen ankkureita, joten tätä ei pitäisi voida edes yrittää).
 
 **Ei vielä tässä paketissa (kirjattu myöhemmäksi, älä ihmettele jos puuttuu):** ankkurin lähettäminen toiselle käyttäjälle ("Katrilta"-merkintä + push-ilmoitus), ja ristiriitalipun automaattiset ankkuriehdotukset — molemmat rakentuvat tämän henkilökohtaisen mallin päälle myöhemmin.
+
+---
+
+## OSA E — Testaa Juhan kalenteritilin syöterivit (riippumaton A/B/C/D:stä)
+
+Ennen migraatiota: tarkista `?listaa=juha` (ks. yllä kohta A.3, rivi 6) että kalenterien nimet täsmäävät. Aja sitten `sql/030_kalenteri_syotteet_data_juha.sql`.
+
+1. Avaa Kalenteri-näkymä (käynnistää synkan) tai `GET /api/caldav-sync` suoraan selaimessa — tarkista vastauksen JSON:sta että Juhan syötteet (`account_key='juha'`) näkyvät mukana Katrin syötteiden (`account_key='katri'`) lisäksi.
+2. **Tärkein tarkistus — ei tuplia:** jos "Perhekalenteri" on jaettu ja näkyy MOLEMPIEN tilien kautta, sen tapahtumien pitää näkyä agendassa TÄSMÄLLEEN KERRAN per tapahtuma, ei kahdesti. (Tekniikka: sama tapahtuma tuottaa saman `ical_uid`:n riippumatta kumman tilin kautta se haettiin, joten tietokannan `unique`-rajoite + päivitys-upsert pitävät sen yhtenä rivinä automaattisesti — ei vaadi mitään manuaalista tarkistusta koodista, mutta KANNATTAA silti todeta silmämääräisesti kalenterista.)
+3. Jos jokin tapahtuma NÄKYY kahdesti agendassa, se on todellinen bugi — kerro Claudelle/Copilotille tarkka tapahtuman nimi + päivä, jotta sitä voi tutkia.
+4. Vain Juhan henkilökohtaisessa kalenterissa olevat tapahtumat (jotka Katrin tili ei aiemmin nähnyt) pitäisi nyt ilmestyä agendaan "uusi"-merkinnällä (kuittausjono) kunnes joku kuittaa ne.
 
 ---
 
