@@ -236,12 +236,19 @@ const KALENTERI_PAIVAT = ['sunnuntai', 'maanantai', 'tiistai', 'keskiviikko', 't
 
 // Näytetäänkö Oma Hytin tänään erääntyvät tehtävät Kalenterin päivänäkymän
 // tänään-agendassa. Laitekohtainen asetus (ei synkattu Supabaseen, kuten ei
-// muutkaan tämän appin laitekohtaiset asetukset) — kytkin Asetukset-näkymässä.
-// Oletus päällä, koska tämä on nimenomaan mitä pyydettiin: näkyy kunnes
-// erikseen laitetaan pois.
+// muutkaan tämän appin laitekohtaiset asetukset). Kytkin siirretty Asetuksista
+// Hytin omaan päänäkymään 2026-07-11 (Hytti v1 -respeksaus) — sama
+// localStorage-avain/logiikka, vain sijainti ja teksti muuttuivat. Oletus
+// päällä, koska tämä on nimenomaan mitä pyydettiin: näkyy kunnes erikseen
+// laitetaan pois. HUOM koskee VAIN perheen näkymiä (etusivu, kalenteri) —
+// Hytin OMASSA näkymässä opiskelu näkyy AINA riippumatta tästä kytkimestä.
 const HYTTI_KALENTERISSA_KEY = 'kauppalista_hytti_kalenterissa';
 function hyttiNakyyKalenterissa() {
   return localStorage.getItem(HYTTI_KALENTERISSA_KEY) !== 'false';
+}
+function paivitaHyttiTyoVapaaLabel() {
+  document.getElementById('hytti-tyo-vapaa-label').textContent = hyttiNakyyKalenterissa() ? 'Opiskelu näkyvissä' : 'Opiskelu piilossa';
+  document.getElementById('hytti-kalenteri-toggle').checked = hyttiNakyyKalenterissa();
 }
 
 // === YLEISET ASETUKSET (avain-arvo, `asetukset`-taulu, sql/023_asetukset.sql) ===
@@ -638,12 +645,18 @@ async function lataaKalenteri() {
     haunLoppu.setDate(haunLoppu.getDate() + 6);
   }
 
-  // kalenteri_syotteet(vari, henkilo) hakee liitetyn syötteen värin ja
-  // omistajan FK-suhteen (syote_id) kautta samassa kyselyssä — molemmat null
-  // jos käsin lisätty tapahtuma. henkilo tarvitaan päällekkäisyysmerkin
-  // vakavuusluokitteluun (ks. paallekkaisyysVakavuus()).
+  // kalenteri_syotteet(vari, henkilo, scope) hakee liitetyn syötteen värin,
+  // omistajan ja scopen FK-suhteen (syote_id) kautta samassa kyselyssä —
+  // kaikki null jos käsin lisätty tapahtuma. henkilo tarvitaan
+  // päällekkäisyysmerkin vakavuusluokitteluun (ks. paallekkaisyysVakavuus()).
+  // scope='hytti' (Hytti v1 + opiskelulaajennus, 2026-07-11) SUODATETAAN POIS
+  // perheen agendasta KOKONAAN heti tässä — hytti-scopen tapahtumat kuuluvat
+  // VAIN omistajansa Hytin tänään-kaistalle/korttien kalenteriin, eivät
+  // koskaan perheen agendaan/kuittausjonoon/Kuormavahtiin edes omistajalleen
+  // itselleen. RLS (sql/027) estää TOISEN käyttäjän pääsyn tietokantatasolla,
+  // tämä suodatus on lisäksi UX-siisteyttä omistajan omalle perhenäkymälle.
   const { data: haetut, error } = await db.from('kalenteri_tapahtumat')
-    .select('*, kalenteri_syotteet(vari, henkilo)')
+    .select('*, kalenteri_syotteet(vari, henkilo, scope)')
     .gte('event_date', paivamaaraISO(haunAlku))
     .lte('event_date', paivamaaraISO(haunLoppu))
     .order('event_date')
@@ -654,12 +667,14 @@ async function lataaKalenteri() {
     return;
   }
 
-  const data = (haetut || []).map(function(t) {
-    return Object.assign({}, t, {
-      _vari: t.kalenteri_syotteet ? t.kalenteri_syotteet.vari : null,
-      _henkilo: t.kalenteri_syotteet ? t.kalenteri_syotteet.henkilo : null,
+  const data = (haetut || [])
+    .filter(function(t) { return !t.kalenteri_syotteet || t.kalenteri_syotteet.scope !== 'hytti'; })
+    .map(function(t) {
+      return Object.assign({}, t, {
+        _vari: t.kalenteri_syotteet ? t.kalenteri_syotteet.vari : null,
+        _henkilo: t.kalenteri_syotteet ? t.kalenteri_syotteet.henkilo : null,
+      });
     });
-  });
 
   await paivitaAnkkuroidutAvaimet();
   await paivitaAsetukset();
@@ -957,14 +972,19 @@ let kuittausjonoUudet = [];
 async function paivitaKuittausTila() {
   await paivitaKuitatutUidt();
   const { data, error } = await db.from('kalenteri_tapahtumat')
-    .select('*, kalenteri_syotteet(vari, name)')
+    .select('*, kalenteri_syotteet(vari, name, scope)')
     .not('ical_uid', 'is', null)
     .order('event_date');
   if (error) {
     console.error('Kuittausjonon haku epäonnistui:', error);
     return;
   }
-  kuittausjonoUudet = (data || []).filter(onkoUusiMinulle);
+  // Hytti-scopen tapahtumia (oma opiskelu/työ) ei koskaan kuitata — ne eivät
+  // ole "uusia" kenellekään perheenjäsenelle, koska niitä ei näytetä
+  // perheen agendassa ollenkaan. Ks. "Hytti v1 + opiskelulaajennus" -osio.
+  kuittausjonoUudet = (data || [])
+    .filter(function(t) { return !t.kalenteri_syotteet || t.kalenteri_syotteet.scope !== 'hytti'; })
+    .filter(onkoUusiMinulle);
 
   const linkki = document.getElementById('kalenteri-kuittaus-linkki');
   if (kuittausjonoUudet.length === 0) {
@@ -1122,6 +1142,47 @@ async function paivitaHyttiArkistoLinkki() {
   linkki.style.display = count ? 'block' : 'none';
 }
 
+// Hytin "Tänään"-kaista (2026-07-11, ICS-syötekoneisto): päivän hytti-scopen
+// kalenteritapahtumat (kellonaika + nimi). Tyhjänä osio piilotetaan
+// KOKONAAN, ei tyhjätilatekstiä tälle yksittäiselle lohkolle. RLS
+// (kalenteri_tapahtumat_select-policy, sql/027) rajaa tuloksen jo
+// automaattisesti kirjautuneen OMAAN Hyttiin — ei tarvitse suodattaa
+// erikseen "onko tämä minun".
+async function lataaHyttiTanaanKaista() {
+  const osio = document.getElementById('hytti-tanaan-osio');
+  const tanaanIso = paivamaaraISO(new Date());
+  const { data, error } = await db.from('kalenteri_tapahtumat')
+    .select('id, title, event_time, kalenteri_syotteet!inner(scope)')
+    .eq('kalenteri_syotteet.scope', 'hytti')
+    .eq('event_date', tanaanIso)
+    .order('event_time', { nullsFirst: false });
+
+  if (error) {
+    console.error('Hytin tänään-kaistan haku epäonnistui:', error);
+    osio.style.display = 'none';
+    return;
+  }
+  if (!data || data.length === 0) {
+    osio.style.display = 'none';
+    return;
+  }
+
+  osio.style.display = 'block';
+  const listEl = document.getElementById('hytti-tanaan-list');
+  listEl.innerHTML = '';
+  data.forEach(function(t) {
+    const li = document.createElement('li');
+    const aika = document.createElement('span');
+    aika.className = 'hytti-tanaan-aika';
+    aika.textContent = t.event_time ? t.event_time.slice(0, 5) : '';
+    li.appendChild(aika);
+    const teksti = document.createElement('span');
+    teksti.textContent = t.title;
+    li.appendChild(teksti);
+    listEl.appendChild(li);
+  });
+}
+
 // Piirtää yhden tehtävärivin Tehtävät-koosteeseen. Sama tietue kuin kortilla
 // — täppäys tässä täppää saman rivin kortillakin, ei kopiota.
 function piirraHyttiTehtavaRivi(rivi) {
@@ -1164,6 +1225,8 @@ function piirraHyttiTehtavaRivi(rivi) {
   });
   li.appendChild(ankkurointiNappi);
 
+  li.appendChild(luoMuistutusNappi('hytti_rivi', rivi.id, rivi.content, null, null, lataaHyttiPaanakyma));
+
   return li;
 }
 
@@ -1198,6 +1261,9 @@ function piirraHyttiKorttiRivi(kortti) {
 // kortteja ei ole ollenkaan, näytetään tyhjätila-ohje kummankin osion sijaan.
 async function lataaHyttiPaanakyma() {
   if (raahattavaRivi) return;
+  paivitaHyttiTyoVapaaLabel();
+  lataaHyttiTanaanKaista();
+
   const { data: kortit, error: korttiError } = await db.from('hytti_kortit').select().eq('status', 'aktiivinen').order('sort_order');
   if (korttiError) {
     console.error('Hytin korttien haku epäonnistui:', korttiError);
@@ -1226,6 +1292,7 @@ async function lataaHyttiPaanakyma() {
   cachedHyttiKortit.forEach(function(kortti) { kortitListEl.appendChild(piirraHyttiKorttiRivi(kortti)); });
 
   await paivitaAnkkuroidutAvaimet();
+  await paivitaMuistutuksetKartta();
 
   // hytti_kortit!inner pakottaa inner joinin, jolloin status-suodatus rajaa
   // myös pääkyselyn rivejä (ei vain sisäkkäistä objektia) — pelkkä .select
@@ -1295,6 +1362,7 @@ async function poistaHyttiRivi(rivi) {
   }
   const { error } = await db.from('hytti_rivit').delete().eq('id', rivi.id);
   if (error) console.error('Hytti-rivin poisto epäonnistui:', error);
+  await db.from('muistutukset').delete().eq('source', 'hytti_rivi').eq('source_ref', String(rivi.id));
   lataaHyttiKortti();
 }
 
@@ -1414,6 +1482,10 @@ function piirraHyttiRivi(rivi, lukutila) {
     });
     li.appendChild(tehtavaNappi);
 
+    if (rivi.is_task) {
+      li.appendChild(luoMuistutusNappi('hytti_rivi', rivi.id, rivi.content, null, null, lataaHyttiKortti));
+    }
+
     const poistoNappi = document.createElement('button');
     poistoNappi.textContent = '×';
     poistoNappi.className = 'delete-btn';
@@ -1436,6 +1508,12 @@ function piirraHyttiRivit() {
 function piirraHyttiKorttiUI() {
   const lukutila = currentHyttiKortti.status === 'arkistoitu';
   document.getElementById('hytti-kortti-title').textContent = '✱ ' + currentHyttiKortti.name.toUpperCase() + ' ✱';
+  document.getElementById('hytti-kortti-tyyppi').textContent = currentHyttiKortti.card_type === 'paattyva' ? 'Päättyvä' : 'Jatkuva';
+
+  const suodatinEl = document.getElementById('hytti-kortti-suodatin');
+  suodatinEl.textContent = 'kalenterisuodatin: ' + (currentHyttiKortti.kalenterisuodatin || '(ei asetettu)');
+  suodatinEl.style.cursor = lukutila ? 'default' : 'pointer';
+  suodatinEl.onclick = lukutila ? null : function() { muokkaaHyttiKalenterisuodatin(); };
 
   const askelEl = document.getElementById('hytti-seuraava-askel');
   askelEl.textContent = currentHyttiKortti.seuraava_askel || (lukutila ? '' : 'seuraava pieni askel...');
@@ -1490,6 +1568,24 @@ function muokkaaHyttiSeuraavaAskel() {
   });
 }
 
+// Kalenterisuodattimen asetus (2026-07-11, "Kortin kalenteri" -osio) — kevyt
+// prompt()-muokkaus, sama periaate kuin hytti-rivin eräpäivä-kentällä. Ei
+// omaa inline-<input>-tekniikkaa koska tämä on harvoin muutettava asetus,
+// ei jatkuvasti muokattava sisältörivi.
+async function muokkaaHyttiKalenterisuodatin() {
+  const syote = prompt('Kalenterisuodatin (sana joka esiintyy kortin kalenteritapahtumien otsikossa), tyhjä = pois käytöstä:', currentHyttiKortti.kalenterisuodatin || '');
+  if (syote === null) return;
+  const uusi = syote.trim() === '' ? null : syote.trim();
+  const { error } = await db.from('hytti_kortit').update({ kalenterisuodatin: uusi }).eq('id', currentHyttiKortti.id);
+  if (error) {
+    console.error('Kalenterisuodattimen tallennus epäonnistui:', error);
+    return;
+  }
+  currentHyttiKortti.kalenterisuodatin = uusi;
+  piirraHyttiKorttiUI();
+  lataaHyttiKorttiKalenteri();
+}
+
 // Lataa avoinna olevan kortin rivit ja piirtää koko korttinäkymän
 async function lataaHyttiKortti() {
   if (!currentHyttiKortti || raahattavaRivi) return;
@@ -1499,8 +1595,62 @@ async function lataaHyttiKortti() {
     return;
   }
   cachedHyttiRivit = data || [];
+  await paivitaMuistutuksetKartta();
   piirraHyttiKorttiUI();
   piirraHyttiRivit();
+  lataaHyttiKorttiKalenteri();
+}
+
+// Kortin oma "Kortin kalenteri" -osio (2026-07-11, ICS-syötekoneisto):
+// tulevat hytti-scopen tapahtumat joiden OTSIKKO sisältää kortin
+// kalenterisuodatin-arvon (case-insensitive, ei älyä). Tyhjä suodatin TAI ei
+// osumia = osio ei näy ollenkaan. Näyttää 7 päivää eteenpäin, kiinteä ikkuna.
+async function lataaHyttiKorttiKalenteri() {
+  const osio = document.getElementById('hytti-kortti-kalenteri-osio');
+  if (!currentHyttiKortti.kalenterisuodatin) {
+    osio.style.display = 'none';
+    return;
+  }
+
+  const tanaanIso = paivamaaraISO(new Date());
+  const loppu = new Date();
+  loppu.setDate(loppu.getDate() + 7);
+  const loppuIso = paivamaaraISO(loppu);
+
+  const { data, error } = await db.from('kalenteri_tapahtumat')
+    .select('id, title, event_date, event_time, kalenteri_syotteet!inner(scope)')
+    .eq('kalenteri_syotteet.scope', 'hytti')
+    .gte('event_date', tanaanIso)
+    .lte('event_date', loppuIso)
+    .ilike('title', '%' + currentHyttiKortti.kalenterisuodatin + '%')
+    .order('event_date')
+    .order('event_time', { nullsFirst: false });
+
+  if (error) {
+    console.error('Kortin kalenterin haku epäonnistui:', error);
+    osio.style.display = 'none';
+    return;
+  }
+  if (!data || data.length === 0) {
+    osio.style.display = 'none';
+    return;
+  }
+
+  osio.style.display = 'block';
+  const listEl = document.getElementById('hytti-kortti-kalenteri-list');
+  listEl.innerHTML = '';
+  data.forEach(function(t) {
+    const li = document.createElement('li');
+    const pvm = new Date(t.event_date + 'T00:00:00');
+    const pvmEl = document.createElement('span');
+    pvmEl.className = 'hytti-kortti-kalenteri-pvm';
+    pvmEl.textContent = pvm.getDate() + '.' + (pvm.getMonth() + 1) + '.' + (t.event_time ? ' klo ' + t.event_time.slice(0, 5) : '');
+    li.appendChild(pvmEl);
+    const teksti = document.createElement('span');
+    teksti.textContent = t.title;
+    li.appendChild(teksti);
+    listEl.appendChild(li);
+  });
 }
 
 async function arkistoiHyttiKortti() {
@@ -1793,7 +1943,6 @@ function avaaOsio(osio) {
     paivitaTiliTiedot();
     paivitaPushTila();
     paivitaSovellusTiedot();
-    document.getElementById('hytti-kalenteri-toggle').checked = hyttiNakyyKalenterissa();
     paivitaAsetukset().then(function() {
       document.getElementById('kuormaraja-input').value = haeAsetusNumero('paivan_menoraja', 5);
     });
@@ -2782,7 +2931,8 @@ document.getElementById('push-lupa-btn').addEventListener('click', pyydaIlmoitus
 document.getElementById('push-testi-btn').addEventListener('click', laheteTestipush);
 document.getElementById('hytti-kalenteri-toggle').addEventListener('change', function(e) {
   localStorage.setItem(HYTTI_KALENTERISSA_KEY, e.target.checked ? 'true' : 'false');
-  naytaIlmoitus(e.target.checked ? 'Hytin tehtävät näkyvät nyt Kalenterissa' : 'Hytin tehtävät piilotettu Kalenterista');
+  paivitaHyttiTyoVapaaLabel();
+  naytaIlmoitus(e.target.checked ? 'Opiskelu näkyy nyt Kalenterissa' : 'Opiskelu piilotettu Kalenterista');
 });
 
 // Kuormavahdin raja tallennetaan koko perheelle yhteiseen `asetukset`-tauluun

@@ -130,7 +130,21 @@
       <h1>✱ OMA HYTTI ✱</h1>
       <span></span>
     </div>
+
+    <div class="settings-row">
+      <span id="hytti-tyo-vapaa-label">Opiskelu näkyvissä</span>
+      <label class="toggle">
+        <input type="checkbox" id="hytti-kalenteri-toggle">
+        <span class="toggle-track"></span>
+      </label>
+    </div>
+
     <hr class="divider">
+
+    <div id="hytti-tanaan-osio" style="display:none">
+      <div class="section-title">📅 Tänään</div>
+      <ul class="list" id="hytti-tanaan-list"></ul>
+    </div>
 
     <div id="hytti-tehtavat-osio">
       <div class="section-title">✅ Tehtävät</div>
@@ -143,13 +157,13 @@
       <ul class="list" id="hytti-kortit-list"></ul>
     </div>
 
-    <p class="section-empty" id="hytti-tyhja" style="display:none">Yksi kortti per tilaisuus tai kokonaisuus. Kirjoita muistiinpanot riveiksi, merkkaa toimintaa vaativat tehtäviksi — ne kokoontuvat itsestään ylös Tehtäviin. Ideat kuuluvat Laituriin, työn alla olevat tänne.</p>
+    <p class="section-empty" id="hytti-tyhja" style="display:none">Yksi kortti per kurssi, projekti tai tilaisuus. Kirjoita muistiinpanot riveiksi, merkkaa toimintaa vaativat tehtäviksi — ne kokoontuvat itsestään ylös. Pidä seuraava askel pienenä ja rumana: ei "kirjoita essee" vaan "avaa tiedosto ja kirjoita yksi ruma kappale". Ideat kuuluvat Laituriin — työn alla olevat tänne.</p>
 
     <div class="hytti-tyyppi-valinta">
       <button class="kalenteri-tila-btn hytti-tyyppi-btn active" data-tyyppi="jatkuva">Jatkuva</button>
       <button class="kalenteri-tila-btn hytti-tyyppi-btn" data-tyyppi="paattyva">Päättyvä</button>
     </div>
-    <p class="hytti-tyyppi-selite">Jatkuva = elää pitkään. Päättyvä = valmistuu ja arkistoituu.</p>
+    <p class="hytti-tyyppi-selite">Päättyvä = valmistuu ja arkistoituu. Jatkuva = elää pitkään.</p>
 
     <div class="add-item">
       <span class="prefix">›</span>
@@ -166,8 +180,15 @@
       <h1 id="hytti-kortti-title">✱ KORTTI ✱</h1>
       <button class="settings-btn" id="hytti-kortti-arkistoi-btn" style="display:none">📦</button>
     </div>
+    <p class="hytti-kortti-tyyppi" id="hytti-kortti-tyyppi"></p>
+    <p class="hytti-kortti-suodatin" id="hytti-kortti-suodatin"></p>
 
-    <div class="hytti-seuraava-askel" id="hytti-seuraava-askel">seuraava pieni askel...</div>
+    <div id="hytti-kortti-kalenteri-osio" style="display:none">
+      <div class="section-title">📅 Kortin kalenteri</div>
+      <ul class="list" id="hytti-kortti-kalenteri-list"></ul>
+    </div>
+
+    <div class="hytti-seuraava-askel-laatikko" id="hytti-seuraava-askel">seuraava pieni askel...</div>
 
     <hr class="divider">
 
@@ -240,17 +261,6 @@
     <button class="login-btn settings-action-btn" id="sovellus-paivita-btn">Päivitä sovellus</button>
     <p class="section-empty" id="sovellus-synkka-tila">Tarkistetaan...</p>
     <button class="login-btn settings-action-btn" id="sovellus-synkkaa-btn">Hae kalenteri nyt</button>
-
-    <hr class="divider">
-
-    <div class="section-title">🚪 Oma Hytti</div>
-    <div class="settings-row">
-      <span>Näytä tänään erääntyvät Kalenterin päivänäkymässä</span>
-      <label class="toggle">
-        <input type="checkbox" id="hytti-kalenteri-toggle">
-        <span class="toggle-track"></span>
-      </label>
-    </div>
 
     <hr class="divider">
 

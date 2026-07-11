@@ -1268,13 +1268,71 @@ h1 {
   margin-bottom: 16px;
 }
 
-.hytti-seuraava-askel {
-  font-size: 13px;
-  color: var(--muted);
-  font-style: italic;
-  margin: -6px 0 4px;
+/* Seuraava askel -kenttä uudelleensuunniteltu 2026-07-11 kehystetyksi
+   laatikoksi (Katrin oma linjaus, korttinäkymän kohta 3) — erottuu selvästi
+   muusta sisällöstä, kulta-reunus tunnistaa MUODOSTA, ei väristä (ks. "väri
+   koristaa, musta kertoo" -periaate). Itse teksti on informaatiota (mikä on
+   seuraava askel) joten täysi --text, EI --muted/--accent. */
+.hytti-seuraava-askel-laatikko {
+  font-size: 14px;
+  color: var(--text);
+  border: 1px solid var(--accent);
+  border-radius: 6px;
+  padding: 10px 12px;
+  margin: 12px 0 16px;
   cursor: pointer;
   min-height: 20px;
+}
+
+/* Kortin tyyppi + kalenterisuodatin-rivi otsikon alla — molemmat
+   informaatiota (mikä tyyppi, mikä suodatin), täysi --text. Suodatin saa
+   katkoviiva-alleviivauksen MUODOSTA tunnistettavaksi klikattavaksi
+   asetukseksi, ei värillä. */
+.hytti-kortti-tyyppi {
+  font-size: 12px;
+  color: var(--text);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin: -4px 0 2px;
+}
+
+.hytti-kortti-suodatin {
+  font-size: 12px;
+  color: var(--text);
+  border-bottom: 1px dashed var(--border-dash);
+  display: inline-block;
+  padding-bottom: 1px;
+  cursor: pointer;
+  margin-bottom: 12px;
+}
+
+/* Tänään-kaista (etusivun tyylinen kevyt rivi: kellonaika + nimi, molemmat
+   informaatiota => täysi --text). Ei checkboxia/nappeja, pelkkä lukurivi. */
+#hytti-tanaan-list li {
+  font-size: 16px;
+  font-weight: 400;
+  min-height: 32px;
+}
+
+.hytti-tanaan-aika {
+  color: var(--text);
+  min-width: 44px;
+  flex-shrink: 0;
+}
+
+/* Kortin oma kalenteri (Itslearning/Lukkarikone-osumat) — sama periaate,
+   päivämäärä+kellonaika on informaatiota, täysi --text. */
+#hytti-kortti-kalenteri-list li {
+  font-size: 14px;
+  font-weight: 400;
+  min-height: 32px;
+}
+
+.hytti-kortti-kalenteri-pvm {
+  color: var(--text);
+  font-size: 12px;
+  min-width: 74px;
+  flex-shrink: 0;
 }
 
 .hytti-kortti-rivi {

@@ -1,10 +1,18 @@
 // Geneerinen kalenterisyöte-synkka: käy läpi kaikki kalenteri_syotteet-taulun
 // enabled=true-rivit ja tuo niiden tapahtumat Satamaan. YKSI yhteinen
-// koneisto kahdelle syötetyypille (icloud/ics_url) ja kahdelle tilalle
-// (taysi/vain_varattu) — uusi kalenteri lisätään Table Editorista, ei tähän
-// tiedostoon koodaamalla. Ks. sql/014_kalenteri_syotteet.sql yläkommentti ja
-// muistiinpanot.md "Kalenterisyötteet"- ja "Kalenterin periaate: yksi totuus,
-// kaksi ikkunaa" -osiot täydelle selitykselle.
+// koneisto KOLMELLE syötetyypille (icloud/ics_url/ics, ks. haeSyoteTekstit())
+// ja kahdelle tilalle (taysi/vain_varattu) — uusi kalenteri lisätään Table
+// Editorista, ei tähän tiedostoon koodaamalla. Ks. sql/014_kalenteri_syotteet.sql
+// yläkommentti ja muistiinpanot.md "Kalenterisyötteet"-, "Kalenterin
+// periaate: yksi totuus, kaksi ikkunaa"- ja "Hytti v1 + opiskelulaajennus +
+// ICS-syötekoneisto" -osiot täydelle selitykselle.
+//
+// scope-sarake (kalenteri_syotteet, sql/027) ratkaisee näkyykö syötteen data
+// perheen yhteisessä agendassa ('perhe', oletus) vai vain yhden henkilön
+// Hytissä ('hytti') — tämä TIEDOSTO ei tarvitse tietää eroa ollenkaan, koska
+// scope vain OHJAA CLIENT-PUOLEN kyselyitä (script.js) sekä RLS:ää
+// (kalenteri_tapahtumat_select-policy, sql/027) — synkka kirjoittaa
+// kaikki syötteet samalla tavalla riippumatta niiden scopesta.
 //
 // ARKKITEHTUURI 2026-07-08 illasta: "yksi totuus, kaksi ikkunaa". Kaikki
 // synkatut tapahtumat kirjoitetaan SUORAAN kalenteri_tapahtumat-tauluun —
@@ -42,12 +50,21 @@
 //                                appleid.apple.com:ista, EI oikea iCloud-salasana)
 //   ICLOUD_USERNAME_JUHA        (sama periaate, Juhan tili)
 //   ICLOUD_APP_PASSWORD_JUHA    (sama periaate, Juhan tili)
+//   ITSLEARNING_ICS_KATRI       (tyyppi='ics'-syötteen ENV-nimi, Katrin
+//                                Itslearning-kalenterin .ics-linkki tokenin
+//                                kanssa — ks. sql/028_hytti_ics_syotteet_data.sql)
+//   LUKKARIKONE_ICS_KATRI       (sama periaate, Lukkarikone-lukujärjestys,
+//                                http://-alkuinen, hyväksytty tälle tyypille)
 //
 // Useampi tili tarvitaan koska osa perheen tapahtumista elää Juhan
 // henkilökohtaisissa kalentereissa, joita Katrin tunnukset eivät näe.
 // kalenteri_syotteet.account_key ('katri'/'juha', ks. sql/017_kalenteri_tilit.sql)
 // kertoo per syöte kumman tilin tunnuksilla se haetaan — itse salasanat
 // pysyvät AINA ympäristömuuttujissa, tauluun tulee vain viittausavain.
+// tyyppi='ics'-syötteillä account_key on muodollinen täyte (ei CalDAV-
+// kirjautumista), tunniste on ITSE ympäristömuuttujan NIMI (ei URL) samasta
+// syystä kuin ICLOUD_*-salasanatkin pysyvät ympäristömuuttujissa: nämä
+// .ics-linkit sisältävät henkilökohtaisen tokenin URL:ssaan.
 
 const { DAVClient } = require('tsdav');
 const ICAL = require('ical.js');
@@ -263,6 +280,33 @@ async function haeIcsUrlSyote(url) {
   return [await vastaus.text()];
 }
 
+// Hakee syötteen ICS-tekstit sen tyypin mukaan — yksi paikka jota sekä
+// ?esikatsele=1-diagnostiikka että varsinainen synkka kutsuvat, ettei
+// tyyppikohtainen haaroitus toistu kahdessa paikassa.
+//
+// 'ics'-tyyppi (Hytti v1 + opiskelulaajennus, 2026-07-11): tunniste on
+// YMPÄRISTÖMUUTTUJAN NIMI, EI suora URL — nämä .ics-linkit (esim.
+// Itslearning/Lukkarikone) sisältävät henkilökohtaisen tokenin itse
+// URL:ssaan, joten niitä ei tallenneta suoraan kalenteri_syotteet-tauluun
+// samaan tapaan kuin julkisen ics_url-syötteen linkkiä. Sama fetch-logiikka
+// kuin ics_url:lla (haeIcsUrlSyote), vain URL:n lähde eroaa.
+async function haeSyoteTekstit(syote, alkuISO, loppuISO) {
+  if (syote.tyyppi === 'icloud') {
+    return haeIcloudSyote(syote.tunniste, alkuISO, loppuISO, syote.account_key || 'katri');
+  }
+  if (syote.tyyppi === 'ics_url') {
+    return haeIcsUrlSyote(syote.tunniste);
+  }
+  if (syote.tyyppi === 'ics') {
+    const url = process.env[syote.tunniste];
+    if (!url) {
+      throw new Error('Ymparistomuuttuja ' + syote.tunniste + ' puuttuu (syote ' + syote.name + ')');
+    }
+    return haeIcsUrlSyote(url);
+  }
+  throw new Error('Tuntematon syotteen tyyppi: ' + syote.tyyppi);
+}
+
 // Hakee kalenteri_tekijat-kartan (organizer_tunniste -> Satama-käyttäjän
 // user_id) kerran per synkkauskerta. Jos jonkin tapahtuman organizeria ei
 // löydy tästä kartasta, sen user_id jää NULLiksi tietokannassa — silloin
@@ -366,9 +410,7 @@ module.exports = async function handler(req, res) {
       const loppuRaja = ICAL.Time.fromJSDate(loppu, true);
 
       const tulokset = await Promise.all((syotteet || []).map(async function(syote) {
-        const icsTekstit = syote.tyyppi === 'icloud'
-          ? await haeIcloudSyote(syote.tunniste, alku.toISOString(), loppu.toISOString(), syote.account_key || 'katri')
-          : await haeIcsUrlSyote(syote.tunniste);
+        const icsTekstit = await haeSyoteTekstit(syote, alku.toISOString(), loppu.toISOString());
         let tapahtumat = [];
         icsTekstit.forEach(function(teksti) { tapahtumat = tapahtumat.concat(jasennaTapahtumat(teksti, alkuRaja, loppuRaja)); });
         return {
@@ -412,14 +454,7 @@ module.exports = async function handler(req, res) {
   const kaikkiUudetRivit = [];
 
   const kaikki = await Promise.allSettled(syotteet.map(async function(syote) {
-    let icsTekstit;
-    if (syote.tyyppi === 'icloud') {
-      icsTekstit = await haeIcloudSyote(syote.tunniste, alkuISO, loppuISO, syote.account_key || 'katri');
-    } else if (syote.tyyppi === 'ics_url') {
-      icsTekstit = await haeIcsUrlSyote(syote.tunniste);
-    } else {
-      throw new Error('Tuntematon syotteen tyyppi: ' + syote.tyyppi);
-    }
+    const icsTekstit = await haeSyoteTekstit(syote, alkuISO, loppuISO);
 
     let tapahtumat = [];
     icsTekstit.forEach(function(teksti) {
