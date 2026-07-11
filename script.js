@@ -3436,11 +3436,44 @@ async function synkkaaKalenteriNyt() {
   nappi.textContent = alkuperainenTeksti;
 }
 
+// "Testaa äly" — todistaa äly-putken (puhelin -> /api/aly -> Claude API ja
+// takaisin) toimivaksi, sama todistusrooli kuin push-testinapilla oli push-
+// infralle. EI vielä yhtään oikeaa älyominaisuutta, vain kiinteä
+// testiprompti — ks. COPILOT.md "Äly-putki" -osio miten uusi ominaisuus
+// rakennetaan tämän päälle.
+async function testaaAly() {
+  const nappi = document.getElementById('aly-testi-btn');
+  const tulosEl = document.getElementById('aly-testi-tulos');
+  nappi.disabled = true;
+  const alkuperainenTeksti = nappi.textContent;
+  nappi.textContent = 'Kysytään...';
+  tulosEl.style.display = 'none';
+
+  try {
+    const { data: sessioData } = await db.auth.getSession();
+    const token = sessioData.session ? sessioData.session.access_token : null;
+    const response = await fetch('/api/aly', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
+      body: JSON.stringify({ prompt: 'Vastaa yhdellä lauseella suomeksi: mikä on hyvän sataman tärkein ominaisuus?' }),
+    });
+    const tulos = await response.json();
+    tulosEl.textContent = response.ok ? tulos.text : 'Virhe: ' + (tulos.error || response.status);
+  } catch (e) {
+    tulosEl.textContent = 'Virhe: ' + e.message;
+  }
+  tulosEl.style.display = 'block';
+
+  nappi.disabled = false;
+  nappi.textContent = alkuperainenTeksti;
+}
+
 document.getElementById('asetukset-signout-btn').addEventListener('click', function() {
   db.auth.signOut();
 });
 document.getElementById('sovellus-paivita-btn').addEventListener('click', paivitaSovellusValimuisti);
 document.getElementById('sovellus-synkkaa-btn').addEventListener('click', synkkaaKalenteriNyt);
+document.getElementById('aly-testi-btn').addEventListener('click', testaaAly);
 
 // === AUTH ===
 

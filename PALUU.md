@@ -1,6 +1,6 @@
 # Paluu tauolta — tee nämä järjestyksessä
 
-Tervetuloa takaisin! Tässä kaikki mitä pitää tehdä käsin ennen kuin testaat mitään. Tehty työ: Muistutukset v1 (push-muistutukset), Hytti v1 + opiskelulaajennus + ICS-syötekoneisto, Ankkurit henkilökohtaisiksi, Juhan kalenteritilin syöterivit, ja varmuuskopiointi — kaikki on rakennettu valmiiksi koodiin, mutta Supabase/Vercel/GitHub-puolen asetukset ja migraatiot pitää tehdä käsin, koska Claude ei koskaan aja niitä itse.
+Tervetuloa takaisin! Tässä kaikki mitä pitää tehdä käsin ennen kuin testaat mitään. Tehty työ: Muistutukset v1 (push-muistutukset), Hytti v1 + opiskelulaajennus + ICS-syötekoneisto, Ankkurit henkilökohtaisiksi, Juhan kalenteritilin syöterivit, varmuuskopiointi, ja äly-putken runko — kaikki on rakennettu valmiiksi koodiin, mutta Supabase/Vercel/GitHub-puolen asetukset ja migraatiot pitää tehdä käsin, koska Claude ei koskaan aja niitä itse.
 
 ---
 
@@ -133,6 +133,21 @@ Ennen migraatiota: tarkista `?listaa=juha` (ks. yllä kohta A.3, rivi 6) että k
 2. **Tärkein tarkistus — ei tuplia:** jos "Perhekalenteri" on jaettu ja näkyy MOLEMPIEN tilien kautta, sen tapahtumien pitää näkyä agendassa TÄSMÄLLEEN KERRAN per tapahtuma, ei kahdesti. (Tekniikka: sama tapahtuma tuottaa saman `ical_uid`:n riippumatta kumman tilin kautta se haettiin, joten tietokannan `unique`-rajoite + päivitys-upsert pitävät sen yhtenä rivinä automaattisesti — ei vaadi mitään manuaalista tarkistusta koodista, mutta KANNATTAA silti todeta silmämääräisesti kalenterista.)
 3. Jos jokin tapahtuma NÄKYY kahdesti agendassa, se on todellinen bugi — kerro Claudelle/Copilotille tarkka tapahtuman nimi + päivä, jotta sitä voi tutkia.
 4. Vain Juhan henkilökohtaisessa kalenterissa olevat tapahtumat (jotka Katrin tili ei aiemmin nähnyt) pitäisi nyt ilmestyä agendaan "uusi"-merkinnällä (kuittausjono) kunnes joku kuittaa ne.
+
+---
+
+## OSA F — Ota äly-putki käyttöön (riippumaton kaikesta yllä olevasta)
+
+Ensimmäinen kerros tulevalle äly-toiminnallisuudelle (Siri-tulkinta, Laituri-luokittelu, jääkaappikuva, ym.) — EI vielä yhtään oikeaa älyominaisuutta, vain todistettu putki puhelimesta Claude API:in ja takaisin. Tekninen kuvaus koko putken toiminnasta ja miten uusia ominaisuuksia lisätään sen päälle on **COPILOT.md**:ssä.
+
+1. Hae Anthropic-avain: console.anthropic.com → kirjaudu → **API Keys** → luo uusi avain (tai käytä olemassa olevaa jos sinulla on jo Anthropic-tili tälle projektille) → kopioi se (näkyy vain kerran).
+2. Vercel → Kauppalista-projekti → **Settings** → **Environment Variables** → uusi muuttuja: **Key** = `ANTHROPIC_API_KEY`, **Value** = kopioitu avain → **Save**.
+3. (Valinnainen, ei pakollinen nyt) Jos joskus haluat vaihtaa mallia ilman koodimuutosta: lisää toinen ympäristömuuttuja `ALY_MALLI` haluamallasi mallitunnisteella — jos tätä EI aseteta, käytetään koodissa olevaa oletusta.
+4. Avaa Satama, mene **Asetukset → Sovellus** → paina **"Testaa äly"**.
+5. **Putki todistettu jos:** napin alle ilmestyy järkevä suomenkielinen vastaus (esim. jokin lause hyvän sataman ominaisuuksista). Jos näkyy virhe:
+   - "ANTHROPIC_API_KEY puuttuu Vercelistä" → askel 2 jäi tekemättä tai kirjoitusvirhe muuttujan nimessä.
+   - "Mallitunniste ei kelvannut" → tarkista `ALY_MALLI` jos asetit sen, tai kerro Claudelle/Copilotille, koodin oletusmalli saattaa vaatia päivitystä.
+   - Muu virhe → lue virheteksti, se on tarkoituksella selkokielinen suomeksi.
 
 ---
 
