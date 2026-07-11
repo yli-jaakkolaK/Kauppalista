@@ -51,6 +51,7 @@ Näitä nimiä käytetään ympäri tätä tiedostoa ilman että niitä aina sel
 - **VAPID-avaimet** — web push -ilmoitusten vaatima avainpari (julkinen avain koodissa, yksityinen Vercelin ympäristömuuttujissa), todistaa push-palvelulle että viesti tulee oikealta lähettäjältä. Ks. "Push-ilmoitukset" -osio.
 - **Muistutukset** — henkilökohtainen ajastettu push-ilmoitus listan riville/kalenteritapahtumalle/ankkurille, ⏰-napista asetettuna. Ks. oma osio.
 - **Äly-putki** — `api/aly.js`, ensimmäinen todistettu kerros joka kutsuu Claude API:a. Ei vielä oikeita älyominaisuuksia. Periaate: "äly ehdottaa, ihminen kuittaa". Ks. oma osio ja COPILOT.md.
+- **Kolme opasdokumenttia, kolme eri roolia:** `muistiinpanot.md` (tämä tiedosto — projektin narratiivi, päätökset, "miksi") / `COPILOT.md` (tekninen "miten lisään uutta" -jatko-opas) / `PALUU.md` (kertaluontoiset käsintehtävät migraatiot+testit tulevalle palaamiselle) / `BACKUP.md` (varmuuskopiointi- ja palautusohje). Jos et tiedä kumpaan jotain kirjoitetaan, ks. kunkin tiedoston oma yläkommentti.
 
 ---
 
@@ -173,7 +174,7 @@ kauppalista/
 ├── style.css         — kuitti-tyyli, tumma/vaalea automaattisesti
 ├── script.js         — kaikki logiikka (Supabase, listat, auth, offline)
 ├── manifest.json     — PWA: nimi "Kauppalista", teema #C9A84C, icon.png, orientation "portrait"
-├── sw.js             — service worker, välimuisti v29, offline-tuki, auto-reload uudesta versiosta, push-käsittelijät
+├── sw.js             — service worker, offline-tuki, auto-reload uudesta versiosta, push-käsittelijät (versionumero `CACHE`-vakiossa, muuttuu joka muutoksella — älä kirjoita sitä tähän tiedostoon kiinteänä, tarkista aina suoraan sw.js:stä)
 ├── icon.png          — 512×512 PWA-ikoni
 ├── package.json      — VAIN api/-kansion serverless-funktioiden npm-riippuvuudet (tsdav, ical.js, web-push). Etusivun vanilla-JS-puoli (index.html/script.js) EI käytä näitä eikä vaadi build-vaihetta — Vercel asentaa nämä automaattisesti vain funktioita ajaessaan.
 ├── api/
@@ -447,7 +448,7 @@ Tehty 2025-07-06:
 ## PWA
 
 - manifest.json: name "Kauppalista", theme_color "#C9A84C", `orientation: "portrait"` (2026-07-07 — iOS Safari ei kuitenkaan tue suunnan ohjelmallista lukitusta luotettavasti, joten tämä ei ole taattu toimimaan)
-- sw.js: cache version **v29** (2026-07-08) — nostettava aina kun index.html/style.css/script.js/icon.png muuttuu. **HUOM:** `/api/`-polut on tietoisesti jätetty POIS cachesta kokonaan (ks. "Kalenterisyötteet"-osio, "sw.js piti korjata tätä varten") — vain APP_FILES-listan tiedostot ja muut samaperäiset staattiset pyynnöt cachetetaan.
+- sw.js: `CACHE`-vakio (versionumero, EI kirjata tähän tiedostoon kiinteänä koska se nousee joka muutoksella — tarkista aina suoraan sw.js:stä tai Asetukset → Sovellus -näkymän versioteksti) — nostettava aina kun index.html/style.css/script.js/icon.png muuttuu. **HUOM:** `/api/`-polut on tietoisesti jätetty POIS cachesta kokonaan (ks. "Kalenterisyötteet"-osio, "sw.js piti korjata tätä varten") — vain APP_FILES-listan tiedostot ja muut samaperäiset staattiset pyynnöt cachetetaan.
 - sw.js sisältää myös `push`- ja `notificationclick`-tapahtumankuuntelijat (2026-07-08) — ks. "Push-ilmoitukset"-osio.
 - **Automaattinen päivitys** (2026-07-07): kun uusi service worker aktivoituu (`controllerchange`-tapahtuma), sivu lataa itsensä kerran uudelleen — ei enää tarvitse sulkea/avata PWA:ta moneen kertaan nähdäkseen uusimman version
 - iPhone: kotinäytöltä aukeaa kuin natiivi appi
@@ -874,7 +875,7 @@ Kun 017–019 oli ajettu ja synkka käynnistettiin, jonoon tuli 15 tapahtumaa �
 
 **Jonon tyhjennys — `sql/020_tyhjenna_kalenteri_odottavat.sql` EI TARVITSE AJAA OLLENKAAN:** tämä migraatio kirjoitettiin alunperin poistamaan 15 BUGI A/B:tä edeltävää virheellistä jonoriviä `kalenteri_odottavat`-taulusta. Sitten arkkitehtuuri muuttui koko lailla ("yksi totuus, kaksi ikkunaa") ennen kuin Katri ehti ajaa sitä — `sql/022_kalenteri_puhdas_alku.sql` (ks. Ajolista #2 alla) tekee TÄSMÄLLEEN saman `kalenteri_odottavat`-tyhjennyksen JA lisäksi siivoaa `kalenteri_tapahtumat`-taulun synkatun datan. **Aja siis suoraan 021→022→023, OHITA 020 kokonaan** — tiedosto on jätetty `sql/`-kansioon historiaksi/numerojärjestyksen säilyttämiseksi, mutta sen ajaminen ei ole tarpeen (eikä haittaisi jos joku ajaisi sen vahingossa, koska 022 kattaa sen).
 
-### Ajolista #2 — arkkitehtuurimuutos "yksi totuus, kaksi ikkunaa" (kirjattu 2026-07-08 illalla, AJETTU — todistettu toimivaksi 2026-07-10 testisessiossa, ks. "Kahden puhelimen testisessio" -osio. **Seuraava ajettava on `sql/024_kalenteri_ristiriita.sql`, ks. "Ristiriitamerkki"-osio.**)
+### Ajolista #2 — arkkitehtuurimuutos "yksi totuus, kaksi ikkunaa" (kirjattu 2026-07-08 illalla, AJETTU — todistettu toimivaksi 2026-07-10 testisessiossa, ks. "Kahden puhelimen testisessio" -osio. **Migraatiot ovat sittemmin jatkuneet paljon pidemmälle (024-030+) — ajantasainen, konsolidoitu ajolista on AINA PALUU.md:ssä, ei tässä historiallisessa osiossa.**)
 
 1. **`sql/021_kalenteri_kuittausjono.sql`** — uudet taulut `kalenteri_tekijat` ja `kalenteri_kuittaukset`. RIIPPUMATON muista, ei muuta olemassa olevaa skeemaa.
 2. **`sql/022_kalenteri_puhdas_alku.sql`** — poistaa KAIKKI aiemmin synkatut rivit (`kalenteri_tapahtumat` where `syote_id is not null`) ja tyhjentää `kalenteri_odottavat`-taulun kokonaan. EI KOSKE käsin lisättyihin tapahtumiin. **Turvallinen ajaa uudelleen** (tyhjän datan poistaminen on no-op). Tarkoitus: puhdas pöytä uudelle mallille — vanhan mallin (hyväksyntäjono) aikana syntynyt data ei ole enää relevanttia. **Korvaa/sisältää `sql/020_tyhjenna_kalenteri_odottavat.sql`:n koko toiminnan — 020:tä EI TARVITSE AJAA ENÄÄ OLLENKAAN, vaikka sitä ei olisi ehtinyt ajaa aiemmin.** Jos 020 sattui tulla ajettua välissä, se ei haittaa (yhteensopiva, molemmat tyhjentävät samaa taulua).
@@ -1137,14 +1138,16 @@ Täysi testipolku (kortin luonti, tehtävät, muistutus, työ/vapaa-kytkin, Juha
 
 ## Sovittu järjestys 23.7.2026 asti (kirjattu 2026-07-08, Katrin oma priorisointi)
 
-Tämä on Katrin itsensä sanelema järjestys — jos joku (Copilot mukaan lukien) miettii mitä tehdä seuraavaksi, tämä lista on ensisijainen totuus, ei alempien osioiden TODO-listaus (ne ovat tarkempi sisältö kunkin kohdan alle, ei prioriteetti):
+**HUOM (2026-07-11): tämä lista on kirjoitettu 2026-07-08 eikä ole enää ajantasainen prioriteettijärjestys** — sen jälkeen on rakennettu paljon lisää (Muistutukset, Hytti v1 -respeksaus + ICS, Ankkurit henkilökohtaisiksi, Varmuuskopiot, Äly-putken runko), ks. Muutosloki ylhäällä ajantasaiselle tapahtumajärjestykselle. Säilytetty tässä historiallisena kontekstina siitä miten alkuperäinen suunnitelma näytti — EI käytetä enää "mitä tehdä seuraavaksi" -päätöksentekoon, sen sijaan katso Muutosloki + kunkin osion oma tila-merkintä (TESTATTU/EI TESTATTU).
 
 1. **Kahden tilin RLS-testi (Katri + Juha)** + koko "Testattavaa seuraavaksi" -lista alta — ennen tai rinnan seuraavan kanssa, EI SAA UNOHTUA
-2. **Kalenterisyötteet** (tämä osio, yllä) — max 4 päivää aikabudjetti. 017/018/019 ajettu, ensimmäinen oikea synkka onnistui (15 riviä jonoon) mutta paljasti BUGI A (hakuikkuna) ja BUGI B (RRULE-poikkeukset) — molemmat korjattu. Sen jälkeen Katri päätti koko arkkitehtuurin uusiksi: hyväksyntäjono pois käytöstä, "yksi totuus, kaksi ikkunaa" -malli (ks. oma osio) — `sql/021`/`022` AJAMATTA, uusintasynkka uudella mallilla on seuraava askel, ks. "Testattavaa seuraavaksi" ja "Ajolista #2".
+2. **Kalenterisyötteet** (tämä osio, yllä) — max 4 päivää aikabudjetti. 017/018/019 ajettu, ensimmäinen oikea synkka onnistui (15 riviä jonoon) mutta paljasti BUGI A (hakuikkuna) ja BUGI B (RRULE-poikkeukset) — molemmat korjattu. Sen jälkeen Katri päätti koko arkkitehtuurin uusiksi: hyväksyntäjono pois käytöstä, "yksi totuus, kaksi ikkunaa" -malli (ks. oma osio) — todistettu toimivaksi 2026-07-10 testisessiossa (huom vain yhteen suuntaan, ks. "Kahden puhelimen testisessio").
 3. **Pakkauslistojen automaattinollaus** — ✓ TOTEUTETTU 2026-07-08, ks. "Pakkauslistan automaattinollaus"-osio alempana täydelle kuvaukselle.
-4. **Push-ilmoitusinfra** — ✓ TOTEUTETTU 2026-07-08 (tilaus + manuaalinen testilähetys, ks. "Push-ilmoitukset"-osio). EI vielä testattu oikeilla laitteilla — tämä on illan testisession pääasia. Ajastettu lähetys (muistutukset) on oma myöhempi työnsä, ei kuulu tähän.
-5. **Muistutusten perusversio** push-infran päälle rakennettuna
-6. **Oma Hytti -runko** — ✓ TOTEUTETTU 2026-07-08 v1 (casekortit + automaattinen tehtäväkooste + Kalenteri-integraatio, täysin yksityinen), ks. "Oma Hytti"-osio. `sql/016_hytti.sql` AJETTU. EI testattu ollenkaan vielä (myös kahden tilin RLS-testi Hytille erikseen kohdassa 1 mainitun lisäksi)
+4. **Push-ilmoitusinfra** — ✓ TOTEUTETTU 2026-07-08 (tilaus + manuaalinen testilähetys, ks. "Push-ilmoitukset"-osio). EI vielä testattu oikeilla laitteilla.
+5. **Muistutusten perusversio** — ✓ TOTEUTETTU 2026-07-10 push-infran päälle (⏰-nappi + GitHub Actions -ajastin), ks. "Muistutukset"-osio. EI vielä testattu.
+6. **Oma Hytti -runko** — ✓ TOTEUTETTU 2026-07-08 v1, **respeksattu ja laajennettu opiskelukalenterilla 2026-07-11** (ks. "Hytti v1 + opiskelulaajennus + ICS-syötekoneisto" -osio). EI testattu ollenkaan vielä (myös kahden tilin RLS-testi Hytille erikseen kohdassa 1 mainitun lisäksi).
+
+**Sittemmin lisätty, ei ollut mukana alkuperäisessä listassa (kirjattu 2026-07-11):** Ankkurit henkilökohtaisiksi (✓ toteutettu), Varmuuskopiointi pg_dump:lla (✓ toteutettu), Juhan CalDAV-tilin syöterivit (✓ toteutettu), Äly-putken runko (✓ toteutettu) — kaikki EI TESTATTU vielä, ks. omat osionsa ja PALUU.md.
 
 **21.–22.7.2026 rauhoitetaan kokonaan:** ei enää uusia ominaisuuksia, pelkkä koko testauslistan läpikäynti MOLEMMILLA tileillä (Katri + Juha) + tämän muistiinpanot.md-tiedoston loppupäivitys niin että Copilot pystyy jatkamaan siitä ilman mitään muuta kontekstia.
 
@@ -1162,8 +1165,11 @@ Tämä on Katrin itsensä sanelema järjestys — jos joku (Copilot mukaan lukie
 - [ ] Kalenteritapahtuman muokkaus jälkikäteen (nyt voi vain lisätä/poistaa, ei muuttaa nimeä/aikaa)
 - [x] **Pakkauslistojen automaattinollaus** — toteutettu 2026-07-08, ks. "Pakkauslistan automaattinollaus"-osio, EI vielä testattu oikealla laitteella (ks. "Testattavaa seuraavaksi")
 - [x] **Push-ilmoitusinfra** (tilaus + testilähetys) — toteutettu 2026-07-08, ks. "Push-ilmoitukset"-osio, EI vielä testattu oikeilla laitteilla (ks. "Testattavaa seuraavaksi")
-- [ ] **Muistutukset** (ajastettu push push-infran päälle) — EI aloitettu, ks. "Sovittu järjestys"-osion kohta 5
-- [ ] **Ulkoisen kalenterin tuonti Satamaan** — koodi valmis, mutta EI TODELLISUUDESSA VIELÄ TESTATTU: 2026-07-08 illalla kävi ilmi että `kalenteri_syotteet`-taulu oli koko ajan tyhjä (synkka ei koskaan epäonnistunut, sille ei vain ollut annettu mitään syötettä) — aiempi tässä samassa muistiossa ollut "testattu, toimii" -merkintä oli siis virheellinen, korjattu. `sql/014_kalenteri_syotteet.sql` AJETTU, mutta `sql/017`–`019` (account_key-sarake, event_end_date, Katrin syöterivit) AJAMATTA — ks. "Kalenterisyötteet"-osion "Ajolista 2026-07-08 illalle" tarkat ohjeet ja ajojärjestys. Vasta näiden jälkeen ensimmäinen oikea testi.
+- [x] **Muistutukset** (ajastettu push push-infran päälle) — TOTEUTETTU 2026-07-10, ks. "Muistutukset"-osio. EI vielä testattu oikealla laitteella.
+- [x] **Ulkoisen kalenterin tuonti Satamaan** — `sql/014`/`017`–`019` AJETTU, ensimmäinen oikea synkka onnistui 2026-07-08 illalla (15 riviä) ja "yksi totuus, kaksi ikkunaa" -malli todistettu toimivaksi 2026-07-10 testisessiossa (huom vain Juha→Katri-suuntaan, ks. "Kahden puhelimen testisessio"). Juhan CalDAV-tilin omat syöterivit (`sql/030`) lisätty 2026-07-11, EI vielä testattu.
+- [x] **Ankkurit henkilökohtaisiksi** — TOTEUTETTU 2026-07-11 (`sql/029`), ks. "Etusivu"-osion "Ankkurit henkilökohtaiset" -kappale. EI vielä testattu.
+- [x] **Varmuuskopiointi** — TOTEUTETTU 2026-07-11 (`pg_dump`-pohjainen, ks. "Varmuuskopiot"-osio ja BACKUP.md). EI vielä ajettu kertaakaan oikeasti.
+- [x] **Äly-putken runko** — TOTEUTETTU 2026-07-11, EI yhtään oikeaa älyominaisuutta vielä (ks. "Äly-putki"-osio ja COPILOT.md). EI vielä testattu.
 
 ## Testattavaa seuraavaksi (koottu 2026-07-07 session lopussa)
 
