@@ -166,8 +166,6 @@ Ei vaadi mitään uutta migraatiota tai asetusta — käyttää samaa `ANTHROPIC
 
 ---
 
----
-
 ## OSA H — Testaa Huomiopallurat (riippumaton kaikesta muusta)
 
 Vaatii `sql/034_realtime_huomiopallurat.sql` ajettuna (ks. OSA A kohta 10) — ilman sitä Realtime-päivitykset eivät laukea, vaikka etusivun avaus laskee luvut silti oikein.
@@ -179,6 +177,18 @@ Vaatii `sql/034_realtime_huomiopallurat.sql` ajettuna (ks. OSA A kohta 10) — i
 5. Kun molemmat luvut ovat nollassa, tarkista ettei laatoissa näy palluraa OLLENKAAN (ei pyöreää "0"-merkkiä, ei mitään).
 6. Jos puhelin on asennettu kotinäytölle (iOS 16.4+): tarkista että sovelluskuvakkeen oikeassa yläkulmassa näkyy numero (kahden palluran summa) kun jompikumpi on > 0, ja katoaa kokonaan kun molemmat on kuitattu/sijoitettu.
 7. **Tunnettu rajaus, ei bugi:** jos push-ilmoitus tulee kun sovellus on kokonaan suljettu, sovelluskuvakkeen numero EI päivity siitä pushista itsestään — se päivittyy vasta kun joku avaa sovelluksen (Realtime/lataus laskee sen silloin). Tämä on tietoinen rajaus, ks. muistiinpanot.md "Huomiopallurat"-osio.
+
+---
+
+## OSA I — Testaa ulkokäytettävyys, toinen kierros (ei migraatiota, riippumaton kaikesta muusta)
+
+Katrin palaute 2026-07-10 ("testattu ulkona auringossa, kontrasti ei riitä") johti ensimmäiseen korjaukseen, mutta se laski värit vain juuri AA-rajan (4,5:1) yläpuolelle — ei riittänyt käytännössä. Toinen kierros (2026-07-13) tummensi värit reilummalla marginaalilla (n. 6-6,5:1) ja korjasi Kuormavahdin kuukausinäkymän pisteen näyttämään numeron pelkän hover-vihjeen sijaan (ei toiminut kosketusnäytöllä).
+
+1. Vie puhelin ulos aurinkoiseen paikkaan, avaa Kalenteri käsivarren mitalta (älä pidä puhelinta lähellä kasvoja).
+2. Päivä- ja viikkonäkymä: tarkista Kuormavahdin "N menoa" -pilleri, kellonajat ja otsikot — pitäisi olla luettavissa siristämättä silmiä.
+3. Kuukausinäkymä: tarkista että kuormittuneen päivän kohdalla näkyy pieni meripihkanvärinen numeromerkki (esim. "6") päivänumeron vieressä, EI enää pelkkä väripiste ilman selitystä.
+4. Käännä puhelin vaakatilaan viikkonäkymässä — pilleri EI saa olla enää silmin nähden pienempi kuin muu teksti ympärillä ("mikroskooppinen"-palaute korjattu).
+5. Jos JOKIN näistä on edelleen vaikealukuinen: kerro Claudelle/Copilotille TARKKA elementti + valo-olosuhde (esim. "kuormapilleri viikkonäkymässä suorassa auringonpaisteessa") — seuraava kierros voi harkita täytettyä taustaa myös kuormamerkille (nyt yhä dashed-reunus, ei täytetty tausta — se on tarkoituksella varattu vain punaiselle päällekkäisyysmerkille).
 
 ---
 

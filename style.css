@@ -4,27 +4,32 @@
   padding: 0;
 }
 
-/* Värit: --muted ja --accent-text on tarkistettu WCAG AA -kontrastisuhdetta
-   (>=4.5:1) vasten --ground-taustaa käyttävälle leipätekstille — aiempi
-   --muted (#B0AA9E vaaleassa) jäi vain n. 2,1:1:een, ei riittänyt ulkona
-   auringossa luettavaksi (Katrin havainto 2026-07-10 testissä). --accent
-   itse pysyy ennallaan (käytössä isoissa/lihavoiduissa otsikoissa ja
-   ikoneina, joilla lievemmät kontrastivaatimukset) — --accent-text on oma,
-   tummempi versio nimenomaan leipätekstikäyttöön (esim. kalenterin
-   kellonaika-teksti). --huomio ja --vaara ovat kolmiportaisen
-   merkkikielen kaksi muuta sävyä, ks. "Kalenterin merkkikieli"
-   muistiinpanot.md:ssä: kulta/--accent = neutraali tieto, meripihka/--huomio
-   = huomaa tämä (ei koskaan syyllistävä), punainen/--vaara = mahdotonta,
-   vaatii reaktion — VARATTU YKSINOMAAN päällekkäisyysmerkille. */
+/* Värit: --muted, --accent-text ja --huomio on tarkistettu WCAG AA
+   -kontrastisuhdetta (>=4.5:1) vasten --ground-taustaa käyttävälle
+   leipätekstille — aiempi --muted (#B0AA9E vaaleassa) jäi vain n. 2,1:1:een,
+   ei riittänyt ulkona auringossa luettavaksi (Katrin havainto 2026-07-10
+   testissä). Vaaleassa teemassa tummennettu VIELÄ KERRAN 2026-07-13 (Katrin
+   uusi testipalaute: bare-minimum 4,5:1 ei riitä oikeassa auringossa
+   käsivarren mitalta, tarvitaan selvä marginaali) — kaikki kolme laskettu
+   nyt noin 6-6,5:1:een asti, ei enää vain juuri rajalla. Tumma teema oli jo
+   valmiiksi tässä haarukassa (5-8:1), ei koskettu. --accent itse pysyy
+   ennallaan (käytössä isoissa/lihavoiduissa otsikoissa ja ikoneina, joilla
+   lievemmät kontrastivaatimukset) — --accent-text on oma, tummempi versio
+   nimenomaan leipätekstikäyttöön (esim. kalenterin kellonaika-teksti).
+   --huomio ja --vaara ovat kolmiportaisen merkkikielen kaksi muuta sävyä,
+   ks. "Kalenterin merkkikieli" muistiinpanot.md:ssä: kulta/--accent =
+   neutraali tieto, meripihka/--huomio = huomaa tämä (ei koskaan
+   syyllistävä), punainen/--vaara = mahdotonta, vaatii reaktion — VARATTU
+   YKSINOMAAN päällekkäisyysmerkille. */
 :root {
   --ground: #F8F5EF;
   --text: #1A1A1A;
   --accent: #C8941A;
-  --accent-text: #8C6512;
-  --muted: #756F62;
+  --accent-text: #73530F;
+  --muted: #5F5A4F;
   --border: #E0DDD6;
   --border-dash: #C8C3B8;
-  --huomio: #A85A1A;
+  --huomio: #8C4A16;
   --vaara: #A83636;
   --vaara-ground: #F5DCDC;
 }
@@ -237,14 +242,17 @@ h1 {
 
   #kalenteri-view[data-tila="viikko"] .kalenteri-paiva-otsikko {
     margin-top: 0;
-    font-size: 12px;
+    font-size: 13px;
     letter-spacing: 0.02em;
     overflow-wrap: break-word;
   }
 
+  /* Aiemmin 10px/2px 5px — todettu "mikroskooppiseksi" ulkokäytössä
+     2026-07-13, bumpattu samaan 13px-vähimmäistavoitteeseen kuin muu
+     kalenteriteksti tässä landscape-viikkonäkymässä. */
   #kalenteri-view[data-tila="viikko"] .paiva-merkki {
-    font-size: 10px;
-    padding: 2px 5px;
+    font-size: 12px;
+    padding: 3px 6px;
     margin-left: 3px;
   }
 
@@ -341,21 +349,36 @@ h1 {
 
 /* Kuukausinäkymän ruutu on liian pieni täydelle merkkipillerille (ks.
    .paiva-merkki alempana) — sama kolmiportainen väriohjaus tiivistettynä
-   pieneksi pisteeksi päivänumeron viereen, ks. "Kalenterin merkkikieli". */
+   pieneksi merkiksi päivänumeron viereen, ks. "Kalenterin merkkikieli".
+   Ristiriita pysyy pelkkänä värillisenä pisteenä (aina sama merkitys, ei
+   tarvitse numeroa). Kuorma sen sijaan sai 2026-07-13 näkyvän lukeman
+   (esim. "6") pelkän `title`-vihjeen lisäksi — `title` vaatii hoveria,
+   joka ei toimi kosketusnäytöllä, joten piste oli käytännössä "näkymätön"
+   selitys mobiilissa vaikka tekninen elementti olikin jo olemassa. */
 .kalenteri-kuukausi-piste {
-  display: inline-block;
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   flex-shrink: 0;
 }
 
-.kalenteri-kuukausi-piste--kuorma {
-  background: var(--huomio);
+.kalenteri-kuukausi-piste--ristiriita {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--vaara);
 }
 
-.kalenteri-kuukausi-piste--ristiriita {
-  background: var(--vaara);
+.kalenteri-kuukausi-piste--kuorma {
+  min-width: 14px;
+  height: 13px;
+  padding: 0 3px;
+  border-radius: 6px;
+  background: var(--huomio);
+  color: var(--ground);
+  font-size: 9px;
+  font-weight: bold;
+  line-height: 1;
 }
 
 .kalenteri-kuukausi-palkit {
@@ -1230,11 +1253,11 @@ h1 {
 .paiva-merkki {
   display: inline-flex;
   align-items: center;
-  font-size: 12px;
+  font-size: 13px;
   font-weight: bold;
   letter-spacing: 0.02em;
   border-radius: 4px;
-  padding: 3px 7px;
+  padding: 4px 8px;
   margin-left: 6px;
   white-space: nowrap;
 }

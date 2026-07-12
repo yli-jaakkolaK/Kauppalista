@@ -822,6 +822,7 @@ function piirraKuukausiPaiva(pvm, kaikkiTapahtumat, linjat, linjojaViikolla, kul
   } else if (laskeMenoja(paivanKaikki) >= kuormaraja) {
     const piste = document.createElement('span');
     piste.className = 'kalenteri-kuukausi-piste kalenteri-kuukausi-piste--kuorma';
+    piste.textContent = String(laskeMenoja(paivanKaikki));
     piste.title = laskeMenoja(paivanKaikki) + ' menoa';
     pvmRivi.appendChild(piste);
   }
