@@ -2952,6 +2952,39 @@ document.getElementById('move-category-btn').addEventListener('click', async fun
   document.getElementById('move-category-btn').textContent = uusiKategoria === 'varasto' ? 'Siirrä Muistilappuihin' : 'Siirrä Varastoon';
 });
 
+// "Luo kopio" — monistaa listan riveineen ja väliotsikoineen (täpät/ostoajat
+// nollattuina) uudeksi, itsenäiseksi listaksi samaan kategoriaan. Käyttötapaus:
+// juhla-/kausipohjat (esim. "Joulun pakkauslista") Varastossa — pohja säilyy
+// koskemattomana, kopiosta tehdään sen vuoden elävä versio.
+document.getElementById('copy-list-btn').addEventListener('click', async function() {
+  if (!currentList) return;
+  const uusiNimi = prompt('Uuden listan nimi', currentList.name + ' (kopio)');
+  if (uusiNimi === null || uusiNimi.trim() === '') return;
+
+  const { data: uusiLista, error: listaError } = await db.from('lists')
+    .insert({ name: uusiNimi.trim(), type: 'checklist', owner_id: currentUserId, category: currentList.category })
+    .select().single();
+  if (listaError) {
+    console.error('Kopion luonti epäonnistui:', listaError);
+    return;
+  }
+
+  const { data: rivit, error: riviError } = await db.from('tuotteet').select().eq('list_id', currentList.id).order('sort_order');
+  if (riviError) {
+    console.error('Rivien haku kopiointia varten epäonnistui:', riviError);
+  } else if (rivit && rivit.length > 0) {
+    const kopiot = rivit.map(function(r) {
+      return { nimi: r.nimi, is_header: r.is_header, sort_order: r.sort_order, list_id: uusiLista.id, tehty: false, bought_at: null };
+    });
+    const { error: insertError } = await db.from('tuotteet').insert(kopiot);
+    if (insertError) console.error('Rivien kopiointi listalle epäonnistui:', insertError);
+  }
+
+  logEvent('created', 'list', uusiLista.id, uusiLista.name, uusiLista.id);
+  document.getElementById('settings-overlay').style.display = 'none';
+  naytaIlmoitus('Kopio "' + uusiLista.name + '" luotu.');
+});
+
 document.getElementById('settings-close').addEventListener('click', function() {
   document.getElementById('settings-overlay').style.display = 'none';
 });
