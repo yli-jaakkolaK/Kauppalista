@@ -1959,6 +1959,7 @@ function avaaOsio(osio) {
     showLaituriView();
     lataaLaituri();
     palautaLaituriLuonnos();
+    merkitseLaituriNahdyksi();
   } else if (osio.route === 'muistilaput') {
     showMuistilaputView();
     lataaMuistilaput();
@@ -2020,16 +2021,51 @@ async function paivitaSovelluskuvakeBadge() {
   }
 }
 
-// Laituri-laatan pallura: VAIN toisen käyttäjän lisäämät, vielä
-// sijoittamattomat rivit — reaktiota odottava asia (joku muu jätti tämän
-// sinulle), ei "uusi tieto" yleisesti. Oma lisäys ei kerrytä omaa palluraa,
-// koska et tarvitse muistutusta omasta juuri kirjoittamastasi rivistä.
-// Pallura katoaa kun rivi SIJOITETAAN (reagoitu), ei kun Laituri vain
-// avataan — tarkempi kuin aiempi "nähty"-aikaleimapohjainen laskuri
-// (korvattu, ks. muistiinpanot.md "Huomiopallurat"-osio).
+// Laituri-laatan pallura: VAIN toisen käyttäjän lisäämät rivit joita EN OLE
+// VIELÄ NÄHNYT — "nähty", ei "sijoittamatta" (korjattu 2026-07-13, ks.
+// muistiinpanot.md "Bugikorjaus: Laituri-pallura"). Ensimmäinen
+// Huomiopallurat-versio laski "sijoittamattomat toisen rivit" — käytännössä
+// Laiturin oma filosofia ("asiat odottavat häpeättä ja hälyttä") ja tämä
+// laskentatapa olivat ristiriidassa: pari päivää vanha, jo kertaalleen
+// nähty mutta yhä sijoittamaton muru sytytti palluran uudelleen JOKA
+// avauksella. Nähty rivi saa nyt odottaa Laiturissa ilman palluraa, vaikka
+// sitä ei olisi vielä sijoitettu. Oma lisäys ei kerrytä omaa palluraa
+// (ennallaan, riippumatta tästä muutoksesta).
+//
+// "Nähty" tallennetaan `laituri_nahty`-tauluun (per käyttäjä, ei
+// laitekohtainen localStorage — kevyin KESTÄVÄ vaihtoehto: säilyy vaikka
+// PWA asennetaan uudelleen tai vaihdetaan puhelinta, sql/040). Nollautuu
+// `merkitseLaituriNahdyksi()`:llä Laiturin avaushetkellä.
+let omaLaituriNahtyAika = null;
+
+async function haeLaituriNahtyAika() {
+  const { data, error } = await db.from('laituri_nahty').select('viimeksi_avattu').eq('user_id', currentUserId).maybeSingle();
+  if (error) {
+    console.error('Laiturin nähty-ajan haku epäonnistui:', error);
+    return null;
+  }
+  return data ? data.viimeksi_avattu : null;
+}
+
+async function merkitseLaituriNahdyksi() {
+  const nyt = new Date().toISOString();
+  const { error } = await db.from('laituri_nahty').upsert({ user_id: currentUserId, viimeksi_avattu: nyt }, { onConflict: 'user_id' });
+  if (error) {
+    console.error('Laiturin nähty-ajan tallennus epäonnistui:', error);
+    return;
+  }
+  omaLaituriNahtyAika = nyt;
+  paivitaLaituriBadge();
+}
+
 async function paivitaLaituriBadge() {
+  if (omaLaituriNahtyAika === null) {
+    omaLaituriNahtyAika = await haeLaituriNahtyAika();
+  }
+  const raja = omaLaituriNahtyAika || '1970-01-01T00:00:00.000Z';
+
   const { count } = await db.from('laituri').select('id', { count: 'exact', head: true })
-    .eq('status', 'uusi').neq('user_id', currentUserId);
+    .neq('user_id', currentUserId).gt('created_at', raja);
   huomioPallurat.laituri = count || 0;
 
   const badge = document.querySelector('.tile-badge[data-osio-key="laituri"]');

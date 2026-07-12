@@ -911,6 +911,29 @@ h1 {
   cursor: pointer;
 }
 
+/* BUGIKORJAUS (2026-07-13): pitkä rivin nimi työnsi toimintonapit (×, ⚓,
+   ⏰) ruudun ulkopuolelle, vaatien vaakarullausta niihin yltääkseen.
+   `min-width: 0` on korjauksen ydin — ilman sitä flex-lapsi (`span`) ei
+   koskaan kutistu sisältönsä leveyttä pienemmäksi (yleinen flexbox-ansa),
+   jolloin pitkä teksti leventää koko rivin näytön yli. Yksirivinen
+   ellipsis-katkaisu pidempien nimien sijaan (ei rivitystä) — pysyy
+   yhtenäisenä `min-height:52px`-rivikorkeuden kanssa kaikissa
+   näkymissä (Muistilaput/Varasto/Kauppalista, Kalenteri, Hytti — kaikki
+   käyttävät samaa `.list li`-rakennetta). Laituri EI tarvinnut tätä
+   (`.laituri-content`/`.laituri-text` oli jo rakennettu `min-width:0` +
+   `word-break:break-word` -periaatteella alusta asti).
+   RAJATTU POIS kiinteän levyisiltä metatiedoilta (kellonaika, eräpäivä,
+   väripallo, "uusi"-merkki) — niillä on jo omat tarkoitukselliset
+   leveytensä, ei saa antaa ellipsiksen/kutistumisen koskea niihin. Jos
+   lisäät JATKOSSA uuden pienen kiinteän-levyisen span-merkinnän `.list
+   li`:n sisään, lisää sen luokka tähän poissulkulistaan. */
+.list li span:not(.kalenteri-aika):not(.kalenteri-vari):not(.kalenteri-uusi-merkki):not(.hytti-tanaan-aika):not(.hytti-tehtava-erapaiva):not(.hytti-rivi-erapaiva):not(.history-time):not(.muistutus-aika) {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .edit-input {
   flex: 1;
   background: none;

@@ -34,6 +34,8 @@ Täysi ohje (asennus, mistä yhteysosoite löytyy) on **BACKUP.md**:ssä.
 
 **⚠ sql/039_events_delete_policy.sql — UUSI, TÄRKEÄ, AJA ENSIN.** Korjaa bugin jonka takia listan poisto ei tehnyt mitään (ks. OSA M alla) — `events`-taululta puuttui delete-RLS-policy kokonaan. Ilman tätä listan poisto ("Poista lista") ei toimi millään listalla jolla on tapahtumahistoriaa, eli käytännössä ei yhdelläkään oikeasti käytetyllä listalla.
 
+**⚠ sql/040_laituri_nahty.sql — UUSI, AJA ENNEN Laituri-palluran testausta.** Luo `laituri_nahty`-taulun (per-käyttäjä "viimeksi avattu" -aikaleima) — korjaa bugin jossa Laituri-pallura ei koskaan sammunut pysyvästi (ks. OSA N alla).
+
 ---
 
 ## OSA A — Muistutusten ajastin
@@ -170,9 +172,30 @@ Katrin raportoima bugi: "jäätelökakku"-listan (Muistilaput) poisto ei tehnyt 
 1. Luo testiksi uusi lista Muistilappuihin, lisää pari riviä, täppää yksi.
 2. Avaa listan asetukset, paina "Poista lista" (tai vastaava poistoreitti kotinäkymän ×-napista) — vahvista dialogissa.
 3. **Listan pitäisi kadota OIKEASTI** — ei jää näkyviin, ei ilmesty takaisin seuraavalla sivun päivityksellä. Onnistuneen poiston jälkeen pitäisi näkyä "Lista poistettu" -toast.
-4. Kokeile myös poistaa lista jolla EI ole yhtään riviä (nopeampi reitti sama koodi, mutta hyvä varmistaa ettei tyhjä lista käyttäydy eri tavalla).
+4. Kokeile myös poistaa lista jolla EI ole yhtään riviä (nopeampi reitti sama koodi, mutta hyvä varmistaa ettei tyhjä lista käyttäydy eri tavalla) — tämä vastaa myös Katrin havaintoa että bugi toistui sekä vanhalla listalla ("jäätelökakku") että ihan juuri luodulla tuoreella ("mansikkahillo"), eli ei ollut sidottu listan ikään.
 5. **Jos poisto EI edelleenkään toimi:** nyt pitäisi näkyä selkokielinen suomenkielinen virhetoast (esim. "Listan poisto epäonnistui (tapahtumat): ..."), EI hiljaisuutta. Kerro Claudelle/Copilotille tarkka virheteksti jos näin käy — se kertoo tarkalleen missä vaiheessa (tuotteet/tapahtumat/lista itse) se kaatuu.
 6. Varmista myös että YKSITTÄISEN RIVIN poisto (× listan sisällä) toimi jo ENNEN tätä korjausta ja toimii yhä — tämä bugi koski VAIN koko listan poistoa, ei yksittäisiä rivejä.
+
+---
+
+## OSA N — Testaa Laituri-pallura ja pitkän rivin ×-nappi (bugikorjaukset)
+
+Kaksi erillistä löydöstä arkikäytöstä, korjattu samassa erässä. Aja `sql/040_laituri_nahty.sql` ensin (ks. Migraatiot-tila yllä).
+
+**Laituri-pallura ("nähty", ei "sijoittamatta"):**
+1. Kirjoita Laituriin uusi rivi (esim. TOISELLA tilillä/puhelimella, tai jos yksin testaat, tarkkaile että OMA lisäys ei koskaan sytytä omaa palluraa — se on jo tuttu sääntö).
+2. Avaa Etusivu toisella tilillä — Laituri-laattaan pitäisi ilmestyä kultainen (EI punainen) pallura.
+3. Avaa Laituri-näkymä (ÄLÄ sijoita riviä, jätä se sijoittamattomaksi tietoisesti).
+4. Palaa Etusivulle — palluran pitäisi olla POISSA, vaikka rivi on YHÄ sijoittamaton.
+5. Sulje sovellus kokonaan, avaa uudelleen, päivitä sivu useaan kertaan — palluran pitäisi PYSYÄ poissa niin kauan kuin mitään UUTTA (nähdyn hetken jälkeen lisättyä) ei ole tullut, riippumatta kuinka moneen kertaan Etusivu avataan.
+6. Lisää TOINEN uusi rivi toiselta tililtä — palluran pitäisi syttyä UUDELLEEN vain tämän uuden rivin takia, ei vanhan (jo nähdyn) takia.
+7. **Väri:** tarkista että pallura on selvästi kultainen/oranssinsävyinen, EI punainen, sekä Laituri- että Kalenteri-laatalla. Jos näkyy edelleen punaisena version päivityksen (Asetukset → "Päivitä sovellus") jälkeenkin, ota kuvakaappaus ja kerro Claudelle/Copilotille — koodista ei löytynyt mitään korjattavaa tälle, joten jos ongelma toistuu, tarvitaan lisätietoa.
+
+**Pitkän rivin ×-nappi:**
+1. Lisää Muistilappuihin (tai mihin tahansa listaan) rivi jolla on TODELLA PITKÄ nimi (esim. "Tämä on todella pitkä tuotteen nimi joka aiemmin työnsi poistonapin pois näkyvistä kokonaan").
+2. Tarkista että teksti katkeaa siististi kolmella pisteellä (…) rivin lopussa, EIKÄ vaadi vaakarullausta — ×-napin (ja ⚓-napin) pitäisi näkyä KOKONAAN ilman rullaamista.
+3. Toista sama testi Kalenterissa (pitkä tapahtuman nimi) ja Hytissä (pitkä tehtävän/rivin nimi) — molemmissa sama korjaus pitäisi päteä.
+4. Laituriin EI pitäisi tarvita erillistä testiä tälle — se toimi jo ennenkin oikein (rivittyy tarvittaessa sen sijaan että katkeaisi).
 
 ---
 
