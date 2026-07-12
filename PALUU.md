@@ -67,6 +67,7 @@ Supabase-projektin sivulta: vasemmalta **SQL Editor** → **New query** → liim
 4. `sql/028_hytti_ics_syotteet_data.sql` — Itslearning + Lukkarikone -syötteet Hyttiin
 5. `sql/029_ankkurit_henkilokohtaiset.sql` — tekee Ankkureista henkilökohtaisia (ks. OSA D alla) — TÄYSIN ERILLINEN Muistutuksista/Hytistä, voit ajaa tämän vaikka jättäisit muut väliin
 6. `sql/030_kalenteri_syotteet_data_juha.sql` — Juhan CalDAV-tilin syöterivit (ks. OSA E alla) — **TARKISTA ENSIN** `GET /api/caldav-sync?listaa=juha` selaimessa (korvaa domain: `https://kauppalista-nine.vercel.app/api/caldav-sync?listaa=juha`) ja vertaa tulosta migraatiotiedoston `tunniste`-arvoihin (Perhekalenteri/Juha/Katri) — jos nimet eivät täsmää kirjain kirjaimelta, älä aja migraatiota vielä, kerro Claudelle/Copilotille mitkä nimet oikeasti tulivat
+7. `sql/031_kalenteri_juha_nimikorjaus.sql` — korjaa 030:n jälkeen löytyneen nimiongelman (jaettu kalenteri näkyy Juhan tilillä nimellä "Yhteinen kalenteri", ei "Perhekalenteri" + Juhan oma yksityinen kalenteri nimetty "Oma") — ks. OSA E, tavoite synkan jälkeen: JSON näyttää 8 syötettä, 0 virhettä
 
 **Tärkeä käsin täytettävä kohta migraation 027 jälkeen:** se luo uuden `hytti_omistajat`-taulun jonka pitää tietää KUKA on 'katri' ja KUKA on 'juha' (oikeat käyttäjätunnukset). Katrin rivi on jo mukana valmiina migraatiossa. **Juhan rivi puuttuu — lisää se itse Table Editorista:**
 - Supabase → **Table Editor** → etsi taulu `hytti_omistajat`
@@ -127,12 +128,13 @@ Ankkurit olivat tähän asti käytännössä yhteiset (kumpikin näki ja pystyi 
 
 ## OSA E — Testaa Juhan kalenteritilin syöterivit (riippumaton A/B/C/D:stä)
 
-Ennen migraatiota: tarkista `?listaa=juha` (ks. yllä kohta A.3, rivi 6) että kalenterien nimet täsmäävät. Aja sitten `sql/030_kalenteri_syotteet_data_juha.sql`.
+Ennen migraatiota: tarkista `?listaa=juha` (ks. yllä kohta A.3, rivi 6) että kalenterien nimet täsmäävät. Aja `sql/030_kalenteri_syotteet_data_juha.sql` JA `sql/031_kalenteri_juha_nimikorjaus.sql` (031 korjaa nimiongelman joka löytyi ensimmäisestä synkkayrityksestä — ks. muistiinpanot.md "Kalenterisyötteet"-osio).
 
-1. Avaa Kalenteri-näkymä (käynnistää synkan) tai `GET /api/caldav-sync` suoraan selaimessa — tarkista vastauksen JSON:sta että Juhan syötteet (`account_key='juha'`) näkyvät mukana Katrin syötteiden (`account_key='katri'`) lisäksi.
-2. **Tärkein tarkistus — ei tuplia:** jos "Perhekalenteri" on jaettu ja näkyy MOLEMPIEN tilien kautta, sen tapahtumien pitää näkyä agendassa TÄSMÄLLEEN KERRAN per tapahtuma, ei kahdesti. (Tekniikka: sama tapahtuma tuottaa saman `ical_uid`:n riippumatta kumman tilin kautta se haettiin, joten tietokannan `unique`-rajoite + päivitys-upsert pitävät sen yhtenä rivinä automaattisesti — ei vaadi mitään manuaalista tarkistusta koodista, mutta KANNATTAA silti todeta silmämääräisesti kalenterista.)
+1. Avaa Kalenteri-näkymä (käynnistää synkan) tai `GET /api/caldav-sync` suoraan selaimessa — **tavoite: JSON näyttää 8 syötettä, 0 virhettä.** Jos virheitä näkyy, lue tarkka virheteksti per syöte (yleensä "Kalenteria X ei löytynyt" = tunniste ei täsmää `?listaa=juha`:n näyttönimeen kirjain kirjaimelta — kerro Claudelle/Copilotille tarkka virhe).
+2. **Tärkein tarkistus — ei tuplia:** jaettu "Yhteinen kalenteri" näkyy MOLEMPIEN tilien kautta (Katrin tililtä nimellä "Perhekalenteri", Juhan tililtä nimellä "Yhteinen kalenteri" — SAMA kalenteri, kaksi eri näyttönimeä eri tileillä), sen tapahtumien pitää näkyä agendassa TÄSMÄLLEEN KERRAN per tapahtuma, ei kahdesti. (Tekniikka: sama tapahtuma tuottaa saman `ical_uid`:n riippumatta kumman tilin kautta se haettiin, joten tietokannan `unique`-rajoite + päivitys-upsert pitävät sen yhtenä rivinä automaattisesti.)
 3. Jos jokin tapahtuma NÄKYY kahdesti agendassa, se on todellinen bugi — kerro Claudelle/Copilotille tarkka tapahtuman nimi + päivä, jotta sitä voi tutkia.
-4. Vain Juhan henkilökohtaisessa kalenterissa olevat tapahtumat (jotka Katrin tili ei aiemmin nähnyt) pitäisi nyt ilmestyä agendaan "uusi"-merkinnällä (kuittausjono) kunnes joku kuittaa ne.
+4. Juhan OMAN yksityisen kalenterin ("Oma") tapahtumat — todennäköisesti niitä perjantain "kadonneita" menoja — pitäisi nyt ilmestyä agendaan "uusi"-merkinnällä (kuittausjono) kunnes joku kuittaa ne.
+5. Jos vanha "Katri Rantanen" -niminen tupla-jaettu kalenteri (poistettu Juhan tililtä) on ehtinyt tuoda jotain Satamaan aiemmin, se pitäisi HÄVITÄ agendasta itsestään tämän synkan yhteydessä (peilisääntö) — ei vaadi käsin siivousta.
 
 ---
 
