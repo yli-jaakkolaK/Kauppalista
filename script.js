@@ -1002,6 +1002,10 @@ async function paivitaKuittausTila() {
     linkki.onclick = function() { avaaKuittausOverlay(kuittausjonoUudet); };
   }
 
+  // Huomiopallura (2026-07-13, ks. "HUOMIOPALLURAT"-osio): sama luku jota
+  // "🆕 N uutta" -linkki jo näyttää, ei duplikoitua laskentaa.
+  huomioPallurat.kalenteri = kuittausjonoUudet.length;
+
   const badge = document.querySelector('.tile-badge[data-osio-key="kalenteri"]');
   if (badge) {
     if (kuittausjonoUudet.length) {
@@ -1011,6 +1015,7 @@ async function paivitaKuittausTila() {
       badge.style.display = 'none';
     }
   }
+  paivitaSovelluskuvakeBadge();
 }
 
 // Piirtää kuittauskortit (otsikko + pvm/aika + värillinen lähdemerkintä +
@@ -1932,7 +1937,6 @@ function avaaOsio(osio) {
     showLaituriView();
     lataaLaituri();
     palautaLaituriLuonnos();
-    merkitseLaituriNahdyksi();
   } else if (osio.route === 'muistilaput') {
     showMuistilaputView();
     lataaMuistilaput();
@@ -1963,28 +1967,58 @@ function avaaOsio(osio) {
   }
 }
 
-// Etusivun Laituri-merkki on "nähty"-pohjainen (ei "käsittelemätön"-pohjainen):
-// laskee montako riviä on lisätty sen jälkeen kun TÄMÄ laite viimeksi avasi
-// Laiturin, laitekohtainen localStorage-aikaleima (kuten Hytti-kalenteri-
-// kytkin) koska Katrilla ja Juhalla on omat puhelimensa. Nollaantuu siis
-// Laiturin avaamisesta, toisin kuin sijoittamattomien rivien määrä (joka
-// näkyy erikseen ITSE Laituri-näkymässä, ks. paivitaLaituriSijoittamattaTeksti).
-const LAITURI_NAHTY_KEY = 'satama_laituri_viimeksi_avattu';
-function merkitseLaituriNahdyksi() {
-  localStorage.setItem(LAITURI_NAHTY_KEY, new Date().toISOString());
+// === HUOMIOPALLURAT (2026-07-13) ===
+// Etusivun laattojen pallura = kuinka moni asia odottaa KÄYTTÄJÄN
+// REAKTIOTA — EI kaikkea uutta. Periaate: pallura vain reaktiota
+// odottaville asioille, aina palava merkki lakkaa merkitsemästä kun
+// käyttäjä on reagoinut (ei kun hän on vain "nähnyt"). Jokainen uusi
+// palluralähde perustellaan erikseen tähän — ei automaattisesti kaikelle.
+// V1: kalenteri (kuittausjono, ks. paivitaKuittausTila()) + laituri
+// (toisen käyttäjän 'uusi'-tilaiset rivit, ks. alla). Muille laatoille EI
+// palluraa vielä (rakenne on laajennettavissa, esim. tuleva
+// ristiriitalippu lisätään samaan `huomioPallurat`-kartaan kun se rakennetaan).
+let huomioPallurat = { kalenteri: 0, laituri: 0 };
+
+// Päivittää iOS:n kotinäytön PWA-kuvakkeen numeron (Badging API, iOS 16.4+)
+// kaikkien huomiopallurien summaksi. Feature-detect — jos API:a ei ole
+// (vanhempi iOS, muu selain), ohitetaan hiljaa, ei näytetä virhettä
+// käyttäjälle. Kutsutaan aina kun jompikumpi pallura päivittyy.
+async function paivitaSovelluskuvakeBadge() {
+  if (!('setAppBadge' in navigator)) return;
+  const summa = huomioPallurat.kalenteri + huomioPallurat.laituri;
+  try {
+    if (summa > 0) {
+      await navigator.setAppBadge(summa);
+    } else {
+      await navigator.clearAppBadge();
+    }
+  } catch (e) {
+    // Ei kriittistä (esim. PWA ei asennettu kotinäytölle) — ei näytetä käyttäjälle.
+  }
 }
 
+// Laituri-laatan pallura: VAIN toisen käyttäjän lisäämät, vielä
+// sijoittamattomat rivit — reaktiota odottava asia (joku muu jätti tämän
+// sinulle), ei "uusi tieto" yleisesti. Oma lisäys ei kerrytä omaa palluraa,
+// koska et tarvitse muistutusta omasta juuri kirjoittamastasi rivistä.
+// Pallura katoaa kun rivi SIJOITETAAN (reagoitu), ei kun Laituri vain
+// avataan — tarkempi kuin aiempi "nähty"-aikaleimapohjainen laskuri
+// (korvattu, ks. muistiinpanot.md "Huomiopallurat"-osio).
 async function paivitaLaituriBadge() {
+  const { count } = await db.from('laituri').select('id', { count: 'exact', head: true })
+    .eq('status', 'uusi').neq('user_id', currentUserId);
+  huomioPallurat.laituri = count || 0;
+
   const badge = document.querySelector('.tile-badge[data-osio-key="laituri"]');
-  if (!badge) return;
-  const viimeksiAvattu = localStorage.getItem(LAITURI_NAHTY_KEY) || '1970-01-01T00:00:00.000Z';
-  const { count } = await db.from('laituri').select('id', { count: 'exact', head: true }).gt('created_at', viimeksiAvattu);
-  if (count) {
-    badge.textContent = count;
-    badge.style.display = 'flex';
-  } else {
-    badge.style.display = 'none';
+  if (badge) {
+    if (huomioPallurat.laituri) {
+      badge.textContent = huomioPallurat.laituri;
+      badge.style.display = 'flex';
+    } else {
+      badge.style.display = 'none';
+    }
   }
+  paivitaSovelluskuvakeBadge();
 }
 
 // Näyttää Laituri-näkymän sisällä kuinka monta riviä odottaa yhä sijoittamista
@@ -3192,6 +3226,25 @@ document.getElementById('new-list-input').addEventListener('keydown', function(e
 const realtimeChannel = db.channel('tuotteet')
   .on('postgres_changes', { event: '*', schema: 'public', table: 'tuotteet' }, () => {
     if (currentList) lataaLista();
+  })
+  .subscribe();
+
+// Huomiopallurat elävät ilman sivun päivitystä (2026-07-13) — sama
+// Realtime-mekanismi kuin tuotteet-kanavalla. Vaatii Replication päällä
+// laituri/kalenteri_tapahtumat/kalenteri_kuittaukset-tauluille
+// (sql/034_realtime_huomiopallurat.sql).
+const laituriRealtimeChannel = db.channel('laituri-pallura')
+  .on('postgres_changes', { event: '*', schema: 'public', table: 'laituri' }, () => {
+    paivitaLaituriBadge();
+  })
+  .subscribe();
+
+const kalenteriPalluraChannel = db.channel('kalenteri-pallura')
+  .on('postgres_changes', { event: '*', schema: 'public', table: 'kalenteri_tapahtumat' }, () => {
+    paivitaKuittausTila();
+  })
+  .on('postgres_changes', { event: '*', schema: 'public', table: 'kalenteri_kuittaukset' }, () => {
+    paivitaKuittausTila();
   })
   .subscribe();
 

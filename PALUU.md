@@ -70,6 +70,7 @@ Supabase-projektin sivulta: vasemmalta **SQL Editor** → **New query** → liim
 7. `sql/031_kalenteri_juha_nimikorjaus.sql` — korjaa 030:n jälkeen löytyneen nimiongelman (jaettu kalenteri näkyy Juhan tilillä nimellä "Yhteinen kalenteri", ei "Perhekalenteri" + Juhan oma yksityinen kalenteri nimetty "Oma") — ks. OSA E, tavoite synkan jälkeen: JSON näyttää 8 syötettä, 0 virhettä
 8. `sql/033_hytti_omistajat_juha.sql` — lisää Juhan rivin `hytti_omistajat`-tauluun AUTOMAATTISESTI (hakee hänen auth-tunnisteensa sähköpostilla `auth.users`-taulusta, ei vaadi UUID:n kopiointia) — **AJA TÄMÄ ENNEN kohtaa 9** (`sql/032`), koska 032 tarvitsee tämän rivin toimiakseen
 9. `sql/032_juha_oma_hytti_scope.sql` — Juhan "Oma"-kalenteri Hytin scopeen (ks. OSA E)
+10. `sql/034_realtime_huomiopallurat.sql` — ottaa Supabase Realtime -Replication-julkaisun käyttöön `laituri`/`kalenteri_tapahtumat`/`kalenteri_kuittaukset`-tauluille (ks. OSA H) — TÄYSIN ERILLINEN muista, voit ajaa tämän vaikka jättäisit muut väliin
 
 ~~Tärkeä käsin täytettävä kohta migraation 027 jälkeen~~ — **KORVATTU 2026-07-13:** `hytti_omistajat`-taulu vaati Juhan rivin (`henkilo='juha'` → hänen auth-tunnisteensa), mutta `sql/027` loi vain Katrin rivin valmiiksi. Alunperin ohjeistettu lisäämään käsin Table Editorista, mutta tämä korvattiin `sql/033`:lla joka hakee tunnisteen automaattisesti sähköpostilla — ei tarvitse enää kopioida mitään UUID:ta käsin.
 
@@ -162,6 +163,22 @@ Ei vaadi mitään uutta migraatiota tai asetusta — käyttää samaa `ANTHROPIC
 4. Paina **Sopii** — pitäisi avautua sama "Minne sijoitit tämän?" -kysymys jota →-nappikin käyttää, mutta äly-ehdotus jo kirjoitettuna kenttään valmiiksi. Voit muokata tekstiä tai hyväksyä sellaisenaan — **mikään ei siirry mihinkään automaattisesti**, vasta kun painat OK tässä kysymyksessä.
 5. Kokeile myös **Ei** — kortti katoaa, rivi pysyy sijoittamattomana, ei mitään tallenneta.
 6. Tarkista ettei ✨-nappia paina mikään AUTOMAATTISESTI (esim. sivun lataus, haku) — sen pitäisi reagoida VAIN suoraan napin painallukseen.
+
+---
+
+---
+
+## OSA H — Testaa Huomiopallurat (riippumaton kaikesta muusta)
+
+Vaatii `sql/034_realtime_huomiopallurat.sql` ajettuna (ks. OSA A kohta 10) — ilman sitä Realtime-päivitykset eivät laukea, vaikka etusivun avaus laskee luvut silti oikein.
+
+1. Kahdella tilillä yhtä aikaa (Katri + Juha): Juha lisää menon kalenteriin → Katrin Etusivun Kalenteri-laattaan pitäisi ilmestyä kultainen pallura muutaman sekunnin sisällä, ILMAN että Katri päivittää sivua.
+2. Katri avaa Kalenterin ja painaa "Kuittaa kaikki" → pallura katoaa Kalenteri-laatasta.
+3. Juha kirjoittaa uuden ajatuksen Laituriin → Katrin Laituri-laattaan ilmestyy pallura. **Juhan OMALLE etusivulle EI ilmesty palluraa** hänen omasta lisäyksestään.
+4. Katri sijoittaa sen rivin ("→"-nappi, mikä tahansa kohde kelpaa) → pallura pienenee/katoaa Laituri-laatasta.
+5. Kun molemmat luvut ovat nollassa, tarkista ettei laatoissa näy palluraa OLLENKAAN (ei pyöreää "0"-merkkiä, ei mitään).
+6. Jos puhelin on asennettu kotinäytölle (iOS 16.4+): tarkista että sovelluskuvakkeen oikeassa yläkulmassa näkyy numero (kahden palluran summa) kun jompikumpi on > 0, ja katoaa kokonaan kun molemmat on kuitattu/sijoitettu.
+7. **Tunnettu rajaus, ei bugi:** jos push-ilmoitus tulee kun sovellus on kokonaan suljettu, sovelluskuvakkeen numero EI päivity siitä pushista itsestään — se päivittyy vasta kun joku avaa sovelluksen (Realtime/lataus laskee sen silloin). Tämä on tietoinen rajaus, ks. muistiinpanot.md "Huomiopallurat"-osio.
 
 ---
 
