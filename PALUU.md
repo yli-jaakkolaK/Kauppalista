@@ -2,7 +2,7 @@
 
 **Päivitetty 2026-07-13 illalla, Katrin käsityöpäivän jälkeen: asennusvaihe on VALMIS.** Kaikki Supabase/Vercel/GitHub-puolen asetukset ja migraatiot (paitsi mahdollisesti sql/035, ks. alla) on nyt tehty käsin — tämä tiedosto on siis enää TESTIPÄIVÄN AJOLISTA, ei asennusohje. Jos joskus tarvitset asennusaskeleet uudelleen (esim. avain vaihtuu, uusi kehityskone), yksityiskohdat on säilytetty kunkin osion sisällä.
 
-**Yksi totuus -huomautus:** Katrilla on myös ERILLINEN kahden puhelimen testilista-tiedosto tämän ulkopuolella. Tästä eteenpäin PALUU.md on KANONINEN testilista — jos erillisessä tiedostossa on jotain mitä tästä puuttuu, kerro Claudelle/Copilotille mitä, niin se lisätään tänne, ja erillinen tiedosto voidaan sen jälkeen jättää käytöstä. Älä ylläpidä kahta eriävää listaa rinnakkain.
+**Yksi totuus -huomautus (päivitetty):** aiemmin täällä kysyttiin erillisen kahden puhelimen testilista-tiedoston perään — se oli itse asiassa tämä sama lista, nyt viety Satamaan itseensä. **Itse torstain testit täpätään Sataman jaetusta "Testipäivä to 16.7." -listasta** (Muistilaput, `sql/036_testipaiva_lista.sql`) — se on lyhyt, rivi per tarkistuskohta, väliotsikoin osittain. **PALUU.md pysyy tämän RINNALLA yksityiskohtaisena teknisenä referenssinä** (tarkat askeleet per testi) — jos Satama-listan rivi ei täsmää tai jää epäselväksi, tarkista sama asia täältä täydellä kuvauksella.
 
 ---
 
@@ -25,6 +25,18 @@ Täysi ohje (asennus, mistä yhteysosoite löytyy) on **BACKUP.md**:ssä.
 **✓ sql/001–034 KAIKKI AJETTU Supabasessa** (Katri, käsityöpäivä) — ei enää mitään ajettavaa tästä välistä normaalilla testauskierroksella.
 
 **⚠ sql/035_ohjeet_vinkit.sql — EI VARMISTETTU AJETUKSI.** Tämä on uusin (rakennettu samaan aikaan kun 001–034 ajettiin käsin, joten saattoi jäädä väliin). Tarkista: avaa Asetukset → "💡 Vinkit" -osio. Jos siellä on 10 riviä (viimeisenä "tarkista iPhonen oletuskalenteri..."), 035 on jo ajettu — ei tarvitse tehdä mitään. Jos siellä ei näy MITÄÄN riviä (tyhjä), aja `sql/035_ohjeet_vinkit.sql` SQL Editorista, ks. myös OSA K alla.
+
+**⚠ sql/036_testipaiva_lista.sql — UUSI, AJA ENNEN TORSTAITA.** Luo jaetun "Testipäivä to 16.7." -listan Muistilappuihin (Satamaan itseensä, ei vain tähän tiedostoon) — ks. yllä oleva "Yksi totuus" -huomautus. Idempotentti, voi ajaa uudelleen jos sanamuotoja pitää korjata (poistaa+luo listan puhtaana joka kerta — HUOM: nollaa myös mahdolliset täpätyt rivit, älä siis aja uudelleen kesken testipäivän).
+
+**⚠ sql/037/038 — pakkauslistojen sisältö, ODOTTAA Katrin antamaa rivisisältöä** (ks. alempana "Pakkauslistat — odottaa sisältöä").
+
+---
+
+## Pakkauslistat — odottaa sisältöä
+
+"Telttaretken pakkauslista" ja "Viikon reissun pakkauslista" ovat olemassa Varastossa (`sql/010_varasto.sql`, jaettuja, omistaja Katri) mutta TYHJINÄ — rivit jätettiin tietoisesti viemättä silloin (priorisointi). Katri pyysi täyttämään ne nyt varhaisista luonnoksista (`telttaretken_pakkauslista.sql` / `viikon_pakkauslista.sql`) tai muistiinpanoista, mutta **kumpaakaan lähdettä ei löytynyt tästä repositoriosta eikä koneen tiedostoista** (haettu läpi Documents/Desktop/Downloads/iCloud Drive) — muistiinpanot.md ei myöskään sisällä koskaan kirjattuja rivisisältöjä, vain listojen olemassaolon.
+
+**Odottaa Katrin antamaa sisältöä** (liitä rivit suoraan viestiin, tai kerro missä luonnostiedostot oikeasti ovat) — sitten kirjoitetaan `sql/037_telttaretki_pakkauslista_sisalto.sql` ja `sql/038_viikkopakkaus_sisalto.sql`, idempotentteina (täyttävät VAIN jos lista on tyhjä, eivät duplikoi jos rivejä on jo).
 
 ---
 
