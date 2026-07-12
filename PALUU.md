@@ -28,15 +28,11 @@ Täysi ohje (asennus, mistä yhteysosoite löytyy) on **BACKUP.md**:ssä.
 
 **⚠ sql/036_testipaiva_lista.sql — UUSI, AJA ENNEN TORSTAITA.** Luo jaetun "Testipäivä to 16.7." -listan Muistilappuihin (Satamaan itseensä, ei vain tähän tiedostoon) — ks. yllä oleva "Yksi totuus" -huomautus. Idempotentti, voi ajaa uudelleen jos sanamuotoja pitää korjata (poistaa+luo listan puhtaana joka kerta — HUOM: nollaa myös mahdolliset täpätyt rivit, älä siis aja uudelleen kesken testipäivän).
 
-**⚠ sql/037/038 — pakkauslistojen sisältö, ODOTTAA Katrin antamaa rivisisältöä** (ks. alempana "Pakkauslistat — odottaa sisältöä").
+**⚠ sql/037_telttaretki_pakkauslista_sisalto.sql — UUSI.** Täyttää "Telttaretken pakkauslista" (93 riviä, 6 väliotsikkoa: Yhteiset varusteet/Jamiel/Rebekka/Katri/Juha/Ruoka) sisällöllä Katrin toimittamasta luonnoksesta. Idempotentti eri tavalla kuin 036: täyttää VAIN jos lista on tyhjä, EI poista/korvaa olemassa olevaa.
+
+**⚠ sql/038_viikkopakkaus_sisalto.sql — UUSI, NIMIHUOMAUTUS.** Täyttää "Viikon reissun pakkauslista" (38 riviä, ei väliotsikoita) sisällöllä. **Katrin antamassa otsikossa listan nimi oli "Viikon pakkauslista leirikeskukseen"** — ERI TEKSTI kuin tietokannassa jo oleva nimi. Migraatio hakee listan sen NYKYISELLÄ tallennetulla nimellä ("Viikon reissun pakkauslista"), koska tehtävä oli täyttää olemassa oleva lista, ei luoda uutta. **Jos haluat kuvaavamman nimen käyttöön, vaihda se itse ✎-napista Muistilaput/Varasto-näkymässä** — ei tehty automaattisesti tässä.
 
 ---
-
-## Pakkauslistat — odottaa sisältöä
-
-"Telttaretken pakkauslista" ja "Viikon reissun pakkauslista" ovat olemassa Varastossa (`sql/010_varasto.sql`, jaettuja, omistaja Katri) mutta TYHJINÄ — rivit jätettiin tietoisesti viemättä silloin (priorisointi). Katri pyysi täyttämään ne nyt varhaisista luonnoksista (`telttaretken_pakkauslista.sql` / `viikon_pakkauslista.sql`) tai muistiinpanoista, mutta **kumpaakaan lähdettä ei löytynyt tästä repositoriosta eikä koneen tiedostoista** (haettu läpi Documents/Desktop/Downloads/iCloud Drive) — muistiinpanot.md ei myöskään sisällä koskaan kirjattuja rivisisältöjä, vain listojen olemassaolon.
-
-**Odottaa Katrin antamaa sisältöä** (liitä rivit suoraan viestiin, tai kerro missä luonnostiedostot oikeasti ovat) — sitten kirjoitetaan `sql/037_telttaretki_pakkauslista_sisalto.sql` ja `sql/038_viikkopakkaus_sisalto.sql`, idempotentteina (täyttävät VAIN jos lista on tyhjä, eivät duplikoi jos rivejä on jo).
 
 ---
 
