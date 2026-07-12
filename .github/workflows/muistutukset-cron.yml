@@ -4,8 +4,13 @@ name: Muistutusten ja kalenterisynkan ajastin
 # muistiinpanot.md "Kalenterisyötteet"-osion "Vercel Cron ei ole käytössä").
 # GitHub Actions -scheduled workflow toimii ulkoisena 5 min -pingaajana
 # ilmaiseksi: kutsuu /api/muistutukset-laheta (lähettää erääntyneet
-# muistutukset) ja /api/caldav-sync (pitää kalenterisynkan tuoreena myös
-# silloin kun kukaan ei ole avannut sovellusta).
+# muistutukset), /api/caldav-sync (pitää kalenterisynkan tuoreena myös
+# silloin kun kukaan ei ole avannut sovellusta) ja /api/aly-nightly
+# (E3-keskiportaan yöajo — ehdottaa ankkuriehdokkaita Laiturin muruista,
+# ks. muistiinpanot.md "E3-keskiporras" -osio). aly-nightly tekee itse
+# työtä vain kerran ~20h välein (tila asetukset-taulussa) vaikka tätä
+# workfow'ta pingataan 5 min välein — sama jaettu MUISTUTUKSET_CRON_SECRET
+# uudelleenkäytetty, ei vaadi uutta salaisuutta.
 #
 # HUOM: GitHub Actionsin cron-aikataulu on "parhaan yrityksen" periaatteella
 # — GitHub voi viivästyttää ajoa ruuhka-aikoina. Muistutusten ±5 min
@@ -26,3 +31,6 @@ jobs:
       - name: Synkkaa kalenteri
         run: |
           curl -fsS "https://kauppalista-nine.vercel.app/api/caldav-sync" || true
+      - name: Aja E3-keskiportaan yöajo (tekee itse vain kerran ~20h välein)
+        run: |
+          curl -fsS "https://kauppalista-nine.vercel.app/api/aly-nightly?key=${{ secrets.MUISTUTUKSET_CRON_SECRET }}" || true

@@ -193,6 +193,7 @@ function paivitaNakyvyysIkoni() {
 async function lataaKotinakyma() {
   lataaOsiot();
   lataaAnkkurit();
+  loadAnchorCandidates();
   paivitaPaivamaara();
 }
 
@@ -1829,7 +1830,10 @@ let ankkuritKaikkiNakyvissa = false;
 // kysely suodattaa done=false — ei tarvita erillistä "ylennyslogiikkaa".
 async function lataaAnkkurit() {
   if (raahattavaRivi) return;
-  const { data, error } = await db.from('ankkurit').select().eq('done', false).eq('user_id', currentUserId).order('sort_order');
+  // is_candidate-rivit (E3-keskiportaan AI-ehdotukset, ks. loadAnchorCandidates())
+  // EIVÄT kuulu tähän listaan eivätkä "3 tärkeintä" -rajaan — ne näytetään
+  // erikseen omana ryhmänään ehdotusten hyväksymistä varten.
+  const { data, error } = await db.from('ankkurit').select().eq('done', false).eq('is_candidate', false).eq('user_id', currentUserId).order('sort_order');
   if (error) {
     console.error('Ankkureiden haku epäonnistui:', error);
     return;
@@ -1904,6 +1908,72 @@ async function lataaAnkkurit() {
   }
 }
 
+// E3 mid-tier V1 ("äly toimii, ihminen valvoo", ks. muistiinpanot.md) — AI-
+// suggested anchor candidates, shown BELOW the real anchors, never inside
+// the "3 most important" limit. New code, English names (house rule, ks.
+// COPILOT.md "Koodikieli"). Three reactions: tick done (reuses the anchor
+// row's own semantics), take as mine (promotes it to a real anchor,
+// is_candidate -> false), or dismiss (deletes it — the underlying Laituri
+// note is NEVER touched, ks. safety invariant in api/aly-nightly.js).
+async function loadAnchorCandidates() {
+  if (raahattavaRivi) return;
+  const { data, error } = await db.from('ankkurit').select()
+    .eq('user_id', currentUserId).eq('source', 'aly').eq('is_candidate', true).eq('done', false)
+    .order('created_at');
+  if (error) {
+    console.error('Ankkuriehdokkaiden haku epäonnistui:', error);
+    return;
+  }
+
+  const listEl = document.getElementById('anchor-candidates-list');
+  listEl.innerHTML = '';
+
+  (data || []).forEach(function(candidate) {
+    const li = document.createElement('li');
+
+    const checkButton = document.createElement('button');
+    checkButton.textContent = '○';
+    checkButton.className = 'check-btn';
+    checkButton.addEventListener('click', async function() {
+      tuntopalauteValmis();
+      const { error } = await db.from('ankkurit').update({ done: true, done_at: new Date().toISOString() }).eq('id', candidate.id);
+      if (error) console.error('Ankkuriehdokkaan merkintä epäonnistui:', error);
+      loadAnchorCandidates();
+    });
+    li.appendChild(checkButton);
+
+    const text = document.createElement('span');
+    text.textContent = '✨ ' + candidate.content;
+    li.appendChild(text);
+
+    const acceptButton = document.createElement('button');
+    acceptButton.textContent = '⚓';
+    acceptButton.className = 'anchor-btn';
+    acceptButton.title = 'Ota omaksi ankkuriksi';
+    acceptButton.addEventListener('click', async function() {
+      const { error } = await db.from('ankkurit').update({ is_candidate: false }).eq('id', candidate.id);
+      if (error) console.error('Ankkuriehdokkaan hyväksyntä epäonnistui:', error);
+      loadAnchorCandidates();
+      lataaAnkkurit();
+    });
+    li.appendChild(acceptButton);
+
+    const dismissButton = document.createElement('button');
+    dismissButton.textContent = '×';
+    dismissButton.className = 'delete-btn';
+    dismissButton.title = 'Poista ehdotus';
+    dismissButton.addEventListener('click', async function() {
+      const { error } = await db.from('ankkurit').delete().eq('id', candidate.id);
+      if (error) console.error('Ankkuriehdokkaan poisto epäonnistui:', error);
+      await db.from('aly_log').update({ undone_at: new Date().toISOString() }).eq('anchor_id', candidate.id).is('undone_at', null);
+      loadAnchorCandidates();
+    });
+    li.appendChild(dismissButton);
+
+    listEl.appendChild(li);
+  });
+}
+
 // Hakee etusivun osiot (Laituri, Ankkurit, ym.) ja piirtää ne geneerisesti —
 // osiot tulevat tietokannasta (nimi, ikoni, reitti, järjestys), ei kovakoodattuina
 async function lataaOsiot() {
@@ -1951,6 +2021,7 @@ async function lataaOsiot() {
 
   paivitaLaituriBadge();
   paivitaKuittausTila();
+  updateSettingsBadge();
 }
 
 // Avaa osion sen route-kentän mukaan. Vain 'laituri' on toistaiseksi toiminnallinen.
@@ -1980,6 +2051,8 @@ function avaaOsio(osio) {
     paivitaPushTila();
     paivitaSovellusTiedot();
     lataaVinkit();
+    loadAiLog();
+    markAiLogSeen();
     paivitaAsetukset().then(function() {
       document.getElementById('kuormaraja-input').value = haeAsetusNumero('paivan_menoraja', 5);
     });
@@ -1998,10 +2071,11 @@ function avaaOsio(osio) {
 // käyttäjä on reagoinut (ei kun hän on vain "nähnyt"). Jokainen uusi
 // palluralähde perustellaan erikseen tähän — ei automaattisesti kaikelle.
 // V1: kalenteri (kuittausjono, ks. paivitaKuittausTila()) + laituri
-// (toisen käyttäjän 'uusi'-tilaiset rivit, ks. alla). Muille laatoille EI
-// palluraa vielä (rakenne on laajennettavissa, esim. tuleva
-// ristiriitalippu lisätään samaan `huomioPallurat`-kartaan kun se rakennetaan).
-let huomioPallurat = { kalenteri: 0, laituri: 0 };
+// (toisen käyttäjän 'uusi'-tilaiset rivit, ks. alla) + asetukset
+// (näkemättömät "Mitä äly on tehnyt" -lokirivit, ks. updateSettingsBadge()
+// alla — ensimmäinen laajennus tähän karttaan, E3-keskiporras 2026-07-13).
+// Muille laatoille EI palluraa vielä.
+let huomioPallurat = { kalenteri: 0, laituri: 0, asetukset: 0 };
 
 // Päivittää iOS:n kotinäytön PWA-kuvakkeen numeron (Badging API, iOS 16.4+)
 // kaikkien huomiopallurien summaksi. Feature-detect — jos API:a ei ole
@@ -2009,7 +2083,7 @@ let huomioPallurat = { kalenteri: 0, laituri: 0 };
 // käyttäjälle. Kutsutaan aina kun jompikumpi pallura päivittyy.
 async function paivitaSovelluskuvakeBadge() {
   if (!('setAppBadge' in navigator)) return;
-  const summa = huomioPallurat.kalenteri + huomioPallurat.laituri;
+  const summa = huomioPallurat.kalenteri + huomioPallurat.laituri + huomioPallurat.asetukset;
   try {
     if (summa > 0) {
       await navigator.setAppBadge(summa);
@@ -2078,6 +2152,109 @@ async function paivitaLaituriBadge() {
     }
   }
   paivitaSovelluskuvakeBadge();
+}
+
+// Asetukset-laatan pallura: E3-keskiportaan "Mitä äly on tehnyt" -lokirivit
+// joita EI OLE VIELÄ NÄHTY — sama "nähty"-aikaleimamalli kuin Laiturin
+// pallura (per-käyttäjä tietokantarivi, ei localStorage). Lokiosion avaus
+// (Asetukset) nollaa. New code, English names (ks. COPILOT.md "Koodikieli").
+let aiLogLastSeen = null;
+
+async function getAiLogLastSeen() {
+  const { data, error } = await db.from('aly_log_seen').select('last_seen').eq('user_id', currentUserId).maybeSingle();
+  if (error) {
+    console.error('Äly-lokin nähty-ajan haku epäonnistui:', error);
+    return null;
+  }
+  return data ? data.last_seen : null;
+}
+
+async function markAiLogSeen() {
+  const now = new Date().toISOString();
+  const { error } = await db.from('aly_log_seen').upsert({ user_id: currentUserId, last_seen: now }, { onConflict: 'user_id' });
+  if (error) {
+    console.error('Äly-lokin nähty-ajan tallennus epäonnistui:', error);
+    return;
+  }
+  aiLogLastSeen = now;
+  updateSettingsBadge();
+}
+
+async function updateSettingsBadge() {
+  if (aiLogLastSeen === null) {
+    aiLogLastSeen = await getAiLogLastSeen();
+  }
+  const cutoff = aiLogLastSeen || '1970-01-01T00:00:00.000Z';
+
+  const { count } = await db.from('aly_log').select('id', { count: 'exact', head: true })
+    .eq('user_id', currentUserId).gt('created_at', cutoff);
+  huomioPallurat.asetukset = count || 0;
+
+  const badge = document.querySelector('.tile-badge[data-osio-key="asetukset"]');
+  if (badge) {
+    if (huomioPallurat.asetukset) {
+      badge.textContent = huomioPallurat.asetukset;
+      badge.style.display = 'flex';
+    } else {
+      badge.style.display = 'none';
+    }
+  }
+  paivitaSovelluskuvakeBadge();
+}
+
+// Piirtää "Mitä äly on tehnyt" -lokin Asetuksiin, uusin ensin. Rivit eivät
+// koskaan katoa (loki on pysyvä historia) — kumottu rivi jää näkyviin
+// yliviivattuna ilman Kumoa-nappia, ei piiloteta.
+async function loadAiLog() {
+  const { data, error } = await db.from('aly_log').select().eq('user_id', currentUserId).order('created_at', { ascending: false });
+  if (error) {
+    console.error('Äly-lokin haku epäonnistui:', error);
+    return;
+  }
+
+  const listEl = document.getElementById('aly-log-list');
+  const emptyEl = document.getElementById('aly-log-tyhja');
+  listEl.innerHTML = '';
+
+  if (!data || data.length === 0) {
+    emptyEl.style.display = 'block';
+    return;
+  }
+  emptyEl.style.display = 'none';
+
+  data.forEach(function(entry) {
+    const row = document.createElement('div');
+    row.className = 'aly-log-rivi' + (entry.undone_at ? ' aly-log-kumottu' : '');
+
+    const text = document.createElement('span');
+    text.className = 'aly-log-teksti';
+    text.textContent = entry.description;
+    row.appendChild(text);
+
+    const time = document.createElement('span');
+    time.className = 'aly-log-aika';
+    time.textContent = suhteellinenAika(entry.created_at);
+    row.appendChild(time);
+
+    if (!entry.undone_at) {
+      const undoButton = document.createElement('button');
+      undoButton.textContent = 'Kumoa';
+      undoButton.className = 'aly-log-kumoa-btn';
+      undoButton.addEventListener('click', async function() {
+        if (entry.anchor_id) {
+          await db.from('ankkurit').delete().eq('id', entry.anchor_id);
+        }
+        const { error } = await db.from('aly_log').update({ undone_at: new Date().toISOString() }).eq('id', entry.id);
+        if (error) console.error('Äly-lokin kumoaminen epäonnistui:', error);
+        loadAiLog();
+        loadAnchorCandidates();
+        lataaAnkkurit();
+      });
+      row.appendChild(undoButton);
+    }
+
+    listEl.appendChild(row);
+  });
 }
 
 // Näyttää Laituri-näkymän sisällä kuinka monta riviä odottaa yhä sijoittamista

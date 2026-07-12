@@ -27,6 +27,7 @@
     <div class="section-title">⚓ Ankkurit</div>
     <ul class="list" id="ankkurit-list"></ul>
     <p class="section-link" id="ankkurit-laajenna" style="display:none"></p>
+    <ul class="list" id="anchor-candidates-list"></ul>
     <div class="add-item">
       <span class="prefix">›</span>
       <input type="text" id="ankkurit-input" placeholder="uusi ankkuri...">
@@ -261,6 +262,12 @@
       <span>Varoitusmerkki päivälle jolla vähintään N kellonaikamenoa</span>
       <input type="number" class="settings-numero-input" id="kuormaraja-input" min="1" step="1">
     </div>
+
+    <hr class="divider">
+
+    <div class="section-title">✨ Mitä äly on tehnyt</div>
+    <p class="section-empty" id="aly-log-tyhja" style="display:none">Ei vielä mitään.</p>
+    <div class="aly-log-list" id="aly-log-list"></div>
   </div>
 
   <div class="container" id="laituri-view" style="display:none">

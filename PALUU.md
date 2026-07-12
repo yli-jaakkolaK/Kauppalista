@@ -36,6 +36,8 @@ Täysi ohje (asennus, mistä yhteysosoite löytyy) on **BACKUP.md**:ssä.
 
 **⚠ sql/040_laituri_nahty.sql — UUSI, AJA ENNEN Laituri-palluran testausta.** Luo `laituri_nahty`-taulun (per-käyttäjä "viimeksi avattu" -aikaleima) — korjaa bugin jossa Laituri-pallura ei koskaan sammunut pysyvästi (ks. OSA N alla).
 
+**⚠ sql/041–043 — UUSIA, E3-KESKIPORRAS, AJA ENNEN OSA O:ta (VIIMEISENÄ testattava, ei kiireellinen ennen sitä).** `041_aly_nightly_setup.sql` (asetukset.aly_yoajo-kytkin + ankkurit.is_candidate), `042_aly_log_evaluated.sql` (aly_log + aly_evaluated -taulut), `043_aly_log_seen.sql` (Asetukset-laatan pallura). Kolme erillistä tiedostoa, aja järjestyksessä 041→042→043 (ei riippuvuutta väliltä paitsi että kaikki kolme tarvitaan ennen OSA O:n testausta).
+
 ---
 
 ## OSA A — Muistutusten ajastin
@@ -259,6 +261,22 @@ Ajastin (OSA A) on jo VIHREÄ ja pyörii — tämä testaa itse push-ilmoituksen
 5. Poista rivi/tapahtuma jolla oli muistutus — tarkista Table Editorista (`muistutukset`-taulu) että sen rivi katosi mukana.
 6. Laitteella jolla push EI ole käytössä: ⏰-paneelin pitäisi näyttää ohje + "Asetuksiin"-nappi lomakkeen sijaan.
 7. Testaa MOLEMMILLA puhelimilla erikseen — kummankin pitäisi saada oma muistutuksensa riippumatta toisesta.
+
+---
+
+## OSA O — Testaa E3-keskiporras V1 "Äly toimii, ihminen valvoo" (VIIMEISENÄ — vasta kun VAIHE 2:n muut osat on kuitattu)
+
+Uusi ominaisuus, rakennettu ja pushattu 15.7. Aja **`sql/041`, `sql/042`, `sql/043`** ennen tätä (ks. Migraatiot-tila yllä). Tämä ei aiheuta mitään ilman että Laiturissa on ainakin yksi selvästi tähän-päivään/huomiseen viittaava, sijoittamaton muru JA yöajo on ehtinyt käydä (ajastin pyörii 5 min välein mutta yöajo itse tekee työtä vain ~20h välein — voit laukaista sen käsin heti testiä varten, ks. kohta 1).
+
+1. Kirjoita Laituriin ilta-testinä muru selvällä ajanmääreellä, esim. **"testi: huomenna klo 15 asia X"**. Jätä sijoittamatta.
+2. Laukaise yöajo käsin (ei tarvitse odottaa oikeaa yötä): GitHub-repo → **Actions** → "Muistutusten ja kalenterisynkan ajastin" → **Run workflow**. (Jos edellisestä ajosta on alle 20h, yöajo toteaa "ei vielä ajankohtainen" eikä tee mitään — odota siinä tapauksessa seuraavaan luonnolliseen ajoon, tai kerro Claudelle/Copilotille niin `MIN_HOURS_BETWEEN_RUNS`-arvoa voi tilapäisesti pienentää testiä varten.)
+3. **Etusivu:** Ankkurien alle pitäisi ilmestyä ✨-merkillä varustettu ehdokasrivi ("✨ testi: huomenna klo 15 asia X" tms. äly-putken muotoilemana). EI saa näkyä "3 tärkeintä" -rajan sisällä eikä vaikuttaa siihen mitä 3 ankkuria näkyy.
+4. **Asetukset → "✨ Mitä äly on tehnyt":** pitäisi näkyä uusi lokirivi kuvauksella + suhteellinen aika + [Kumoa]-nappi. Asetukset-laatan pitäisi näyttää kultainen pallura kotiruudukossa ENNEN kuin avaat Asetukset, ja sammua avaamisen jälkeen.
+5. Kokeile kaikki kolme reaktiota etusivun ehdokasrivillä ERI testimuruilla (tee tarvittaessa useampi testimuru + yöajo): (a) täppää ○ → rivi merkitään tehdyksi normaalisti; (b) paina ⚓ ("ota omaksi") → rivi katoaa ehdokkaista ja ilmestyy tavallisiin ankkureihin; (c) paina × ("poista") → rivi katoaa kokonaan.
+6. **Kumoa-testi:** paina Asetuksista jonkin (yhä aktiivisen, ei-kumotun) lokirivin [Kumoa]-nappia — vastaava ankkuririvi (jos yhä olemassa missä tahansa tilassa) pitäisi kadota, ja lokirivi jää näkyviin yliviivattuna ilman Kumoa-nappia.
+7. **Tärkein tarkistus — turvainvariantti:** koko testin ajan alkuperäinen Laiturin muru ("testi: huomenna klo 15 asia X") pysyy Laiturissa TÄYSIN KOSKEMATTOMANA (ei muokattu, ei poistettu, ei sijoitettu) riippumatta mitä ehdokkaalle/ankkurille tehtiin.
+8. **Raukeamistesti (vaatii kaksi yöajoa n. vuorokauden välein, voi jättää myöhemmäksi):** jos ehdokasta ei reagoida mitenkään ennen seuraavaa yöajoa, sen pitäisi hävitä hiljaa ilman virhettä — muru säilyy Laiturissa, lokirivi jää (yliviivattuna), ja jos muru on yhä ajankohtainen, uusi ehdotus on mahdollinen.
+9. Jos jokin epäonnistuu: tarkista Vercelin Logs-välilehdeltä `/api/aly-nightly`-kutsun vaste ja `[aly-nightly]`-lokirivit — ne kertovat tarkalleen missä vaiheessa (kytkin pois, ei vielä ajankohtainen, ei kelvollisia muruja, Anthropic-virhe) juuttui.
 
 ---
 

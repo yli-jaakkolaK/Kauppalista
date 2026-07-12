@@ -91,6 +91,13 @@ Täysi toteutus: `script.js`:n `pyydaLaituriEhdotus()`/`piirraLaituriEhdotusKort
 
 Kummassakin tapauksessa: **kopioi auth-kaava ja virheenkäsittely `api/aly.js`:stä sellaisenaan**, älä keksi niitä uudelleen.
 
+**C) Ajastettu (cron-pohjainen) taustatyö**, jos ominaisuus EI reagoi käyttäjän omaan napin painallukseen vaan ajaa itsestään taustalla (esim. yöllinen haku) — TOTEUTETTU ensimmäisen kerran `api/aly-nightly.js`:ssä (E3-keskiporras, ks. muistiinpanot.md). Eri auth-malli kuin A/B, koska kutsuja on GitHub Actions -cron, ei kirjautunut selainkäyttäjä:
+- **EI JWT-validointia** (`haeKayttajaId()`) — sen sijaan jaettu salaisuus URL:ssa (`?key=...`), sama kaava kuin `api/muistutukset-laheta.js`:ssä. Käytä olemassa olevaa `MUISTUTUKSET_CRON_SECRET`-salaisuutta uudelleen jos mahdollista (yksi salaisuus vähemmän Katrin ylläpidettäväksi) sen sijaan että loisit uuden joka kerta.
+- **`SUPABASE_SERVICE_KEY` (service_role) suoraan REST-kutsuissa**, ei supabase-js-kirjastoa — sama `supabaseFetch()`-helperi-kaava kuin `muistutukset-laheta.js`:ssä, kopioi sieltä.
+- **Kutsu SAMASTA GitHub Actions -ajastimesta** (`.github/workflows/muistutukset-cron.yml`, 5 min välein) lisäämällä uusi `curl`-askel — ÄLÄ luo uutta erillistä workflow-tiedostoa jollei ajastustarve genuinesti eroa (esim. eri aikaväli).
+- **Jos ominaisuuden pitää tapahtua harvemmin kuin 5 min välein** (esim. kerran vrk:ssa): ÄLÄ yritä säätää GitHub Actionsin omaa cron-aikataulua tarkaksi (se on "parhaan yrityksen" periaatteella, ei tarkka). Sen sijaan tallenna oma "viimeksi ajettu" -tila `asetukset`-tauluun ja tarkista se endpointin ALUSSA (`if (tunnit_edellisestä < N) return`) — endpoint itse päättää onko sen aika toimia, ajastin vain "pingaa" usein. Tämä on kevyempi kuin oman cron-aikataulun rakentaminen ja toimii samalla ajastimella kuin kaikki muukin.
+- **Kytkin datana on suositeltava** jos taustatyö voi joskus tarvita sammuttamisen käytöksen yllättäessä (`asetukset`-taulun rivi, esim. `'on'`/`'off'`) — ei UI:ta pakosti, Table Editor -hallinnointi riittää useimmiten.
+
 ### Auth-kaava (kopioi tämä aina)
 
 ```js
