@@ -626,6 +626,64 @@ h1 {
   -webkit-tap-highlight-color: transparent;
 }
 
+/* Laituri-avustaja (2026-07-12, ensimmäinen oikea älyominaisuus) — sama
+   kokoluokka kuin muillakin rivinapeilla, ei omaa erikoisväriä (ei koristele
+   "tämä on äly" -tunnetta enempää kuin muutkaan toiminnot). */
+.aly-ehdotus-btn {
+  min-width: 44px;
+  min-height: 44px;
+  background: none;
+  border: none;
+  outline: none;
+  appearance: none;
+  -webkit-appearance: none;
+  font-size: 18px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  -webkit-tap-highlight-color: transparent;
+  opacity: 0.6;
+}
+
+.aly-ehdotus-btn:disabled {
+  opacity: 0.3;
+  cursor: default;
+}
+
+/* Äly-ehdotuskortti: kuittityylinen rivi Laiturin rivin alla, katkoviiva-
+   kehys tunnistaa sen MUODOSTA erilliseksi kuin varsinaiset Laituri-rivit
+   (ks. "Kalenterin merkkikieli"/"väri koristaa, musta kertoo" -periaate —
+   itse ehdotusteksti on informaatiota, täysi --text). */
+.laituri-ehdotus-rivi {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 10px;
+  margin: -1px 0 4px;
+  border: 1px dashed var(--border-dash);
+  border-radius: 4px;
+  font-size: 13px;
+  color: var(--text);
+}
+
+.laituri-ehdotus-virhe {
+  color: var(--muted);
+  font-style: italic;
+}
+
+.laituri-ehdotus-napit {
+  display: flex;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.laituri-ehdotus-napit .dialog-btn {
+  padding: 4px 10px;
+  font-size: 12px;
+}
+
 .subtitle {
   font-size: 14px;
   letter-spacing: 0.1em;

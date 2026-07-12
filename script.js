@@ -2037,18 +2037,20 @@ async function lataaLaituri(hakusana) {
     li.appendChild(sisalto);
 
     if (rivi.status !== 'sijoitettu') {
+      const alyNappi = document.createElement('button');
+      alyNappi.className = 'aly-ehdotus-btn';
+      alyNappi.textContent = '✨';
+      alyNappi.title = 'Kysy älyltä ehdotus mihin tämä kuuluisi';
+      alyNappi.addEventListener('click', function() {
+        pyydaLaituriEhdotus(rivi, alyNappi, li);
+      });
+      li.appendChild(alyNappi);
+
       const sijoitaNappi = document.createElement('button');
       sijoitaNappi.className = 'place-btn';
       sijoitaNappi.textContent = '→';
-      sijoitaNappi.addEventListener('click', async function() {
-        const minne = prompt('Minne sijoitit tämän?');
-        if (!minne || !minne.trim()) return;
-        const { error } = await db.from('laituri').update({ status: 'sijoitettu', placed_where: minne.trim() }).eq('id', rivi.id);
-        if (error) {
-          console.error('Sijoitus epäonnistui:', error);
-        }
-        lataaLaituri(document.getElementById('laituri-search').value.trim());
-        paivitaLaituriBadge();
+      sijoitaNappi.addEventListener('click', function() {
+        sijoitaLaituriRivi(rivi);
       });
       li.appendChild(sijoitaNappi);
     }
@@ -2070,6 +2072,151 @@ async function lataaLaituri(hakusana) {
 
     listEl.appendChild(li);
   });
+}
+
+// Sijoittaa Laiturin rivin ("minne sijoitit tämän?") — sama toiminto käytössä
+// sekä →-napista (tyhjä oletusarvo) että äly-ehdotuksen "Sopii"-napista
+// (esitäytetty ehdotettu kohde, jonka käyttäjä voi vielä muokata tai
+// hyväksyä sellaisenaan). Ei koskaan siirrä mitään automaattisesti.
+async function sijoitaLaituriRivi(rivi, oletusTeksti) {
+  const minne = prompt('Minne sijoitit tämän?', oletusTeksti || '');
+  if (!minne || !minne.trim()) return;
+  const { error } = await db.from('laituri').update({ status: 'sijoitettu', placed_where: minne.trim() }).eq('id', rivi.id);
+  if (error) {
+    console.error('Sijoitus epäonnistui:', error);
+  }
+  lataaLaituri(document.getElementById('laituri-search').value.trim());
+  paivitaLaituriBadge();
+}
+
+// Siivoaa rivin (li) jälkeen mahdollisesti jo olevan ehdotuskortin pois
+// ennen uuden piirtämistä tai virheen näyttämistä — estää korttien pinoamisen
+// jos ✨-nappia painetaan useaan kertaan.
+function poistaLaituriEhdotusKortti(li) {
+  const seuraava = li.nextElementSibling;
+  if (seuraava && seuraava.classList.contains('laituri-ehdotus-rivi')) {
+    seuraava.remove();
+  }
+}
+
+function naytaLaituriEhdotusVirhe(li, viesti) {
+  poistaLaituriEhdotusKortti(li);
+  const kortti = document.createElement('li');
+  kortti.className = 'laituri-ehdotus-rivi laituri-ehdotus-virhe';
+  kortti.textContent = viesti;
+  li.insertAdjacentElement('afterend', kortti);
+}
+
+// Piirtää äly-ehdotuksen kuittikorttina rivin alle: "→ <ehdotus> · <perustelu>"
+// + Sopii/Ei-napit. EI KOSKAAN kirjoita tietokantaan mitään itse — "Sopii"
+// avaa saman sijoitusdialogin jota →-nappikin käyttää, vain esitäytettynä.
+function piirraLaituriEhdotusKortti(rivi, li, ehdotus) {
+  poistaLaituriEhdotusKortti(li);
+
+  const kortti = document.createElement('li');
+  kortti.className = 'laituri-ehdotus-rivi';
+
+  const teksti = document.createElement('span');
+  teksti.textContent = '→ ' + ehdotus.ehdotus + (ehdotus.perustelu ? ' · ' + ehdotus.perustelu : '');
+  kortti.appendChild(teksti);
+
+  const napit = document.createElement('span');
+  napit.className = 'laituri-ehdotus-napit';
+
+  const sopiiNappi = document.createElement('button');
+  sopiiNappi.className = 'dialog-btn dialog-btn-cancel';
+  sopiiNappi.textContent = 'Sopii';
+  sopiiNappi.addEventListener('click', function() {
+    poistaLaituriEhdotusKortti(li);
+    sijoitaLaituriRivi(rivi, ehdotus.ehdotus);
+  });
+  napit.appendChild(sopiiNappi);
+
+  const eiNappi = document.createElement('button');
+  eiNappi.className = 'dialog-btn dialog-btn-cancel';
+  eiNappi.textContent = 'Ei';
+  eiNappi.addEventListener('click', function() {
+    poistaLaituriEhdotusKortti(li);
+  });
+  napit.appendChild(eiNappi);
+
+  kortti.appendChild(napit);
+  li.insertAdjacentElement('afterend', kortti);
+}
+
+// Jäsentää äly-putken palauttaman tekstin JSON:iksi — siivoaa mahdolliset
+// ```-koodilohkoaidat jotka mallit joskus lisäävät pyynnöstä huolimatta.
+// Palauttaa null (ei kaadu) jos jäsennys epäonnistuu.
+function jasennaAlyJSON(teksti) {
+  if (!teksti) return null;
+  const siivottu = teksti.trim().replace(/^```(?:json)?/i, '').replace(/```$/, '').trim();
+  try {
+    return JSON.parse(siivottu);
+  } catch (e) {
+    return null;
+  }
+}
+
+// Laituri-avustaja (2026-07-12) — ensimmäinen oikea älyominaisuus äly-putken
+// päälle (ks. COPILOT.md "Äly-putki" -osio, "tapa A": sama /api/aly, uusi
+// prompti). ÄLY EHDOTTAA, IHMINEN KUITTAA: kysyy äly-putkelta ehdotuksen
+// mihin muru kuuluisi, näyttää sen kuittikorttina — EI KOSKAAN siirrä tai
+// tallenna mitään automaattisesti. Kutsutaan VAIN napin painalluksesta,
+// ei koskaan automaattisesti joka riville (ei yllätyskuluja).
+async function pyydaLaituriEhdotus(rivi, nappi, li) {
+  nappi.disabled = true;
+  const alkuperainenTeksti = nappi.textContent;
+  nappi.textContent = '…';
+
+  // Käyttäjän näkyvissä olevien listojen (Muistilaput + Varasto, sama
+  // `lists`-taulu) nimet DYNAAMISESTI joka kutsulla — EI kovakoodattua
+  // listaa, jottei tarvitse muistaa päivittää tätä kun listoja lisätään/
+  // poistetaan/nimetään uudelleen. RLS rajaa tuloksen jo automaattisesti
+  // kirjautuneen näkyviin listoihin (omat + jaetut).
+  const { data: listat, error: listatError } = await db.from('lists').select('name');
+  if (listatError) {
+    console.error('Listojen haku ehdotusta varten epäonnistui:', listatError);
+  }
+  const kohteet = (listat || []).map(function(l) { return l.name; })
+    .concat(['kalenteriin (päivämäärällinen asia)', 'hytin kortille', 'ei mikään näistä']);
+
+  const prompti = 'Tässä on lyhyt muistiinpano perheen "Laituri"-muistilistalta: "' + rivi.content + '"\n\n' +
+    'Mahdolliset sijoituskohteet: ' + kohteet.map(function(k) { return '"' + k + '"'; }).join(', ') + '.\n\n' +
+    'Ehdota YKSI näistä kohteista johon tämä muistiinpano todennäköisimmin kuuluisi. ' +
+    'Vastaa VAIN JSON-muodossa, ei mitään muuta tekstiä, ei markdown-koodilohkoja:\n' +
+    '{"ehdotus": "<kohteen nimi tarkalleen listalta>", "perustelu": "<max 10 sanaa suomeksi>"}';
+
+  let tulos = null;
+  let virhe = null;
+  try {
+    const { data: sessioData } = await db.auth.getSession();
+    const token = sessioData.session ? sessioData.session.access_token : null;
+    const vastaus = await fetch('/api/aly', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
+      body: JSON.stringify({ prompt: prompti, max_tokens: 100 }),
+    });
+    tulos = await vastaus.json();
+    if (!vastaus.ok) virhe = tulos.error || 'Äly ei osannut tätä, kokeile myöhemmin';
+  } catch (e) {
+    virhe = 'Äly ei osannut tätä, kokeile myöhemmin';
+  }
+
+  nappi.disabled = false;
+  nappi.textContent = alkuperainenTeksti;
+
+  if (virhe) {
+    naytaLaituriEhdotusVirhe(li, virhe);
+    return;
+  }
+
+  const ehdotus = jasennaAlyJSON(tulos.text);
+  if (!ehdotus || !ehdotus.ehdotus) {
+    naytaLaituriEhdotusVirhe(li, 'Äly ei osannut tätä, kokeile myöhemmin');
+    return;
+  }
+
+  piirraLaituriEhdotusKortti(rivi, li, ehdotus);
 }
 
 // Muuttaa listan nimen inline-muokattavaksi kotinäkymässä

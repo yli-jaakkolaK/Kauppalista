@@ -138,7 +138,7 @@ Ennen migraatiota: tarkista `?listaa=juha` (ks. yllä kohta A.3, rivi 6) että k
 
 ## OSA F — Ota äly-putki käyttöön (riippumaton kaikesta yllä olevasta)
 
-Ensimmäinen kerros tulevalle äly-toiminnallisuudelle (Siri-tulkinta, Laituri-luokittelu, jääkaappikuva, ym.) — EI vielä yhtään oikeaa älyominaisuutta, vain todistettu putki puhelimesta Claude API:in ja takaisin. Tekninen kuvaus koko putken toiminnasta ja miten uusia ominaisuuksia lisätään sen päälle on **COPILOT.md**:ssä.
+**✓ TEHTY JA TODISTETTU 2026-07-12 oikealla laitteella** — "Testaa äly" vastasi järkevästi, `ANTHROPIC_API_KEY` paikallaan Vercelissä. Askeleet 1-5 säilytetty tässä jos joudut joskus tekemään tämän uudelleen (esim. avain vaihtuu):
 
 1. Hae Anthropic-avain: console.anthropic.com → kirjaudu → **API Keys** → luo uusi avain (tai käytä olemassa olevaa jos sinulla on jo Anthropic-tili tälle projektille) → kopioi se (näkyy vain kerran).
 2. Vercel → Kauppalista-projekti → **Settings** → **Environment Variables** → uusi muuttuja: **Key** = `ANTHROPIC_API_KEY`, **Value** = kopioitu avain → **Save**.
@@ -148,6 +148,19 @@ Ensimmäinen kerros tulevalle äly-toiminnallisuudelle (Siri-tulkinta, Laituri-l
    - "ANTHROPIC_API_KEY puuttuu Vercelistä" → askel 2 jäi tekemättä tai kirjoitusvirhe muuttujan nimessä.
    - "Mallitunniste ei kelvannut" → tarkista `ALY_MALLI` jos asetit sen, tai kerro Claudelle/Copilotille, koodin oletusmalli saattaa vaatia päivitystä.
    - Muu virhe → lue virheteksti, se on tarkoituksella selkokielinen suomeksi.
+
+---
+
+## OSA G — Testaa Laituri-avustaja (ensimmäinen oikea älyominaisuus, riippumaton kaikesta muusta)
+
+Ei vaadi mitään uutta migraatiota tai asetusta — käyttää samaa `ANTHROPIC_API_KEY`:tä kuin OSA F.
+
+1. Avaa Laituri, lisää muutama ajatus jos listalla ei ole yhtään sijoittamatonta riviä.
+2. Paina jonkin rivin ✨-nappia (näkyy vain sijoittamattomilla riveillä, samassa kohdassa kuin →-nappi).
+3. **Ehdotus ilmestyy** rivin alle muutaman sekunnin sisällä: "→ <kohde> · <lyhyt perustelu>" + [Sopii] [Ei] -napit.
+4. Paina **Sopii** — pitäisi avautua sama "Minne sijoitit tämän?" -kysymys jota →-nappikin käyttää, mutta äly-ehdotus jo kirjoitettuna kenttään valmiiksi. Voit muokata tekstiä tai hyväksyä sellaisenaan — **mikään ei siirry mihinkään automaattisesti**, vasta kun painat OK tässä kysymyksessä.
+5. Kokeile myös **Ei** — kortti katoaa, rivi pysyy sijoittamattomana, ei mitään tallenneta.
+6. Tarkista ettei ✨-nappia paina mikään AUTOMAATTISESTI (esim. sivun lataus, haku) — sen pitäisi reagoida VAIN suoraan napin painallukseen.
 
 ---
 

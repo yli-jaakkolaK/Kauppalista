@@ -4,13 +4,13 @@ Tämä tiedosto on eri asia kuin **muistiinpanot.md** (projektin historia, pää
 
 ---
 
-## Äly-putki (`api/aly.js`, rakennettu 2026-07-11)
+## Äly-putki (`api/aly.js`, rakennettu 2026-07-11, todistettu + ensimmäinen oikea ominaisuus 2026-07-12)
 
 ### Mikä tämä on
 
-Yksi endpoint (`POST /api/aly`) joka kutsuu Anthropicin Messages API:a ja palauttaa vastauksen. Ensimmäinen kerros — todistettu putki puhelimesta Claude API:in ja takaisin, EI mitään oikeaa älyominaisuutta vielä. Todistettu "Testaa äly" -napilla Asetukset → Sovellus-osiossa (sama todistusrooli kuin push-testinapilla oli push-infralle, ks. muistiinpanot.md "Push-ilmoitukset"-osio).
+Yksi endpoint (`POST /api/aly`) joka kutsuu Anthropicin Messages API:a ja palauttaa vastauksen. Putki todistettu "Testaa äly" -napilla Asetukset → Sovellus-osiossa (sama todistusrooli kuin push-testinapilla oli push-infralle, ks. muistiinpanot.md "Push-ilmoitukset"-osio) 2026-07-12. Ensimmäinen oikea älyominaisuus (Laituri-avustaja) rakennettu heti perään, ks. alla.
 
-Jokainen tuleva älyominaisuus (Siri-tulkinta, Laituri-luokittelu, jääkaappikuvan tulkinta, ym.) rakentuu TÄMÄN päälle — ei omaa erillistä Anthropic-integraatiotaan.
+Jokainen tuleva älyominaisuus (Siri-tulkinta, jääkaappikuvan tulkinta, ym.) rakentuu TÄMÄN päälle — ei omaa erillistä Anthropic-integraatiotaan.
 
 ### *** PERIAATE: ÄLY EHDOTTAA, IHMINEN KUITTAA ***
 
@@ -24,20 +24,43 @@ Tämä on talon periaate kaikelle mitä äly-putken päälle rakennetaan, ei vai
 
 Kaksi tapaa, valitse sen mukaan kuinka erilainen uusi tarve on olemassa olevaan `/api/aly`-rajapintaan verrattuna:
 
-**A) Sama endpoint, uusi prompti kutsuvasta koodista** (oletustapa, käytä tätä ellei ole hyvää syytä muuhun). `/api/aly` on tarkoituksella geneerinen — `{ prompt, max_tokens }` sisään, `{ text }` ulos. Uusi ominaisuus on tyypillisesti VAIN uusi `fetch('/api/aly', {...})`-kutsu `script.js`:ssä jollain toisella promptilla, ja UI joka näyttää vastauksen ehdotuksena (ks. periaate yllä). Esimerkki (konseptuaalinen, EI toteutettu): Laituri-rivin luokittelu voisi rakentua näin:
+**A) Sama endpoint, uusi prompti kutsuvasta koodista** (oletustapa, käytä tätä ellei ole hyvää syytä muuhun). `/api/aly` on tarkoituksella geneerinen — `{ prompt, max_tokens }` sisään, `{ text }` ulos. Uusi ominaisuus on tyypillisesti VAIN uusi `fetch('/api/aly', {...})`-kutsu `script.js`:ssä jollain toisella promptilla, ja UI joka näyttää vastauksen ehdotuksena (ks. periaate yllä).
+
+**Oikea, toteutettu esimerkki: Laituri-avustaja (2026-07-12, ensimmäinen oikea älyominaisuus).** ✨-nappi Laiturin rivillä kysyy äly-putkelta ehdotuksen mihin muru kuuluisi. Rakenne kannattaa kopioida sellaisenaan uuteen "tapa A" -ominaisuuteen:
+
 ```js
-const vastaus = await fetch('/api/aly', {
-  method: 'POST',
-  headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
-  body: JSON.stringify({
-    prompt: 'Luokittele tämä lyhyt ajatus yhteen sanaan (esim. "osto", "idea", "muistettava"): "' + rivi.content + '"',
-    max_tokens: 20,
-  }),
-});
-const { text } = await vastaus.json();
-// Näytä `text` käyttäjälle EHDOTUKSENA (esim. pieni nappi "merkitse: <text>?")
-// — EI koskaan tallenna suoraan tähän kohtaan.
+// 1) Kohteet DYNAAMISESTI kutsuhetkellä — EI kovakoodattua listaa.
+const { data: listat } = await db.from('lists').select('name');
+const kohteet = (listat || []).map(l => l.name)
+  .concat(['kalenteriin (päivämäärällinen asia)', 'hytin kortille', 'ei mikään näistä']);
+
+// 2) Prompti pyytää AINA puhtaan JSON:in, ei muuta tekstiä.
+const prompti = 'Tässä on lyhyt muistiinpano ...: "' + rivi.content + '"\n\n' +
+  'Mahdolliset sijoituskohteet: ' + kohteet.map(k => '"' + k + '"').join(', ') + '.\n\n' +
+  'Ehdota YKSI näistä. Vastaa VAIN JSON-muodossa, ei mitään muuta tekstiä, ei markdown-koodilohkoja:\n' +
+  '{"ehdotus": "<kohteen nimi tarkalleen listalta>", "perustelu": "<max 10 sanaa suomeksi>"}';
+
+// 3) Kutsu /api/aly TÄSMÄLLEEN kuten "Testaa äly" (Authorization: Bearer <access_token>).
+
+// 4) JSON-jäsennys TURVALLISESTI — mallit lisäävät joskus ```-aitoja pyynnöstä
+//    huolimatta, ja jäsennys voi epäonnistua. EI KOSKAAN kaadu, palauta null.
+function jasennaAlyJSON(teksti) {
+  if (!teksti) return null;
+  const siivottu = teksti.trim().replace(/^```(?:json)?/i, '').replace(/```$/, '').trim();
+  try { return JSON.parse(siivottu); } catch (e) { return null; }
+}
+
+// 5) Näytä ehdotus kuittikorttina (EI koskaan automaattista tallennusta):
+//    "→ <ehdotus> · <perustelu>" + [Sopii] [Ei]. "Sopii" avaa OLEMASSA OLEVAN
+//    manuaalisen toiminnon (tässä: sijoitusdialogi) esitäytettynä ehdotuksella
+//    — käyttäjä vahvistaa/muokkaa, äly ei kirjoita tietokantaan mitään suoraan.
+//    "Ei" vain poistaa kortin.
 ```
+
+Täysi toteutus: `script.js`:n `pyydaLaituriEhdotus()`/`piirraLaituriEhdotusKortti()`/`jasennaAlyJSON()`/`sijoitaLaituriRivi()` (ks. myös muistiinpanot.md "Laituri-avustaja"-osio). Poimi tästä kolme toistuvaa kaavaa aina kun rakennat uuden "tapa A" -ominaisuuden:
+1. Kutsutaan VAIN eksplisiittisestä käyttäjän napin painalluksesta, EI koskaan automaattisesti/taustalla — ei yllätyskuluja.
+2. JSON-vastaukset jäsennetään AINA `jasennaAlyJSON()`-tyylisellä turvallisella funktiolla, ei koskaan suoralla `JSON.parse()`:lla ilman try/catchia — malli voi palauttaa mitä tahansa.
+3. Ehdotus esitetään AINA kuittikorttina jonka voi hyväksyä/hylätä, "hyväksy" käyttää AINA olemassa olevaa manuaalista toimintopolkua (esitäytettynä) sen sijaan että äly kirjoittaisi suoraan uuteen tauluun/kenttään.
 
 **B) Uusi endpoint**, jos tarve on rakenteellisesti erilainen eikä taivu `{prompt, max_tokens}`-muotoon — esim.:
 - **System-prompt-tuki** (kiinteä rooliohje jokaiselle kutsulle, esim. "Olet Sataman ystävällinen avustaja, vastaa aina suomeksi ja lyhyesti") — voisi lisätä `/api/aly`:iin uutena valinnaisena `system`-parametrina (Anthropic Messages APIn oma `system`-kenttä), EI vaadi uutta endpointtia.
