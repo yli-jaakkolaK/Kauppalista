@@ -32,7 +32,7 @@ Täysi ohje (asennus, mistä yhteysosoite löytyy) on **BACKUP.md**:ssä.
 
 **⚠ sql/038_viikkopakkaus_sisalto.sql — UUSI, NIMIHUOMAUTUS.** Täyttää "Viikon reissun pakkauslista" (38 riviä, ei väliotsikoita) sisällöllä. **Katrin antamassa otsikossa listan nimi oli "Viikon pakkauslista leirikeskukseen"** — ERI TEKSTI kuin tietokannassa jo oleva nimi. Migraatio hakee listan sen NYKYISELLÄ tallennetulla nimellä ("Viikon reissun pakkauslista"), koska tehtävä oli täyttää olemassa oleva lista, ei luoda uutta. **Jos haluat kuvaavamman nimen käyttöön, vaihda se itse ✎-napista Muistilaput/Varasto-näkymässä** — ei tehty automaattisesti tässä.
 
----
+**⚠ sql/039_events_delete_policy.sql — UUSI, TÄRKEÄ, AJA ENSIN.** Korjaa bugin jonka takia listan poisto ei tehnyt mitään (ks. OSA M alla) — `events`-taululta puuttui delete-RLS-policy kokonaan. Ilman tätä listan poisto ("Poista lista") ei toimi millään listalla jolla on tapahtumahistoriaa, eli käytännössä ei yhdelläkään oikeasti käytetyllä listalla.
 
 ---
 
@@ -160,6 +160,19 @@ Katrin palaute 2026-07-10 johti ensimmäiseen korjaukseen, mutta se laski värit
 5. Avaa Kauppalista — kahden valitun rivin nimet pitäisi näkyä siellä UUSINA, täppäämättöminä riveinä.
 6. **Tärkein tarkistus:** avaa alkuperäinen "Resepti: lohikeitto" -lista uudelleen — sen pitäisi olla TÄYSIN ENNALLAAN.
 7. Testaa myös "Peruuta", ja tarkista ettei ☑-nappi näy kun avaat itse Kauppalista-listan.
+
+---
+
+## OSA M — Testaa listan poisto (bugikorjaus)
+
+Katrin raportoima bugi: "jäätelökakku"-listan (Muistilaput) poisto ei tehnyt mitään, toistettavasti. Juurisyy: `events`-taululta puuttui delete-RLS-policy kokonaan — korjattu `sql/039_events_delete_policy.sql`:llä (**aja tämä ensin**, ks. Migraatiot-tila yllä) + `poistaLista()`-koodikorjauksella joka nyt näyttää AINA selkokielisen virheen jos jokin poistovaihe epäonnistuu, sen sijaan että jatkaisi/nielaisisi hiljaa.
+
+1. Luo testiksi uusi lista Muistilappuihin, lisää pari riviä, täppää yksi.
+2. Avaa listan asetukset, paina "Poista lista" (tai vastaava poistoreitti kotinäkymän ×-napista) — vahvista dialogissa.
+3. **Listan pitäisi kadota OIKEASTI** — ei jää näkyviin, ei ilmesty takaisin seuraavalla sivun päivityksellä. Onnistuneen poiston jälkeen pitäisi näkyä "Lista poistettu" -toast.
+4. Kokeile myös poistaa lista jolla EI ole yhtään riviä (nopeampi reitti sama koodi, mutta hyvä varmistaa ettei tyhjä lista käyttäydy eri tavalla).
+5. **Jos poisto EI edelleenkään toimi:** nyt pitäisi näkyä selkokielinen suomenkielinen virhetoast (esim. "Listan poisto epäonnistui (tapahtumat): ..."), EI hiljaisuutta. Kerro Claudelle/Copilotille tarkka virheteksti jos näin käy — se kertoo tarkalleen missä vaiheessa (tuotteet/tapahtumat/lista itse) se kaatuu.
+6. Varmista myös että YKSITTÄISEN RIVIN poisto (× listan sisällä) toimi jo ENNEN tätä korjausta ja toimii yhä — tämä bugi koski VAIN koko listan poistoa, ei yksittäisiä rivejä.
 
 ---
 

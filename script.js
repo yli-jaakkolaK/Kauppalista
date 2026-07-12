@@ -2347,6 +2347,16 @@ function naytaVahvistus(otsikko, teksti, poistaTeksti) {
   });
 }
 
+// Poisto etenee tiukassa FK-turvallisessa järjestyksessä (tuotteet -> events
+// -> lists, sama järjestys kuin sql/036-039:n idempotenssikommenteissa) ja
+// PYSÄHTYY heti ensimmäiseen epäonnistuneeseen vaiheeseen — ei koskaan enää
+// jatka hiljaa seuraaviin vaiheisiin jos jokin kaatuu (bugi 2026-07-13:
+// events-taululta puuttui delete-policy, jonka takia sen poisto ei tehnyt
+// mitään RLS:n takia, ja sitä seurannut lists-poisto kaatui FK-rajoitteeseen
+// — virhe päätyi vain konsoliin, käyttäjä ei nähnyt mitään, "poisto" ei
+// koskaan tehnyt mitään mutta ei myöskään kertonut miksi. Korjattu policyn
+// osalta sql/039:ssä, mutta TÄMÄ koodi ei enää saa nielaista virhettä
+// hiljaa riippumatta siitä mikä sen tulevaisuudessa aiheuttaisi).
 async function poistaLista(lista, paivitaNakyma) {
   const { count } = await db.from('tuotteet').select('id', { count: 'exact', head: true }).eq('list_id', lista.id);
   const teksti = count > 0 ? 'Listalla on ' + count + ' asiaa — nekin poistuvat.' : null;
@@ -2354,17 +2364,33 @@ async function poistaLista(lista, paivitaNakyma) {
   if (!vahvistus) return;
 
   const del1 = await db.from('tuotteet').delete().eq('list_id', lista.id);
-  if (del1.error) console.error('Listan tuotteiden poisto epäonnistui:', del1.error);
+  if (del1.error) {
+    console.error('Listan tuotteiden poisto epäonnistui:', del1.error);
+    naytaIlmoitus('Listan poisto epäonnistui (tuotteet): ' + (del1.error.message || 'tuntematon virhe') + ' — kerro tämä Claudelle/Copilotille.');
+    return;
+  }
+
   const del2 = await db.from('events').delete().eq('list_id', lista.id);
-  if (del2.error) console.error('Listan tapahtumien poisto epäonnistui:', del2.error);
+  if (del2.error) {
+    console.error('Listan tapahtumien poisto epäonnistui:', del2.error);
+    naytaIlmoitus('Listan poisto epäonnistui (tapahtumat): ' + (del2.error.message || 'tuntematon virhe') + ' — kerro tämä Claudelle/Copilotille.');
+    return;
+  }
+
   const del3 = await db.from('lists').delete().eq('id', lista.id);
-  if (del3.error) console.error('Listan poisto epäonnistui:', del3.error);
+  if (del3.error) {
+    console.error('Listan poisto epäonnistui:', del3.error);
+    naytaIlmoitus('Listan poisto epäonnistui: ' + (del3.error.message || 'tuntematon virhe') + ' — kerro tämä Claudelle/Copilotille.');
+    return;
+  }
+
   logEvent('deleted', 'list', lista.id, lista.name, null);
 
   if (currentList && currentList.id === lista.id) {
     currentList = null;
   }
   paivitaNakyma();
+  naytaIlmoitus('Lista "' + lista.name + '" poistettu.');
 }
 
 // Kirjautumisen jälkeen: näytetään aina Etusivu
