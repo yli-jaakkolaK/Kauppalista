@@ -167,7 +167,7 @@ Katrin palaute 2026-07-10 johti ensimmäiseen korjaukseen, mutta se laski värit
 
 ## OSA M — Testaa listan poisto (bugikorjaus)
 
-Katrin raportoima bugi: "jäätelökakku"-listan (Muistilaput) poisto ei tehnyt mitään, toistettavasti. Juurisyy: `events`-taululta puuttui delete-RLS-policy kokonaan — korjattu `sql/039_events_delete_policy.sql`:llä (**aja tämä ensin**, ks. Migraatiot-tila yllä) + `poistaLista()`-koodikorjauksella joka nyt näyttää AINA selkokielisen virheen jos jokin poistovaihe epäonnistuu, sen sijaan että jatkaisi/nielaisisi hiljaa.
+Katrin raportoima bugi: "jäätelökakku"-listan (Muistilaput) poisto ei tehnyt mitään, toistettavasti. Juurisyy: `events`-taululta puuttui delete-RLS-policy kokonaan — korjattu `sql/039_events_delete_policy.sql`:llä (**aja tämä ensin**, ks. Migraatiot-tila yllä) + `deleteList()`-koodikorjauksella (funktio, aiemmin `poistaLista()`) joka nyt näyttää AINA selkokielisen virheen jos jokin poistovaihe epäonnistuu, sen sijaan että jatkaisi/nielaisisi hiljaa.
 
 1. Luo testiksi uusi lista Muistilappuihin, lisää pari riviä, täppää yksi.
 2. Avaa listan asetukset, paina "Poista lista" (tai vastaava poistoreitti kotinäkymän ×-napista) — vahvista dialogissa.

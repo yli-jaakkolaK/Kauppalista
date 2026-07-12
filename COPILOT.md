@@ -4,6 +4,18 @@ Tämä tiedosto on eri asia kuin **muistiinpanot.md** (projektin historia, pää
 
 ---
 
+## Koodikieli: uusi koodi englanniksi (talon sääntö, kirjattu 2026-07-13)
+
+**Tästä eteenpäin uusi koodi kirjoitetaan englanniksi** — funktioiden ja muuttujien nimet SEKÄ koodikommentit. Kolme rajausta:
+
+1. **EI massauudelleennimeämistä olemassa olevalle koodille.** Tietokannan taulut/sarakkeet (`tuotteet`, `lists`, `nimi`, `tehty`, `list_id` ym.) ja toimivat, koskemattomat funktiot pysyvät nykyisissä suomenkielisissä nimissään. Nimeä olemassa oleva koodi uudelleen VAIN jos se muutenkin kirjoitetaan kokonaan uusiksi samassa työssä (esim. bugikorjaus joka jo muutti funktion sisältöä merkittävästi — silloin on järkevää nimetä se englanniksi SAMALLA). Sekakielisyys (osa suomeksi, osa englanniksi, rinnakkain samassa tiedostossa) on HYVÄKSYTTY, tarkoituksellinen välitila — raja kulkee "uusi = englanti", ei "kaikki heti englanniksi".
+2. **Käyttäjälle näkyvät tekstit ovat AINA suomeksi** — UI-tekstit, virheilmoitukset, toastit, push-ilmoitukset, kaikki mitä Katri tai Juha lukevat sovelluksessa. Tämä sääntö koskee VAIN koodin omaa kieltä (nimet, kommentit), ei koskaan käyttöliittymän kieltä.
+3. **Tietokannan skeeman nimet pysyvät suomeksi historiallisista syistä** — uusi koodi viittaa niihin sellaisenaan, ei käännetä kutsuhetkellä. Esimerkki: `deleteList()` (englanninkielinen funktio) operoi silti `tuotteet`-taulua ja sen `list_id`-saraketta — tämä on OK, ei ristiriita.
+
+**Miksi tämä on kirjattu, ei vain hiljainen tapa:** englanti ei ole vain tekoälytyökaluja varten. Repo on julkisessa palvelussa (GitHub) — yleisesti ymmärretyt nimet tekevät koodista luettavaa, kommentoitavaa ja autettavaa KENELLE TAHANSA (issueiden kirjoittaminen, koodiesimerkkien jakaminen, virheviestien googlaus, tulevat avustajat jotka eivät osaa suomea). Suomenkielinen koodi rajaisi kaiken tulevan yhteistyön ja avunsaannin vain suomenkielisiin. Tarkoitus on että koodi muuttuu englanninkieliseksi AJAN SAATOSSA, sitä mukaa kun tiedostoihin muutenkin kosketaan — ei kertarysäyksellä, ei koskaan koskematta koodiin jota ei olisi muutenkaan tarvinnut muuttaa.
+
+---
+
 ## Äly-putki (`api/aly.js`, rakennettu 2026-07-11, todistettu + ensimmäinen oikea ominaisuus 2026-07-12)
 
 ### Mikä tämä on

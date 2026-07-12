@@ -238,7 +238,7 @@ async function lataaListatNakymaan(containerId, kategoria) {
       poistoNappi.className = 'delete-btn';
       poistoNappi.addEventListener('click', function(e) {
         e.stopPropagation();
-        poistaLista(lista, paivitaNakyma);
+        deleteList(lista, paivitaNakyma);
       });
       item.appendChild(poistoNappi);
     }
@@ -2383,50 +2383,49 @@ function naytaVahvistus(otsikko, teksti, poistaTeksti) {
   });
 }
 
-// Poisto etenee tiukassa FK-turvallisessa järjestyksessä (tuotteet -> events
-// -> lists, sama järjestys kuin sql/036-039:n idempotenssikommenteissa) ja
-// PYSÄHTYY heti ensimmäiseen epäonnistuneeseen vaiheeseen — ei koskaan enää
-// jatka hiljaa seuraaviin vaiheisiin jos jokin kaatuu (bugi 2026-07-13:
-// events-taululta puuttui delete-policy, jonka takia sen poisto ei tehnyt
-// mitään RLS:n takia, ja sitä seurannut lists-poisto kaatui FK-rajoitteeseen
-// — virhe päätyi vain konsoliin, käyttäjä ei nähnyt mitään, "poisto" ei
-// koskaan tehnyt mitään mutta ei myöskään kertonut miksi. Korjattu policyn
-// osalta sql/039:ssä, mutta TÄMÄ koodi ei enää saa nielaista virhettä
-// hiljaa riippumatta siitä mikä sen tulevaisuudessa aiheuttaisi).
-async function poistaLista(lista, paivitaNakyma) {
-  const { count } = await db.from('tuotteet').select('id', { count: 'exact', head: true }).eq('list_id', lista.id);
-  const teksti = count > 0 ? 'Listalla on ' + count + ' asiaa — nekin poistuvat.' : null;
-  const vahvistus = await naytaVahvistus('Poistetaanko ' + lista.name + '?', teksti, 'Poista lista');
-  if (!vahvistus) return;
+// Deletion proceeds in strict FK-safe order (tuotteet -> events -> lists,
+// same order as the idempotency comments in sql/036-039) and STOPS at the
+// first failed step — it never silently continues to the next step if one
+// fails (bug 2026-07-13: the events table was missing a delete policy, so
+// its delete silently affected 0 rows due to RLS, and the following lists
+// delete then failed on a foreign key violation — the error only reached
+// the console, never the user, so "delete" silently did nothing and never
+// said why. Fixed on the policy side in sql/039, but this code must never
+// swallow an error silently again regardless of what causes it in future).
+async function deleteList(list, refreshView) {
+  const { count } = await db.from('tuotteet').select('id', { count: 'exact', head: true }).eq('list_id', list.id);
+  const message = count > 0 ? 'Listalla on ' + count + ' asiaa — nekin poistuvat.' : null;
+  const confirmed = await naytaVahvistus('Poistetaanko ' + list.name + '?', message, 'Poista lista');
+  if (!confirmed) return;
 
-  const del1 = await db.from('tuotteet').delete().eq('list_id', lista.id);
-  if (del1.error) {
-    console.error('Listan tuotteiden poisto epäonnistui:', del1.error);
-    naytaIlmoitus('Listan poisto epäonnistui (tuotteet): ' + (del1.error.message || 'tuntematon virhe') + ' — kerro tämä Claudelle/Copilotille.');
+  const deleteItems = await db.from('tuotteet').delete().eq('list_id', list.id);
+  if (deleteItems.error) {
+    console.error('Listan tuotteiden poisto epäonnistui:', deleteItems.error);
+    naytaIlmoitus('Listan poisto epäonnistui (tuotteet): ' + (deleteItems.error.message || 'tuntematon virhe') + ' — kerro tämä Claudelle/Copilotille.');
     return;
   }
 
-  const del2 = await db.from('events').delete().eq('list_id', lista.id);
-  if (del2.error) {
-    console.error('Listan tapahtumien poisto epäonnistui:', del2.error);
-    naytaIlmoitus('Listan poisto epäonnistui (tapahtumat): ' + (del2.error.message || 'tuntematon virhe') + ' — kerro tämä Claudelle/Copilotille.');
+  const deleteEvents = await db.from('events').delete().eq('list_id', list.id);
+  if (deleteEvents.error) {
+    console.error('Listan tapahtumien poisto epäonnistui:', deleteEvents.error);
+    naytaIlmoitus('Listan poisto epäonnistui (tapahtumat): ' + (deleteEvents.error.message || 'tuntematon virhe') + ' — kerro tämä Claudelle/Copilotille.');
     return;
   }
 
-  const del3 = await db.from('lists').delete().eq('id', lista.id);
-  if (del3.error) {
-    console.error('Listan poisto epäonnistui:', del3.error);
-    naytaIlmoitus('Listan poisto epäonnistui: ' + (del3.error.message || 'tuntematon virhe') + ' — kerro tämä Claudelle/Copilotille.');
+  const deleteListRow = await db.from('lists').delete().eq('id', list.id);
+  if (deleteListRow.error) {
+    console.error('Listan poisto epäonnistui:', deleteListRow.error);
+    naytaIlmoitus('Listan poisto epäonnistui: ' + (deleteListRow.error.message || 'tuntematon virhe') + ' — kerro tämä Claudelle/Copilotille.');
     return;
   }
 
-  logEvent('deleted', 'list', lista.id, lista.name, null);
+  logEvent('deleted', 'list', list.id, list.name, null);
 
-  if (currentList && currentList.id === lista.id) {
+  if (currentList && currentList.id === list.id) {
     currentList = null;
   }
-  paivitaNakyma();
-  naytaIlmoitus('Lista "' + lista.name + '" poistettu.');
+  refreshView();
+  naytaIlmoitus('Lista "' + list.name + '" poistettu.');
 }
 
 // Kirjautumisen jälkeen: näytetään aina Etusivu
