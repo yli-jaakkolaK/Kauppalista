@@ -32,6 +32,17 @@ Tämä on talon periaate kaikelle mitä äly-putken päälle rakennetaan, ei vai
 - Jokainen tuleva ominaisuus jonka äly "tekee" (esim. ehdottaa mihin kategoriaan Laiturin rivi kuuluu, tulkitsee mitä Siri-komento tarkoitti) esitetään käyttäjälle EHDOTUKSENA jonka voi hyväksyä sellaisenaan, muokata, tai hylätä — sama malli kuin kuittausjonolla on jo kalenterisynkalle (ks. muistiinpanot.md "Kalenterin periaate: yksi totuus, kaksi ikkunaa") ja kuin Vaihe 2:n loma-aikojen automaattitäytöllä on suunniteltu toimimaan (ks. "Loma-aikojen täyttö" -osio: "EI KIRJOITA suoraan ilman vahvistusta").
 - Kun rakennat uutta älyominaisuutta: jos suunnittelet UI:ta joka tallentaa älyn vastauksen tietokantaan ILMAN välikätistä hyväksyntävaihetta, pysähdy — se rikkoo tätä periaatetta, suunnittele uudelleen.
 
+### *** PERIAATE: MAKSIMIAUTOMAATIO, MINIMIKUSTANNUS *** (sisarperiaate edelliselle — tämä koskee KUINKA USEIN ja MILLÄ tavalla, "Äly ehdottaa" koskee MITÄ)
+
+Kaikki mikä voi tapahtua automaattisesti, tapahtuu automaattisesti — mutta halvimmalla toimivalla tavalla. Neljä sääntöä ennen kuin rakennat mitään uutta äly-putken päälle:
+
+1. **Äly VAIN siihen mihin logiikka ei taivu.** Jos asia voidaan ilmaista säännöksi, laskennaksi tai ajastukseksi — tee se koodilla/datalla, ei älykutsulla. Kuormavahti, Ristiriitamerkki ja kuittausjono ovat kaikki puhdasta laskentaa, ei yhtäkään älykutsua — pidä se niin.
+2. **Älykutsut ERISSÄ ja TAPAHTUMISTA** (napin painallus, yöajo, uusi data) — EI KOSKAAN silmukassa, ei jokaisella näkymän avauksella, ei uudelleen samalle jo arvioidulle datalle. Jos ominaisuus voisi tarvita saman kutsun toistuvasti samalle riville/datalle, lisää käsitelty-merkintä (esim. oma sarake tai status-arvo) joka estää turhan uusintakutsun.
+3. **Halvin malli joka riittää tehtävään** — ks. "Kustannusnäkökulma" alla, `ALY_MALLI`-arkkitehtuuri on juuri tätä varten.
+4. **Usage-lokitus jokaisesta kutsusta pysyy** — ks. "Kustannusnäkökulma" alla, kustannuksen on oltava aina nähtävissä.
+
+**Kysy tämä ENNEN kuin rakennat uuden älyominaisuuden:** *"Voiko tämän tehdä ilman älykutsua — ja jos ei, kuinka harvoin kutsu riittää?"* Täysi tausta ja Katrin kiteytykset: muistiinpanot.md, "Design-periaate: MAKSIMIAUTOMAATIO, MINIMIKUSTANNUS".
+
 ### Miten lisäät uuden älyominaisuuden
 
 Kaksi tapaa, valitse sen mukaan kuinka erilainen uusi tarve on olemassa olevaan `/api/aly`-rajapintaan verrattuna:
