@@ -292,7 +292,10 @@
     <div class="list-header">
       <button class="back-btn" id="back-btn">‹</button>
       <h1 id="list-title">✱ kauppalista ✱</h1>
-      <button class="settings-btn" id="settings-btn">🔒</button>
+      <div class="list-header-actions">
+        <button class="settings-btn" id="valinta-toggle-btn" title="Valitse useita">☑</button>
+        <button class="settings-btn" id="settings-btn">🔒</button>
+      </div>
     </div>
     <div class="subtitle" id="subtitle">ladataan...</div>
 
@@ -305,6 +308,14 @@
     </div>
 
     <ul class="list"></ul>
+
+    <div class="valinta-palkki" id="valinta-palkki" style="display:none">
+      <span id="valinta-maara-teksti">0 valittu</span>
+      <div class="valinta-napit">
+        <button class="dialog-btn dialog-btn-cancel" id="valinta-peruuta-btn">Peruuta</button>
+        <button class="dialog-btn dialog-btn-cancel" id="valinta-kauppalistalle-btn">Kauppalistalle</button>
+      </div>
+    </div>
 
     <hr class="divider" id="footer-divider" style="display:none">
     <div class="list-footer" id="list-footer" style="display:none">

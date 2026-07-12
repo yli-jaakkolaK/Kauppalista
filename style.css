@@ -131,6 +131,73 @@ h1 {
   -webkit-tap-highlight-color: transparent;
 }
 
+/* app-view tarvitsee KAKSI otsikkorivin oikean puolen nappia (valinta +
+   asetukset) — kääritty omaan flex-konttiin, joka itse istuu 3. grid-
+   sarakkeessa. .settings-btn:n oma `grid-column:3` ei vaikuta täällä,
+   koska se pätee vain grid-lapsiin, ei tämän flex-kontin sisäisiin
+   nappeihin — muiden näkymien (Hytin kortti ym.) yhden napin .list-header
+   pysyy täysin ennallaan. */
+.list-header-actions {
+  grid-column: 3;
+  display: flex;
+  justify-content: flex-end;
+}
+
+.list-header-actions .settings-btn {
+  min-width: 36px;
+}
+
+.list-header-actions .settings-btn.active {
+  color: var(--huomio);
+}
+
+/* Ruoka-välivaihe (2026-07-13): valitse useita rivejä ja siirrä ne
+   Kauppalistalle kerralla ("Siirrä valitut" -periaate) — kevyt palkki
+   joka ilmestyy listan alle vain valintatilan ajaksi. */
+.valinta-palkki {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px 0;
+  border-top: 1px dashed var(--border-dash);
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.valinta-napit {
+  display: flex;
+  gap: 8px;
+}
+
+.valinta-napit .dialog-btn {
+  flex: none;
+  padding: 6px 12px;
+  font-size: 13px;
+}
+
+.valinta-napit .dialog-btn:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.valinta-napit .dialog-btn:disabled:hover {
+  background: none;
+  color: var(--accent);
+}
+
+.valinta-checkbox {
+  width: 20px;
+  height: 20px;
+  margin-right: 6px;
+  flex-shrink: 0;
+  accent-color: var(--accent);
+}
+
+.list li.valinta-valittu {
+  background: var(--border);
+}
+
 .kalenteri-tilat {
   display: flex;
   gap: 8px;

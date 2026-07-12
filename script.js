@@ -81,6 +81,10 @@ let cachedTuotteet = [];
 let currentUserId = null;
 let currentList = null;
 let aktiivinenOtsikkoId = null;
+// Ruoka-välivaihe (2026-07-13): valintatila listan sisällä, jotta useita
+// rivejä voi siirtää/kopioida Kauppalistalle kerralla ("Siirrä valitut").
+let valintatilaPaalla = false;
+let valitutTuoteIdt = new Set();
 // Avain on "lähde:tunniste" (esim. "muistilaput:42"), koska sama tunniste
 // voi periaatteessa esiintyä eri lähteissä (tuotteet.id vs. kalenterin id)
 let ankkuroidutAvaimet = new Set();
@@ -129,8 +133,25 @@ function avaaLista(lista) {
   document.getElementById('list-title').textContent = '✱ ' + lista.name + ' ✱';
   paivitaNakyvyysIkoni();
   paivitaLisaysKohde();
+  poistuValintatilasta();
+  // Kauppalistalta itseltään ei voi siirtää Kauppalistalle
+  document.getElementById('valinta-toggle-btn').style.display = lista.name === 'Kauppalista' ? 'none' : '';
   showAppView();
   lataaLista();
+}
+
+// Sulkee Ruoka-välivaiheen valintatilan (uuden listan avaus, Peruuta-nappi
+// tai onnistunut siirto Kauppalistalle kutsuvat tätä).
+function poistuValintatilasta() {
+  valintatilaPaalla = false;
+  valitutTuoteIdt.clear();
+  document.getElementById('valinta-toggle-btn').classList.remove('active');
+  document.getElementById('valinta-palkki').style.display = 'none';
+}
+
+function paivitaValintaMaara() {
+  document.getElementById('valinta-maara-teksti').textContent = valitutTuoteIdt.size + ' valittu';
+  document.getElementById('valinta-kauppalistalle-btn').disabled = valitutTuoteIdt.size === 0;
 }
 
 // Laskee mihin kohtaan uusi rivi asetetaan: aktiivisen otsikon alle jos
@@ -2676,6 +2697,27 @@ function paivitaNaytto(tuotteet) {
       return;
     }
 
+    // Ruoka-välivaihe: valintatilassa jokainen rivi saa oman valintaruudun
+    // ENNEN tavallista check-nappia — erillinen elementti, ei sekoiteta
+    // "tehty"-tilaan, joten kumpaakin voi käyttää samaan aikaan sekaannuksetta.
+    if (valintatilaPaalla) {
+      item.classList.toggle('valinta-valittu', valitutTuoteIdt.has(tuote.id));
+      const valintaRuutu = document.createElement('input');
+      valintaRuutu.type = 'checkbox';
+      valintaRuutu.className = 'valinta-checkbox';
+      valintaRuutu.checked = valitutTuoteIdt.has(tuote.id);
+      valintaRuutu.addEventListener('change', function() {
+        if (valintaRuutu.checked) {
+          valitutTuoteIdt.add(tuote.id);
+        } else {
+          valitutTuoteIdt.delete(tuote.id);
+        }
+        item.classList.toggle('valinta-valittu', valintaRuutu.checked);
+        paivitaValintaMaara();
+      });
+      item.appendChild(valintaRuutu);
+    }
+
     // Vasemmalla: yliviivaustoiminto
     const checkNappi = document.createElement('button');
     checkNappi.textContent = tuote.tehty ? '✓' : '○';
@@ -2927,6 +2969,49 @@ document.getElementById('back-btn').addEventListener('click', function() {
     showMuistilaputView();
     lataaMuistilaput();
   }
+});
+
+// Ruoka-välivaihe: valintatilan päälle/pois-kytkin
+document.getElementById('valinta-toggle-btn').addEventListener('click', function() {
+  valintatilaPaalla = !valintatilaPaalla;
+  valitutTuoteIdt.clear();
+  this.classList.toggle('active', valintatilaPaalla);
+  document.getElementById('valinta-palkki').style.display = valintatilaPaalla ? 'flex' : 'none';
+  paivitaValintaMaara();
+  paivitaNaytto(cachedTuotteet);
+});
+
+document.getElementById('valinta-peruuta-btn').addEventListener('click', function() {
+  poistuValintatilasta();
+  paivitaNaytto(cachedTuotteet);
+});
+
+// "Kauppalistalle" — kopioi valitut rivit (nimi) uusiksi riveiksi
+// Kauppalistaan, EI poista/siirrä alkuperäisestä listasta (sama "kopio, ei
+// vie alkuperäistä" -periaate kuin Varaston "Luo kopio" -napissa) —
+// esim. reseptilistan ainekset pysyvät reseptillä myös ensi kerraksi.
+document.getElementById('valinta-kauppalistalle-btn').addEventListener('click', async function() {
+  if (valitutTuoteIdt.size === 0) return;
+
+  const { data: kauppalista, error: hakuError } = await db.from('lists').select('id').eq('name', 'Kauppalista').single();
+  if (hakuError || !kauppalista) {
+    console.error('Kauppalistan haku epäonnistui:', hakuError);
+    return;
+  }
+
+  const uudetRivit = cachedTuotteet
+    .filter(function(t) { return valitutTuoteIdt.has(t.id); })
+    .map(function(t) { return { nimi: t.nimi, tehty: false, list_id: kauppalista.id, is_header: false }; });
+
+  const { error: insertError } = await db.from('tuotteet').insert(uudetRivit);
+  if (insertError) {
+    console.error('Rivien lisäys Kauppalistalle epäonnistui:', insertError);
+    return;
+  }
+
+  naytaIlmoitus(uudetRivit.length + ' tuotetta lisätty Kauppalistalle.');
+  poistuValintatilasta();
+  paivitaNaytto(cachedTuotteet);
 });
 
 // Listan asetukset — näkyvyyden vaihto

@@ -214,4 +214,16 @@ Katrin palaute 2026-07-10 ("testattu ulkona auringossa, kontrasti ei riitä") jo
 
 ---
 
+## OSA L — Testaa Ruoka-välivaihe "Siirrä valitut Kauppalistalle" (ei migraatiota, riippumaton kaikesta muusta)
+
+1. Tee testiksi lista Varastoon (esim. "Resepti: lohikeitto") 3-4 rivillä.
+2. Avaa lista, paina otsikkorivin ☑-nappia (settings-napin/lukon vieressä) — jokaisen rivin eteen pitäisi ilmestyä oma valintaruutu, ja listan alle palkki "0 valittu" + [Peruuta] [Kauppalistalle] (jälkimmäinen harmaana).
+3. Valitse 2 riviä valintaruuduista — laskurin pitäisi näyttää "2 valittu" ja Kauppalistalle-nappi aktivoitua.
+4. Paina "Kauppalistalle" — toast-ilmoitus, valintatila sulkeutuu.
+5. Avaa Kauppalista (Muistilaput → Kauppalista) — kahden valitun rivin nimet pitäisi näkyä siellä UUSINA, täppäämättöminä riveinä.
+6. **Tärkein tarkistus:** avaa alkuperäinen "Resepti: lohikeitto" -lista uudelleen — sen pitäisi olla TÄYSIN ENNALLAAN, mitään ei poistunut/siirtynyt.
+7. Testaa myös "Peruuta" (sulkee valintatilan, ei tallenna mitään) ja tarkista ettei ☑-nappi näy ollenkaan kun avaat itse Kauppalista-listan.
+
+---
+
 Kysy Claudelta jos joku kohta ei täsmää tai jokin näistä napeista/valikoista ei löydy — käyttöliittymät muuttuvat välillä hieman.
