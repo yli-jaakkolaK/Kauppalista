@@ -71,6 +71,7 @@ Supabase-projektin sivulta: vasemmalta **SQL Editor** → **New query** → liim
 8. `sql/033_hytti_omistajat_juha.sql` — lisää Juhan rivin `hytti_omistajat`-tauluun AUTOMAATTISESTI (hakee hänen auth-tunnisteensa sähköpostilla `auth.users`-taulusta, ei vaadi UUID:n kopiointia) — **AJA TÄMÄ ENNEN kohtaa 9** (`sql/032`), koska 032 tarvitsee tämän rivin toimiakseen
 9. `sql/032_juha_oma_hytti_scope.sql` — Juhan "Oma"-kalenteri Hytin scopeen (ks. OSA E)
 10. `sql/034_realtime_huomiopallurat.sql` — ottaa Supabase Realtime -Replication-julkaisun käyttöön `laituri`/`kalenteri_tapahtumat`/`kalenteri_kuittaukset`-tauluille (ks. OSA H) — TÄYSIN ERILLINEN muista, voit ajaa tämän vaikka jättäisit muut väliin
+11. `sql/035_ohjeet_vinkit.sql` — luo `ohjeet`-taulun ja siirtää Asetusten 9 vinkkiä sinne + lisää 1 uuden (ks. OSA J) — TÄYSIN ERILLINEN muista
 
 ~~Tärkeä käsin täytettävä kohta migraation 027 jälkeen~~ — **KORVATTU 2026-07-13:** `hytti_omistajat`-taulu vaati Juhan rivin (`henkilo='juha'` → hänen auth-tunnisteensa), mutta `sql/027` loi vain Katrin rivin valmiiksi. Alunperin ohjeistettu lisäämään käsin Table Editorista, mutta tämä korvattiin `sql/033`:lla joka hakee tunnisteen automaattisesti sähköpostilla — ei tarvitse enää kopioida mitään UUID:ta käsin.
 
@@ -189,6 +190,15 @@ Katrin palaute 2026-07-10 ("testattu ulkona auringossa, kontrasti ei riitä") jo
 3. Kuukausinäkymä: tarkista että kuormittuneen päivän kohdalla näkyy pieni meripihkanvärinen numeromerkki (esim. "6") päivänumeron vieressä, EI enää pelkkä väripiste ilman selitystä.
 4. Käännä puhelin vaakatilaan viikkonäkymässä — pilleri EI saa olla enää silmin nähden pienempi kuin muu teksti ympärillä ("mikroskooppinen"-palaute korjattu).
 5. Jos JOKIN näistä on edelleen vaikealukuinen: kerro Claudelle/Copilotille TARKKA elementti + valo-olosuhde (esim. "kuormapilleri viikkonäkymässä suorassa auringonpaisteessa") — seuraava kierros voi harkita täytettyä taustaa myös kuormamerkille (nyt yhä dashed-reunus, ei täytetty tausta — se on tarkoituksella varattu vain punaiselle päällekkäisyysmerkille).
+
+---
+
+## OSA J — Testaa Vinkit ohjeet-taulusta (aja `sql/035_ohjeet_vinkit.sql` ensin, riippumaton kaikesta muusta)
+
+1. Avaa Asetukset — "💡 Vinkit" -osiossa pitäisi näkyä 10 riviä (9 vanhaa tuttua + uusi "tarkista iPhonen oletuskalenteri" -vinkki, viimeisenä).
+2. Supabasen Table Editorista `ohjeet`-tauluun: lisää uusi rivi, `content` = mikä tahansa teksti, `sort_order` = esim. 105. Sulje ja avaa Asetukset uudelleen sovelluksessa — uuden rivin pitäisi näkyä listan lopussa, EI vaadi mitään koodimuutosta tai deploytä.
+3. Muuta jonkin rivin `sort_order`-arvoa Table Editorista — järjestyksen pitäisi muuttua vastaavasti seuraavalla avauksella.
+4. Tarkista että "Missä muokataan mitäkin" -alaotsikon 5 riviä näkyvät ENNALLAAN (nämä pysyivät tietoisesti staattisina, eivät ole osa tätä muutosta).
 
 ---
 

@@ -1957,6 +1957,7 @@ function avaaOsio(osio) {
     paivitaTiliTiedot();
     paivitaPushTila();
     paivitaSovellusTiedot();
+    lataaVinkit();
     paivitaAsetukset().then(function() {
       document.getElementById('kuormaraja-input').value = haeAsetusNumero('paivan_menoraja', 5);
     });
@@ -3567,6 +3568,25 @@ function suhteellinenAika(isoAika) {
   if (tunnit < 24) return tunnit + ' h sitten';
   const paivat = Math.round(tunnit / 24);
   return paivat + ' pv sitten';
+}
+
+// Vinkit-lista (sql/035_ohjeet_vinkit.sql) — dataohjattu 2026-07-13, oli
+// aiemmin 9 kovakoodattua diviä index.html:ssä. Uuden vinkin voi lisätä
+// Table Editorista (ohjeet-taulu, content+sort_order) ilman koodimuutosta.
+async function lataaVinkit() {
+  const container = document.getElementById('vinkki-lista-data');
+  const { data, error } = await db.from('ohjeet').select('content').order('sort_order');
+  if (error) {
+    console.error('Vinkkien haku epäonnistui:', error);
+    return;
+  }
+  container.innerHTML = '';
+  (data || []).forEach(function(rivi) {
+    const div = document.createElement('div');
+    div.className = 'vinkki-rivi';
+    div.textContent = rivi.content;
+    container.appendChild(div);
+  });
 }
 
 // Näyttää sw-välimuistin version (caches.keys() — ei tarvitse pitää samaa
