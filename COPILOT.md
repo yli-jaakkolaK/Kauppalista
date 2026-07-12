@@ -103,3 +103,11 @@ Sama malli kuin `api/push-test.js`:ssä — validoi kutsujan Supabase-istunnon `
 ### Testaus
 
 "Testaa äly" -nappi Asetukset → Sovellus-osiossa lähettää kiinteän testipromptin ja näyttää vastauksen napin alla. Jos tämä toimii, koko putki (kirjautuminen → JWT-validointi → Anthropic-kutsu → vastaus takaisin puhelimeen) on todistettu — uusi ominaisuus voi luottaa siihen ilman uutta putkitestiä.
+
+---
+
+## GitHub Actions -ajastin: mihin se vaikuttaa ja miten se voi hiljentyä
+
+Muistutukset (`api/muistutukset-laheta.js`) ja kalenterisynkka (`api/caldav-sync.js`) EIVÄT käynnisty itsestään Vercel Hobby -tasolla (ei omaa cron-tukea) — molemmat riippuvat kokonaan `.github/workflows/muistutukset-cron.yml`:stä, joka herää 5 minuutin välein ja kutsuu molempia.
+
+**Jos muistutukset tai kalenterisynkka lakkaavat toimimasta yhtäkkiä ilman koodimuutosta, tarkista ENSIN GitHub-repon Actions-välilehti ennen kuin epäilet koodivikaa.** GitHub pysäyttää ajastetut (`schedule`-tyyppiset) workflowt automaattisesti jos repoon ei ole tullut yhtään committia noin 60 päivään — tästä lähtee sähköposti-ilmoitus repon omistajalle, ja Actions-välilehdellä workflow-listan vieressä näkyy silloin "Enable"-nappi joka käynnistää sen uudelleen yhdellä painalluksella. Tämä ei ole koskaan lähikuukausien huoli Copilot-aikana (committeja tulee luonnostaan jatkuvasta kehityksestä), mutta jos projektiin joskus tulee pitkä hiljainen jakso, tämä on ensimmäinen paikka tarkistaa.
