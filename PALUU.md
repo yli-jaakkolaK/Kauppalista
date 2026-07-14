@@ -40,6 +40,8 @@ Täysi ohje (asennus, mistä yhteysosoite löytyy) on **BACKUP.md**:ssä.
 
 **⚠ sql/046_testipaiva_uiremontti_rivi.sql — UUSI, AJA ENNEN OSA P:tä.** Lisää "Testipäivä to 16.7." -listalle uuden "OSA G" -väliotsikon + yhden uusintatestirivin Rivien UI-remonttia (ks. OSA P alla) varten. EI toista koko listaa (toisin kuin sql/036) — turvallinen ajaa vaikka muita rivejä on jo täpätty.
 
+**⚠ sql/047–049 — UUSIA, KESKIVIIKON LÖYDÖKSET (17.7.), AJA ENNEN OSA Q:ta.** `047_laituri_kalenteri_itseilmoitus_korjaus.sql` (palauttaa kaikki virheellisesti "kalenteriin"-kohteella sijoitetuksi merkityt Laiturin rivit sijoittamattomiksi, sisältää RAISE NOTICE -diagnostiikan), `048_aly_log_undo_reason.sql` (aly_log.undo_reason-sarake — kertoo raukesiko ehdotus hiljaa vai peruttiinko se), `049_testipaiva_keskiviikon_loydokset_rivit.sql` (uusi "OSA H" -väliotsikko + uusintatestirivit, ei toista koko listaa). Aja järjestyksessä 047→048→049.
+
 ---
 
 ## OSA A — Muistutusten ajastin
@@ -295,6 +297,32 @@ Korjaa bugin jossa pitkät rivit näkyivät muodossa "tyyny…" edellisen ellips
 6. **Hytti:** avaa jokin kortti jolla on tehtäväksi merkitty rivi (☑). Tarkista että pidempi tehtävärivi näkyy aiempaa paremmin, ja että rivin "⋯" sisältää ⏰ Muistutus + Poista.
 7. **Testipäivä-listan uusi rivi:** täppää "Testipäivä to 16.7." -listan uusi "OSA G" -rivi (ks. sql/046) kun kohdat 1–6 on käyty läpi.
 8. Jos jokin rivi näyttää edelleen katkeavan liian aikaisin lyhyellä, tavallisen mittaisella tekstillä (ei keinotekoisen pitkällä), kerro Claudelle tarkka rivin teksti ja näkymä — kyse on todennäköisesti uudesta, vielä löytymättömästä kiinteän-levyisestä elementistä joka pitäisi lisätä `style.css`:n ellipsis-poissulkulistaan tai flex-korjauksen piiriin.
+
+---
+
+## OSA Q — Testaa keskiviikon löydökset (2026-07-17, ks. muistiinpanot.md "Keskiviikon löydökset")
+
+Aja **`sql/047`–`049`** ennen tätä. Kolme kokonaisuutta, testaa tässä järjestyksessä (sama kuin korjausjärjestys).
+
+**1. Kalenteri-sijoitus (vakavin korjaus):**
+1. Avaa Laituri, kirjoita testimuru selvällä ajanmääreellä ("huomenna klo 15 testi"), jätä sijoittamatta.
+2. Paina ✨ — äly-ehdotuksen pitäisi TÄSTÄ ETEENPÄIN olla joko olemassa oleva lista, "muistutus (ajankohtaan sidottu asia)" tai "hytin kortille"/"ei mikään näistä" — **EI KOSKAAN "kalenteriin"**.
+3. Jos ehdotus on muistutus: paina Sopii — pitäisi avautua OIKEA muistutuspaneeli (sama kuin ⏰-napista muualla), EI browserin `prompt()`-ikkunaa. Aseta muistutus — rivin pitäisi muuttua "sijoitetuksi" VASTA tämän jälkeen, meta-tekstissä "→ muistutus asetettu".
+4. Kokeile myös suoraa ⚓-nappia sijoittamattomalla Laituri-rivillä (uusi, näkyy ✨:n ja →:n välissä) — pitäisi nostaa muru sellaisenaan päivän Ankkureihin ilman sijoitusdialogia, ⚓ jää kultaiseksi/aktiiviseksi.
+5. Sijoitetulla rivillä pitäisi näkyä uusi "↺"-nappi (ei enää ✨/→/⚓) — paina sitä, rivin pitäisi palautua sijoittamattomaksi ("N sijoittamatta" -laskuri kasvaa yhdellä).
+6. Jos Laiturissa on VANHOJA rivejä joiden kohdalla luki aiemmin "→ kalenteriin..." — tarkista `sql/047`:n jälkeen että ne ovat palautuneet sijoittamattomiksi (Vercel/Supabase SQL Editorin RAISE NOTICE -tulosteesta näkee mitkä rivit korjattiin).
+
+**2. Äly-loki:**
+1. Asetukset → "✨ Mitä äly on tehnyt" — jokaisella rivillä pitäisi näkyä pieni TILA-merkintä (Odottaa reaktiota / Otettu omaksi / Tehty / Rauennut / Kumottu) kuvauksen ja ajan lisäksi.
+2. Anna jonkin ✨-ehdokkaan raueta (ei reagoida ennen seuraavaa yöajoa, tai testaa käsin painamalla × ehdokaskortilta) — lokirivin pitäisi näyttää "Rauennut (ei reagoitu)" TAI "Kumottu" (× = kumottu tässä versiossa) + muted-linkki "Muru on yhä Laiturissa →". Paina linkkiä — pitäisi avautua Laituri haettuna suoraan sillä murulla.
+
+**3. E3 + Ankkurit:**
+1. Etusivu, kun ✨-ehdokkaita on ≥1: pitäisi näkyä pieni "✨ Ehdotukset" -otsikko Ankkurit-lohkon alla, JA ehdokasrivin ympärillä kulta katkoviivakehys (ei pelkkä himmeä/opacity-rivi).
+2. Napauta minkä tahansa ANKKURIN (ei ehdokkaan) tekstiä — pitäisi avautua inline-muokkaus kuten kaikkialla muualla. Muokkaa tekstiä, tallenna (Enter/blur) — vain ankkuri muuttuu, alkuperäinen lähderivi (jos ankkuri nostettu Muistilapuilta/Kalenterista/Hytistä) EI muutu.
+3. Napauta ✨-ehdokkaan tekstiä ja muokkaa sitä — tallennuksen pitäisi SEKÄ tallentaa uuden tekstin ETTÄ ottaa ehdokkaan omaksi ankkuriksi automaattisesti (katoaa ehdokkaista, ilmestyy tavallisiin ankkureihin).
+4. **Pitkät tekstit kaikkialla:** kirjoita pitkä Laiturin muru (yli 40 merkkiä) — tarkista ettei se katkea "…"-merkkiin missään (Laiturin omalla rivillä TAI ✨-ehdotuskortilla TAI E3-ankkuriehdokkaalla). Kaikkien kolmen pitäisi näyttää teksti kokonaan, tarvittaessa monirivisenä.
+5. **Testipäivä-listan uudet rivit:** täppää "Testipäivä to 16.7." -listan uusi "OSA H" -osio (ks. sql/049) kun yllä olevat on käyty läpi.
+6. Jos jokin kohta ei täsmää: tarkista Vercelin Logs `/api/aly-nightly`-kutsuista ja selaimen konsolista virheitä — kaikki tämän osan toiminnot kirjoittavat `console.error`:iin jos jokin tietokantakutsu epäonnistuu.
 
 ---
 

@@ -235,7 +235,7 @@ module.exports = async function handler(req, res) {
       await supabaseFetch('aly_log?anchor_id=eq.' + row.id + '&undone_at=is.null', {
         method: 'PATCH',
         headers: { Prefer: 'return=minimal' },
-        body: JSON.stringify({ undone_at: new Date().toISOString() }),
+        body: JSON.stringify({ undone_at: new Date().toISOString(), undo_reason: 'expired' }),
       });
 
       const noteId = Number(row.source_ref);

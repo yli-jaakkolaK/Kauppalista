@@ -1885,8 +1885,42 @@ async function lataaAnkkurit() {
     });
     li.appendChild(checkNappi);
 
+    // BUGIKORJAUS (2026-07-17, "Ankkurin muokkaus puuttuu"): napautus avaa
+    // inline-muokkauksen kuten kaikkialla muualla — pelkkä poista+lisää-kierto
+    // oli riittämätön pienelle korjaukselle ("Ikaalisiin"→"Parkanoon").
+    // PÄÄTÖS lähdekytköksestä: muokkaus koskee VAIN tätä ankkuria, EI
+    // lähderiviä (Muistilaput/Kalenteri/Hytti) josta ankkuri on mahdollisesti
+    // nostettu — `ankkurit.content` on jo arkkitehtuurissa KOPIO otettu
+    // ankkurointihetkellä (ks. vaihdaAnkkurointiYleinen), ei elävä viittaus,
+    // joten tämä on johdonmukaista olemassa olevan mallin kanssa, ei uusi
+    // poikkeus. Kytkös EI saa katketa hiljaa — title-vihje kertoo sen aina.
     const teksti = document.createElement('span');
     teksti.textContent = ankkuri.content;
+    teksti.title = 'Muokkaus koskee vain tätä ankkuria, ei alkuperäistä riviä';
+    teksti.addEventListener('click', function() {
+      const inputti = document.createElement('input');
+      inputti.type = 'text';
+      inputti.value = ankkuri.content;
+      inputti.className = 'edit-input';
+      teksti.replaceWith(inputti);
+      inputti.focus();
+      inputti.select();
+
+      async function tallenna() {
+        const uusi = inputti.value.trim();
+        if (uusi && uusi !== ankkuri.content) {
+          const { error } = await db.from('ankkurit').update({ content: uusi }).eq('id', ankkuri.id);
+          if (error) console.error('Ankkurin muokkaus epäonnistui:', error);
+        }
+        lataaAnkkurit();
+      }
+
+      inputti.addEventListener('blur', tallenna);
+      inputti.addEventListener('keydown', function(e) {
+        if (e.key === 'Enter') inputti.blur();
+        if (e.key === 'Escape') { inputti.value = ankkuri.content; inputti.blur(); }
+      });
+    });
     li.appendChild(teksti);
 
     const irrotaNappi = document.createElement('button');
@@ -1943,6 +1977,13 @@ async function loadAnchorCandidates() {
   const listEl = document.getElementById('anchor-candidates-list');
   listEl.innerHTML = '';
 
+  // BUGIKORJAUS (2026-07-17, ks. "✨-ehdokkaan erottuvuus"): väsynyt käyttäjä
+  // ilman listaa ei rekisteröinyt ehdokasta ollenkaan etusivulla — rivi
+  // hukkui muun sisällön joukkoon. Muoto (otsikko + katkoviivakehys alla),
+  // ei himmeys — opacity ei viesti mitään saavutettavasti.
+  const otsikkoEl = document.getElementById('anchor-candidates-title');
+  if (otsikkoEl) otsikkoEl.style.display = (data || []).length ? 'block' : 'none';
+
   huomioPallurat.ankkurit = (data || []).length;
   const badge = document.getElementById('anchor-candidates-badge');
   if (badge) {
@@ -1957,6 +1998,7 @@ async function loadAnchorCandidates() {
 
   (data || []).forEach(function(candidate) {
     const li = document.createElement('li');
+    li.className = 'anchor-candidate-row';
 
     const checkButton = document.createElement('button');
     checkButton.textContent = '○';
@@ -1969,8 +2011,44 @@ async function loadAnchorCandidates() {
     });
     li.appendChild(checkButton);
 
+    // BUGIKORJAUS (2026-07-17, "Ankkurin muokkaus puuttuu"): ✨-ehdokkaan
+    // muokkaus = "ota omiin + muokattu" — pelkkä tekstin korjaus on jo
+    // eksplisiittinen sitoutuminen, ei jätetä sitä silti ehdokastilaan.
     const text = document.createElement('span');
     text.textContent = '✨ ' + candidate.content;
+    text.title = 'Muokkaus ottaa ehdotuksen omaksi ankkuriksi';
+    text.addEventListener('click', function() {
+      let peruttu = false;
+      const inputti = document.createElement('input');
+      inputti.type = 'text';
+      inputti.value = candidate.content;
+      inputti.className = 'edit-input';
+      text.replaceWith(inputti);
+      inputti.focus();
+      inputti.select();
+
+      async function tallenna() {
+        if (peruttu) {
+          loadAnchorCandidates();
+          return;
+        }
+        const uusi = inputti.value.trim();
+        if (uusi) {
+          const paivitys = { is_candidate: false };
+          if (uusi !== candidate.content) paivitys.content = uusi;
+          const { error } = await db.from('ankkurit').update(paivitys).eq('id', candidate.id);
+          if (error) console.error('Ankkuriehdokkaan muokkaus epäonnistui:', error);
+        }
+        loadAnchorCandidates();
+        lataaAnkkurit();
+      }
+
+      inputti.addEventListener('blur', tallenna);
+      inputti.addEventListener('keydown', function(e) {
+        if (e.key === 'Enter') inputti.blur();
+        if (e.key === 'Escape') { peruttu = true; inputti.blur(); }
+      });
+    });
     li.appendChild(text);
 
     const acceptButton = document.createElement('button');
@@ -1992,7 +2070,7 @@ async function loadAnchorCandidates() {
     dismissButton.addEventListener('click', async function() {
       const { error } = await db.from('ankkurit').delete().eq('id', candidate.id);
       if (error) console.error('Ankkuriehdokkaan poisto epäonnistui:', error);
-      await db.from('aly_log').update({ undone_at: new Date().toISOString() }).eq('anchor_id', candidate.id).is('undone_at', null);
+      await db.from('aly_log').update({ undone_at: new Date().toISOString(), undo_reason: 'dismissed' }).eq('anchor_id', candidate.id).is('undone_at', null);
       loadAnchorCandidates();
     });
     li.appendChild(dismissButton);
@@ -2235,6 +2313,36 @@ async function updateSettingsBadge() {
 // Piirtää "Mitä äly on tehnyt" -lokin Asetuksiin, uusin ensin. Rivit eivät
 // koskaan katoa (loki on pysyvä historia) — kumottu rivi jää näkyviin
 // yliviivattuna ilman Kumoa-nappia, ei piiloteta.
+// Avaa Laituri-näkymän ja hakee suoraan lähdemurun sisällöllä — käytetään
+// äly-lokin "→ Laituri" -linkistä (ks. loadAiLog alla), jotta rauenneen/
+// kumotun ehdotuksen lähdemuru löytyy heti eikä jää arvailun varaan.
+function avaaLaiturinMuru(sisalto) {
+  showLaituriView();
+  const hakuKentta = document.getElementById('laituri-search');
+  if (hakuKentta) hakuKentta.value = sisalto;
+  lataaLaituri(sisalto);
+  palautaLaituriLuonnos();
+  merkitseLaituriNahdyksi();
+}
+
+// Äly-lokin rivin TILA (2026-07-17, ks. "Äly-loki on umpikuja" -bugikorjaus):
+// invariantti sanoo että äly VAIN LISÄÄ, mutta pelkkä invariantti ei riitä —
+// sen pitää myös NÄKYÄ käyttäjälle, muuten rauennut ehdotus on umpikuja
+// (käyttäjä ei tiedä onko muru yhä olemassa jossain). Neljä tilaa: aktiivinen
+// (odottaa yhä reaktiota), otettu omaksi, tehty, rauennut/kumottu — jälkimmäiselle
+// näytetään aina muistutus että LÄHDEMURU on koskematon Laiturissa (turvainvariantti
+// pitää tämän aina totena) + suora linkki sinne.
+function alyLokiTila(entry, ankkuri) {
+  if (!entry.undone_at) {
+    if (!ankkuri) return { teksti: 'Tuntematon tila', luokka: '' };
+    if (ankkuri.done) return { teksti: 'Tehty', luokka: 'aly-log-tila-tehty' };
+    if (ankkuri.is_candidate) return { teksti: 'Odottaa reaktiota', luokka: 'aly-log-tila-aktiivinen' };
+    return { teksti: 'Otettu omaksi', luokka: 'aly-log-tila-otettu' };
+  }
+  if (entry.undo_reason === 'expired') return { teksti: 'Rauennut (ei reagoitu)', luokka: 'aly-log-tila-rauennut' };
+  return { teksti: 'Kumottu', luokka: 'aly-log-tila-rauennut' };
+}
+
 async function loadAiLog() {
   const { data, error } = await db.from('aly_log').select().eq('user_id', currentUserId).order('created_at', { ascending: false });
   if (error) {
@@ -2252,6 +2360,20 @@ async function loadAiLog() {
   }
   emptyEl.style.display = 'none';
 
+  // Kaksi kertakyselyä koko listalle (ei per-rivi-kyselyä): ankkurin
+  // NYKYINEN tila (tehty/otettu omaksi/yhä odottava) + lähdemurun sisältö
+  // "→ Laituri" -linkkiä varten.
+  const anchorIds = data.map(function(e) { return e.anchor_id; }).filter(function(id) { return id !== null && id !== undefined; });
+  const sourceRefs = data.map(function(e) { return e.source_ref; }).filter(Boolean);
+  const [ankkuritTulos, laituriTulos] = await Promise.all([
+    anchorIds.length ? db.from('ankkurit').select('id,is_candidate,done').in('id', anchorIds) : Promise.resolve({ data: [] }),
+    sourceRefs.length ? db.from('laituri').select('id,content').in('id', sourceRefs) : Promise.resolve({ data: [] }),
+  ]);
+  const ankkuritKartta = {};
+  (ankkuritTulos.data || []).forEach(function(a) { ankkuritKartta[a.id] = a; });
+  const laituriKartta = {};
+  (laituriTulos.data || []).forEach(function(l) { laituriKartta[l.id] = l; });
+
   data.forEach(function(entry) {
     const row = document.createElement('div');
     row.className = 'aly-log-rivi' + (entry.undone_at ? ' aly-log-kumottu' : '');
@@ -2261,10 +2383,25 @@ async function loadAiLog() {
     text.textContent = entry.description;
     row.appendChild(text);
 
+    const tila = alyLokiTila(entry, entry.anchor_id ? ankkuritKartta[entry.anchor_id] : null);
+    const tilaEl = document.createElement('span');
+    tilaEl.className = 'aly-log-tila ' + tila.luokka;
+    tilaEl.textContent = tila.teksti;
+    row.appendChild(tilaEl);
+
     const time = document.createElement('span');
     time.className = 'aly-log-aika';
     time.textContent = suhteellinenAika(entry.created_at);
     row.appendChild(time);
+
+    const laituriRivi = entry.source_ref ? laituriKartta[entry.source_ref] : null;
+    if (entry.undone_at && laituriRivi) {
+      const linkki = document.createElement('button');
+      linkki.className = 'aly-log-linkki';
+      linkki.textContent = 'Muru on yhä Laiturissa →';
+      linkki.addEventListener('click', function() { avaaLaiturinMuru(laituriRivi.content); });
+      row.appendChild(linkki);
+    }
 
     if (!entry.undone_at) {
       const undoButton = document.createElement('button');
@@ -2274,7 +2411,7 @@ async function loadAiLog() {
         if (entry.anchor_id) {
           await db.from('ankkurit').delete().eq('id', entry.anchor_id);
         }
-        const { error } = await db.from('aly_log').update({ undone_at: new Date().toISOString() }).eq('id', entry.id);
+        const { error } = await db.from('aly_log').update({ undone_at: new Date().toISOString(), undo_reason: 'manual' }).eq('id', entry.id);
         if (error) console.error('Äly-lokin kumoaminen epäonnistui:', error);
         loadAiLog();
         loadAnchorCandidates();
@@ -2346,6 +2483,23 @@ async function lataaLaituri(hakusana) {
       });
       li.appendChild(alyNappi);
 
+      // Suora ⚓-oikotie (2026-07-17, ks. "Kalenteri-sijoitus ei kirjoita
+      // mitään" -bugikorjaus): nostaa murun sellaisenaan tälle päivälle
+      // ankkuriksi ilman sijoitusvirtaa — sama todistettu, oikeasti
+      // tietokantaan kirjoittava mekanismi kuin Muistilappujen ⚓ (ks.
+      // vaihdaAnkkurointiYleinen). EI merkitse murua sijoitetuksi (ankkurointi
+      // ja sijoitus ovat eri kysymyksiä, sama periaate kuin Muistilapuilla).
+      const ankkuriNappi = document.createElement('button');
+      ankkuriNappi.className = 'anchor-btn' + (ankkuroidutAvaimet.has('laituri:' + rivi.id) ? ' active' : '');
+      ankkuriNappi.textContent = '⚓';
+      ankkuriNappi.title = 'Nosta tälle päivälle ankkuriksi';
+      ankkuriNappi.addEventListener('click', function() {
+        vaihdaAnkkurointiYleinen('laituri', rivi.id, rivi.content, function() {
+          lataaLaituri(document.getElementById('laituri-search').value.trim());
+        });
+      });
+      li.appendChild(ankkuriNappi);
+
       const sijoitaNappi = document.createElement('button');
       sijoitaNappi.className = 'place-btn';
       sijoitaNappi.textContent = '→';
@@ -2353,6 +2507,20 @@ async function lataaLaituri(hakusana) {
         sijoitaLaituriRivi(rivi);
       });
       li.appendChild(sijoitaNappi);
+    } else {
+      // "↺ palauta sijoittamattomaksi" (2026-07-17, ks. "Kalenteri-sijoitus
+      // ei kirjoita mitään" -bugikorjaus) — sijoitettu-merkintä voi olla
+      // virheellinen (esim. vanha "kalenteriin"-itseilmoitus jota mikään ei
+      // koskaan toteuttanut), joten palautus pitää olla aina mahdollinen.
+      // Aina turvallinen: ei poista mitään, palauttaa vain tilan.
+      const palautaNappi = document.createElement('button');
+      palautaNappi.className = 'restore-btn';
+      palautaNappi.textContent = '↺';
+      palautaNappi.title = 'Palauta sijoittamattomaksi';
+      palautaNappi.addEventListener('click', function() {
+        palautaLaituriSijoittamattomaksi(rivi);
+      });
+      li.appendChild(palautaNappi);
     }
 
     const poistoNappi = document.createElement('button');
@@ -2365,6 +2533,8 @@ async function lataaLaituri(hakusana) {
       if (error) {
         console.error('Laiturin rivin poisto epäonnistui:', error);
       }
+      await db.from('muistutukset').delete().eq('source', 'laituri').eq('source_ref', String(rivi.id));
+      await db.from('ankkurit').delete().eq('source', 'laituri').eq('source_ref', String(rivi.id));
       lataaLaituri(document.getElementById('laituri-search').value.trim());
       paivitaLaituriBadge();
     });
@@ -2374,16 +2544,56 @@ async function lataaLaituri(hakusana) {
   });
 }
 
-// Sijoittaa Laiturin rivin ("minne sijoitit tämän?") — sama toiminto käytössä
-// sekä →-napista (tyhjä oletusarvo) että äly-ehdotuksen "Sopii"-napista
-// (esitäytetty ehdotettu kohde, jonka käyttäjä voi vielä muokata tai
-// hyväksyä sellaisenaan). Ei koskaan siirrä mitään automaattisesti.
+// BUGIKORJAUS (2026-07-17, ks. muistiinpanot.md "Kalenteri-sijoitus ei
+// kirjoita mitään"): tämä on VAPAAMUOTOINEN OMA ILMOITUS ("minne sinä itse
+// veit tämän"), EI koskaan automaattinen siirto mihinkään — Satama ei
+// kirjoita tuotteet/kalenteri_tapahtumat-tauluihin tästä. Tämä on aivan
+// oikein listakohteille (Kauppalista, hytin kortti — käyttäjä lisää rivin
+// itse sinne, tämä vain kirjaa sen ylös), MUTTA oli aiemmin harhaanjohtava
+// "kalenteriin"-kohteelle: SATAMALLA EI OLE KALENTERIKIRJOITUSPOLKUA
+// LAINKAAN (ei Sataman omaan kalenterinäkymään, ei tietenkään iCloudiin —
+// ks. "Kalenterisyötteet"-osio, synkka on VAIN luku-suuntainen kunnes ICS-
+// julkaisu joskus rakennetaan). "Sopii" kalenteri-ehdotukselle merkitsi silti
+// murun sijoitetuksi vaikka mitään ei syntynyt minnekään — järjestelmä väitti
+// murun olevan perillä paikassa jota ei ole. Korjattu POISTAMALLA "kalenteriin"
+// kokonaan äly-ehdotusten kohdevalikoimasta (ks. pyydaLaituriEhdotus) ja
+// tarjoamalla sen tilalle KAKSI aidosti toimivaa reittiä ajankohtaan
+// sidotulle murulle: (1) muistutus (ks. merkitseLaituriMuistutuksella alla,
+// kirjoittaa oikeasti `muistutukset`-tauluun), (2) suora ⚓-ankkurointi
+// (ks. lataaLaituri, kirjoittaa oikeasti `ankkurit`-tauluun). Kumpikaan ei
+// vaadi tätä prompt()-pohjaista itseilmoitusta ollenkaan.
 async function sijoitaLaituriRivi(rivi, oletusTeksti) {
   const minne = prompt('Minne sijoitit tämän?', oletusTeksti || '');
   if (!minne || !minne.trim()) return;
   const { error } = await db.from('laituri').update({ status: 'sijoitettu', placed_where: minne.trim() }).eq('id', rivi.id);
   if (error) {
     console.error('Sijoitus epäonnistui:', error);
+  }
+  lataaLaituri(document.getElementById('laituri-search').value.trim());
+  paivitaLaituriBadge();
+}
+
+// Merkitsee murun sijoitetuksi VASTA kun muistutus on VARMISTETUSTI
+// tallentunut (kutsutaan avaaMuistutusPaneelin jalkeenPaivitys-callbackina,
+// joka laukeaa vain onnistuneen tallennuksen jälkeen — ks. lisaaMuistutus).
+// Tilamerkintä seuraa siis todellisuutta, ei aikomusta.
+async function merkitseLaituriMuistutuksella(rivi) {
+  const { error } = await db.from('laituri').update({ status: 'sijoitettu', placed_where: 'muistutus asetettu' }).eq('id', rivi.id);
+  if (error) {
+    console.error('Sijoitusmerkintä epäonnistui:', error);
+  }
+  lataaLaituri(document.getElementById('laituri-search').value.trim());
+  paivitaLaituriBadge();
+}
+
+// "↺ palauta sijoittamattomaksi" — sijoitetun (tai virheellisesti
+// sijoitetuksi merkityn) murun ⋯-valikon toiminto. Aina turvallinen: ei
+// koskaan poista mitään, palauttaa vain tilan ja tyhjentää placed_where-
+// merkinnän joka ei enää pidä paikkaansa.
+async function palautaLaituriSijoittamattomaksi(rivi) {
+  const { error } = await db.from('laituri').update({ status: 'uusi', placed_where: null }).eq('id', rivi.id);
+  if (error) {
+    console.error('Palautus sijoittamattomaksi epäonnistui:', error);
   }
   lataaLaituri(document.getElementById('laituri-search').value.trim());
   paivitaLaituriBadge();
@@ -2407,9 +2617,18 @@ function naytaLaituriEhdotusVirhe(li, viesti) {
   li.insertAdjacentElement('afterend', kortti);
 }
 
+// Ainoa "kohde" jonka äly saa ehdottaa joka on OIKEASTI toteutettavissa
+// automaattisesti (kirjoittaa `muistutukset`-tauluun) — ei vapaamuotoinen
+// itseilmoitus kuten muut kohteet. Sama merkkijono kohdeluettelossa
+// (pyydaLaituriEhdotus) ja "Sopii"-käsittelyssä alla, ettei kirjoitusvirhe
+// pääse eriyttämään niitä toisistaan.
+const LAITURI_MUISTUTUS_KOHDE = 'muistutus (ajankohtaan sidottu asia)';
+
 // Piirtää äly-ehdotuksen kuittikorttina rivin alle: "→ <ehdotus> · <perustelu>"
-// + Sopii/Ei-napit. EI KOSKAAN kirjoita tietokantaan mitään itse — "Sopii"
-// avaa saman sijoitusdialogin jota →-nappikin käyttää, vain esitäytettynä.
+// + Sopii/Ei-napit. EI KOSKAAN kirjoita tietokantaan mitään itse PAITSI
+// muistutus-kohteelle (ks. LAITURI_MUISTUTUS_KOHDE) — "Sopii" avaa silloin
+// oikean muistutuspaneelin (aito kirjoituspolku), muille kohteille saman
+// vapaamuotoisen itseilmoitusdialogin jota →-nappikin käyttää.
 function piirraLaituriEhdotusKortti(rivi, li, ehdotus) {
   poistaLaituriEhdotusKortti(li);
 
@@ -2428,7 +2647,13 @@ function piirraLaituriEhdotusKortti(rivi, li, ehdotus) {
   sopiiNappi.textContent = 'Sopii';
   sopiiNappi.addEventListener('click', function() {
     poistaLaituriEhdotusKortti(li);
-    sijoitaLaituriRivi(rivi, ehdotus.ehdotus);
+    if (ehdotus.ehdotus === LAITURI_MUISTUTUS_KOHDE) {
+      avaaMuistutusPaneeli('laituri', rivi.id, rivi.content, null, null, function() {
+        merkitseLaituriMuistutuksella(rivi);
+      });
+    } else {
+      sijoitaLaituriRivi(rivi, ehdotus.ehdotus);
+    }
   });
   napit.appendChild(sopiiNappi);
 
@@ -2477,8 +2702,15 @@ async function pyydaLaituriEhdotus(rivi, nappi, li) {
   if (listatError) {
     console.error('Listojen haku ehdotusta varten epäonnistui:', listatError);
   }
+  // BUGIKORJAUS (2026-07-17): 'kalenteriin' POISTETTU kohdevalikoimasta —
+  // Satamalla EI OLE kalenterikirjoituspolkua (ei omaan kalenterinäkymään,
+  // ei tietenkään iCloudiin), joten se oli itseilmoituskohteista ainoa joka
+  // näytti tuottavan jotain vaikka ei tuottanut mitään. Tilalla aidosti
+  // toteutettavissa oleva muistutus (ks. LAITURI_MUISTUTUS_KOHDE ja
+  // piirraLaituriEhdotusKortti) — ehdotus- ja toteutuskerroksen pitää olla
+  // samaa mieltä sovelluksen kyvyistä.
   const kohteet = (listat || []).map(function(l) { return l.name; })
-    .concat(['kalenteriin (päivämäärällinen asia)', 'hytin kortille', 'ei mikään näistä']);
+    .concat([LAITURI_MUISTUTUS_KOHDE, 'hytin kortille', 'ei mikään näistä']);
 
   const prompti = 'Tässä on lyhyt muistiinpano perheen "Laituri"-muistilistalta: "' + rivi.content + '"\n\n' +
     'Mahdolliset sijoituskohteet: ' + kohteet.map(function(k) { return '"' + k + '"'; }).join(', ') + '.\n\n' +

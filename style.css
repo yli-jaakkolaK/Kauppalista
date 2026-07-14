@@ -531,6 +531,49 @@ h1 {
   flex-shrink: 0;
 }
 
+/* Äly-lokin TILA (2026-07-17, ks. "Äly-loki on umpikuja" -bugikorjaus) —
+   invariantin pitää myös NÄKYÄ, ei riitä että se pitää paikkansa. Neutraali
+   oletus (aktiivinen/otettu/tehty), meripihka rauenneelle/kumotulle —
+   sama kolmiportainen merkkikieli kuin muualla, ei uutta väriä keksitty. */
+.aly-log-tila {
+  flex-shrink: 0;
+  font-size: 10px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  padding: 2px 6px;
+  border-radius: 3px;
+  color: var(--muted);
+  border: 1px solid var(--border-dash);
+}
+
+.aly-log-tila-aktiivinen {
+  color: var(--accent-text);
+  border-color: var(--accent);
+}
+
+.aly-log-tila-rauennut {
+  color: var(--huomio);
+  border-color: var(--huomio);
+}
+
+.aly-log-linkki {
+  flex-basis: 100%;
+  text-align: left;
+  font-size: 12px;
+  color: var(--muted);
+  font-style: italic;
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.aly-log-linkki:hover,
+.aly-log-linkki:active {
+  color: var(--accent-text);
+}
+
 .aly-log-kumoa-btn {
   flex-shrink: 0;
   font-size: 11px;
@@ -635,6 +678,15 @@ h1 {
   text-align: center;
   padding: 8px 0;
   cursor: pointer;
+}
+
+/* "✨-ehdokkaan erottuvuus" (2026-07-17, ks. muistiinpanot.md) — pieni
+   muted-otsikko näkyy VAIN kun ehdokkaita on ≥1, muuten ei vie tilaa. */
+.anchor-candidates-title {
+  font-size: 12px;
+  letter-spacing: 0.06em;
+  color: var(--muted);
+  margin: 10px 0 2px;
 }
 
 .sections-grid {
@@ -795,6 +847,31 @@ h1 {
   -webkit-tap-highlight-color: transparent;
 }
 
+/* "↺ palauta sijoittamattomaksi" (2026-07-17, ks. "Kalenteri-sijoitus ei
+   kirjoita mitään" -bugikorjaus) — sama kokoluokka kuin .place-btn, ei
+   erikoisväriä (korjaustoiminto, ei ensisijainen ele). */
+.restore-btn {
+  min-width: 44px;
+  min-height: 44px;
+  background: none;
+  border: none;
+  outline: none;
+  appearance: none;
+  -webkit-appearance: none;
+  font-size: 20px;
+  color: var(--muted);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.restore-btn:hover,
+.restore-btn:active {
+  color: var(--accent-text);
+}
+
 /* Laituri-avustaja (2026-07-12, ensimmäinen oikea älyominaisuus) — sama
    kokoluokka kuin muillakin rivinapeilla, ei omaa erikoisväriä (ei koristele
    "tämä on äly" -tunnetta enempää kuin muutkaan toiminnot). */
@@ -824,10 +901,10 @@ h1 {
    kehys tunnistaa sen MUODOSTA erilliseksi kuin varsinaiset Laituri-rivit
    (ks. "Kalenterin merkkikieli"/"väri koristaa, musta kertoo" -periaate —
    itse ehdotusteksti on informaatiota, täysi --text). */
-.laituri-ehdotus-rivi {
+.list li.laituri-ehdotus-rivi {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
+  flex-direction: column;
+  align-items: stretch;
   gap: 8px;
   padding: 8px 10px;
   margin: -1px 0 4px;
@@ -846,6 +923,8 @@ h1 {
   display: flex;
   gap: 6px;
   flex-shrink: 0;
+  flex-basis: 100%;
+  justify-content: flex-end;
 }
 
 .laituri-ehdotus-napit .dialog-btn {
@@ -1033,9 +1112,7 @@ h1 {
    ellipsis-katkaisu pidempien nimien sijaan (ei rivitystä) — pysyy
    yhtenäisenä `min-height:52px`-rivikorkeuden kanssa kaikissa
    näkymissä (Muistilaput/Kauppalista, Kalenteri, Hytti — kaikki
-   käyttävät samaa `.list li`-rakennetta). Laituri EI tarvinnut tätä
-   (`.laituri-content`/`.laituri-text` oli jo rakennettu `min-width:0` +
-   `word-break:break-word` -periaatteella alusta asti).
+   käyttävät samaa `.list li`-rakennetta).
    RIVIEN UI-REMONTTI (2026-07-16): tämä ellipsis-korjaus YKSIN ei riittänyt —
    pakkauslistan pisimmät oikeat rivit ("Katri: kuulosuojaimet/korvatulpat")
    katkesivat yhä liian aikaisin, koska ikonikaista vei ison osan rivin
@@ -1045,14 +1122,26 @@ h1 {
    RAJATTU POIS tästä ellipsis-säännöstä (`:not(.varasto-rivi)` alla) ja saa
    oman rivityssäännön (ks. alempana) — "Varastossa lista nukkuu" -periaatteen
    mukaisesti pohja on luettava KOKONAAN eikä rivikorkeuden tarvitse pysyä
-   kiinteänä, koska riviä ei "eletä" (sama word-break-periaate kuin Laiturin
-   murulla alusta asti).
+   kiinteänä, koska riviä ei "eletä".
+   BUGIKORJAUS (2026-07-17, ks. "Rivien UI-remontti" jatko-osio
+   muistiinpanot.md:ssä): tässä oli VIRHEELLINEN väite ("Laituri EI tarvinnut
+   tätä") joka osoittautui vääräksi — Laituri KÄYTTÄÄ samaa `.list`-luokkaa
+   `<ul id="laituri-list">`:ssä, joten `.laituri-text`/`.laituri-meta` JA
+   ✨-ehdotuskortin/E3-ankkuriehdokkaan teksti kärsivät TÄSMÄLLEEN samasta
+   liian-korkean-CSS-spesifisyyden ansasta kuin Kalenterin rivit ennen 16.7.
+   korjausta — vain kukaan ei huomannut koska niitä ei testattu pitkillä
+   oikeilla teksteillä (F3:n/Bugi 5:n sokea piste toistui). Korjattu
+   RAJAAMALLA nämä KOKONAAN pois (`.laituri-ehdotus-rivi`/`.anchor-candidate-row`
+   li-tasolla, `.laituri-text`/`.laituri-meta` span-tasolla) ja antamalla
+   niille OMA rivityssääntö (ks. alempana) — "päätösnäkymässä sisältö näkyy
+   aina kokonaan" -periaatteen mukaisesti teksti EI KOSKAAN katkea
+   ehdotus-/päätöskorteilla, riippumatta pituudesta.
    RAJATTU POIS kiinteän levyisiltä metatiedoilta (kellonaika, eräpäivä,
    väripallo, "uusi"-merkki) — niillä on jo omat tarkoitukselliset
    leveytensä, ei saa antaa ellipsiksen/kutistumisen koskea niihin. Jos
    lisäät JATKOSSA uuden pienen kiinteän-levyisen span-merkinnän `.list
    li`:n sisään, lisää sen luokka tähän poissulkulistaan. */
-.list li:not(.varasto-rivi) span:not(.kalenteri-aika):not(.kalenteri-vari):not(.kalenteri-uusi-merkki):not(.hytti-tanaan-aika):not(.hytti-tehtava-erapaiva):not(.hytti-rivi-erapaiva):not(.history-time):not(.muistutus-aika) {
+.list li:not(.varasto-rivi):not(.laituri-ehdotus-rivi):not(.anchor-candidate-row) span:not(.kalenteri-aika):not(.kalenteri-vari):not(.kalenteri-uusi-merkki):not(.hytti-tanaan-aika):not(.hytti-tehtava-erapaiva):not(.hytti-rivi-erapaiva):not(.history-time):not(.muistutus-aika):not(.laituri-text):not(.laituri-meta) {
   flex: 1;
   min-width: 0;
   overflow: hidden;
@@ -1076,6 +1165,36 @@ h1 {
 
 .list li.varasto-rivi .overflow-btn {
   margin-top: 2px;
+}
+
+/* PÄÄTÖSKORTIT (2026-07-17, ks. "Rivien UI-remontti" jatko-osio): mikä
+   tahansa Sopii/Ei- tai vastaavaa reagointia odottava kuittiteksti (Laiturin
+   ✨-ehdotus, E3:n ankkuriehdokas) EI KOSKAAN katkea ellipsillä — käyttäjän
+   pitää nähdä TARKALLEEN mitä hän hyväksyy ennen kuin painaa mitään.
+   Monirivisyys sallittu, rivikorkeus kasvaa tarvittaessa. */
+.laituri-ehdotus-rivi span,
+.anchor-candidate-row span {
+  flex: 1;
+  min-width: 0;
+  white-space: normal;
+  word-break: break-word;
+}
+
+/* "✨-ehdokkaan erottuvuus" (2026-07-17, ks. muistiinpanot.md "E3 + Ankkurit"):
+   väsynyt, ohikulkeva käyttäjä ei rekisteröinyt ehdokasriviä koska se ei
+   erottunut muusta sisällöstä millään tavalla. Korjattu MUODOLLA (kulta
+   katkoviivakehys), EI himmeydellä — opacity ei ole saavutettava viesti,
+   eikä sitä käytetä tässä. Teksti pysyy täydellä --text-värillä (ks. yllä). */
+.list li.anchor-candidate-row {
+  border: 1px dashed var(--accent);
+  border-bottom: 1px dashed var(--accent);
+  border-radius: 4px;
+  padding: 4px 6px;
+  margin-bottom: 6px;
+}
+
+.list li.anchor-candidate-row:last-child {
+  margin-bottom: 0;
 }
 
 .edit-input {
