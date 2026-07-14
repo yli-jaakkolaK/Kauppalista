@@ -1928,6 +1928,18 @@ async function loadAnchorCandidates() {
   const listEl = document.getElementById('anchor-candidates-list');
   listEl.innerHTML = '';
 
+  huomioPallurat.ankkurit = (data || []).length;
+  const badge = document.getElementById('anchor-candidates-badge');
+  if (badge) {
+    if (huomioPallurat.ankkurit) {
+      badge.textContent = huomioPallurat.ankkurit;
+      badge.style.display = 'inline-flex';
+    } else {
+      badge.style.display = 'none';
+    }
+  }
+  paivitaSovelluskuvakeBadge();
+
   (data || []).forEach(function(candidate) {
     const li = document.createElement('li');
 
@@ -2073,9 +2085,12 @@ function avaaOsio(osio) {
 // V1: kalenteri (kuittausjono, ks. paivitaKuittausTila()) + laituri
 // (toisen käyttäjän 'uusi'-tilaiset rivit, ks. alla) + asetukset
 // (näkemättömät "Mitä äly on tehnyt" -lokirivit, ks. updateSettingsBadge()
-// alla — ensimmäinen laajennus tähän karttaan, E3-keskiporras 2026-07-13).
-// Muille laatoille EI palluraa vielä.
-let huomioPallurat = { kalenteri: 0, laituri: 0, asetukset: 0 };
+// alla — ensimmäinen laajennus tähän karttaan, E3-keskiporras 2026-07-13)
+// + ankkurit (reagoimattomat äly-ehdokkaat, ks. loadAnchorCandidates() —
+// lisätty 2026-07-16, samalla reagointipohjaisella logiikalla kuin
+// kalenteri, ei tarvinnut omaa "nähty"-mekanismia koska ehdokasrivin oma
+// tila JO kertoo onko siihen reagoitu). Muille laatoille EI palluraa vielä.
+let huomioPallurat = { kalenteri: 0, laituri: 0, asetukset: 0, ankkurit: 0 };
 
 // Päivittää iOS:n kotinäytön PWA-kuvakkeen numeron (Badging API, iOS 16.4+)
 // kaikkien huomiopallurien summaksi. Feature-detect — jos API:a ei ole
@@ -2083,7 +2098,7 @@ let huomioPallurat = { kalenteri: 0, laituri: 0, asetukset: 0 };
 // käyttäjälle. Kutsutaan aina kun jompikumpi pallura päivittyy.
 async function paivitaSovelluskuvakeBadge() {
   if (!('setAppBadge' in navigator)) return;
-  const summa = huomioPallurat.kalenteri + huomioPallurat.laituri + huomioPallurat.asetukset;
+  const summa = huomioPallurat.kalenteri + huomioPallurat.laituri + huomioPallurat.asetukset + huomioPallurat.ankkurit;
   try {
     if (summa > 0) {
       await navigator.setAppBadge(summa);

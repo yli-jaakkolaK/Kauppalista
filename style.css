@@ -715,6 +715,28 @@ h1 {
   font-weight: bold;
 }
 
+/* E3-keskiporras (2026-07-16): sama huomiopallura-kieli kuin .tile-badge,
+   mutta INLINE (ei laattaa/absoluuttista sijoitusta) — ankkuriehdokkaat
+   eivät elä omalla navigointilaatallaan, vaan suoraan Etusivun "⚓
+   Ankkurit" -otsikon vieressä missä ne itsekin näkyvät. Reagointipohjainen
+   nollaus (kuten Kalenteri-laatalla) — laskuri on suoraan reagoimattomien
+   ehdokkaiden määrä, ei tarvitse erillistä "nähty"-aikaleimaa. */
+.inline-badge {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 9px;
+  background: var(--accent);
+  color: var(--ground);
+  font-size: 10px;
+  font-weight: bold;
+  vertical-align: middle;
+  margin-left: 4px;
+}
+
 .laituri-tila-teksti {
   font-size: 12px;
   color: var(--muted);
