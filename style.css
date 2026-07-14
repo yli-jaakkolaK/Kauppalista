@@ -929,6 +929,7 @@ h1 {
 }
 
 .list li {
+  position: relative; /* ankkuroi rivin oman "⋯"-valikon (.row-menu) juuri sen alle */
   display: flex;
   align-items: center;
   min-height: 52px;
@@ -962,8 +963,23 @@ h1 {
   background: var(--border);
 }
 
+/* RIVIEN UI-REMONTTI (2026-07-16, ks. muistiinpanot.md): aiempi ellipsis-korjaus
+   (13.7.) piti tekstin katkeamattomana mutta ei riittänyt yksin — neljä
+   kiinteän-levyistä nappia (check/⚓/⏰/×) rivin molemmin puolin veivät yhdessä
+   ~190px 350px-levyisestä rivistä, jolloin teksti katkesi liian aikaisin
+   ("tyyny…", "käsi…") pakkauslistan pitkillä oikeilla riveillä. Korjattu
+   kahdella tavalla: (1) nappien VISUAALINEN leveys kutistettu selvästi
+   pienemmäksi tässä ja alla olevissa .anchor-btn/.reminder-btn/.delete-btn
+   -säännöissä, KOSKETUSALUE pidetty silti isona ::before-pseudoelementin
+   "hit slop" -laajennuksella (position:absolute + negatiivinen inset — ei vie
+   flex-tilaa, laajenee näkymättömästi napin ulkopuolelle mahdollisesti tekstin
+   päälle asti); (2) elävien listojen (Muistilaput/Kauppalista) harvemmin
+   tarvitut toiminnot (⏰/muokkaus/×) koottu yhteen "⋯"-nappiin (ks.
+   .overflow-btn/.row-menu alla), Varastossa poistettu kokonaan (ks.
+   isVarasto-haara script.js:n paivitaNaytto()-funktiossa). */
 .check-btn {
-  min-width: 52px;
+  position: relative;
+  min-width: 36px;
   min-height: 52px;
   background: none;
   border: none;
@@ -980,12 +996,31 @@ h1 {
   font-family: 'Courier New', Courier, monospace;
 }
 
+.check-btn::before,
+.anchor-btn::before,
+.reminder-btn::before,
+.delete-btn::before,
+.overflow-btn::before {
+  content: '';
+  position: absolute;
+  inset: -6px;
+  z-index: 1;
+}
+
 .list li.done .check-btn {
   color: var(--accent);
 }
 
+/* RIVIEN UI-REMONTTI (2026-07-16): `flex:1` EI ollut aiemmin rajattu vain
+   kasvavaan pääteksti-spaniin — se koski KAIKKIA rivin spaneja, myös
+   kiinteän sisältöisiä metatietoja (kalenteri-aika, muistutus-aika, ym.).
+   Koska niiden oma teksti ei koskaan venynyt täyttämään flex-kasvun
+   antamaa tilaa, ne varastivat näkymätöntä tyhjää tilaa pääteksiltä ilman
+   että se näkyi missään — yksi piilevä syy liian aikaiseen katkeamiseen
+   varsinkin Kalenterin riveillä. Perusarvo nyt `flex:0 1 auto` (ei kasvua,
+   saa silti kutistua), ja VAIN kasvava pääteksti saa `flex:1` erikseen
+   (ks. alla oleva ellipsis-sääntö ja `.varasto-rivi span`). */
 .list li span {
-  flex: 1;
   padding: 4px 0;
   cursor: pointer;
 }
@@ -997,20 +1032,50 @@ h1 {
    jolloin pitkä teksti leventää koko rivin näytön yli. Yksirivinen
    ellipsis-katkaisu pidempien nimien sijaan (ei rivitystä) — pysyy
    yhtenäisenä `min-height:52px`-rivikorkeuden kanssa kaikissa
-   näkymissä (Muistilaput/Varasto/Kauppalista, Kalenteri, Hytti — kaikki
+   näkymissä (Muistilaput/Kauppalista, Kalenteri, Hytti — kaikki
    käyttävät samaa `.list li`-rakennetta). Laituri EI tarvinnut tätä
    (`.laituri-content`/`.laituri-text` oli jo rakennettu `min-width:0` +
    `word-break:break-word` -periaatteella alusta asti).
+   RIVIEN UI-REMONTTI (2026-07-16): tämä ellipsis-korjaus YKSIN ei riittänyt —
+   pakkauslistan pisimmät oikeat rivit ("Katri: kuulosuojaimet/korvatulpat")
+   katkesivat yhä liian aikaisin, koska ikonikaista vei ison osan rivin
+   leveydestä (ks. .check-btn/.anchor-btn/.reminder-btn/.delete-btn/
+   .overflow-btn -kommentti yllä kaistan kaventamisesta). LISÄKSI Varasto
+   (`.varasto-rivi`, ks. script.js:n paivitaNaytto()) on nyt kokonaan
+   RAJATTU POIS tästä ellipsis-säännöstä (`:not(.varasto-rivi)` alla) ja saa
+   oman rivityssäännön (ks. alempana) — "Varastossa lista nukkuu" -periaatteen
+   mukaisesti pohja on luettava KOKONAAN eikä rivikorkeuden tarvitse pysyä
+   kiinteänä, koska riviä ei "eletä" (sama word-break-periaate kuin Laiturin
+   murulla alusta asti).
    RAJATTU POIS kiinteän levyisiltä metatiedoilta (kellonaika, eräpäivä,
    väripallo, "uusi"-merkki) — niillä on jo omat tarkoitukselliset
    leveytensä, ei saa antaa ellipsiksen/kutistumisen koskea niihin. Jos
    lisäät JATKOSSA uuden pienen kiinteän-levyisen span-merkinnän `.list
    li`:n sisään, lisää sen luokka tähän poissulkulistaan. */
-.list li span:not(.kalenteri-aika):not(.kalenteri-vari):not(.kalenteri-uusi-merkki):not(.hytti-tanaan-aika):not(.hytti-tehtava-erapaiva):not(.hytti-rivi-erapaiva):not(.history-time):not(.muistutus-aika) {
+.list li:not(.varasto-rivi) span:not(.kalenteri-aika):not(.kalenteri-vari):not(.kalenteri-uusi-merkki):not(.hytti-tanaan-aika):not(.hytti-tehtava-erapaiva):not(.hytti-rivi-erapaiva):not(.history-time):not(.muistutus-aika) {
+  flex: 1;
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.list li.varasto-rivi {
+  align-items: flex-start;
+  min-height: 44px;
+  padding: 6px 0;
+}
+
+.list li.varasto-rivi span {
+  flex: 1;
+  min-width: 0;
+  white-space: normal;
+  word-break: break-word;
+  padding: 6px 0;
+}
+
+.list li.varasto-rivi .overflow-btn {
+  margin-top: 2px;
 }
 
 .edit-input {
@@ -1031,14 +1096,15 @@ h1 {
 }
 
 .delete-btn {
-  min-width: 52px;
+  position: relative;
+  min-width: 36px;
   min-height: 52px;
   background: none;
   border: none;
   outline: none;
   appearance: none;
   -webkit-appearance: none;
-  font-size: 28px;
+  font-size: 24px;
   color: var(--muted);
   cursor: pointer;
   display: flex;
@@ -1055,7 +1121,8 @@ h1 {
 }
 
 .anchor-btn {
-  min-width: 44px;
+  position: relative;
+  min-width: 32px;
   min-height: 44px;
   background: none;
   border: none;
@@ -1096,7 +1163,8 @@ h1 {
 }
 
 .reminder-btn {
-  min-width: 44px;
+  position: relative;
+  min-width: 32px;
   min-height: 44px;
   background: none;
   border: none;
@@ -1121,6 +1189,77 @@ h1 {
 .reminder-btn.active {
   color: var(--accent);
   opacity: 1;
+}
+
+/* "⋯"-rivivalikko (2026-07-16, ks. "Rivien UI-remontti" muistiinpanot.md:ssä):
+   kokoaa harvemmin tarvitut rivitoiminnot (muistutus/muokkaus/poisto) yhden
+   napin taakse pienenä ankkuroituna pudotusvalikkona rivin alle. */
+.overflow-btn {
+  position: relative;
+  min-width: 32px;
+  min-height: 44px;
+  background: none;
+  border: none;
+  outline: none;
+  appearance: none;
+  -webkit-appearance: none;
+  font-size: 20px;
+  color: var(--muted);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  -webkit-tap-highlight-color: transparent;
+  opacity: 0.5;
+  flex-shrink: 0;
+}
+
+.overflow-btn:hover,
+.overflow-btn:active {
+  opacity: 1;
+}
+
+.row-menu {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  z-index: 5;
+  display: flex;
+  flex-direction: column;
+  min-width: 150px;
+  background: var(--ground);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.2);
+  overflow: hidden;
+}
+
+.row-menu-item {
+  background: none;
+  border: none;
+  outline: none;
+  text-align: left;
+  font-family: 'Courier New', Courier, monospace;
+  font-size: 15px;
+  font-weight: 500;
+  color: var(--text);
+  padding: 12px 16px;
+  min-height: 44px;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.row-menu-item:not(:last-child) {
+  border-bottom: 1px solid var(--border);
+}
+
+.row-menu-item:hover,
+.row-menu-item:active {
+  background: var(--border);
+}
+
+.row-menu-item-danger {
+  color: #e24b4a;
 }
 
 .muistutus-aika {

@@ -38,6 +38,8 @@ Täysi ohje (asennus, mistä yhteysosoite löytyy) on **BACKUP.md**:ssä.
 
 **⚠ sql/041–045 — UUSIA, E3-KESKIPORRAS, AJA ENNEN OSA O:ta (VIIMEISENÄ testattava, ei kiireellinen ennen sitä).** `041_aly_nightly_setup.sql` (asetukset.aly_yoajo-kytkin + ankkurit.is_candidate), `042_aly_log_evaluated.sql` (aly_log + aly_evaluated -taulut), `043_aly_log_seen.sql` (Asetukset-laatan pallura), `044_aly_evaluated_content.sql` (aly_evaluated.content — bugikorjaus 16.7., muokkaus vapauttaa uudelleenarvioinnin), `045_aly_log_category.sql` (aly_log.category/deadline — "Hetki vs. ikkuna" -luokittelu, sama bugikorjaus). Viisi erillistä tiedostoa, aja järjestyksessä 041→042→043→044→045 (ei riippuvuutta väliltä paitsi että kaikki viisi tarvitaan ennen OSA O:n testausta).
 
+**⚠ sql/046_testipaiva_uiremontti_rivi.sql — UUSI, AJA ENNEN OSA P:tä.** Lisää "Testipäivä to 16.7." -listalle uuden "OSA G" -väliotsikon + yhden uusintatestirivin Rivien UI-remonttia (ks. OSA P alla) varten. EI toista koko listaa (toisin kuin sql/036) — turvallinen ajaa vaikka muita rivejä on jo täpätty.
+
 ---
 
 ## OSA A — Muistutusten ajastin
@@ -278,6 +280,21 @@ Rakennettu ja pushattu 15.7., ensimmäinen oikea yöajo 16.7. paljasti uudelleen
 8. **Raukeamistesti, hetkiasia (vaatii kaksi yöajoa n. vuorokauden välein):** jätä hetkiasia-ehdokas (kohta 1a) täysin reagoimatta. Seuraavan yöajon pitäisi poistaa se hiljaa — muru säilyy Laiturissa, lokirivi jää yliviivattuna, JA sama muru EI SAA nousta uudelleen kolmannessa yöajossa (tämä oli 16.7. bugi). Voit tarkistaa tämän myös suoraan: `aly_evaluated`-taulussa pitäisi näkyä murun `content` täsmälleen sellaisena kuin se oli Laiturissa.
 9. **Raukeamistesti, ikkuna-asia (vaatii kaksi yöajoa, voi tehdä samalla kierroksella kuin kohta 8):** jätä ikkuna-asia-ehdokas (kohta 1b) reagoimatta. Seuraavan yöajon pitäisi poistaa ehdokas MUTTA nostaa SAMA muru uudelleen ehdokkaaksi heti samassa ajossa (koska takaraja — 24.7. — ei ole vielä ohi). Testaa tämän jälkeen myös murun MUOKKAUS (muuta tekstiä) — seuraavan yöajon pitäisi arvioida se aivan uutena murun sisältönä.
 10. Jos jokin epäonnistuu: tarkista Vercelin Logs-välilehdeltä `/api/aly-nightly`-kutsun vaste ja `[aly-nightly]`-lokirivit — ne kertovat tarkalleen missä vaiheessa (kytkin pois, ei vielä ajankohtainen, ei kelvollisia muruja, Anthropic-virhe) juuttui.
+
+---
+
+## OSA P — Testaa Rivien UI-remontti (2026-07-16, ks. muistiinpanot.md "Rivien UI-remontti")
+
+Korjaa bugin jossa pitkät rivit näkyivät muodossa "tyyny…" edellisen ellipsis-korjauksen (13.7.) jälkeen — ikonikaista vei liikaa tilaa JA kiinteät metatietospanit (kellonaika, muistutusaika ym.) varastivat näkymätöntä flex-tilaa päätekstiltä. Aja **`sql/046`** ennen tätä.
+
+1. **Varasto (pakkauslista):** avaa "Telttaretken pakkauslista" tai "Viikon reissun pakkauslista". Etsi rivit **"Katri: kuulosuojaimet/korvatulpat"** ja **"Uikkarit + uimakengät/sukat/pyyhe"** (tai vastaavat pitkät rivit) — pitäisi näkyä KOKONAAN, rivittyneenä useammalle riville, EI katkaistuna ellipsillä. Ei täppää, ei ⚓ näkyvissä — vain hiljainen "⋯" oikeassa reunassa.
+2. Paina Varaston rivin "⋯" — pitäisi avautua pieni valikko: Muokkaa, Poista. Kokeile molemmat (Poista vaatii vahvistuksen kuten ennenkin).
+3. **Muistilaput/Kauppalista:** avaa mikä tahansa elävä lista. Rivillä pitäisi näkyä: täppä (○/✓) + teksti + ⚓ (aina näkyvissä) + "⋯". Paina "⋯" — valikossa: ⏰ Muistutus, Muokkaa, Poista. Aseta muistutus jollekin riville — sen pitäisi näkyä pienenä aikatietona tekstin perässä ("huomenna 08:00" tms.), EI omana nappinaan.
+4. Kirjoita testiksi pitkä tuotenimi (esim. "Katri: kuulosuojaimet ja varapatterit") Kauppalistalle — pitäisi näkyä selvästi enemmän tekstiä ennen ellipsis-katkaisua kuin ennen tätä korjausta (ei välttämättä täysin kokonaan, elävillä listoilla on edelleen täppä+⚓+⋯ näkyvissä).
+5. **Kalenteri:** tarkista tavallisen pituinen tapahtuma (esim. "Vanhempainilta koulussa") — pitäisi näkyä lähes kokonaan. Paina rivin "⋯" — valikossa ⏰ Muistutus + (jos rivi ei ole synkattu iCloudista) Poista. ⚓ pysyy suoraan näkyvänä.
+6. **Hytti:** avaa jokin kortti jolla on tehtäväksi merkitty rivi (☑). Tarkista että pidempi tehtävärivi näkyy aiempaa paremmin, ja että rivin "⋯" sisältää ⏰ Muistutus + Poista.
+7. **Testipäivä-listan uusi rivi:** täppää "Testipäivä to 16.7." -listan uusi "OSA G" -rivi (ks. sql/046) kun kohdat 1–6 on käyty läpi.
+8. Jos jokin rivi näyttää edelleen katkeavan liian aikaisin lyhyellä, tavallisen mittaisella tekstillä (ei keinotekoisen pitkällä), kerro Claudelle tarkka rivin teksti ja näkymä — kyse on todennäköisesti uudesta, vielä löytymättömästä kiinteän-levyisestä elementistä joka pitäisi lisätä `style.css`:n ellipsis-poissulkulistaan tai flex-korjauksen piiriin.
 
 ---
 

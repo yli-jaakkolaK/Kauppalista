@@ -543,6 +543,8 @@ function piirraKalenteriRivi(rivi) {
     li.appendChild(vari);
   }
 
+  li.dataset.tuoteId = rivi.id;
+
   const teksti = document.createElement('span');
   teksti.textContent = rivi.title;
   li.appendChild(teksti);
@@ -564,6 +566,9 @@ function piirraKalenteriRivi(rivi) {
     li.appendChild(uusiMerkki);
   }
 
+  const muistutusAika = reminderTimeBadge('kalenteri', rivi.id);
+  if (muistutusAika) li.appendChild(muistutusAika);
+
   const ankkurointiNappi = document.createElement('button');
   ankkurointiNappi.textContent = '⚓';
   ankkurointiNappi.className = 'anchor-btn' + (ankkuroidutAvaimet.has('kalenteri:' + rivi.id) ? ' active' : '');
@@ -573,30 +578,35 @@ function piirraKalenteriRivi(rivi) {
   });
   li.appendChild(ankkurointiNappi);
 
-  li.appendChild(luoMuistutusNappi('kalenteri', rivi.id, rivi.title, rivi.event_date, rivi.event_time, lataaKalenteri));
-
-  // Synkatulla rivillä (ical_uid asetettu) EI näytetä poistonappia lainkaan:
+  // Harvemmin tarvitut toiminnot yhden hiljaisen "⋯"-napin taakse (ks.
+  // "Rivien UI-remontti" muistiinpanot.md:ssä) — vapauttaa tilaa tapahtuman
+  // nimelle samalla periaatteella kuin Muistilaput/Kauppalista.
+  // Synkatulla rivillä (ical_uid asetettu) EI näytetä poistoa lainkaan:
   // "yksi totuus, kaksi ikkunaa" -periaatteen mukaan poisto kuuluu tehdä
   // iPhonen Kalenterissa, ja peilisääntö (siivoaPoistetut, api/caldav-sync.js)
   // poistaa rivin täältä automaattisesti seuraavassa synkassa. Ilman tätä
-  // rajausta poistonappi näytti poistavan tapahtuman "kokonaan", vaikka se
-  // vain katosi Satamasta hetkeksi ja synkka olisi tuonut sen takaisin.
+  // rajausta poisto näytti poistavan tapahtuman "kokonaan", vaikka se vain
+  // katosi Satamasta hetkeksi ja synkka olisi tuonut sen takaisin.
+  const menuItems = [
+    { label: '⏰ Muistutus', onClick: function() { avaaMuistutusPaneeli('kalenteri', rivi.id, rivi.title, rivi.event_date, rivi.event_time, lataaKalenteri); } },
+  ];
   if (!rivi.ical_uid) {
-    const poistoNappi = document.createElement('button');
-    poistoNappi.textContent = '×';
-    poistoNappi.className = 'delete-btn';
-    poistoNappi.addEventListener('click', async function() {
-      const vahvistus = await naytaVahvistus('Poistetaanko ' + rivi.title + '?', null, 'Poista');
-      if (!vahvistus) return;
-      const { error } = await db.from('kalenteri_tapahtumat').delete().eq('id', rivi.id);
-      if (error) {
-        console.error('Tapahtuman poisto epäonnistui:', error);
-      }
-      await db.from('muistutukset').delete().eq('source', 'kalenteri').eq('source_ref', String(rivi.id));
-      lataaKalenteri();
+    menuItems.push({
+      label: 'Poista',
+      danger: true,
+      onClick: async function() {
+        const vahvistus = await naytaVahvistus('Poistetaanko ' + rivi.title + '?', null, 'Poista');
+        if (!vahvistus) return;
+        const { error } = await db.from('kalenteri_tapahtumat').delete().eq('id', rivi.id);
+        if (error) {
+          console.error('Tapahtuman poisto epäonnistui:', error);
+        }
+        await db.from('muistutukset').delete().eq('source', 'kalenteri').eq('source_ref', String(rivi.id));
+        lataaKalenteri();
+      },
     });
-    li.appendChild(poistoNappi);
   }
+  li.appendChild(createOverflowButton(li, menuItems));
 
   return li;
 }
@@ -1518,14 +1528,19 @@ function piirraHyttiRivi(rivi, lukutila) {
     li.appendChild(tehtavaNappi);
 
     if (rivi.is_task) {
-      li.appendChild(luoMuistutusNappi('hytti_rivi', rivi.id, rivi.content, null, null, lataaHyttiKortti));
+      const muistutusAika = reminderTimeBadge('hytti_rivi', rivi.id);
+      if (muistutusAika) li.appendChild(muistutusAika);
     }
 
-    const poistoNappi = document.createElement('button');
-    poistoNappi.textContent = '×';
-    poistoNappi.className = 'delete-btn';
-    poistoNappi.addEventListener('click', function() { poistaHyttiRivi(rivi); });
-    li.appendChild(poistoNappi);
+    // Harvemmin tarvitut toiminnot yhden hiljaisen "⋯"-napin taakse (ks.
+    // "Rivien UI-remontti" muistiinpanot.md:ssä) — sama periaate kuin
+    // Muistilaput/Kauppalista/Kalenteri-riveillä.
+    const menuItems = [];
+    if (rivi.is_task) {
+      menuItems.push({ label: '⏰ Muistutus', onClick: function() { avaaMuistutusPaneeli('hytti_rivi', rivi.id, rivi.content, null, null, lataaHyttiKortti); } });
+    }
+    menuItems.push({ label: 'Poista', danger: true, onClick: function() { poistaHyttiRivi(rivi); } });
+    li.appendChild(createOverflowButton(li, menuItems));
   }
 
   return li;
@@ -2912,9 +2927,78 @@ async function tallennaUusiJarjestys(li, kohde, asetukset) {
   }
 }
 
+// Rivien "⋯"-valikko (2026-07-16, ks. "Rivien UI-remontti" muistiinpanot.md:ssä):
+// harvemmin tarvitut rivitoiminnot (muistutus, muokkaus, poisto) siirretty pois
+// näkyvästä ikonikaistasta yhteen kompaktiin nappiin, jotta pitkä rivin teksti saa
+// enemmän tilaa ennen ellipsis-katkaisua. Vain yksi valikko voi olla auki kerrallaan.
+let openRowMenuEl = null;
+
+function closeRowMenu() {
+  if (!openRowMenuEl) return;
+  if (openRowMenuEl.isConnected) openRowMenuEl.remove();
+  document.removeEventListener('click', handleRowMenuOutsideClick, true);
+  openRowMenuEl = null;
+}
+
+function handleRowMenuOutsideClick(e) {
+  if (openRowMenuEl && !openRowMenuEl.contains(e.target)) closeRowMenu();
+}
+
+// items: [{ label, danger, onClick }]. li tarvitsee position:relative (ks. style.css)
+// jotta valikko ankkuroituu juuri sen rivin alle, ei sivun kulmaan.
+function openRowMenu(li, items) {
+  const wasOpenForThisRow = openRowMenuEl && openRowMenuEl.dataset.forRow === li.dataset.tuoteId;
+  closeRowMenu();
+  if (wasOpenForThisRow) return;
+
+  const menu = document.createElement('div');
+  menu.className = 'row-menu';
+  menu.dataset.forRow = li.dataset.tuoteId || '';
+  items.forEach(function(kohta) {
+    const nappi = document.createElement('button');
+    nappi.type = 'button';
+    nappi.className = 'row-menu-item' + (kohta.danger ? ' row-menu-item-danger' : '');
+    nappi.textContent = kohta.label;
+    nappi.addEventListener('click', function(e) {
+      e.stopPropagation();
+      closeRowMenu();
+      kohta.onClick();
+    });
+    menu.appendChild(nappi);
+  });
+
+  li.appendChild(menu);
+  openRowMenuEl = menu;
+  setTimeout(function() { document.addEventListener('click', handleRowMenuOutsideClick, true); }, 0);
+}
+
+function createOverflowButton(li, items) {
+  const nappi = document.createElement('button');
+  nappi.type = 'button';
+  nappi.textContent = '⋯';
+  nappi.className = 'overflow-btn';
+  nappi.addEventListener('click', function(e) {
+    e.stopPropagation();
+    openRowMenu(li, items);
+  });
+  return nappi;
+}
+
+// Pieni oheisteksti asetetusta muistutuksesta (tieto, ei nappi) — näytetään
+// rivin tekstin perässä myös silloin kun itse ⏰-toiminto asuu "⋯"-valikossa.
+function reminderTimeBadge(source, sourceRef) {
+  const omat = muistutuksetKartta[muistutusAvain(source, sourceRef)] || [];
+  if (omat.length === 0) return null;
+  const aika = document.createElement('span');
+  aika.className = 'muistutus-aika';
+  aika.textContent = omat.length === 1 ? muotoileMuistutusAika(omat[0].remind_at) : '×' + omat.length;
+  return aika;
+}
+
 // Piirtää listan näytölle
 function paivitaNaytto(tuotteet) {
   if (raahattavaRivi) return;
+  closeRowMenu();
   list.innerHTML = '';
   const naytettavat = historyOpen ? tuotteet : tuotteet.filter(t => !t.tehty);
 
@@ -2971,32 +3055,42 @@ function paivitaNaytto(tuotteet) {
       item.appendChild(valintaRuutu);
     }
 
-    // Vasemmalla: yliviivaustoiminto
-    const checkNappi = document.createElement('button');
-    checkNappi.textContent = tuote.tehty ? '✓' : '○';
-    checkNappi.className = 'check-btn';
-    item.appendChild(checkNappi);
+    // "Varastossa lista nukkuu — toiminnot heräävät kun lista herää" (ks.
+    // "Rivien UI-remontti" muistiinpanot.md:ssä): Varaston rivit ovat luettavia
+    // pohjia, ei elettyjä listoja — ei täppää, ei ⚓, ei muistutusta, teksti saa
+    // koko leveyden. Vain hiljainen "⋯" (muokkaus/poisto) jää, samoin kuin
+    // eläville listoille, mutta ilman muita toimintoja.
+    const isVarasto = currentList && currentList.category === 'varasto';
+    if (isVarasto) item.classList.add('varasto-rivi');
 
-    checkNappi.addEventListener('click', async function() {
-      const updateData = { tehty: !tuote.tehty, bought_at: !tuote.tehty ? new Date().toISOString() : null };
-      const eventAction = updateData.tehty ? 'checked' : 'unchecked';
-      if (updateData.tehty) tuntopalauteValmis();
-      if (navigator.onLine) {
-        const { error } = await db.from('tuotteet').update(updateData).eq('id', tuote.id);
-        if (error) {
-          console.error('Tuotteen merkintä epäonnistui:', error);
+    // Vasemmalla: yliviivaustoiminto (ei Varastossa)
+    if (!isVarasto) {
+      const checkNappi = document.createElement('button');
+      checkNappi.textContent = tuote.tehty ? '✓' : '○';
+      checkNappi.className = 'check-btn';
+      item.appendChild(checkNappi);
+
+      checkNappi.addEventListener('click', async function() {
+        const updateData = { tehty: !tuote.tehty, bought_at: !tuote.tehty ? new Date().toISOString() : null };
+        const eventAction = updateData.tehty ? 'checked' : 'unchecked';
+        if (updateData.tehty) tuntopalauteValmis();
+        if (navigator.onLine) {
+          const { error } = await db.from('tuotteet').update(updateData).eq('id', tuote.id);
+          if (error) {
+            console.error('Tuotteen merkintä epäonnistui:', error);
+          }
+          logEvent(eventAction, 'item', tuote.id, tuote.nimi, tuote.list_id);
+          await lataaLista();
+          if (!error && updateData.tehty) tarkistaPakkauslistanNollaus();
+        } else {
+          addToQueue({ type: 'update', data: { id: tuote.id, ...updateData } });
+          cachedTuotteet = cachedTuotteet.map(t => t.id === tuote.id ? { ...t, ...updateData } : t);
+          paivitaNaytto(cachedTuotteet);
+          paivitaFooter(cachedTuotteet);
+          logEvent(eventAction, 'item', tuote.id, tuote.nimi, tuote.list_id);
         }
-        logEvent(eventAction, 'item', tuote.id, tuote.nimi, tuote.list_id);
-        await lataaLista();
-        if (!error && updateData.tehty) tarkistaPakkauslistanNollaus();
-      } else {
-        addToQueue({ type: 'update', data: { id: tuote.id, ...updateData } });
-        cachedTuotteet = cachedTuotteet.map(t => t.id === tuote.id ? { ...t, ...updateData } : t);
-        paivitaNaytto(cachedTuotteet);
-        paivitaFooter(cachedTuotteet);
-        logEvent(eventAction, 'item', tuote.id, tuote.nimi, tuote.list_id);
-      }
-    });
+      });
+    }
 
     // Keskellä: teksti, napautus avaa muokkauksen
     const teksti = document.createElement('span');
@@ -3016,7 +3110,13 @@ function paivitaNaytto(tuotteet) {
       item.appendChild(aikaEl);
     }
 
-    teksti.addEventListener('click', async function() {
+    if (!isVarasto) {
+      const muistutusAika = reminderTimeBadge('rivi', tuote.id);
+      if (muistutusAika) item.appendChild(muistutusAika);
+    }
+
+    // Muokkaus: sama toiminto sekä tekstin napautuksesta että "⋯"-valikosta.
+    function aloitaMuokkaus() {
       const inputti = document.createElement('input');
       inputti.type = 'text';
       inputti.value = tuote.nimi;
@@ -3050,28 +3150,37 @@ function paivitaNaytto(tuotteet) {
         if (e.key === 'Enter') inputti.blur();
         if (e.key === 'Escape') { inputti.value = tuote.nimi; inputti.blur(); }
       });
-    });
+    }
 
-    // Ankkurointi: nostaa/poistaa rivin päivän Ankkureihin
-    const ankkuriNappi = document.createElement('button');
-    ankkuriNappi.textContent = '⚓';
-    ankkuriNappi.className = 'anchor-btn' + (ankkuroidutAvaimet.has('muistilaput:' + tuote.id) ? ' active' : '');
-    ankkuriNappi.addEventListener('click', function() { vaihdaAnkkurointi(tuote); });
-    item.appendChild(ankkuriNappi);
+    teksti.addEventListener('click', aloitaMuokkaus);
 
-    item.appendChild(luoMuistutusNappi('rivi', tuote.id, tuote.nimi, null, null, lataaLista));
+    // Ankkurointi: nostaa/poistaa rivin päivän Ankkureihin — pysyy suoraan
+    // näkyvänä (ei valikon takana), koska se on todistetusti käytetyin ja
+    // impulsiivisin ele arkikäytössä (ei Varastossa, ks. yllä).
+    if (!isVarasto) {
+      const ankkuriNappi = document.createElement('button');
+      ankkuriNappi.textContent = '⚓';
+      ankkuriNappi.className = 'anchor-btn' + (ankkuroidutAvaimet.has('muistilaput:' + tuote.id) ? ' active' : '');
+      ankkuriNappi.addEventListener('click', function() { vaihdaAnkkurointi(tuote); });
+      item.appendChild(ankkuriNappi);
+    }
 
-    // Oikealla: poistaminen
-    const nappi = document.createElement('button');
-    nappi.textContent = '×';
-    nappi.className = 'delete-btn';
-    item.appendChild(nappi);
+    // Harvemmin tarvitut toiminnot yhden hiljaisen "⋯"-napin taakse.
+    const menuItems = isVarasto
+      ? [
+          { label: 'Muokkaa', onClick: aloitaMuokkaus },
+          { label: 'Poista', danger: true, onClick: function() { poistaTuote(tuote); } },
+        ]
+      : [
+          { label: '⏰ Muistutus', onClick: function() { avaaMuistutusPaneeli('rivi', tuote.id, tuote.nimi, null, null, lataaLista); } },
+          { label: 'Muokkaa', onClick: aloitaMuokkaus },
+          { label: 'Poista', danger: true, onClick: function() { poistaTuote(tuote); } },
+        ];
+    item.appendChild(createOverflowButton(item, menuItems));
 
     if (tuote.tehty) {
       item.classList.add('done');
     }
-
-    nappi.addEventListener('click', function() { poistaTuote(tuote); });
 
     list.appendChild(item);
   });
