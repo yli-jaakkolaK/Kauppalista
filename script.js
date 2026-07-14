@@ -1843,6 +1843,19 @@ let ankkuritKaikkiNakyvissa = false;
 // näkymän nähdäkseen ja priorisoidakseen kaikki raahaamalla. Kun yksi
 // merkitään tehdyksi, seuraava nousee automaattisesti näkyviin koska
 // kysely suodattaa done=false — ei tarvita erillistä "ylennyslogiikkaa".
+// Ankkuriarkkitehtuuri "jokaisella ankkurilla on koti" (2026-07-14, ks.
+// muistiinpanot.md): `ankkurit.source` ja `muistutukset.source` käyttävät
+// ERI sanastoa SAMALLE kohteelle (esim. Muistilaput-rivi on ankkurissa
+// 'muistilaput' mutta rivin OMA ⏰-nappi käyttää muistutuksissa 'rivi') —
+// tämä kartta kääntää ankkurin kotilähteen sen kotitaulun OMAAN
+// muistutus-sanastoon, jotta ankkurin ⏰:llä asetettu muistutus voidaan
+// siirtää kotiin laskun yhteydessä sen sijaan että se katoaisi.
+const ANKKURI_KOTI_MUISTUTUS_LAHDE = { muistilaput: 'rivi', hytti: 'hytti_rivi', aly: 'laituri' };
+function ankkurinKotiMuistutusLahde(ankkuri) {
+  return ANKKURI_KOTI_MUISTUTUS_LAHDE[ankkuri.source] || ankkuri.source;
+}
+const ANKKURI_KOTI_NIMI = { muistilaput: 'Muistilapuista', kalenteri: 'Kalenterista', hytti: 'Hytistä', laituri: 'Laiturista', aly: 'Laiturista' };
+
 async function lataaAnkkurit() {
   if (raahattavaRivi) return;
   // is_candidate-rivit (E3-keskiportaan AI-ehdotukset, ks. loadAnchorCandidates())
@@ -1864,6 +1877,7 @@ async function lataaAnkkurit() {
 
   nayta.forEach(function(ankkuri) {
     const li = document.createElement('li');
+    li.className = 'ankkuri-rivi';
     li.dataset.tuoteId = ankkuri.id;
     alustaRaahaus(li, ankkuri, {
       container: listEl,
@@ -1923,20 +1937,46 @@ async function lataaAnkkurit() {
     });
     li.appendChild(teksti);
 
+    // BUGIKORJAUS (2026-07-14, "Ankkurien hätäkorjaus"): kolme käsin luotua
+    // ankkuria katosi vahinkopainalluksista jäljettömiin — käsin luotu ankkuri
+    // ON sisältö (ei vain osoitin lähteeseen, ks. "Ankkuriarkkitehtuuri"-
+    // suunnitelma), joten sen poisto oli lopullinen data-menetysriski.
+    // Poisto EI TAPAHDU heti — 5s kumottava toast ensin, todellinen poisto
+    // vasta jos ei kumota. Rivi vain himmenee tänä aikana, ei katoa DOM:ista.
     const irrotaNappi = document.createElement('button');
     irrotaNappi.textContent = '⚓';
     irrotaNappi.className = 'anchor-btn active';
     irrotaNappi.addEventListener('click', function() {
-      irrotaNappi.classList.add('leaving');
       li.style.opacity = '0.3';
-      setTimeout(async function() {
-        const { error } = await db.from('ankkurit').delete().eq('id', ankkuri.id);
-        if (error) {
-          console.error('Ankkurin irrotus epäonnistui:', error);
+      irrotaNappi.disabled = true;
+      const kotiNimi = ANKKURI_KOTI_NIMI[ankkuri.source];
+      naytaKumottavaIlmoitus(
+        kotiNimi ? ('Ankkuri laskettu — löytyy ' + kotiNimi) : 'Ankkuri laskettu',
+        async function() {
+          const { error } = await db.from('ankkurit').delete().eq('id', ankkuri.id);
+          if (error) {
+            console.error('Ankkurin irrotus epäonnistui:', error);
+          }
+          // BUGIKORJAUS ("Ankkuriarkkitehtuuri: jokaisella ankkurilla on
+          // koti"): LASKU POISTAA VAIN NOSTON — muistutukset kuuluvat
+          // sisällölle, eivät nostolle, joten ne SIIRRETÄÄN kotiin sen
+          // sijaan että poistettaisiin. Vain vanha migroimaton
+          // 'manual'-ankkuri (ei kotia) putoaa varasuunnitelmaan (poisto).
+          if (ankkuri.source && ankkuri.source !== 'manual' && ankkuri.source_ref) {
+            const kotiLahde = ankkurinKotiMuistutusLahde(ankkuri);
+            await db.from('muistutukset')
+              .update({ source: kotiLahde, source_ref: String(ankkuri.source_ref) })
+              .eq('source', 'ankkuri').eq('source_ref', String(ankkuri.id));
+          } else {
+            await db.from('muistutukset').delete().eq('source', 'ankkuri').eq('source_ref', String(ankkuri.id));
+          }
+          lataaAnkkurit();
+        },
+        function() {
+          li.style.opacity = '';
+          irrotaNappi.disabled = false;
         }
-        await db.from('muistutukset').delete().eq('source', 'ankkuri').eq('source_ref', String(ankkuri.id));
-        lataaAnkkurit();
-      }, 250);
+      );
     });
     li.appendChild(irrotaNappi);
 
@@ -2063,15 +2103,31 @@ async function loadAnchorCandidates() {
     });
     li.appendChild(acceptButton);
 
+    // BUGIKORJAUS (2026-07-14, "Ankkurien hätäkorjaus"): sama 5s kumottava
+    // toast kuin varsinaisilla ankkureilla, konsistenssin vuoksi ("jokainen
+    // ankkurin poistava ele") — vaikka ehdokkaan lähdemuru on jo turvassa
+    // Laiturissa (ks. aly_log-linkki), pelkkä yksi yhteinen malli on
+    // helpompi muistaa kuin kaksi eri sääntöä.
     const dismissButton = document.createElement('button');
     dismissButton.textContent = '×';
     dismissButton.className = 'delete-btn';
     dismissButton.title = 'Poista ehdotus';
-    dismissButton.addEventListener('click', async function() {
-      const { error } = await db.from('ankkurit').delete().eq('id', candidate.id);
-      if (error) console.error('Ankkuriehdokkaan poisto epäonnistui:', error);
-      await db.from('aly_log').update({ undone_at: new Date().toISOString(), undo_reason: 'dismissed' }).eq('anchor_id', candidate.id).is('undone_at', null);
-      loadAnchorCandidates();
+    dismissButton.addEventListener('click', function() {
+      li.style.opacity = '0.3';
+      dismissButton.disabled = true;
+      naytaKumottavaIlmoitus(
+        'Ehdotus poistettu',
+        async function() {
+          const { error } = await db.from('ankkurit').delete().eq('id', candidate.id);
+          if (error) console.error('Ankkuriehdokkaan poisto epäonnistui:', error);
+          await db.from('aly_log').update({ undone_at: new Date().toISOString(), undo_reason: 'dismissed' }).eq('anchor_id', candidate.id).is('undone_at', null);
+          loadAnchorCandidates();
+        },
+        function() {
+          li.style.opacity = '';
+          dismissButton.disabled = false;
+        }
+      );
     });
     li.appendChild(dismissButton);
 
@@ -2998,6 +3054,46 @@ function naytaIlmoitus(teksti) {
   }, 1800);
 }
 
+// BUGIKORJAUS (2026-07-14, ks. muistiinpanot.md "Ankkurien hätäkorjaus"):
+// varsinaisToiminto (esim. tietokannasta poisto) suoritetaan VASTA 5s
+// kuluttua, EI heti — jos käyttäjä painaa "Kumoa" sitä ennen, toimintoa ei
+// koskaan suoriteta. Tämä on tarkoituksella eri malli kuin "poista heti,
+// yritä palauttaa jos kumotaan" — deferoitu suoritus ei voi koskaan
+// epäonnistua osittain, koska mitään ei ehdi tapahtua ennen kumoamisikkunan
+// päättymistä. Käytetään joka kerta kun ele tuhoaa käsin luotua sisältöä.
+function naytaKumottavaIlmoitus(teksti, varsinaisToiminto, peruttuCallback) {
+  const toast = document.createElement('div');
+  toast.className = 'toast toast-kumottava';
+
+  const tekstiEl = document.createElement('span');
+  tekstiEl.textContent = teksti;
+  toast.appendChild(tekstiEl);
+
+  const kumoaNappi = document.createElement('button');
+  kumoaNappi.className = 'toast-kumoa-btn';
+  kumoaNappi.textContent = 'Kumoa';
+  toast.appendChild(kumoaNappi);
+
+  document.body.appendChild(toast);
+  requestAnimationFrame(function() { toast.classList.add('nakyva'); });
+
+  function sulje() {
+    toast.classList.remove('nakyva');
+    setTimeout(function() { toast.remove(); }, 300);
+  }
+
+  const ajastin = setTimeout(function() {
+    sulje();
+    varsinaisToiminto();
+  }, 5000);
+
+  kumoaNappi.addEventListener('click', function() {
+    clearTimeout(ajastin);
+    sulje();
+    if (peruttuCallback) peruttuCallback();
+  });
+}
+
 // Pakkauslistan automaattinollaus: jos avoinna olevan listan nimessä on
 // (missä tahansa muodossa, isoja/pieniä kirjaimia välittämättä) "pakkauslista"
 // ja KAIKKI ei-otsikkorivit on juuri täpätty valmiiksi, nollataan koko lista
@@ -3687,15 +3783,31 @@ document.getElementById('visibility-toggle').addEventListener('change', async fu
 });
 
 // Ankkurit
+// BUGIKORJAUS (2026-07-14, "Ankkuriarkkitehtuuri: jokaisella ankkurilla on
+// koti"): käsin kirjoitettu ankkuri EI enää OLE itse sisältö (jonka lasku
+// tuhoaisi) — se luo taustalla murun Laituriin ja nostaa SEN, täsmälleen
+// sama polku kuin Muistilapuilta/Kalenterista/Hytistä/älyltä nostetulla
+// ankkurilla. Käyttöliittymä ei muutu, mutta "lasku" ei voi enää koskaan
+// hävittää sisältöä — se palaa aina Laituriin.
 document.getElementById('ankkurit-add-btn').addEventListener('click', async function() {
   const ankkuriInput = document.getElementById('ankkurit-input');
   const teksti = ankkuriInput.value.trim();
   if (teksti === '') { ankkuriInput.focus(); return; }
 
-  const { error } = await db.from('ankkurit').insert({ content: teksti, user_id: currentUserId, source: 'manual' });
+  const { data: muru, error: muruError } = await db.from('laituri')
+    .insert({ content: teksti, user_id: currentUserId, status: 'uusi' })
+    .select().single();
+  if (muruError) {
+    console.error('Murun luonti epäonnistui:', muruError);
+    naytaIlmoitus('Ankkurin luonti epäonnistui');
+    return;
+  }
+
+  const { error } = await db.from('ankkurit').insert({ content: teksti, source: 'laituri', source_ref: String(muru.id), user_id: currentUserId });
   if (error) {
     console.error('Ankkurin lisäys epäonnistui:', error);
   }
+  await paivitaAnkkuroidutAvaimet();
   ankkuriInput.value = '';
   lataaAnkkurit();
 });

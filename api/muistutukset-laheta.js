@@ -47,11 +47,14 @@ module.exports = async function handler(req, res) {
   );
   const erapaivat = await erapaivatVastaus.json();
 
+  console.log('[muistutukset-laheta] ' + nyt + ': ' + (Array.isArray(erapaivat) ? erapaivat.length : 0) + ' erääntynyttä.');
+
   if (!Array.isArray(erapaivat) || erapaivat.length === 0) {
     return res.status(200).json({ success: true, lahetetty: 0, tarkistettu: 0 });
   }
 
   let lahetetty = 0;
+  let jatetaanYrittamaan = 0;
   for (const muistutus of erapaivat) {
     const tilausVastaus = await supabaseFetch('push_tilaukset?select=*&user_id=eq.' + muistutus.user_id);
     const tilaukset = await tilausVastaus.json();
@@ -69,20 +72,35 @@ module.exports = async function handler(req, res) {
         if (e.statusCode === 404 || e.statusCode === 410) {
           await supabaseFetch('push_tilaukset?id=eq.' + tilaus.id, { method: 'DELETE' });
         } else {
-          console.error('Muistutuksen push epäonnistui:', e.message);
+          console.error('Muistutuksen push epäonnistui (id=' + muistutus.id + ', source=' + muistutus.source + '):', e.message);
         }
       }
     }));
 
-    // Merkitään lähetetyksi VAIKKA kaikki yritykset epäonnistuisivat —
-    // tietoinen yksinkertaistus (ei retry/backoff-järjestelmää V1:ssä).
-    await supabaseFetch('muistutukset?id=eq.' + muistutus.id, {
-      method: 'PATCH',
-      headers: { Prefer: 'return=minimal' },
-      body: JSON.stringify({ sent_at: new Date().toISOString() }),
-    });
+    // BUGIKORJAUS (2026-07-14, ks. muistiinpanot.md "Ajastetut muistutukset
+    // eivät tule perille"): merkittiin AIEMMIN lähetetyksi VAIKKA KAIKKI
+    // yritykset epäonnistuisivat — "tietoinen yksinkertaistus" joka
+    // kuitenkin tarkoitti että YKSIKIN ohimenevä push-lähetysvirhe (verkko,
+    // tilapäinen 5xx palvelimelta) hävitti muistutuksen PYSYVÄSTI, hiljaa,
+    // ilman uudelleenyritystä — täsmälleen "tilamerkintä ei seurannut
+    // todellisuutta" -luonnevika. Nyt: merkitään lähetetyksi VAIN jos joku
+    // onnistui TAI tilauksia ei ollut yhtään (ei mitään yritettävää, ei siis
+    // retryttävää). Muutoin sent_at jää tyhjäksi — SEURAAVA ~5 min kuluttua
+    // ajava kierros yrittää automaattisesti uudelleen, kunnes onnistuu tai
+    // tilaus todetaan pysyvästi vanhentuneeksi (404/410, siivotaan yllä).
+    const eiRetryttavaa = !Array.isArray(tilaukset) || tilaukset.length === 0;
+    if (joku || eiRetryttavaa) {
+      await supabaseFetch('muistutukset?id=eq.' + muistutus.id, {
+        method: 'PATCH',
+        headers: { Prefer: 'return=minimal' },
+        body: JSON.stringify({ sent_at: new Date().toISOString() }),
+      });
+    } else {
+      jatetaanYrittamaan++;
+      console.error('[muistutukset-laheta] id=' + muistutus.id + ' (source=' + muistutus.source + ', source_ref=' + muistutus.source_ref + ') EI lähtenyt yhteenkään tilaukseen — jätetään uudelleenyritettäväksi.');
+    }
     if (joku) lahetetty++;
   }
 
-  return res.status(200).json({ success: true, lahetetty: lahetetty, tarkistettu: erapaivat.length });
+  return res.status(200).json({ success: true, lahetetty: lahetetty, tarkistettu: erapaivat.length, uudelleenyritetaan: jatetaanYrittamaan });
 };

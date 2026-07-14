@@ -1011,6 +1011,7 @@ h1 {
   position: relative; /* ankkuroi rivin oman "⋯"-valikon (.row-menu) juuri sen alle */
   display: flex;
   align-items: center;
+  gap: 6px; /* BUGIKORJAUS 2026-07-14, ks. .check-btn::before-kommentti alla */
   min-height: 52px;
   border-bottom: 1px solid var(--border);
   font-size: 22px;
@@ -1055,7 +1056,17 @@ h1 {
    päälle asti); (2) elävien listojen (Muistilaput/Kauppalista) harvemmin
    tarvitut toiminnot (⏰/muokkaus/×) koottu yhteen "⋯"-nappiin (ks.
    .overflow-btn/.row-menu alla), Varastossa poistettu kokonaan (ks.
-   isVarasto-haara script.js:n paivitaNaytto()-funktiossa). */
+   isVarasto-haara script.js:n paivitaNaytto()-funktiossa).
+   BUGIKORJAUS (2026-07-14, ks. muistiinpanot.md "Ankkurin ⏰: kaksoistoiminto"):
+   `.list li`:llä ei ollut lainkaan `gap`-väliä nappien välillä — vierekkäiset
+   napit (esim. ⚓ ja ⏰) koskettivat toisiaan, jolloin niiden ::before-hit-
+   slopit (kumpikin -6px) menivät päällekkäin n. 12px matkalta saumassa.
+   Kosketus juuri kahden napin rajalla saattoi laueta VÄÄRÄÄN nappiin —
+   tästä aiheutui ankkurin vahingossatapahtuva poisto kellon asettamisen
+   sijaan. Korjattu: `.list li` sai `gap:6px`, ja hit-slop kavennettu
+   VAAKASUUNNASSA `-3px`:iin (pystysuunta pysyy `-6px`:ssä, koska siinä ei
+   ole vierekkäistä nappia riskinä) — 3px+3px=6px täsmää tasan gapin kanssa,
+   joten hit-slopit koskettavat mutta eivät koskaan mene päällekkäin. */
 .check-btn {
   position: relative;
   min-width: 36px;
@@ -1082,7 +1093,7 @@ h1 {
 .overflow-btn::before {
   content: '';
   position: absolute;
-  inset: -6px;
+  inset: -6px -3px;
   z-index: 1;
 }
 
@@ -1140,8 +1151,15 @@ h1 {
    väripallo, "uusi"-merkki) — niillä on jo omat tarkoitukselliset
    leveytensä, ei saa antaa ellipsiksen/kutistumisen koskea niihin. Jos
    lisäät JATKOSSA uuden pienen kiinteän-levyisen span-merkinnän `.list
-   li`:n sisään, lisää sen luokka tähän poissulkulistaan. */
-.list li:not(.varasto-rivi):not(.laituri-ehdotus-rivi):not(.anchor-candidate-row) span:not(.kalenteri-aika):not(.kalenteri-vari):not(.kalenteri-uusi-merkki):not(.hytti-tanaan-aika):not(.hytti-tehtava-erapaiva):not(.hytti-rivi-erapaiva):not(.history-time):not(.muistutus-aika):not(.laituri-text):not(.laituri-meta) {
+   li`:n sisään, lisää sen luokka tähän poissulkulistaan.
+   BUGIKORJAUS (2026-07-14, "Ankkuririvien tekstikatkaisu"): Ankkurit jäivät
+   Rivien UI-remontin ulkopuolelle vaikka jakavat saman `.list li`-rakenteen
+   — pitkä ankkuri ("vastaa Piispanristin sahalle rakennustilauksesta")
+   katkesi ellipsillä vaikka rivistä n. 1/3 oli tyhjää tilaa. `.ankkuri-rivi`
+   (ks. script.js:n lataaAnkkurit()) rajattu pois tästä säännöstä ja saa oman
+   enintään 4-rivisen line-clamp-säännön alla — välimuoto Varaston (ei koskaan
+   ellipsis) ja elävien listojen (aina yksirivinen) välillä. */
+.list li:not(.varasto-rivi):not(.laituri-ehdotus-rivi):not(.anchor-candidate-row):not(.ankkuri-rivi) span:not(.kalenteri-aika):not(.kalenteri-vari):not(.kalenteri-uusi-merkki):not(.hytti-tanaan-aika):not(.hytti-tehtava-erapaiva):not(.hytti-rivi-erapaiva):not(.history-time):not(.muistutus-aika):not(.laituri-text):not(.laituri-meta) {
   flex: 1;
   min-width: 0;
   overflow: hidden;
@@ -1164,6 +1182,36 @@ h1 {
 }
 
 .list li.varasto-rivi .overflow-btn {
+  margin-top: 2px;
+}
+
+/* Ankkurit (2026-07-14, "Ankkuririvien tekstikatkaisu"): välimuoto Varaston
+   (ei koskaan ellipsis) ja elävien listojen (aina yksirivinen) välillä —
+   teksti saa rivittyä enintään 4 riville (testattu Piispanristin-esimerkillä, 3 ei riittänyt), ellipsis vasta jos senkin jälkeen jää
+   ylimääräistä. `-webkit-line-clamp` on iOS Safarin (kohdealustan) täysin
+   tukema, vaikka nimessä on vielä webkit-etuliite. */
+.list li.ankkuri-rivi {
+  align-items: flex-start;
+  min-height: 44px;
+  padding: 6px 0;
+}
+
+.list li.ankkuri-rivi span:not(.muistutus-aika):not(.muistutus-wrap) {
+  flex: 1;
+  min-width: 0;
+  white-space: normal;
+  word-break: break-word;
+  display: -webkit-box;
+  -webkit-line-clamp: 5;
+  line-clamp: 5;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.list li.ankkuri-rivi .check-btn,
+.list li.ankkuri-rivi .anchor-btn,
+.list li.ankkuri-rivi .muistutus-wrap {
   margin-top: 2px;
 }
 
@@ -1561,6 +1609,39 @@ h1 {
 .toast.nakyva {
   opacity: 1;
   transform: translateX(-50%) translateY(0);
+}
+
+/* Kumottava toast (2026-07-14, ks. muistiinpanot.md "Ankkurien hätäkorjaus")
+   — sisältää [Kumoa]-napin, joten `pointer-events` pitää olla `auto`
+   toisin kuin perus-.toast:ssa, joka on tarkoituksella klikkaamaton. */
+.toast-kumottava {
+  pointer-events: auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  text-align: left;
+}
+
+.toast-kumoa-btn {
+  flex-shrink: 0;
+  font-family: 'Courier New', Courier, monospace;
+  font-size: 12px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  background: none;
+  border: 1px dashed var(--accent);
+  color: var(--accent);
+  border-radius: 4px;
+  padding: 6px 10px;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.toast-kumoa-btn:hover,
+.toast-kumoa-btn:active {
+  background: var(--accent);
+  color: var(--ground);
 }
 
 /* === VAHVISTUSDIALOGI === */

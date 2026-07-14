@@ -42,6 +42,8 @@ Täysi ohje (asennus, mistä yhteysosoite löytyy) on **BACKUP.md**:ssä.
 
 **⚠ sql/047–049 — UUSIA, KESKIVIIKON LÖYDÖKSET (17.7.), AJA ENNEN OSA Q:ta.** `047_laituri_kalenteri_itseilmoitus_korjaus.sql` (palauttaa kaikki virheellisesti "kalenteriin"-kohteella sijoitetuksi merkityt Laiturin rivit sijoittamattomiksi, sisältää RAISE NOTICE -diagnostiikan), `048_aly_log_undo_reason.sql` (aly_log.undo_reason-sarake — kertoo raukesiko ehdotus hiljaa vai peruttiinko se), `049_testipaiva_keskiviikon_loydokset_rivit.sql` (uusi "OSA H" -väliotsikko + uusintatestirivit, ei toista koko listaa). Aja järjestyksessä 047→048→049.
 
+**⚠ sql/050–052 — UUSIA, TIISTAIN LÖYDÖKSET + ILTA-KIILA (14.7.), AJA ENNEN OSA R:ää.** `050_muistutukset_laituri_source.sql` (lisää puuttuvan 'laituri'-arvon muistutukset.source-CHECK-rajoitteeseen — ilman tätä Laiturin murun muistutus-kohde kaatuu virheeseen), `051_ankkurit_manual_migraatio_laituriin.sql` (migroi kaikki vanhat käsin luodut ankkurit Laituri-pohjaisiksi — luo jokaiselle murun, sisältö säilyy, RAISE NOTICE -diagnostiikka), `052_testipaiva_tiistain_loydokset_rivit.sql` (uusi "OSA I" -väliotsikko + uusintatestirivit). Aja järjestyksessä 050→051→052 — **050 ENNEN 051:tä on tärkeää** vain jos testaat muistutuksen asettamista Laiturin murulle ennen ankkuri-migraatiota, muuten järjestys 051→050 toimisi yhtä hyvin.
+
 ---
 
 ## OSA A — Muistutusten ajastin
@@ -323,6 +325,45 @@ Aja **`sql/047`–`049`** ennen tätä. Kolme kokonaisuutta, testaa tässä jär
 4. **Pitkät tekstit kaikkialla:** kirjoita pitkä Laiturin muru (yli 40 merkkiä) — tarkista ettei se katkea "…"-merkkiin missään (Laiturin omalla rivillä TAI ✨-ehdotuskortilla TAI E3-ankkuriehdokkaalla). Kaikkien kolmen pitäisi näyttää teksti kokonaan, tarvittaessa monirivisenä.
 5. **Testipäivä-listan uudet rivit:** täppää "Testipäivä to 16.7." -listan uusi "OSA H" -osio (ks. sql/049) kun yllä olevat on käyty läpi.
 6. Jos jokin kohta ei täsmää: tarkista Vercelin Logs `/api/aly-nightly`-kutsuista ja selaimen konsolista virheitä — kaikki tämän osan toiminnot kirjoittavat `console.error`:iin jos jokin tietokantakutsu epäonnistuu.
+
+---
+
+## OSA R — Testaa tiistain löydökset + ilta-kiila (2026-07-14, ks. muistiinpanot.md "Ankkurien hätäkorjaus" / "Ankkuriarkkitehtuuri" / "Ajastetut muistutukset eivät tule perille")
+
+Aja **`sql/050`–`052`** ennen tätä. **Tämä osa on kriittisin tähän mennessä testatuista — koskee datanmenetystä ja muistutusten toimivuutta.**
+
+**1. Ankkurien hätäkorjaus + Ankkuriarkkitehtuuri:**
+1. Lisää uusi ankkuri käsin etusivun ankkuri-kentästä. Tarkista Laiturista (jos avaat sen) — pitäisi näkyä uusi muru samalla sisällöllä, jo ⚓-merkittynä.
+2. Paina jonkin ankkurin ⚓ (lasku) -nappia — rivin pitäisi himmentyä, JA näytön alareunaan ilmestyä toast "Ankkuri laskettu — löytyy Laiturista/Muistilapuista/jne." + [Kumoa]-nappi 5 sekunnin ajaksi.
+3. Paina [Kumoa] ennen 5s:n täyttymistä — ankkurin pitäisi palautua ennalleen, EI poistua.
+4. Toista, mutta ÄLÄ paina Kumoa — odota yli 5s. Ankkurin pitäisi nyt oikeasti kadota listasta. Tarkista Laiturista/Muistilapuista/Kalenterista/Hytistä (sen mukaan mistä ankkuri oli) että sisältö on TALLELLA siellä.
+5. **Vanhat käsin luodut ankkurit:** jos sinulla oli ankkureita ennen tätä päivitystä, tarkista `sql/051`:n RAISE NOTICE -tulosteesta montako migroitiin — kokeile laskea yksi niistä, tarkista että sisältö löytyy Laiturista lasun jälkeen (ei katoa).
+
+**2. Ankkurin ⏰ kaksoistoiminto:**
+1. Kokeile useita kertoja peräkkäin (10+) painaa ankkurin ⏰-nappia eri kohdista sen kosketusaluetta (myös lähellä ⚓-napin reunaa) — ankkuri EI SAA koskaan poistua kellon painalluksesta.
+2. Aseta muistutus ankkurille — paneelissa pitäisi lukea "Aseta" (ei "+ Lisää") ja "Peruuta" (ei "Sulje"). Aseta jokin aika, tarkista että se ilmestyy paneelin omaan listaan HETI.
+3. Laske sama ankkuri (⚓ pois, odota yli 5s) — muistutuksen pitäisi SÄILYÄ (siirtyy Laituriin/kotiin, ei katoa). Tarkista avaamalla kohteen oma ⏰-paneeli — muistutuksen pitäisi näkyä siellä.
+
+**3. Ankkuririvien tekstikatkaisu:**
+1. Kirjoita pitkä ankkuri, esim. "vastaa Piispanristin sahalle rakennustilauksesta" tai vastaava oikea pitkä rivi — pitäisi näkyä KOKONAAN, rivittyneenä useammalle riville, EI katkaistuna "…"-merkkiin.
+
+**4. Ajastetut muistutukset (KIILA — tärkein, tarkista ENSIN tämä ennen muuta testausta):**
+1. **Ennen käsintestausta, aja tämä SELECT Supabasen SQL Editorissa** (pelkkä luku, ei muuta mitään) nähdäksesi eiliset/tämänpäiväiset muistutusrivit:
+   ```sql
+   select id, source, source_ref, content, remind_at, sent_at, created_at
+   from muistutukset
+   where created_at > now() - interval '1 day'
+   order by created_at desc;
+   ```
+   Jos näet rivejä joilla `sent_at` on asetettu mutta push ei koskaan tullut — se oli todennäköisesti eilisen bugi (nyt korjattu, ei pitäisi enää toistua).
+2. Aseta muistutus jollekin ankkurille/riville/kalenteritapahtumalle 2-3 minuutin päähän. Sulje appi kokonaan (ei vain taustalle — sulje PWA).
+3. Odota ajastettu hetki + 5-10 min (cron käy 5 min välein, salli viivettä). Push-ilmoituksen pitäisi tulla puhelimen ilmoituskeskukseen appin ollessa suljettuna.
+4. Jos EI tule: tarkista Vercelin Logs-välilehdeltä `/api/muistutukset-laheta`-kutsujen loki (uusi `[muistutukset-laheta]`-rivi kertoo joka kierroksella montako erääntynyttä löytyi ja montako jäi uudelleenyritettäväksi) — kerro Claudelle mitä löydät, tutkinta jatkuu tarkemmin sen perusteella.
+5. **Huomisen vertailumatriisi (4 muistutusta: listarivi ×2 / kalenteri / ankkuri, eri kellonajat)** kannattaa ajaa VASTA kun kohta 2-3 on ensin todettu toimivaksi tällä korjatulla versiolla.
+
+**5. Testipäivä-listan uudet rivit:** täppää "Testipäivä to 16.7." -listan uusi "OSA I" -osio (ks. sql/052) kun yllä olevat on käyty läpi.
+
+**Aikataulumuutos:** torstai 16.7. on nyt Katrin OMA soolotestipäivä korjausten päällä (ei enää jäädytysraja) — Juhan kanssa testataan erikseen kun ydin (muistutukset, ankkurit) on todistettu toimivaksi, todennäköisesti perjantaista viikonloppuun: vakaat osat ensin (push hänelle, peilikuva, yksityisyyssymmetria, pallurat), muistutus/ankkuriosat vasta kun ne toimivat luotettavasti Katrilla.
 
 ---
 
