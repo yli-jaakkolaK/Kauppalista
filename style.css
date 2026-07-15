@@ -1311,9 +1311,17 @@ h1 {
   opacity: 1;
 }
 
+/* BUGIKORJAUS ("Laiturin ⚓-tilan näkyvyys", ks. muistiinpanot.md): pelkkä
+   väri/opacity-ero (kulta vs. himmeä) ei erottunut vilkaisulla — sama
+   glyfi, vain sävy vaihtui. Nyt aktiivinen tila saa oman TÄYTETYN
+   muodon (pyöristetty tausta), ei vain värin — "muoto kertoo tilan, ei
+   väri yksin" -periaate. Koskee kaikkia ⚓-nappeja koko sovelluksessa
+   (sama luokka), ei vain Laituria. */
 .anchor-btn.active {
-  color: var(--accent);
+  color: var(--ground);
   opacity: 1;
+  background: var(--accent);
+  border-radius: 8px;
 }
 
 .anchor-btn.leaving {

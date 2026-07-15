@@ -119,6 +119,7 @@ Jokainen älyn tekemä aikasidonnainen ehdotus (mikä tahansa "tämä koskee tie
 
 **TIISTAIN LÖYDÖKSET (14.7.) + ILTA-KIILA KORJATTU, VIISI BUGIA LISÄÄ (Bugi 11–15):** kriittisin — kolme käsin luotua ankkuria kadonnut pysyvästi (ei varmuuskopiota) → 5s kumottava toast KAIKKIIN ankkurin poistaviin eleisiin (`naytaKumottavaIlmoitus()`) hätäkorjauksena, JA varsinainen korjaus: **Ankkuriarkkitehtuuri "jokaisella ankkurilla on koti"** — käsin luotu ankkuri luo nyt taustalla murun Laituriin eikä ole enää itse ainoa kopio sisällöstä, lasku ei voi enää koskaan tuhota mitään (`sql/051` migroi vanhat). Ankkurin ⏰ kaksoistoiminto (poisti ankkurin kellon sijaan) juuriltaan `.list li`:n puuttuva `gap`+hit-slop-päällekkäisyys, korjattu kaikkiin rivityyppeihin. Ankkuririvit saivat vihdoin tekstirivityksen (line-clamp). **Ilta-kiila:** ajastetut muistutukset eivät tulleet perille — kaksi teoriaa kumottu koodista, LÖYDETTY JA KORJATTU todellinen bugi (cron merkitsi lähetetyksi vaikka push epäonnistuisi, nyt uudelleenyrittää) + erillinen `'laituri'`-source-rajoite puuttui (`sql/050`, oma bugi samalta päivältä). Jäljellä epävarmuutta jonka vain Katri voi tarkistaa (SQL-kysely valmiina osiossa, Vercel Logs). Kohdat 5–13 kirjattu suunnitelmaksi, EI VIELÄ TOTEUTETTU. AJA `sql/047`–`051` (kaikki tähän mennessä ajamattomat) ennen PALUU.md:n OSA R -testiä. **EI TESTATTU vielä oikealla laitteella — Katri tarkistaa ensin muistutus-SQL:n + Vercel Logsin, huomisen vertailumatriisi vasta tämän jälkeen.**
 - **2026-07-15 aamu — KIILA ratkesi todistetusti, uusi bugi löytyi eri paikasta:** Katrin ke-aamun tarkistus vahvisti koko muistutuskoneiston (tallennus, poiminta, lähetys, uudelleenyritys) toimivaksi — 8:21-muistutus tuli lopulta perille, myöhässä mutta perillä, kun GitHub Actions -workflow vihdoin pyörähti (todistettu toteuma-aikaleimoilla ~60–180 min välein, ei 5 min kuten luvattu). Juurisyy: **"GitHub Actions schedule ei ole kello vaan arpa"** — matalan prioriteetin ajastusjono, ei luotettava aikakriittiselle työlle. Ratkaisu: ulkoinen cron-palvelu (cron-job.org) ensisijaiseksi laukaisijaksi, GitHub Actions varalaukaisijaksi (ei poisteta). Katrin oma asennusaskel, ohjeet PALUU.md OSA S:ssä ja COPILOT.md:ssä. Samalla löydetty JA korjattu ERI, riippumaton bugi: **E3:n yöajo ei tehnyt mitään usean yön ajan** — `callClaude()`:n epäonnistumista ei erotettu aidosta "ei osumaa" -tuloksesta, joten epäonnistunut äly-kutsu merkitsi murut hiljaa pysyvästi käsitellyiksi (neljäs tapaus samasta "tilamerkintä ei seurannut todellisuutta" -luonnevirheestä samalla viikolla, hiljaisin näistä — ei jättänyt mitään jälkeä). Korjattu erottamalla `matches===null` (epäonnistui) omaksi käsittelykseen — murut jäävät nyt odottamaan seuraavaa ajoa sen sijaan että katoaisivat. Kirjattu Bugi 16. Vahvistettu koodista (ei vielä visuaalisesti) että ankkurin aikamerkintä-katkeamisraportti oli vanhalta versiolta eikä koodissa ole enää syytä sille toistua. Ei sw-bump tällä kertaa — vain palvelinpuolen (`api/aly-nightly.js`) ja dokumentaation muutoksia, ei mitään asiakaspuolen tiedostoa joka vaatisi välimuistin ohituksen. Koonti 2:n kohdat 5–13 odottavat yhä vuoroaan. Ei koskettu odottavaan pakettiin.
+- **2026-07-15 — Laiturin ⚓-tilan näkyvyys korjattu:** sijoittamaton ja jo-ankkurina-oleva muru näyttivät identtisiltä (pelkkä väri/opacity-ero ⚓-napissa, ei muotoa). Korjattu: `.anchor-btn.active` sai täytetyn pyöristetyn muodon (koskee kaikkia ⚓-nappeja koko sovelluksessa, ei vain Laituria), Laiturin meta-riville lisätty "· ⚓ ankkurissa" -tekstitieto. Bugi 17. `sw.js` v58.
 
 Jos joudut päättämään mistä jatkat: aja ensin PALUU.md:n VAIHE 1 -testit läpi (täppäys Satama-listalta), sitten torstaina VAIHE 2 Juhan kanssa, sitten E3-keskiportaan OSA O, Rivien UI-remontin OSA P, keskiviikon löydösten OSA Q ja tiistain löydösten OSA R viimeisinä (torstai on nyt Katrin soolotestipäivä korjausten päällä — Juhan kanssa testataan erikseen kun ydin on todistettu, ks. "Bugikorjaus: Ajastetut muistutukset eivät tule perille" -osion aikataulupäivitys), ja vasta sen jälkeen aloita ristiriitapaketti.
 
@@ -307,6 +308,16 @@ Tämä osio on lyhyt päiväkirjamainen kooste — tarkka sisältö löytyy aina
 **Korjaus:** `matches === null` (epäonnistunut/jäsentymätön vastaus) käsitellään nyt erikseen — kyseisen käyttäjän murut jätetään merkitsemättä, jäävät odottamaan seuraavaa ajoa. Ks. "Bugikorjaus: Yöajo ei tee mitään" -osio.
 
 **Opittu:** aina kun ulkoisen palvelun (tässä: Anthropic API) epäonnistumista käsitellään, tarkista ettei epäonnistumisen "turvallinen oletusarvo" (tässä: tyhjä taulukko) ole VAHINGOSSA sama arvo kuin aidon onnistuneen-mutta-tyhjän-tuloksen arvo — jos ne näyttävät koodissa samalta, ne pitää erottaa eksplisiittisesti (`null` vs. `[]`), muuten virhe naamioituu onnistumiseksi.
+
+### Bugi 17 — Laiturin ⚓-tilan näkyvyys (löydetty/korjattu 2026-07-15)
+
+**Oire:** sijoittamaton ja jo-ankkurina-oleva Laiturin muru näyttivät identtisiltä Laiturissa — vilkaisulla ei erottanut kumpi on kumpi.
+
+**Juurisyy:** `.anchor-btn.active`-tila erottui vain väristä/opacitysta, ei muodosta — sama luonnevirhe kuin ✨-ehdokkaan erottuvuus-bugissa (Bugi 9).
+
+**Korjaus:** `.anchor-btn.active` sai täytetyn muodon (pyöristetty tausta), ei vain väriä — koskee kaikkia ⚓-nappeja koko sovelluksessa. Laiturin meta-riville lisätty "· ⚓ ankkurissa" -teksti-info. Ks. "Bugikorjaus: Laiturin ⚓-tilan näkyvyys" -osio.
+
+**Opittu:** kolmas kerta samalle "väri yksin ei riitä vilkaisulle" -virheelle (✨-ehdokas, ja nyt tämä) — kun rakennat UUDEN kaksitilaisen napin/merkin, tarkista SUORAAN alusta asti onko ero havaittavissa MUODOSSA eikä vain värissä, älä odota että joku raportoi sekaannuksen.
 
 ---
 
@@ -791,6 +802,24 @@ Jos kohdan 2 kysely näyttää `merkitty_sisalto`-arvon täsmälleen samana kuin
 ## Ankkuurin aikamerkintä (`.muistutus-aika`) — vahvistettu jo korjatuksi (havainto 2026-07-14 vanhalta versiolta)
 
 Katri raportoi ke-aamuna että ankkurin aikamerkintä katkesi kesken ("8.2█") vanhalla, ennen 14.7. illan rivityskorjausta olleella versiolla — Kauppalistalla vastaava teksti näkyi kokonaan. Tarkistettu koodista: `.ankkuri-rivi span:not(.muistutus-aika):not(.muistutus-wrap)` -sääntö (ks. "Bugikorjaus: Ankkuririvien tekstikatkaisu") rajaa `.muistutus-aika`-badgen KOKONAAN pois sekä line-clamp- että ellipsis-käsittelystä — se ei kuulu kumpaankaan sääntöön `.ankkuri-rivi`:n sisällä, joten sillä ei ole mitään koodillista syytä katketa. Todennäköisesti jo korjautunut samalla korjauksella, mutta EI VARMISTETTU visuaalisesti oikealla laitteella — Katri tarkistaa uudella versiolla.
+
+---
+
+## Bugikorjaus: Laiturin ⚓-tilan näkyvyys (2026-07-15)
+
+**Oire:** suoran nosto-⚓:n käyttöönoton (17.7.) jälkeen sijoittamaton ja jo-ankkurina-oleva Laiturin muru näyttivät Laiturissa identtisiltä — vilkaisulla ei erottanut kumpi on kumpi.
+
+**Juurisyy:** `.anchor-btn.active`-tila erottui vain väristä/opacitysta (`color:var(--accent); opacity:1` vs. `color:var(--muted); opacity:0.4`) — SAMA glyfi (⚓) molemmissa tiloissa, vain sävy vaihtui. Ei muotoeroa. Sama "väri yksin ei riitä vilkaisulle" -luonnevirhe kuin ✨-ehdokkaan erottuvuus-bugissa (ks. "Väsynyt käyttäjä ohikulkevalla vilkaisulla" -design-periaate).
+
+**Toiminnallisuus oli jo kunnossa:** `vaihdaAnkkurointiYleinen()` toimii jo bidirektionaalisesti (nostaa jos ei ankkuroitu, laskee jos on) — sama ⚓-nappi jo TOIMI toggle-tavalla (nosto ↔ lasku), ongelma oli PUHTAASTI visuaalinen erottuvuus, ei toiminto.
+
+**Korjaus, kaksi osaa:**
+1. **`.anchor-btn.active` sai TÄYTETYN muodon** (pyöristetty kulta-tausta + kontrastiväri glyfille), ei enää pelkkä värinvaihto — koskee samaa jaettua luokkaa KAIKKIALLA sovelluksessa (Muistilaput/Kauppalista/Kalenteri/Hytti/Laituri/Ankkurit), joten sama korjaus poistaa saman epäselvyyden kaikkialta yhdellä kertaa. Tarkistettu Playwrightilla molemmissa teemoissa — erottuu nyt selvästi.
+2. **Laiturin murun meta-riville** (sinä/kumppani · aika -teksti) lisätty `· ⚓ ankkurissa` -maininta kun muru on ankkuroitu — tieto, ei nappi, samalla periaatteella kuin `.muistutus-aika`. Napin `title`-vihje myös dynaaminen ("Nosta tälle päivälle ankkuriksi" vs. "Ankkurissa — napauta laskeaksesi").
+
+**Opittu:** kun tila-indikaattori nojaa vain väriin/opacityyn (ei muotoon), se on aina riski väsyneelle/ohikulkevalle vilkaisulle riippumatta kuinka looginen ero on koodissa — sama periaate joka löytyi jo ✨-ehdokkaan kohdalla pätee yhtä lailla mihin tahansa kaksitilaiseen nappiin.
+
+**Korjaus:** `style.css` (`.anchor-btn.active`), `script.js` (`lataaLaituri()`:n meta-teksti + napin title). `sw.js` v58. **EI TESTATTU vielä oikealla laitteella.**
 
 ---
 

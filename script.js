@@ -2518,13 +2518,22 @@ async function lataaLaituri(hakusana) {
     teksti.textContent = rivi.content;
     sisalto.appendChild(teksti);
 
+    // BUGIKORJAUS ("Laiturin ⚓-tilan näkyvyys"): sijoittamaton ja jo-
+    // ankkurina-oleva muru näyttivät identtisiltä — ⚓-napin oma väri/opacity-
+    // ero (ks. .anchor-btn.active) ei riittänyt vilkaisulle. Tieto tilasta
+    // (ei nappi) lisätty tekstin perässä olevaan meta-riviin — muoto
+    // (näkyvä sana) kertoo tilan, ei pelkkä napin väri.
+    const onAnkkuroitu = ankkuroidutAvaimet.has('laituri:' + rivi.id);
+
     const meta = document.createElement('span');
     meta.className = 'laituri-meta';
     const kuka = rivi.user_id === currentUserId ? 'sinä' : 'kumppani';
     const d = new Date(rivi.created_at);
     const aika = d.getDate().toString().padStart(2, '0') + '.' + (d.getMonth() + 1).toString().padStart(2, '0') + '. ' +
                  d.getHours().toString().padStart(2, '0') + ':' + d.getMinutes().toString().padStart(2, '0');
-    meta.textContent = kuka + ' · ' + aika + (rivi.status === 'sijoitettu' ? ' · → ' + rivi.placed_where : '');
+    meta.textContent = kuka + ' · ' + aika +
+      (rivi.status === 'sijoitettu' ? ' · → ' + rivi.placed_where : '') +
+      (onAnkkuroitu ? ' · ⚓ ankkurissa' : '');
     sisalto.appendChild(meta);
 
     li.appendChild(sisalto);
@@ -2546,9 +2555,9 @@ async function lataaLaituri(hakusana) {
       // vaihdaAnkkurointiYleinen). EI merkitse murua sijoitetuksi (ankkurointi
       // ja sijoitus ovat eri kysymyksiä, sama periaate kuin Muistilapuilla).
       const ankkuriNappi = document.createElement('button');
-      ankkuriNappi.className = 'anchor-btn' + (ankkuroidutAvaimet.has('laituri:' + rivi.id) ? ' active' : '');
+      ankkuriNappi.className = 'anchor-btn' + (onAnkkuroitu ? ' active' : '');
       ankkuriNappi.textContent = '⚓';
-      ankkuriNappi.title = 'Nosta tälle päivälle ankkuriksi';
+      ankkuriNappi.title = onAnkkuroitu ? 'Ankkurissa — napauta laskeaksesi' : 'Nosta tälle päivälle ankkuriksi';
       ankkuriNappi.addEventListener('click', function() {
         vaihdaAnkkurointiYleinen('laituri', rivi.id, rivi.content, function() {
           lataaLaituri(document.getElementById('laituri-search').value.trim());
