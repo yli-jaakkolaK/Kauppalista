@@ -2525,6 +2525,49 @@ async function lataaLaituri(hakusana) {
     // (näkyvä sana) kertoo tilan, ei pelkkä napin väri.
     const onAnkkuroitu = ankkuroidutAvaimet.has('laituri:' + rivi.id);
 
+    // Murun kevyt korjausmuokkaus (2026-07-15, ks. muistiinpanot.md "Laiturin
+    // murujen kevyt korjausmuokkaus"): KOROSTETUSTI korjaava käyttötapaus
+    // (esim. monitulkintaiseksi jäänyt muru täsmennetään "täytetty [pvm]"),
+    // EI jalostava — vanhoja muruja ei ole tarkoitus muuten muokata, sama
+    // ele kuin kaikkialla muualla (napautus = inline-muokkaus). Kaksi
+    // kytköstä, molemmat jo olemassa olevan arkkitehtuurin ansiosta/mukaan:
+    // (1) älyn käsittelymerkintä (aly_evaluated.content, ks. sql/044)
+    // vapautuu AUTOMAATTISESTI seuraavana yönä koska yöajo vertaa tallennettua
+    // sisältöä NYKYISEEN sisältöön — ei vaadi erillistä nollausta täältä;
+    // (2) jos muru on ankkuroitu, korjaus PÄIVITTYY myös ankkuriin ("yksi
+    // totuus" tälle nimenomaiselle suunnalle — päinvastoin kuin ankkurin
+    // oman muokkauksen kohdalla, ks. Bugi 10, joka tietoisesti EI vaikuta
+    // takaisin lähteeseen).
+    teksti.title = 'Napauta korjataksesi (esim. epäselväksi jäänyt muru)';
+    teksti.addEventListener('click', function() {
+      const inputti = document.createElement('input');
+      inputti.type = 'text';
+      inputti.value = rivi.content;
+      inputti.className = 'edit-input';
+      teksti.replaceWith(inputti);
+      inputti.focus();
+      inputti.select();
+
+      async function tallenna() {
+        const uusi = inputti.value.trim();
+        if (uusi && uusi !== rivi.content) {
+          const { error } = await db.from('laituri').update({ content: uusi }).eq('id', rivi.id);
+          if (error) {
+            console.error('Murun muokkaus epäonnistui:', error);
+          } else if (onAnkkuroitu) {
+            await db.from('ankkurit').update({ content: uusi }).eq('source', 'laituri').eq('source_ref', String(rivi.id));
+          }
+        }
+        lataaLaituri(document.getElementById('laituri-search').value.trim());
+      }
+
+      inputti.addEventListener('blur', tallenna);
+      inputti.addEventListener('keydown', function(e) {
+        if (e.key === 'Enter') inputti.blur();
+        if (e.key === 'Escape') { inputti.value = rivi.content; inputti.blur(); }
+      });
+    });
+
     const meta = document.createElement('span');
     meta.className = 'laituri-meta';
     const kuka = rivi.user_id === currentUserId ? 'sinä' : 'kumppani';
