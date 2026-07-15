@@ -138,6 +138,14 @@ Sama malli kuin `api/push-test.js`:ssä — validoi kutsujan Supabase-istunnon `
 
 ## GitHub Actions -ajastin: mihin se vaikuttaa ja miten se voi hiljentyä
 
-Muistutukset (`api/muistutukset-laheta.js`) ja kalenterisynkka (`api/caldav-sync.js`) EIVÄT käynnisty itsestään Vercel Hobby -tasolla (ei omaa cron-tukea) — molemmat riippuvat kokonaan `.github/workflows/muistutukset-cron.yml`:stä, joka herää 5 minuutin välein ja kutsuu molempia.
+Muistutukset (`api/muistutukset-laheta.js`), kalenterisynkka (`api/caldav-sync.js`) ja E3:n yöajo (`api/aly-nightly.js`) EIVÄT käynnisty itsestään Vercel Hobby -tasolla (ei omaa cron-tukea) — kaikki kolme riippuivat alunperin kokonaan `.github/workflows/muistutukset-cron.yml`:stä, jonka piti herätä 5 minuutin välein.
 
 **Jos muistutukset tai kalenterisynkka lakkaavat toimimasta yhtäkkiä ilman koodimuutosta, tarkista ENSIN GitHub-repon Actions-välilehti ennen kuin epäilet koodivikaa.** GitHub pysäyttää ajastetut (`schedule`-tyyppiset) workflowt automaattisesti jos repoon ei ole tullut yhtään committia noin 60 päivään — tästä lähtee sähköposti-ilmoitus repon omistajalle, ja Actions-välilehdellä workflow-listan vieressä näkyy silloin "Enable"-nappi joka käynnistää sen uudelleen yhdellä painalluksella. Tämä ei ole koskaan lähikuukausien huoli Copilot-aikana (committeja tulee luonnostaan jatkuvasta kehityksestä), mutta jos projektiin joskus tulee pitkä hiljainen jakso, tämä on ensimmäinen paikka tarkistaa.
+
+### BUGIKORJAUS/OPPI (2026-07-15): "GitHub Actions schedule ei ole kello vaan arpa"
+
+Todistettu 2026-07-14/15 illan diagnoosissa ("Ajastetut muistutukset eivät tule perille" -bugi, ks. muistiinpanot.md): `cron: '*/5 * * * *'` EI tarkoita että workflow todella herää 5 min välein. GitHub Actionsin `schedule`-triggerit ovat matalan prioriteetin jono — havaitut toteuma-aikaleimat olivat 60–180 min välein, ei 5 min. Tämä EI ollut koodivika (muistutus tallentui, cron poimi sen, push lähti — kaikki todistettu toimivaksi kun ajo vihdoin pyörähti), vain väärä LAUKAISIJA aikakriittiselle työlle.
+
+**Korjaus: ulkoinen cron-palvelu (cron-job.org) ensisijaiseksi laukaisijaksi, GitHub Actions jää varalaukaisijaksi (ei poisteta — ilmainen, ei haittaa, molemmat kutsuvat samoja idempotentteja endpointteja turvallisesti päällekkäinkin).** Katrin oma asennusaskel (vaatii ulkoisen tilin, ei tehtävissä koodista) — täydet ohjeet PALUU.md:n OSA S:ssä.
+
+**Yleistettävä oppi:** jos rakennat JATKOSSA jotain aikakriittistä (esim. Viikkokatsaus, Horisontti-rytmioppija) tämän saman `muistutukset-cron.yml`-workflow'n varaan, MUISTA että sen toteuma-aikataulu on suuntaa-antava, ei taattu — 20h+ -välein tapahtuvalle työlle (kuten E3:n yöajo) tämä on lähes huomaamaton, mutta minuuttitason tarkkuutta vaativalle (muistutukset) se on merkittävä riski jota ei näy testauksessa ellei nimenomaan mittaa toteuma-aikaleimoja.

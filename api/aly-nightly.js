@@ -286,13 +286,35 @@ module.exports = async function handler(req, res) {
   });
 
   let usersChecked = 0;
+  let usersFailed = 0;
   let matchesCreated = 0;
 
   for (const userId of Object.keys(byUser)) {
     const userNotes = byUser[userId];
     usersChecked++;
     const result = await callClaude(buildPrompt(userNotes), userId);
-    const matches = (result && Array.isArray(result.matches)) ? result.matches : [];
+
+    // BUGIKORJAUS (2026-07-15, ks. muistiinpanot.md "Yöajo ei tee mitään"):
+    // ennen tätä, jos äly-kutsu epäonnistui (Anthropic-virhe TAI vastaus ei
+    // jäsentynyt kelvolliseksi JSON:ksi) `callClaude()` palautti `null`, ja
+    // se rinnastettiin virheellisesti "äly katsoi eikä löytänyt osumaa"
+    // -tulokseen (`matches = []` molemmissa tapauksissa) — KAIKKI käyttäjän
+    // murut merkittiin silloin PYSYVÄSTI käsitellyiksi (`markEvaluated`)
+    // vaikka äly ei koskaan oikeasti nähnyt niitä. Sama "merkitty tehdyksi
+    // vaikkei tehty" -luonnevika kuin muistutus-cronissa (ks. "Ajastetut
+    // muistutukset eivät tule perille") — vain hiljaisempi, koska tämä ei
+    // näy käyttäjälle MITENKÄÄN (ei virhettä, ei puuttuvaa pushia, pelkkä
+    // pysyvä hiljaisuus joka näyttää täsmälleen samalta kuin oikea "ei
+    // osumaa"). Korjattu: erotetaan "äly vastasi kelvollisesti, matches on
+    // (mahdollisesti tyhjä) taulukko" ja "äly-kutsu epäonnistui/vastaus ei
+    // jäsentynyt" toisistaan — jälkimmäisessä TÄMÄN käyttäjän muruja EI
+    // merkitä käsitellyiksi ollenkaan, ne jäävät odottamaan seuraavaa ajoa.
+    const matches = (result && Array.isArray(result.matches)) ? result.matches : null;
+    if (matches === null) {
+      usersFailed++;
+      console.error('[aly-nightly] Äly-kutsu epäonnistui tai vastaus ei jäsentynyt käyttäjälle ' + userId + ' — ' + userNotes.length + ' murua jätetään EI-käsitellyiksi, yritetään uudelleen seuraavalla ajolla.');
+      continue;
+    }
     const matchedIds = new Set();
 
     for (const match of matches) {
@@ -357,6 +379,7 @@ module.exports = async function handler(req, res) {
     success: true,
     expired: expired,
     users_checked: usersChecked,
+    users_failed: usersFailed,
     notes_evaluated: eligible.length,
     matches: matchesCreated,
   });

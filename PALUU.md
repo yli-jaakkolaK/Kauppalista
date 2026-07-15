@@ -367,4 +367,49 @@ Aja **`sql/050`–`052`** ennen tätä. **Tämä osa on kriittisin tähän menne
 
 ---
 
+## OSA S — Ke-aamun jatko: vaihda cron-laukaisija + tarkista yöajo (2026-07-15)
+
+**Ei uusia migraatioita tälle osalle** — vain yksi palvelinpuolen koodikorjaus (`api/aly-nightly.js`) + kaksi Katrin omaa asennusaskelta.
+
+### 1. Vaihda muistutusten/synkan/yöajon laukaisija ulkoiseen palveluun (KRIITTINEN, tehtävissä milloin vain — ei odota mitään)
+
+**Tausta:** GitHub Actionsin `schedule`-triggeri on todistettu (ke-aamun toteuma-aikaleimat) epäluotettavaksi ~5 min syklille — se toteutui 60–180 min välein, ei 5 min. Koneisto itsessään on kunnossa (todistettu), pelkkä laukaisija pitää vaihtaa luotettavampaan. GitHub Actions jää PAIKOILLEEN varalaukaisijaksi — ei tarvitse poistaa mitään `.github/workflows/muistutukset-cron.yml`:stä.
+
+**Askeleet (cron-job.org, ilmainen, ei vaadi luottokorttia):**
+1. Mene osoitteeseen cron-job.org, luo ilmainen tili (sähköposti + salasana).
+2. Kirjaudu sisään → "Create cronjob".
+3. Luo KOLME erillistä cron-työtä (yksi per endpoint), kaikille asetus **"Every 5 minutes"**:
+   - **Muistutukset:** URL `https://kauppalista-nine.vercel.app/api/muistutukset-laheta?avain=<MUISTUTUKSET_CRON_SECRET-arvo>` (sama arvo joka on jo GitHubin Secrets-listalla — löytyy GitHub-repon Settings → Secrets and variables → Actions, arvoa ei näy enää sieltä jälkikäteen, joten jos et muista sitä, tarkista Vercelin Environment Variables -listalta, sama arvo pitää olla siellä)
+   - **Kalenterisynkka:** URL `https://kauppalista-nine.vercel.app/api/caldav-sync` (ei tarvitse avainta)
+   - **E3-yöajo:** URL `https://kauppalista-nine.vercel.app/api/aly-nightly?key=<sama MUISTUTUKSET_CRON_SECRET-arvo>` (endpoint itse rajoittaa oikean työn ~20h väliin, joten 5 min pingaus on turvallinen ja tarkoituksellinen — sama malli kuin GitHub Actionsissa nyt)
+4. Tallenna kaikki kolme, anna niiden pyöriä ~15 min, tarkista cron-job.org:n omasta "Execution history" -näkymästä että kutsut palauttavat HTTP 200.
+5. **Turvahuomio:** cron-job.org näkee nyt saman salaisuuden URL:ssa kuin GitHub Actions — tämä on sama luottamustaso kuin ennenkin (ei uutta riskiä periaatteessa), mutta jos joskus haluat kiristää, salaisuuden voi vaihtaa (uusi arvo sekä Verceliin että molempiin laukaisijoihin) — ei kiireellinen nyt.
+
+### 2. Tarkista yöajon tila (E3, ks. muistiinpanot.md "Bugikorjaus: Yöajo ei tee mitään")
+
+Kaksi täydellistä testimurua ei noussut ehdokkaiksi. Bugi (äly-kutsun epäonnistuminen sekoittui "ei osumaa" -tulokseen) on korjattu, mutta aja nämä LUKEVAT (turvalliset) SQL-kyselyt Supabasen SQL Editorissa nähdäksesi tarkan tilanteen:
+
+```sql
+-- 1) Onko yöajo päällä, ja kuinka kauan viime yrityksestä?
+select key, value from asetukset where key in ('aly_yoajo', 'aly_yoajo_last_run');
+
+-- 2) Löytyvätkö testimurut, ja onko ne jo (mahdollisesti virheellisesti) merkitty käsitellyiksi?
+select l.id, l.content, l.status, l.created_at,
+       ev.content as merkitty_sisalto, ev.evaluated_at
+from laituri l
+left join aly_evaluated ev on ev.laituri_id = l.id
+where l.content ilike '%palaveri%' or l.content ilike '%liput 20.7%'
+order by l.created_at desc;
+```
+
+Jos kohdan 2 `merkitty_sisalto` täsmää tarkalleen `content`-sarakkeeseen, muru on merkitty käsitellyksi eikä nouse uudelleen samalla sisällöllä. **Pakota uudelleenarviointi heti** (jos haluat testata korjausta odottamatta seuraavaa luonnollista 20h-jaksoa) poistamalla vastaava rivi:
+```sql
+delete from aly_evaluated where laituri_id in (
+  select id from laituri where content ilike '%palaveri%' or content ilike '%liput 20.7%'
+);
+```
+Laukaise sitten yöajo käsin (GitHub-repo → Actions → "Muistutusten ja kalenterisynkan ajastin" → Run workflow, TAI odota cron-job.org:n seuraavaa 5 min pingausta kun se on asennettu) ja tarkista Vercelin Logs `/api/aly-nightly`-kutsuista `[aly-nightly]`-rivit — pitäisi nyt näkyä joko osuma tai `users_failed:0`.
+
+---
+
 Kysy Claudelta jos joku kohta ei täsmää tai jokin näistä napeista/valikoista ei löydy — käyttöliittymät muuttuvat välillä hieman.

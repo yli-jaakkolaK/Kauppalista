@@ -117,7 +117,8 @@ Jokainen älyn tekemä aikasidonnainen ehdotus (mikä tahansa "tämä koskee tie
 
 **KESKIVIIKON LÖYDÖKSET (17.7.) KORJATTU, VIISI BUGIA (Bugi 6–10):** vakavin — Kalenteri-sijoitus ei kirjoittanut mitään minnekään mutta merkitsi murun silti sijoitetuksi (`sql/047` korjaa vanhat virheelliset merkinnät); Rivien UI-remontti ei kattanut Laituria/päätöskortteja (jatko-osa, ei uutta migraatiota); Äly-loki oli umpikuja (`sql/048` lisää undo_reason); ✨-ehdokas ei erottunut (muotokorjaus, ei himmeys); ankkurin muokkaus puuttui kokonaan. Kaksi uutta yleistä design-periaatetta kirjattu ("Vahvistus seuraa todellisuutta", "Väsynyt käyttäjä ohikulkevalla vilkaisulla") ja uusi prominentti huomautus dokumentin alkuun ("Satama→kalenteri-kirjoitusta EI OLE"). AJA `sql/047`–`048` ennen PALUU.md:n OSA Q -testiä. **EI TESTATTU vielä oikealla laitteella.**
 
-**TIISTAIN LÖYDÖKSET (21.7.) + ILTA-KIILA KORJATTU, VIISI BUGIA LISÄÄ (Bugi 11–15):** kriittisin — kolme käsin luotua ankkuria kadonnut pysyvästi (ei varmuuskopiota) → 5s kumottava toast KAIKKIIN ankkurin poistaviin eleisiin (`naytaKumottavaIlmoitus()`) hätäkorjauksena, JA varsinainen korjaus: **Ankkuriarkkitehtuuri "jokaisella ankkurilla on koti"** — käsin luotu ankkuri luo nyt taustalla murun Laituriin eikä ole enää itse ainoa kopio sisällöstä, lasku ei voi enää koskaan tuhota mitään (`sql/051` migroi vanhat). Ankkurin ⏰ kaksoistoiminto (poisti ankkurin kellon sijaan) juuriltaan `.list li`:n puuttuva `gap`+hit-slop-päällekkäisyys, korjattu kaikkiin rivityyppeihin. Ankkuririvit saivat vihdoin tekstirivityksen (line-clamp). **Ilta-kiila:** ajastetut muistutukset eivät tulleet perille — kaksi teoriaa kumottu koodista, LÖYDETTY JA KORJATTU todellinen bugi (cron merkitsi lähetetyksi vaikka push epäonnistuisi, nyt uudelleenyrittää) + erillinen `'laituri'`-source-rajoite puuttui (`sql/050`, oma bugi samalta päivältä). Jäljellä epävarmuutta jonka vain Katri voi tarkistaa (SQL-kysely valmiina osiossa, Vercel Logs). Kohdat 5–13 kirjattu suunnitelmaksi, EI VIELÄ TOTEUTETTU. AJA `sql/047`–`051` (kaikki tähän mennessä ajamattomat) ennen PALUU.md:n OSA R -testiä. **EI TESTATTU vielä oikealla laitteella — Katri tarkistaa ensin muistutus-SQL:n + Vercel Logsin, huomisen vertailumatriisi vasta tämän jälkeen.**
+**TIISTAIN LÖYDÖKSET (14.7.) + ILTA-KIILA KORJATTU, VIISI BUGIA LISÄÄ (Bugi 11–15):** kriittisin — kolme käsin luotua ankkuria kadonnut pysyvästi (ei varmuuskopiota) → 5s kumottava toast KAIKKIIN ankkurin poistaviin eleisiin (`naytaKumottavaIlmoitus()`) hätäkorjauksena, JA varsinainen korjaus: **Ankkuriarkkitehtuuri "jokaisella ankkurilla on koti"** — käsin luotu ankkuri luo nyt taustalla murun Laituriin eikä ole enää itse ainoa kopio sisällöstä, lasku ei voi enää koskaan tuhota mitään (`sql/051` migroi vanhat). Ankkurin ⏰ kaksoistoiminto (poisti ankkurin kellon sijaan) juuriltaan `.list li`:n puuttuva `gap`+hit-slop-päällekkäisyys, korjattu kaikkiin rivityyppeihin. Ankkuririvit saivat vihdoin tekstirivityksen (line-clamp). **Ilta-kiila:** ajastetut muistutukset eivät tulleet perille — kaksi teoriaa kumottu koodista, LÖYDETTY JA KORJATTU todellinen bugi (cron merkitsi lähetetyksi vaikka push epäonnistuisi, nyt uudelleenyrittää) + erillinen `'laituri'`-source-rajoite puuttui (`sql/050`, oma bugi samalta päivältä). Jäljellä epävarmuutta jonka vain Katri voi tarkistaa (SQL-kysely valmiina osiossa, Vercel Logs). Kohdat 5–13 kirjattu suunnitelmaksi, EI VIELÄ TOTEUTETTU. AJA `sql/047`–`051` (kaikki tähän mennessä ajamattomat) ennen PALUU.md:n OSA R -testiä. **EI TESTATTU vielä oikealla laitteella — Katri tarkistaa ensin muistutus-SQL:n + Vercel Logsin, huomisen vertailumatriisi vasta tämän jälkeen.**
+- **2026-07-15 aamu — KIILA ratkesi todistetusti, uusi bugi löytyi eri paikasta:** Katrin ke-aamun tarkistus vahvisti koko muistutuskoneiston (tallennus, poiminta, lähetys, uudelleenyritys) toimivaksi — 8:21-muistutus tuli lopulta perille, myöhässä mutta perillä, kun GitHub Actions -workflow vihdoin pyörähti (todistettu toteuma-aikaleimoilla ~60–180 min välein, ei 5 min kuten luvattu). Juurisyy: **"GitHub Actions schedule ei ole kello vaan arpa"** — matalan prioriteetin ajastusjono, ei luotettava aikakriittiselle työlle. Ratkaisu: ulkoinen cron-palvelu (cron-job.org) ensisijaiseksi laukaisijaksi, GitHub Actions varalaukaisijaksi (ei poisteta). Katrin oma asennusaskel, ohjeet PALUU.md OSA S:ssä ja COPILOT.md:ssä. Samalla löydetty JA korjattu ERI, riippumaton bugi: **E3:n yöajo ei tehnyt mitään usean yön ajan** — `callClaude()`:n epäonnistumista ei erotettu aidosta "ei osumaa" -tuloksesta, joten epäonnistunut äly-kutsu merkitsi murut hiljaa pysyvästi käsitellyiksi (neljäs tapaus samasta "tilamerkintä ei seurannut todellisuutta" -luonnevirheestä samalla viikolla, hiljaisin näistä — ei jättänyt mitään jälkeä). Korjattu erottamalla `matches===null` (epäonnistui) omaksi käsittelykseen — murut jäävät nyt odottamaan seuraavaa ajoa sen sijaan että katoaisivat. Kirjattu Bugi 16. Vahvistettu koodista (ei vielä visuaalisesti) että ankkurin aikamerkintä-katkeamisraportti oli vanhalta versiolta eikä koodissa ole enää syytä sille toistua. Ei sw-bump tällä kertaa — vain palvelinpuolen (`api/aly-nightly.js`) ja dokumentaation muutoksia, ei mitään asiakaspuolen tiedostoa joka vaatisi välimuistin ohituksen. Koonti 2:n kohdat 5–13 odottavat yhä vuoroaan. Ei koskettu odottavaan pakettiin.
 
 Jos joudut päättämään mistä jatkat: aja ensin PALUU.md:n VAIHE 1 -testit läpi (täppäys Satama-listalta), sitten torstaina VAIHE 2 Juhan kanssa, sitten E3-keskiportaan OSA O, Rivien UI-remontin OSA P, keskiviikon löydösten OSA Q ja tiistain löydösten OSA R viimeisinä (torstai on nyt Katrin soolotestipäivä korjausten päällä — Juhan kanssa testataan erikseen kun ydin on todistettu, ks. "Bugikorjaus: Ajastetut muistutukset eivät tule perille" -osion aikataulupäivitys), ja vasta sen jälkeen aloita ristiriitapaketti.
 
@@ -296,6 +297,16 @@ Tämä osio on lyhyt päiväkirjamainen kooste — tarkka sisältö löytyy aina
 **Korjaus:** `sql/050_muistutukset_laituri_source.sql` laajentaa rajoitteen.
 
 **Opittu:** kun lisäät uuden `source`-arvon yhteen paikkaan (esim. `avaaMuistutusPaneeli('laituri', ...)`), tarkista SAMALLA onko vastaava tietokannan CHECK-rajoite jo olemassa — helppo unohtaa kun rajoite on eri tiedostossa kuin juuri muokattu koodi.
+
+### Bugi 16 — Yöajo merkitsi murut käsitellyiksi vaikka äly-kutsu epäonnistui (löydetty/korjattu 2026-07-15)
+
+**Oire:** kaksi täydellistä testimurua Laiturissa ei noussut ehdokkaiksi usean yökierroksen jälkeenkään, äly-loki täysin tyhjä.
+
+**Juurisyy:** `callClaude()`:n epäonnistumista (`null`-paluuarvo) EI erotettu koodissa aidosta "äly katsoi eikä löytänyt osumaa" -tuloksesta (`{matches:[]}`) — molemmat johtivat samaan `matches=[]`-käsittelyyn, jolloin KAIKKI käyttäjän murut merkittiin pysyvästi käsitellyiksi vaikka äly ei koskaan nähnyt niitä. Neljäs tapaus samasta luonnevirheestä samalla viikolla, ja hiljaisin näistä — ei jättänyt MITÄÄN jälkeä, näytti täsmälleen samalta kuin oikea tulos.
+
+**Korjaus:** `matches === null` (epäonnistunut/jäsentymätön vastaus) käsitellään nyt erikseen — kyseisen käyttäjän murut jätetään merkitsemättä, jäävät odottamaan seuraavaa ajoa. Ks. "Bugikorjaus: Yöajo ei tee mitään" -osio.
+
+**Opittu:** aina kun ulkoisen palvelun (tässä: Anthropic API) epäonnistumista käsitellään, tarkista ettei epäonnistumisen "turvallinen oletusarvo" (tässä: tyhjä taulukko) ole VAHINGOSSA sama arvo kuin aidon onnistuneen-mutta-tyhjän-tuloksen arvo — jos ne näyttävät koodissa samalta, ne pitää erottaa eksplisiittisesti (`null` vs. `[]`), muuten virhe naamioituu onnistumiseksi.
 
 ---
 
@@ -718,6 +729,12 @@ Jos rivejä ei näy → kirjoitusvaihe epäonnistui hiljaa jostain toisesta syys
 
 **Korjaus:** `api/muistutukset-laheta.js` (retry-korjaus + lokitus), `sql/050_muistutukset_laituri_source.sql`. **EI TESTATTU/VARMISTETTU vielä oikealla datalla** — Katri tarkistaa yllä olevan SQL:n ja Vercel Logsin, kertoo tuloksen niin tutkinta jatkuu oikeaan suuntaan tarvittaessa. Huomisen 4 muistutuksen vertailumatriisi (listarivi ×2 / kalenteri / ankkuri, eri kellonajat) suositellaan ajettavaksi TÄMÄN korjauksen JÄLKEEN, ei ennen.
 
+**RATKAISU TODISTETTU 2026-07-15 aamulla — koneisto ehjä, laukaisija rikki:** Katrin ke-aamun tarkistus antoi lopullisen vastauksen. GitHub Actions -workflown ajojen toteuma-aikaleimat (~60–180 min välein, EI 5 min kuten `cron: '*/5 * * * *'` lupaa) paljastivat että GitHubin `schedule`-triggeri on matalan prioriteetin jono, ei luotettava kello. Vercel Logs klo 8–9 oli täysin tyhjä (ei kutsuja lainkaan sinä aikana) — 8:21 asetettu muistutus odotti kannassa siihen asti kunnes ajo vihdoin pyörähti n. klo 10, ja **TULI TUOLLOIN PERILLE** (myöhässä, mutta perillä). Tämä todistaa KOLME asiaa kerralla: (1) "Sulje ei tallenna" -teoria lopullisesti kumottu — tallennus toimi; (2) poiminta toimii myös ankkurimuistutuksille; (3) yllä oleva uudelleenyrityskorjaus toimi — VANHA koodi olisi haudannut tämän muistutuksen hiljaa ensimmäisen (tyhjän kierroksen puuttuessa syntyneen) epäonnistuneen yrityksen jälkeen, UUSI koodi piti sen elossa kunnes ajo vihdoin tapahtui. Eilisillan 2/5 muistutusta (jotka "näyttivät onnistuneelta" mutta eivät tulleet) selittyvät samalla mekanismilla — ne erääntyivät harvojen ajokertojen väliin, ja VANHA (sittemmin korjattu) merkintäbugi olisi hautanut ne pysyvästi jos/kun ajo lopulta olisi tullut.
+
+**Havaittu sivuseikka:** 8:21-muistutus tuli HILJAA ilmoituskeskukseen (ei pörinää) — todennäköisesti iOS:n oma toimitushetki-/prioriteettilogiikka myöhässä saapuvalle pushille, ei Saman koodivika. Seurataan jatkossa uudella "PÖRISI / TULI HILJAA / EI MISSÄÄN" -kolmijaolla (ks. muistutusdiagnostiikka-ohje COPILOT.md:ssä) jos ilmiö toistuu ajallaan saapuvalla pushilla.
+
+**TOIMENPIDE — laukaisija vaihdettu:** koneisto (tallennus, poiminta, lähetys, uudelleenyritys) on nyt todistetusti ehjä — ongelma on YKSINOMAAN GitHub Actionsin epäluotettava ~5 min syke. Ratkaisu: ulkoinen cron-palvelu (cron-job.org) ensisijaiseksi laukaisijaksi, GitHub Actions jää varalaukaisijaksi (ei poisteta — ilmainen, molemmat voivat kutsua samoja idempotentteja endpointteja turvallisesti vaikka päällekkäinkin). Katrin oma asennusaskel, täydet ohjeet PALUU.md:n OSA S:ssä, oppi kirjattu myös COPILOT.md:hen ("GitHub Actions schedule ei ole kello vaan arpa").
+
 ---
 
 ## Ankkuriarkkitehtuuri: "Jokaisella ankkurilla on koti" (rakennettu 2026-07-14)
@@ -737,6 +754,43 @@ Jos rivejä ei näy → kirjoitusvaihe epäonnistui hiljaa jostain toisesta syys
 **Yhtenäistää ihmisen ja älyn polut:** invariantti "mikään kirjoitettu ei koskaan katoa" (E3:n turvainvariantti) kattaa nyt myös käyttöliittymän omat eleet, ei vain älyn tekemät — sama sääntö riippumatta siitä KUKA/MIKÄ loi ankkurin.
 
 **Korjaus:** `script.js` (`#ankkurit-add-btn`-käsittelijä, `irrotaNappi`, uudet `ANKKURI_KOTI_MUISTUTUS_LAHDE`/`ankkurinKotiMuistutusLahde`/`ANKKURI_KOTI_NIMI`), `sql/051_ankkurit_manual_migraatio_laituriin.sql`. `sw.js` v57. **EI TESTATTU vielä oikealla laitteella** — ks. PALUU.md OSA R.
+
+---
+
+## Bugikorjaus: Yöajo ei tee mitään — merkitsi murut käsitellyiksi vaikka äly-kutsu epäonnistui (2026-07-15)
+
+**Lähde:** Katrin ke-aamun raportti — kaksi täydellistä testimurua Laiturissa (hetki: "huomenna klo 14 palaveri", ikkuna: "osta liput 20.7. mennessä") eivät nousseet ehdokkaiksi usean yökierroksen jälkeenkään. Äly-loki täysin tyhjä (ei yhtään riviä koskaan), ei palluroita. Erillinen vika muistutus-bugista — samasta yöajo-endpointista, mutta ei sama syy.
+
+**Tutkittu koodikatselmuksella (`api/aly-nightly.js`), löytyi todellinen bugi jo ensimmäisellä lukukerralla:**
+
+`callClaude()` palauttaa `null` jos Anthropic-API-kutsu epäonnistuu TAI vastaus ei jäsenny kelvolliseksi JSON:ksi. Ennen tätä korjausta koodi teki: `const matches = (result && Array.isArray(result.matches)) ? result.matches : [];` — eli sekä "äly vastasi: ei osumia" (`{matches: []}`) ETTÄ "äly-kutsu epäonnistui kokonaan" (`result === null`) johtivat TÄSMÄLLEEN samaan lopputulokseen koodin silmissä: tyhjä `matches`-taulukko. Seurauksena rivillä 348+ KAIKKI käyttäjän sen yön murut merkittiin `markEvaluated()`:llä PYSYVÄSTI käsitellyiksi ("ei osumaa") — VAIKKA äly ei koskaan oikeasti nähnyt niitä.
+
+**Miksi tämä on erityisen vaarallinen hiljaisuusbugi:** toisin kuin muistutus-cronin vastaava vika (joka ainakin JÄTTI jäljen — `sent_at` jäi asettamatta niin kauan kuin push epäonnistui, ja lopulta paljastui vertailemalla toteumaa), tämä versio näytti TÄSMÄLLEEN samalta kuin oikea, aito "äly katsoi eikä löytänyt mitään" -tulos. Ei virhettä, ei puuttuvaa lokiriviä (koska mitään ei edes yritetty kirjata), ei mitään merkkiä siitä että jotain meni pieleen — pelkkä pysyvä, näennäisesti-normaali hiljaisuus. Neljäs tapaus samalla viikolla samasta luonnevirheestä ("tilamerkintä ei seurannut todellisuutta").
+
+**Korjaus:** erotetaan "äly vastasi kelvollisesti (matches on taulukko, mahdollisesti tyhjä)" ja "äly-kutsu epäonnistui tai vastaus ei jäsentynyt" (`matches === null`) toisistaan. Jälkimmäisessä tapauksessa TÄMÄN käyttäjän murut EIVÄT merkitse käsitellyiksi ollenkaan — `continue` hyppää seuraavaan käyttäjään, murut jäävät odottamaan seuraavaa ajoa. Lisätty `usersFailed`-laskuri vastaukseen + `console.error`-rivi diagnostiikkaa varten.
+
+**Jäljellä oleva epävarmuus:** en pysty täältä tarkistamaan MIKSI äly-kutsu (jos se ylipäätään epäonnistui — se on vain YKSI mahdollinen selitys kolmesta, ks. alla) epäonnistui juuri näiden kahden murun kohdalla — vaatii Vercel Logsin `[aly-nightly]`-rivien tarkistusta (Anthropic-virhevastaukset näkyvät siellä `console.error`:illa jo entuudestaan). **Kaksi muuta mahdollista, tähän mennessä tarkistamatonta selitystä samalle oireelle** (Katrin oma lista, ei minun arvaamiani): (1) `asetukset.aly_yoajo`-kytkin on jostain syystä `'off'` — tarkista suoraan; (2) `aly_yoajo_last_run`-aikaleima päivittyy JOKAISESTA yrityksestä (myös nollatuloksisesta), joten jos edellinen yritys sattui juuri ennen murujen kirjoittamista, 20h-jäähdytys estää seuraavan oikean tarkistuksen paljon pidempään kuin "kerran yössä" antaisi olettaa — TÄMÄ EI OLE VIKA sinänsä (tarkoituksellinen, ks. koodikommentti) mutta yhdistettynä epäluotettavaan GitHub Actions -laukaisijaan (ks. yllä) voi venyä yllättävän pitkäksi. **Suositellut lukevat SQL-tarkistukset (turvallisia SQL Editorissa):**
+```sql
+-- 1) Onko yöajo päällä, ja kuinka kauan viime yrityksestä?
+select key, value from asetukset where key in ('aly_yoajo', 'aly_yoajo_last_run');
+
+-- 2) Löytyvätkö testimurut, ja onko ne jo (virheellisesti) merkitty käsitellyiksi?
+select l.id, l.content, l.status, l.created_at,
+       ev.content as merkitty_sisalto, ev.evaluated_at
+from laituri l
+left join aly_evaluated ev on ev.laituri_id = l.id
+where l.content ilike '%palaveri%' or l.content ilike '%liput 20.7%'
+order by l.created_at desc;
+```
+Jos kohdan 2 kysely näyttää `merkitty_sisalto`-arvon täsmälleen samana kuin `content` → muru ON merkitty käsitellyksi (joko tämän juuri korjatun bugin takia AIEMMIN, tai koska äly aidosti ei löytänyt osumaa) — poista rivi `aly_evaluated`-taulusta manuaalisesti SQL Editorista jos haluat pakottaa uudelleenarvioinnin heti (idempotentti, `on_conflict`-upsert luo sen uudelleen seuraavalla arvioinnilla).
+
+**Korjaus:** `api/aly-nightly.js` (`matches === null` -erottelu, `usersFailed`-laskuri). **EI TESTATTU/VARMISTETTU vielä oikealla datalla** — Katri tarkistaa yllä olevat SQL-kyselyt + Vercel Logsin `[aly-nightly]`-rivit, kertoo tuloksen.
+
+---
+
+## Ankkuurin aikamerkintä (`.muistutus-aika`) — vahvistettu jo korjatuksi (havainto 2026-07-14 vanhalta versiolta)
+
+Katri raportoi ke-aamuna että ankkurin aikamerkintä katkesi kesken ("8.2█") vanhalla, ennen 14.7. illan rivityskorjausta olleella versiolla — Kauppalistalla vastaava teksti näkyi kokonaan. Tarkistettu koodista: `.ankkuri-rivi span:not(.muistutus-aika):not(.muistutus-wrap)` -sääntö (ks. "Bugikorjaus: Ankkuririvien tekstikatkaisu") rajaa `.muistutus-aika`-badgen KOKONAAN pois sekä line-clamp- että ellipsis-käsittelystä — se ei kuulu kumpaankaan sääntöön `.ankkuri-rivi`:n sisällä, joten sillä ei ole mitään koodillista syytä katketa. Todennäköisesti jo korjautunut samalla korjauksella, mutta EI VARMISTETTU visuaalisesti oikealla laitteella — Katri tarkistaa uudella versiolla.
 
 ---
 
