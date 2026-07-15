@@ -89,6 +89,28 @@ let valitutTuoteIdt = new Set();
 // voi periaatteessa esiintyä eri lähteissä (tuotteet.id vs. kalenterin id)
 let ankkuroidutAvaimet = new Set();
 
+// "Ankkurin ehdottaminen toiselle" (2026-07-16, ks. muistiinpanot.md) —
+// perheenjäsenten henkilo<->user_id-kartta (sama hytti_omistajat-taulu jota
+// kalenterin henkilökohtaiset syötteet jo käyttävät, luettavissa kenelle
+// tahansa kirjautuneelle) kevyesti asiakaspuolelle, jotta "ehdota toiselle"
+// -toiminto tietää KENELLE ehdottaa ilman kovakoodattua UUID:tä.
+let toinenKayttaja = null; // { henkilo, user_id } tai null jos ei löytynyt
+async function paivitaHenkiloKartta() {
+  const { data, error } = await db.from('hytti_omistajat').select('henkilo, user_id');
+  if (error) {
+    console.error('Henkilökartan haku epäonnistui:', error);
+    return;
+  }
+  toinenKayttaja = (data || []).find(function(rivi) { return rivi.user_id !== currentUserId; }) || null;
+}
+function henkiloNimi(henkilo) {
+  return henkilo ? henkilo.charAt(0).toUpperCase() + henkilo.slice(1) : 'kumppanille';
+}
+// Ei-pysyvä muisti tämän istunnon aikana lähetetyistä ehdotuksista — estää
+// vahinkokaksoisklikkauksen, EI kysele takaisin onko ehdotus hyväksytty/
+// hylätty (ks. "hylkäys ei koskaan raportoidu lähettäjälle" -turvasääntö).
+let ehdotetutTassaIstunnossa = new Set();
+
 // Hakee mitkä rivit (mistä tahansa lähteestä) KIRJAUTUNUT ITSE on jo
 // nostanut Ankkureihin — ankkurit ovat henkilökohtaisia (2026-07-11), joten
 // tämä on aina rajattava omaan user_id:hen, muuten toisen käyttäjän ankkuri
@@ -2000,9 +2022,11 @@ async function lataaAnkkurit() {
           // BUGIKORJAUS ("Ankkuriarkkitehtuuri: jokaisella ankkurilla on
           // koti"): LASKU POISTAA VAIN NOSTON — muistutukset kuuluvat
           // sisällölle, eivät nostolle, joten ne SIIRRETÄÄN kotiin sen
-          // sijaan että poistettaisiin. Vain vanha migroimaton
-          // 'manual'-ankkuri (ei kotia) putoaa varasuunnitelmaan (poisto).
-          if (ankkuri.source && ankkuri.source !== 'manual' && ankkuri.source_ref) {
+          // sijaan että poistettaisiin. Vanha migroimaton 'manual'-ankkuri
+          // (ei kotia) JA hyväksytty ihmislähtöinen ehdotus ('ehdotus' — koti
+          // on LÄHETTÄJÄN oma Laituri, ei jotain jonne vastaanottaja pääsisi)
+          // putoavat varasuunnitelmaan (poisto).
+          if (ankkuri.source && ankkuri.source !== 'manual' && ankkuri.source !== 'ehdotus' && ankkuri.source_ref) {
             const kotiLahde = ankkurinKotiMuistutusLahde(ankkuri);
             await db.from('muistutukset')
               .update({ source: kotiLahde, source_ref: String(ankkuri.source_ref) })
@@ -2046,13 +2070,22 @@ async function lataaAnkkurit() {
 // note is NEVER touched, ks. safety invariant in api/aly-nightly.js).
 async function loadAnchorCandidates() {
   if (raahattavaRivi) return;
+  // source ei enää rajata 'aly':ksi — is_candidate=true kattaa nyt kaksi
+  // alkuperää: koneen ehdotus (source='aly', ✨) ja toisen käyttäjän ehdotus
+  // (source='ehdotus', ks. "Ankkurin ehdottaminen toiselle" muistiinpanot.md:ssä).
   const { data, error } = await db.from('ankkurit').select()
-    .eq('user_id', currentUserId).eq('source', 'aly').eq('is_candidate', true).eq('done', false)
+    .eq('user_id', currentUserId).eq('is_candidate', true).eq('done', false)
     .order('created_at');
   if (error) {
     console.error('Ankkuriehdokkaiden haku epäonnistui:', error);
     return;
   }
+
+  // "Siirrä myöhemmäksi" (ks. alla) suodattaa ehdotuksen pois näkyvistä
+  // kunnes visible_from koittaa — ei erillistä kyselyä, suodatetaan
+  // asiakaspuolella koska rivimäärä on aina pieni.
+  const nyt = new Date();
+  const naytettavat = (data || []).filter(function(c) { return !c.visible_from || new Date(c.visible_from) <= nyt; });
 
   const listEl = document.getElementById('anchor-candidates-list');
   listEl.innerHTML = '';
@@ -2062,9 +2095,9 @@ async function loadAnchorCandidates() {
   // hukkui muun sisällön joukkoon. Muoto (otsikko + katkoviivakehys alla),
   // ei himmeys — opacity ei viesti mitään saavutettavasti.
   const otsikkoEl = document.getElementById('anchor-candidates-title');
-  if (otsikkoEl) otsikkoEl.style.display = (data || []).length ? 'block' : 'none';
+  if (otsikkoEl) otsikkoEl.style.display = naytettavat.length ? 'block' : 'none';
 
-  huomioPallurat.ankkurit = (data || []).length;
+  huomioPallurat.ankkurit = naytettavat.length;
   const badge = document.getElementById('anchor-candidates-badge');
   if (badge) {
     if (huomioPallurat.ankkurit) {
@@ -2076,7 +2109,7 @@ async function loadAnchorCandidates() {
   }
   paivitaSovelluskuvakeBadge();
 
-  (data || []).forEach(function(candidate) {
+  naytettavat.forEach(function(candidate) {
     const li = document.createElement('li');
     li.className = 'anchor-candidate-row';
 
@@ -2094,8 +2127,14 @@ async function loadAnchorCandidates() {
     // BUGIKORJAUS (2026-07-17, "Ankkurin muokkaus puuttuu"): ✨-ehdokkaan
     // muokkaus = "ota omiin + muokattu" — pelkkä tekstin korjaus on jo
     // eksplisiittinen sitoutuminen, ei jätetä sitä silti ehdokastilaan.
+    // Sama koskee ihmislähtöistä ehdotusta (source='ehdotus') — ero on vain
+    // merkissä: ✨ koneelta, lähettäjän nimi + 💬 ihmiseltä (kahden hengen
+    // perheessä lähettäjä on aina "toinenKayttaja", ei tarvitse erillistä
+    // proposed_by->henkilo-hakua).
     const text = document.createElement('span');
-    text.textContent = '✨ ' + candidate.content;
+    text.textContent = candidate.source === 'ehdotus'
+      ? '💬 ' + henkiloNimi(toinenKayttaja ? toinenKayttaja.henkilo : null) + ': ' + candidate.content
+      : '✨ ' + candidate.content;
     text.title = 'Muokkaus ottaa ehdotuksen omaksi ankkuriksi';
     text.addEventListener('click', function() {
       let peruttu = false;
@@ -2143,6 +2182,29 @@ async function loadAnchorCandidates() {
     });
     li.appendChild(acceptButton);
 
+    // "Siirrä myöhemmäksi" — vain ihmislähtöiselle ehdotukselle (spesifioitu
+    // Katrin toimesta, ✨-koneehdokkailla ei tätä reaktiota). Hetki/ikkuna-
+    // koneiston sukulainen (ks. design-periaate): siirto = uusi nousupäivä,
+    // ei muuta sisältöä eikä poista mitään.
+    if (candidate.source === 'ehdotus') {
+      const postponeButton = document.createElement('button');
+      postponeButton.textContent = '⏭';
+      postponeButton.className = 'postpone-btn';
+      postponeButton.title = 'Siirrä myöhemmäksi';
+      postponeButton.addEventListener('click', async function() {
+        const vastaus = prompt('Nouse uudelleen kuinka monen päivän päästä?', '1');
+        if (vastaus === null) return;
+        const paivia = parseInt(vastaus, 10);
+        if (!paivia || paivia < 1) return;
+        const uusiPvm = new Date();
+        uusiPvm.setDate(uusiPvm.getDate() + paivia);
+        const { error } = await db.from('ankkurit').update({ visible_from: uusiPvm.toISOString() }).eq('id', candidate.id);
+        if (error) console.error('Ehdotuksen siirto epäonnistui:', error);
+        loadAnchorCandidates();
+      });
+      li.appendChild(postponeButton);
+    }
+
     // BUGIKORJAUS (2026-07-14, "Ankkurien hätäkorjaus"): sama 5s kumottava
     // toast kuin varsinaisilla ankkureilla, konsistenssin vuoksi ("jokainen
     // ankkurin poistava ele") — vaikka ehdokkaan lähdemuru on jo turvassa
@@ -2160,7 +2222,14 @@ async function loadAnchorCandidates() {
         async function() {
           const { error } = await db.from('ankkurit').delete().eq('id', candidate.id);
           if (error) console.error('Ankkuriehdokkaan poisto epäonnistui:', error);
-          await db.from('aly_log').update({ undone_at: new Date().toISOString(), undo_reason: 'dismissed' }).eq('anchor_id', candidate.id).is('undone_at', null);
+          // aly_log koskee vain koneehdotuksia (source='aly') — ihmislähtöisellä
+          // ehdotuksella ei ole aly_log-riviä, eikä lähettäjälle koskaan
+          // raportoida hylkäystä (ks. muistiinpanot.md "Ankkurin ehdottaminen
+          // toiselle" -turvasäännöt), joten tälle sourcelle ei ole mitään
+          // päivitettävää täällä.
+          if (candidate.source === 'aly') {
+            await db.from('aly_log').update({ undone_at: new Date().toISOString(), undo_reason: 'dismissed' }).eq('anchor_id', candidate.id).is('undone_at', null);
+          }
           loadAnchorCandidates();
         },
         function() {
@@ -2655,6 +2724,40 @@ async function lataaLaituri(hakusana) {
         sijoitaLaituriRivi(rivi);
       });
       li.appendChild(sijoitaNappi);
+
+      // "Ankkurin ehdottaminen toiselle" (2026-07-16, ks. muistiinpanot.md) —
+      // vain omalle murulle, koska ehdotus on ehdottajan OMA ajatus (ei
+      // partnerin murun uudelleenehdotus). Kirjoittaa suoraan toisen
+      // ankkureihin CANDIDATE-rivinä (is_candidate=true, RLS sallii tämän
+      // yhden tarkkaan rajatun poikkeuksen, ks. sql/056) — ei koskaan
+      // "oikeana" ankkurina, vastaanottaja päättää lopputuloksen kokonaan.
+      if (rivi.user_id === currentUserId && toinenKayttaja) {
+        const ehdotaNappi = document.createElement('button');
+        ehdotaNappi.className = 'suggest-btn';
+        const joEhdotettu = ehdotetutTassaIstunnossa.has(rivi.id);
+        ehdotaNappi.textContent = joEhdotettu ? '✓' : '💬';
+        ehdotaNappi.disabled = joEhdotettu;
+        ehdotaNappi.title = joEhdotettu
+          ? 'Ehdotettu ' + henkiloNimi(toinenKayttaja.henkilo) + ':lle'
+          : 'Ehdota ' + henkiloNimi(toinenKayttaja.henkilo) + ':lle ankkuriksi';
+        ehdotaNappi.addEventListener('click', async function() {
+          const { error } = await db.from('ankkurit').insert({
+            content: rivi.content,
+            source: 'ehdotus',
+            source_ref: String(rivi.id),
+            user_id: toinenKayttaja.user_id,
+            is_candidate: true,
+            proposed_by: currentUserId,
+          });
+          if (error) {
+            console.error('Ehdotuksen lähetys epäonnistui:', error);
+            return;
+          }
+          ehdotetutTassaIstunnossa.add(rivi.id);
+          lataaLaituri(document.getElementById('laituri-search').value.trim());
+        });
+        li.appendChild(ehdotaNappi);
+      }
     } else {
       // "↺ palauta sijoittamattomaksi" (2026-07-17, ks. "Kalenteri-sijoitus
       // ei kirjoita mitään" -bugikorjaus) — sijoitettu-merkintä voi olla
@@ -3018,6 +3121,7 @@ async function deleteList(list, refreshView) {
 // Kirjautumisen jälkeen: näytetään aina Etusivu
 function siirryKirjautumisenJalkeen() {
   showHomeView();
+  paivitaHenkiloKartta();
   lataaKotinakyma();
 }
 

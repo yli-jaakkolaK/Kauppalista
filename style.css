@@ -897,6 +897,32 @@ h1 {
   cursor: default;
 }
 
+/* "Ankkurin ehdottaminen toiselle" (2026-07-16, ks. muistiinpanot.md) — sama
+   kokoluokka kuin muillakin rivinapeilla, .restore-btn:n kaltainen neutraali
+   sävy (ei ensisijainen ele omalla murulla, mutta ei myöskään piiloteltu). */
+.suggest-btn,
+.postpone-btn {
+  min-width: 44px;
+  min-height: 44px;
+  background: none;
+  border: none;
+  outline: none;
+  appearance: none;
+  -webkit-appearance: none;
+  font-size: 18px;
+  color: var(--muted);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.suggest-btn:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
 /* Äly-ehdotuskortti: kuittityylinen rivi Laiturin rivin alla, katkoviiva-
    kehys tunnistaa sen MUODOSTA erilliseksi kuin varsinaiset Laituri-rivit
    (ks. "Kalenterin merkkikieli"/"väri koristaa, musta kertoo" -periaate —

@@ -491,4 +491,24 @@ Ei erillistä migraatiota tälle koodikorjaukselle (client-puolen suodatuslogiik
 
 ---
 
+## OSA V — Ankkurin ehdottaminen toiselle (2026-07-16, vaatii KAHDEN käyttäjän session)
+
+**Aja `sql/056` ja `sql/057`** (näkyvyys+RLS, sitten testirivit).
+
+**Tausta:** Juhan oma toive ("voitko laittaa mun ankkureihin että X") — Laiturin omalla rivillä uusi 💬-nappi ehdottaa sen sisällön suoraan toisen käyttäjän ankkureihin katkoviivakehyksisenä ehdokkaana (sama mekanismi kuin E3:n ✨-ehdotuksilla). Vastaanottaja: hyväksy (⚓)/hylkää (×)/siirrä myöhemmäksi (⏭, kysyy montako päivää).
+
+**Ei voi testata yksin** — vaatii Juhan oman kirjautumisen, koska ehdotuksen INSERT-oikeus (RLS, sql/056) on sidottu tekijän omaan `auth.uid()`:hen eikä toimi saman käyttäjän kahdella välilehdellä/tunnuksella.
+
+**Testiaskeleet (Juha + Katri yhdessä):**
+1. Juha: Laituri → kirjoita uusi ajatus → napauta 💬 ("Ehdota Katrille") → napin pitäisi muuttua "✓"-tilaan (ei voi ehdottaa samaa kahdesti tässä istunnossa).
+2. Katri: Etusivu → Ankkurit-osion alla uusi "Ehdotukset"-ryhmä → näkyy "💬 Juha: ..." katkoviivakehyksessä, kotinäytön pallura kasvaa yhdellä.
+3. Katri: ⚓ hyväksyy → rivi siirtyy tavallisiin ankkureihin, katkoviivakehys katoaa.
+4. Juha: tarkista ettei alkuperäinen muru Laiturissa muuttunut/kadonnut mihinkään.
+5. Toinen kierros: Juha ehdottaa uudestaan → Katri ⏭ siirtää 1 päivän päähän → ehdotus katoaa näkyvistä heti, palaa näkyviin seuraavana päivänä (tai testaa nopeammin: aseta `visible_from` menneisyyteen suoraan SQL Editorista ja lataa sivu uudelleen).
+6. Kolmas kierros: Juha ehdottaa uudestaan → Katri × hylkää → rivi katoaa jäljettömiin. Juha: varmista ettei mikään näytä hänelle onko ehdotus hyväksytty vai hylätty (tarkoituksellinen — ks. muistiinpanot.md "Ankkurin ehdottaminen toiselle").
+
+Ei sw-bump-erillisvaihetta tälle (samassa `sw.js` v63 -bumpissa kuin Kalenterin kerrosarkkitehtuurin viimeistely, jos molemmat päätyvät samaan pushiin).
+
+---
+
 Kysy Claudelta jos joku kohta ei täsmää tai jokin näistä napeista/valikoista ei löydy — käyttöliittymät muuttuvat välillä hieman.
