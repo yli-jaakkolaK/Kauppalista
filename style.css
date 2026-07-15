@@ -1775,6 +1775,27 @@ h1 {
   flex-shrink: 0;
 }
 
+/* Hytti-scopen (oma opiskelu/työ) tapahtuma pääkalenterin agenda/viikko
+   -näkymässä (Katrin 2026-07-16 linjaus): toissijainen ilme MUODOLLA, ei
+   himmeydellä — reunapalkki + pieni glyyfi (.kalenteri-hytti-glyyfi) korvaa
+   feedin oman väripallon (.kalenteri-vari) hytti-riveillä. */
+.list li.kalenteri-rivi-hytti {
+  border-left: 3px solid var(--border);
+  padding-left: 6px;
+}
+.kalenteri-hytti-glyyfi {
+  flex-shrink: 0;
+  margin-right: 8px;
+  font-size: 13px;
+}
+
+/* Kuukausiruudukon niputettu hytti-lukumerkintä ("▫N") — ks. piirraKuukausiPaiva()
+   script.js:ssä. Sama muoto-ei-väri-periaate, tässäkin ero on tekstillinen
+   (▫-symboli + luku), ei väripohjainen. */
+.kalenteri-kuukausi-tapahtuma-hytti {
+  color: var(--muted);
+}
+
 /* "Uusi minulle" -merkki agendan rivillä (kuittausjono, ks. muistiinpanot.md
    "Kalenterin periaate: yksi totuus, kaksi ikkunaa") — napautus kuittaa. */
 .kalenteri-uusi-merkki {

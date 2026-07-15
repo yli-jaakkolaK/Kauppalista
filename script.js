@@ -312,11 +312,11 @@ function haeAsetusJSON(key, oletus) {
 // Kuormavahti: laskee kellonaikaan sidottujen (koko päivän kestävät, esim.
 // synttarit, EIVÄT kerrytä) tapahtumien määrän annetulta riviltä. Ankkurit ja
 // Hytin tehtävät EIVÄT lasketa mukaan — kyse on kalenterin kuormasta
-// (kiinteät ulkoiset menot), ei omista tehtävälistoista. scope='hytti' EI
-// KOSKAAN lasketa mukaan (Katrin 2026-07-16 linjaus koski vain NÄKYVYYTTÄ,
-// ei kuormalaskentaa) — oma opiskelu-/työmeno ei ole "perheen kuormaa".
+// (kiinteät ulkoiset menot), ei omista tehtävälistoista. scope='hytti' LASKETAAN
+// MUKAAN (Katrin 2026-07-16 korjattu linjaus) — oma opiskelu-/työmeno ON aitoa
+// perheen kapasiteetista pois olevaa kuormaa (esim. "koulussa koko päivän").
 function laskeMenoja(rivit) {
-  return rivit.filter(function(r) { return (!r._tyyppi || r._tyyppi === 'tapahtuma') && r._scope !== 'hytti' && r.event_time; }).length;
+  return rivit.filter(function(r) { return (!r._tyyppi || r._tyyppi === 'tapahtuma') && r.event_time; }).length;
 }
 
 // === PÄÄLLEKKÄISYYSMERKKI (2026-07-10, ks. muistiinpanot.md "Ristiriitamerkki") ===
@@ -387,10 +387,11 @@ function paallekkaisyysVakavuus(a, b, isoPvm) {
 }
 
 // Onko annetulla päivällä vähintään yksi todellinen (ei suodatettu) ristiriita?
-// scope='hytti' ei osallistu vertailuun samasta syystä kuin laskeMenoja():ssa
-// — oma opiskelu-/työmeno ei ole osa perheen ristiriitatarkastelua.
+// scope='hytti' OSALLISTUU vertailuun (Katrin 2026-07-16 korjattu linjaus) —
+// paallekkaisyysVakavuus():n olemassa oleva 'ei_koskaan'-sääntö (eri henkilön
+// omat kalenterit) hoitaa jo oikean lopputuloksen, ei tarvitse erillistä poissulkua.
 function onkoPaivanRistiriita(rivit, isoPvm) {
-  const tapahtumat = rivit.filter(function(r) { return (!r._tyyppi || r._tyyppi === 'tapahtuma') && r._scope !== 'hytti' && r.event_time; });
+  const tapahtumat = rivit.filter(function(r) { return (!r._tyyppi || r._tyyppi === 'tapahtuma') && r.event_time; });
   for (let i = 0; i < tapahtumat.length; i++) {
     for (let j = i + 1; j < tapahtumat.length; j++) {
       if (!onkoAjallisestiPaallekkainen(tapahtumat[i], tapahtumat[j])) continue;
@@ -535,12 +536,24 @@ function piirraKalenteriRivi(rivi) {
     return li;
   }
 
+  // Hytti-scopen (oma opiskelu/työ) tapahtuma saa toissijaisen ilmeen
+  // pääkalenterissa — MUODOLLA (reunapalkki + pieni glyyfi), ei himmeydellä,
+  // samaa periaatetta noudattaen kuin ✨-ehdokkaan erottuvuuskorjaus (ks.
+  // "Väsynyt käyttäjä ohikulkevalla vilkaisulla" -design-periaate).
+  if (rivi._scope === 'hytti') li.classList.add('kalenteri-rivi-hytti');
+
   const aika = document.createElement('span');
   aika.className = 'kalenteri-aika';
   aika.textContent = rivi.event_time ? rivi.event_time.slice(0, 5) : '';
   li.appendChild(aika);
 
-  if (rivi._vari) {
+  if (rivi._scope === 'hytti') {
+    const glyyfi = document.createElement('span');
+    glyyfi.className = 'kalenteri-hytti-glyyfi';
+    glyyfi.textContent = '🚪';
+    glyyfi.title = (rivi._henkilo ? rivi._henkilo.charAt(0).toUpperCase() + rivi._henkilo.slice(1) + ': ' : '') + 'opiskelu/työ (hytti)';
+    li.appendChild(glyyfi);
+  } else if (rivi._vari) {
     const vari = document.createElement('span');
     vari.className = 'kalenteri-vari';
     vari.style.backgroundColor = rivi._vari;
@@ -696,10 +709,12 @@ async function lataaKalenteri() {
   // omistajan hytti-riviä, joten sitä ei suodateta client-puolella pois enää
   // (Katrin 2026-07-16 linjaus — KORVAA aiemman "ei koskaan perheen agendaan"
   // -päätöksen: hytti-scopen tapahtumat näkyvät nyt agenda/viikko/kuukausi
-  // -näkymässä omistajalleen siinä missä perhekalenterinkin). Kuittausjono
-  // (paivitaKuittausTila) ja Kuormavahti/ristiriitamerkki (laskeMenoja,
-  // onkoPaivanRistiriita) jättävät hytti-scopen edelleen erikseen pois —
-  // vain tämä NÄKYVYYS muuttui, ei kuorma-/kuittauslaskenta.
+  // -näkymässä omistajalleen siinä missä perhekalenterinkin, JA osallistuvat
+  // Kuormavahtiin (laskeMenoja) ja ristiriitamerkkiin (onkoPaivanRistiriita)
+  // normaalisti — oma opiskelu-/työmeno ON aitoa perheen kapasiteetista pois
+  // olevaa kuormaa). AINOA poikkeus: Kuittausjono (paivitaKuittausTila,
+  // onkoUusiMinulle) jättää hytti-scopen edelleen erikseen pois — omaa
+  // luentoa ei koskaan "kuitata".
   const { data: haetut, error } = await db.from('kalenteri_tapahtumat')
     .select('*, kalenteri_syotteet(vari, henkilo, scope)')
     .gte('event_date', paivamaaraISO(haunAlku))
@@ -892,8 +907,14 @@ function piirraKuukausiPaiva(pvm, kaikkiTapahtumat, linjat, linjojaViikolla, kul
     solu.appendChild(palkitEl);
   }
 
-  const yksipaivaiset = kaikkiTapahtumat.filter(function(t) { return !onkoMonipaivainen(t) && tapahtumaKattaaPaivan(t, iso); });
-  if (yksipaivaiset.length > 0) {
+  // Hytti-scopen (oma opiskelu/työ) yksipäiväiset tapahtumat niputetaan yhdeksi
+  // kompaktiksi lukumerkinnäksi ("▫N") sen sijaan että jokainen luento veisi
+  // oman rivinsä — kuukausiruutu on liian pieni listaamaan koko lukujärjestystä,
+  // agenda/viikkonäkymä (piirraKalenteriRivi) näyttää ne silti yksitellen.
+  const kaikkiYksipaivaiset = kaikkiTapahtumat.filter(function(t) { return !onkoMonipaivainen(t) && tapahtumaKattaaPaivan(t, iso); });
+  const yksipaivaiset = kaikkiYksipaivaiset.filter(function(t) { return t._scope !== 'hytti'; });
+  const hyttiYksipaivaiset = kaikkiYksipaivaiset.filter(function(t) { return t._scope === 'hytti'; });
+  if (yksipaivaiset.length > 0 || hyttiYksipaivaiset.length > 0) {
     const listaEl = document.createElement('div');
     listaEl.className = 'kalenteri-kuukausi-tapahtumat';
     yksipaivaiset.forEach(function(t) {
@@ -903,6 +924,13 @@ function piirraKuukausiPaiva(pvm, kaikkiTapahtumat, linjat, linjojaViikolla, kul
       rivi.textContent = (t.event_time ? t.event_time.slice(0, 5) + ' ' : '') + t.title;
       listaEl.appendChild(rivi);
     });
+    if (hyttiYksipaivaiset.length > 0) {
+      const hyttiRivi = document.createElement('div');
+      hyttiRivi.className = 'kalenteri-kuukausi-tapahtuma kalenteri-kuukausi-tapahtuma-hytti';
+      hyttiRivi.textContent = '▫' + hyttiYksipaivaiset.length;
+      hyttiRivi.title = hyttiYksipaivaiset.map(function(t) { return t.title; }).join(', ');
+      listaEl.appendChild(hyttiRivi);
+    }
     solu.appendChild(listaEl);
   }
 

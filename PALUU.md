@@ -462,17 +462,32 @@ Ei voi todeta yhdellä ajolla — vaatii vähintään kaksi peräkkäistä yöaj
 3. Tarkista Vercelin Logsista `/api/aly-nightly` — vastauksen `held_back_today`-kentän pitäisi näyttää >0 jos sama muru olisi muuten noussut uudelleen.
 4. Poista ehdokas käyttöliittymästä kesken päivän → sen PITÄISI pysyä poissa loppupäivän, mutta saada nousta uudelleen seuraavana aamuna (takarajaan asti).
 
-### 2. Hytti-scopen tapahtumien näkyvyys pääkalenterissa
+### 2. Hytti-scopen tapahtumien näkyvyys + kuorma/ristiriita pääkalenterissa
 
-**Tausta:** Katrin 2026-07-16 linjaus muutti aiempaa tarkoituksellista arkkitehtuuria — hytti-scopen (opiskelu/työ) tapahtumat näkyivät AIEMMIN vain Hytin oman kortin 7 päivän ikkunassa, EIVÄT KOSKAAN pääkalenterin agenda/viikko/kuukausi-näkymässä edes omistajalleen itselleen. Uusi linjaus: pääkalenteri näyttää ne omistajalleen niin pitkälle kuin selataan, siinä missä perhekalenterinkin — Hytin oman kortin 7 pv -ikkuna pysyy ennallaan. Korjattu `script.js`:n `lataaKalenteri()`:ssä (RLS, sql/027, takasi jo ettei toisen omistajan hytti-riviä koskaan tule kyselyyn — client-puolen blanketti-suodatus poistettu sen päältä). Kuittausjono ja Kuormavahti/ristiriitamerkki jättävät hytti-scopen edelleen omaksi tapaukseksi (ei muuttunut).
+**Tausta:** Katrin 2026-07-16 linjaus (ja sitä samana päivänä täsmentänyt korjaus) muutti aiempaa tarkoituksellista arkkitehtuuria kahdessa vaiheessa. Ensin: hytti-scopen (opiskelu/työ) tapahtumat näkyivät AIEMMIN vain Hytin oman kortin 7 päivän ikkunassa, EIVÄT KOSKAAN pääkalenterin agenda/viikko/kuukausi-näkymässä edes omistajalleen itselleen — tämä poistettiin (RLS, sql/027, takasi jo ettei toisen omistajan hytti-riviä koskaan tule kyselyyn, joten client-puolen blanketti-suodatus riitti poistaa). Katri korjasi VIELÄ saman päivän toista puoliskoa: hytti-tapahtumat EIVÄT ole eristettyjä perheen kuormasta — "Katri koulussa koko päivän" on aitoa perheen kapasiteetista pois olevaa kuormaa, joten hytti-scope OSALLISTUU nyt Kuormavahtiin (`laskeMenoja()`) ja ristiriitamerkkiin (`onkoPaivanRistiriita()`) täysin normaalisti, samaan tapaan kuin mikä tahansa muu tapahtuma. **AINOA edelleen voimassa oleva poikkeus: kuittausjono** (`paivitaKuittausTila`, `onkoUusiMinulle`) — omaa luentoa ei koskaan kuitata, tämä rajaus oli oikein alusta asti eikä muuttunut.
 
 **Testikriteeri (data jo vahvistettu kunnossa 15.7., ks. OSA T kohta 1 — tämä on puhtaasti UI-testi):**
-1. Katri: Kalenteri → selaa syyskuuhun (kuukausi- tai viikkotilassa) → Lukkarikone-luennot NÄKYVÄT (oma feedin väri, otsikko).
-2. Katri: sama luento EI näy "🆕 uutta" -kuittausjonossa, EI vaikuta Kuormavahdin "N menoa" -lukemaan.
-3. Juha: sama ajankohta → Katrin luentoja EI näy (scope-raja pitää, RLS estää jo tietokantatasolla).
-4. Hytti-osio: kortin oma 7 päivän kalenteri toimii kuten ennenkin, ei muutosta.
+1. Katri: Kalenteri → selaa syyskuuhun (kuukausi- tai viikkotilassa) → Lukkarikone-luennot NÄKYVÄT.
+2. Katri: sama luento EI näy "🆕 uutta" -kuittausjonossa, MUTTA VAIKUTTAA Kuormavahdin "N menoa" -lukemaan ja voi laukaista ristiriitamerkin jos se osuu päällekkäin toisen tapahtuman kanssa.
+3. Hytti-osio: kortin oma 7 päivän kalenteri toimii kuten ennenkin, ei muutosta.
 
-Ei erillistä migraatiota tälle koodikorjaukselle (client-puolen suodatuslogiikka, `sw.js` v61 bump riittää välimuistin ohitukseen).
+Ei erillistä migraatiota tälle koodikorjaukselle (client-puolen suodatuslogiikka, `sw.js` v62 bump riittää välimuistin ohitukseen).
+
+### 3. Visuaalinen kerros: hytti-tapahtuma erottuu MUODOLLA, ei väriltä
+
+**Tausta:** koska hytti-tapahtumat näkyvät nyt suoraan perheen agendan seassa, ne tarvitsevat oman toissijaisen ilmeensä ettei niitä sekoita perhetapahtumiin — samalla "muoto kertoo tilan, ei väri yksin" -periaatteella kuin ✨-ehdokkaan erottuvuuskorjaus (ei koskaan pelkkä opacity/himmeys). Agenda/viikkonäkymässä hytti-rivi saa vasemman reunapalkin + pienen 🚪-glyyfin feedin oman väripallon (`.kalenteri-vari`) tilalle. Kuukausiruudukko on liian pieni listaamaan jokaista luentoa erikseen — samaisen päivän hytti-tapahtumat niputetaan yhdeksi kompaktiksi "▫N"-lukumerkinnäksi, perhetapahtumat listautuvat edelleen yksitellen.
+
+**Testi:** selaa Kalenteria agenda/viikko/kuukausi-tiloissa jollain hytti-tapahtumia sisältävällä ajanjaksolla — tarkista visuaalinen ero silmämääräisesti (ei pelkkää väriä).
+
+### 4. Syötekohtainen näkyvyys: "perheelle" vs. "vain minulle"
+
+**Tausta:** kaikki hytti-scopen data ei ole samanarvoista — Lukkarikoneen lukujärjestys on hyödyllistä perheen suunnittelutietoa ("Katri koulussa koko päivän"), kun taas henkilökohtainen "Oma"-kalenteri (Juhan tuleva, tai vastaava tuleva Katrin oma) on täysin yksityinen. **Aja `sql/055` ensin** — lisää `kalenteri_syotteet.nakyvyys`-sarakkeen (`'perheelle'`/`'vain_omistajalle'`, oletus jälkimmäinen) ja laajentaa sekä `kalenteri_tapahtumat_select`- että `kalenteri_syotteet_select`-RLS-policyt sallimaan luvun kun feedin `nakyvyys='perheelle'`, riippumatta katsojan omasta `henkilo`-tunnisteesta. Lukkarikone asetettu `'perheelle'`:ksi tässä samassa migraatiossa; Itslearning jää `'vain_omistajalle'`:ksi (ei sama "perheen suunnittelutieto" -luonne).
+
+**Testikriteeri:**
+1. Juha selaa syyskuuhun → Katrin Lukkarikone-luennot NÄKYVÄT hänelle (🚪-glyyfillä merkittynä), ja vaikuttavat myös HÄNEN Kuormavahtiinsa (yhteinen kapasiteettitieto — Juha näkee ettei Katri ole käytettävissä).
+2. Katrin/Juhan täysin yksityinen hytti-syöte (`nakyvyys='vain_omistajalle'`, oletus) pysyy edelleen täysin näkymättömänä toiselle — testaa kun Juhan oma "Oma"-kalenteri joskus lisätään.
+
+**Ei vielä toteutettu (kirjattu speksiksi, Katrin oma priorisointijärjestys):** (4) kurssisuodatin — syötteen asetuksiin monivalinta yksittäisistä kursseista/ryhmistä, rakennetaan elokuussa kun Katri ilmoittautuu syksyn kursseille. (5) "Nosto perheelle" — hytti-tapahtuman voi joskus nostaa täyden perhetapahtuman ilmeeseen (puhtaasti korostus-ele, ei vaikuta kuormaan koska kuorma laskee jo kaiken) — ei kiireellinen, ei aikataulutettu.
 
 ---
 
