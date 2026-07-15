@@ -2179,6 +2179,22 @@ Täysi testipolku (kortin luonti, tehtävät, muistutus, työ/vapaa-kytkin, Juha
 
 **Tekninen luokitus: Copilot-ajan INFRAPROJEKTI, oma erillinen työnsä** (inbound email -palvelu + webhook-vastaanotto sähköpostille — ei ole tällä hetkellä olemassa mitään Satamassa joka vastaanottaisi saapuvaa sähköpostia). **Poimintamoottori ja yöajo-mekanismi OVAT jo olemassa/rakenteilla** (E3:n `api/aly-nightly.js` on suoraan uudelleenkäytettävä malli tälle — sama "yksi erä per käyttäjä, epävarma=ei osumaa, ehdotus+loki+pallura" -kaava) — **puuttuu VAIN vastaanottokanava**. Kirjattu Copilot-työlistalle OMANA projektinaan, ei sekoiteta E3:n tai muiden jo rakennettujen osien kanssa.
 
+---
+
+## Juhan toiminnanohjaus — "Päivän mitta" (konseptikirjattu 2026-07-16, EI TOTEUTETTU, rakennetaan Copilot-ajalla palasina)
+
+**Lähde:** Juhan itse sanoittama tarve omasta arjestaan (tehokkuus + priorisointi + toiminnanohjaus + siirtymät) — toinen mitoituskäyttäjä tuottamassa speksiä ensimmäistä kertaa, ei vain Katrin oma näkökulma. Kolme itsenäistä palaa, kaikki rakentuvat OLEMASSA OLEVAN päälle (Hytti, ankkurit, Kuormavahti-käsite, kalenteri) — ei uutta rinnakkaista järjestelmää.
+
+**Yhteiset periaatteet kaikille kolmelle:** dataa ei rakenneta ilman käyttöä (ei inventaarioita/tiloja jotka pitäisi ylläpitää — sama "hetken totuus" -henki kuin Ruoka-moduulissa), kaikki VALINNAISIA (minimalisti ohittaa kaikki kolme, syvyys tarjolla ei tyrkyllä), ja jokainen nojaa jo kirjattuihin periaatteisiin (Kolmiporras: appi ei priorisoi puolesta, ihminen päättää; Maksimiautomaatio/minimikustannus: ei kellotusta, ei jatkuvaa seurantaa).
+
+**(1) Arvio + toteuma:** Hytin tehtävälle valinnainen kestoarvio pikanapeilla (15/30/60 min). Täppäyksen yhteydessä YKSI kysymys: "meni: vähemmän / about / enemmän / paljon enemmän" — ei kellotusta, ei tarkkaa minuuttilukua. Parin viikon kertyneestä datasta lasketaan HENKILÖKOHTAINEN kerroin, näytetään arvion rinnalla ("30 min → sinulla ~50 min"). Tarkoitus: suunnitteluharha (aina aliarvioi kestot) hoituu PALAUTTEELLA, ei moralisoinnilla — appi ei sano "olit väärässä", vain näyttää oman historian.
+
+**(2) Henkilökohtainen Kuormavahti:** päivän valittujen ankkurien+tehtävien arviosumma (kohdasta 1) vs. kalenterin vapaa aika samana päivänä, yhtenä rivinä ("valittua ~4h · vapaata ~2,5h"), sama kulta/meripihka-kolmiporrasväritys kuin nykyisellä perhe-Kuormavahdilla. Näytetään AAMULLA, jolloin ylilastauksen pudottaminen on vielä VALINTA eikä myöhemmin epäonnistuminen. Appi EI priorisoi puolesta (ei automaattista karsintaa) — puhtaasti Vilkaisuarvo-periaatteen mukainen tieto, ihminen päättää mitä pudottaa.
+
+**(3) Siirtymätaskut:** tehtävälle kevyt kontekstimerkki "🚗 sopii siirtymään" (kädet varattu, pää vapaa — puhelut, sanelut, kuunneltavat). Siirtymän ALKAESSA hytti tarjoaa sopivat tehtävät ajan mukaan ("25 min matka — nämä kolme sopisivat"), kärjessä luontevasti purkusanelu. **Turvavaatimus, ei toive:** EI näpelöintiä ajon aikana — ehdotus tulee ENNEN ajoa, tai vaihtoehtoisesti Siri-tasoinen ääniohjaus, ei koskaan ruudun selailua liikkeessä.
+
+**Suhde muihin älyideoihin:** rakentuu suoraan olemassa olevan Hytin/ankkurien/Kuormavahdin päälle — ei siis oma erillinen älykartan kohta, mutta noudattaa samaa Kolmiporras/Maksimiautomaatio-kurinalaisuutta kuin "Sataman älykartta" -osion ideat. Ei koodia, ei migraatiota tässä kirjauksessa — rakennetaan Copilot-ajalla, palasina (ei kaikkea kerralla).
+
 ## Sovittu järjestys 23.7.2026 asti (kirjattu 2026-07-08, Katrin oma priorisointi)
 
 **HUOM (2026-07-11): tämä lista on kirjoitettu 2026-07-08 eikä ole enää ajantasainen prioriteettijärjestys** — sen jälkeen on rakennettu paljon lisää (Muistutukset, Hytti v1 -respeksaus + ICS, Ankkurit henkilökohtaisiksi, Varmuuskopiot, Äly-putken runko), ks. Muutosloki ylhäällä ajantasaiselle tapahtumajärjestykselle. Säilytetty tässä historiallisena kontekstina siitä miten alkuperäinen suunnitelma näytti — EI käytetä enää "mitä tehdä seuraavaksi" -päätöksentekoon, sen sijaan katso Muutosloki + kunkin osion oma tila-merkintä (TESTATTU/EI TESTATTU).
