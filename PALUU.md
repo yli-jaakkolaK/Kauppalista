@@ -446,4 +446,34 @@ Vertaa tätä oikeisiin Lukkarikone-tapahtumien otsikoihin (kohdan 1 kyselyn rin
 
 ---
 
+---
+
+## OSA U — Kaksi porttikorjausta: toistolukko + hytti-scopen kalenterinäkyvyys (2026-07-16)
+
+**Aja `sql/054` ensin** (lisää tämän osan testirivit "Testipäivä to 16.7." -listalle, idempotentti).
+
+### 1. Toistolukko (ikkuna-asia kerran per kalenteripäivä)
+
+**Tausta:** ikkuna-asia ("osta liput Parkanoon, 20.7. mennessä") nousi ehdokkaaksi joka ajokierroksella (~tunneittain) globaalin ~20h-porttiajan sijaan per-muru-kalenteripäivälukon puuttuessa. Korjattu `api/aly-nightly.js`:ssä uudella `aly_log`-pohjaisella tarkistuksella joka on riippumaton ulompaa porttiajasta.
+
+Ei voi todeta yhdellä ajolla — vaatii vähintään kaksi peräkkäistä yöajoa (tai kaksi käsin laukaistua ajoa cron-job.org:n asennuksen jälkeen, ks. OSA S) samana kalenteripäivänä:
+1. Varmista että jokin ikkuna-asia (esim. testimuru "osta liput X. mennessä") on ehdokaslistalla ensimmäisen ajon jälkeen.
+2. Laukaise yöajo uudelleen SAMANA päivänä (käsin GitHub Actionsista tai odota cron-job.org:n seuraavaa pingausta).
+3. Tarkista Vercelin Logsista `/api/aly-nightly` — vastauksen `held_back_today`-kentän pitäisi näyttää >0 jos sama muru olisi muuten noussut uudelleen.
+4. Poista ehdokas käyttöliittymästä kesken päivän → sen PITÄISI pysyä poissa loppupäivän, mutta saada nousta uudelleen seuraavana aamuna (takarajaan asti).
+
+### 2. Hytti-scopen tapahtumien näkyvyys pääkalenterissa
+
+**Tausta:** Katrin 2026-07-16 linjaus muutti aiempaa tarkoituksellista arkkitehtuuria — hytti-scopen (opiskelu/työ) tapahtumat näkyivät AIEMMIN vain Hytin oman kortin 7 päivän ikkunassa, EIVÄT KOSKAAN pääkalenterin agenda/viikko/kuukausi-näkymässä edes omistajalleen itselleen. Uusi linjaus: pääkalenteri näyttää ne omistajalleen niin pitkälle kuin selataan, siinä missä perhekalenterinkin — Hytin oman kortin 7 pv -ikkuna pysyy ennallaan. Korjattu `script.js`:n `lataaKalenteri()`:ssä (RLS, sql/027, takasi jo ettei toisen omistajan hytti-riviä koskaan tule kyselyyn — client-puolen blanketti-suodatus poistettu sen päältä). Kuittausjono ja Kuormavahti/ristiriitamerkki jättävät hytti-scopen edelleen omaksi tapaukseksi (ei muuttunut).
+
+**Testikriteeri (data jo vahvistettu kunnossa 15.7., ks. OSA T kohta 1 — tämä on puhtaasti UI-testi):**
+1. Katri: Kalenteri → selaa syyskuuhun (kuukausi- tai viikkotilassa) → Lukkarikone-luennot NÄKYVÄT (oma feedin väri, otsikko).
+2. Katri: sama luento EI näy "🆕 uutta" -kuittausjonossa, EI vaikuta Kuormavahdin "N menoa" -lukemaan.
+3. Juha: sama ajankohta → Katrin luentoja EI näy (scope-raja pitää, RLS estää jo tietokantatasolla).
+4. Hytti-osio: kortin oma 7 päivän kalenteri toimii kuten ennenkin, ei muutosta.
+
+Ei erillistä migraatiota tälle koodikorjaukselle (client-puolen suodatuslogiikka, `sw.js` v61 bump riittää välimuistin ohitukseen).
+
+---
+
 Kysy Claudelta jos joku kohta ei täsmää tai jokin näistä napeista/valikoista ei löydy — käyttöliittymät muuttuvat välillä hieman.

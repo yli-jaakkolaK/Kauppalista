@@ -271,11 +271,39 @@ module.exports = async function handler(req, res) {
     return evaluatedContent !== note.content;
   }
 
-  const eligible = notes.filter(isEligible);
+  const eligibleByAge = notes.filter(isEligible);
+
+  // BUGFIX (2026-07-16, "Repeat lock" — ks. muistiinpanot.md): an "ikkuna"
+  // (window) item expired and became re-eligible again the SAME night
+  // instead of the next one, because the only guard against re-suggesting
+  // it was the GLOBAL ~20h gate above (MIN_HOURS_BETWEEN_RUNS) — not a
+  // PER-NOTE, CALENDAR-DAY check. If the scheduler (GitHub Actions, ks.
+  // "GitHub Actions schedule ei ole kello vaan arpa") pinged more often
+  // than once per 20h, or the global gate failed for any reason, the same
+  // window item could resurface multiple times on the SAME calendar day —
+  // the spec ("once per day until the deadline") never meant that.
+  // Fixed by adding an INDEPENDENT, per-note calendar-day lock: check
+  // aly_log for whether THIS note already got a suggestion TODAY (UTC
+  // calendar day, same definition as buildPrompt()'s today/tomorrow) —
+  // regardless of how many times this job has actually run. Covers both
+  // silent expiry AND manual dismissal (× on the candidate card): both
+  // leave an aly_log row dated today, so neither one "resets" the lock
+  // within the same day — only the next calendar day opens it again.
+  const todayStartIso = isoDate(new Date()) + 'T00:00:00.000Z';
+  const suggestedTodayIds = new Set();
+  if (eligibleByAge.length) {
+    const idList = eligibleByAge.map(function(n) { return n.id; }).join(',');
+    const suggestedTodayRes = await supabaseFetch(
+      'aly_log?select=source_ref&source_ref=in.(' + idList + ')&created_at=gte.' + encodeURIComponent(todayStartIso)
+    );
+    (await suggestedTodayRes.json() || []).forEach(function(r) { suggestedTodayIds.add(Number(r.source_ref)); });
+  }
+
+  const eligible = eligibleByAge.filter(function(n) { return !suggestedTodayIds.has(n.id); });
 
   if (eligible.length === 0) {
     await setSetting('aly_yoajo_last_run', new Date().toISOString());
-    return res.status(200).json({ success: true, expired: expired, users_checked: 0, matches: 0 });
+    return res.status(200).json({ success: true, expired: expired, users_checked: 0, matches: 0, held_back_today: suggestedTodayIds.size });
   }
 
   // 3) Group by owner — one batched call per user, never one call per note.
@@ -381,6 +409,7 @@ module.exports = async function handler(req, res) {
     users_checked: usersChecked,
     users_failed: usersFailed,
     notes_evaluated: eligible.length,
+    held_back_today: suggestedTodayIds.size,
     matches: matchesCreated,
   });
 };

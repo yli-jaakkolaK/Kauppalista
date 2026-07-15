@@ -312,9 +312,11 @@ function haeAsetusJSON(key, oletus) {
 // Kuormavahti: laskee kellonaikaan sidottujen (koko päivän kestävät, esim.
 // synttarit, EIVÄT kerrytä) tapahtumien määrän annetulta riviltä. Ankkurit ja
 // Hytin tehtävät EIVÄT lasketa mukaan — kyse on kalenterin kuormasta
-// (kiinteät ulkoiset menot), ei omista tehtävälistoista.
+// (kiinteät ulkoiset menot), ei omista tehtävälistoista. scope='hytti' EI
+// KOSKAAN lasketa mukaan (Katrin 2026-07-16 linjaus koski vain NÄKYVYYTTÄ,
+// ei kuormalaskentaa) — oma opiskelu-/työmeno ei ole "perheen kuormaa".
 function laskeMenoja(rivit) {
-  return rivit.filter(function(r) { return (!r._tyyppi || r._tyyppi === 'tapahtuma') && r.event_time; }).length;
+  return rivit.filter(function(r) { return (!r._tyyppi || r._tyyppi === 'tapahtuma') && r._scope !== 'hytti' && r.event_time; }).length;
 }
 
 // === PÄÄLLEKKÄISYYSMERKKI (2026-07-10, ks. muistiinpanot.md "Ristiriitamerkki") ===
@@ -385,8 +387,10 @@ function paallekkaisyysVakavuus(a, b, isoPvm) {
 }
 
 // Onko annetulla päivällä vähintään yksi todellinen (ei suodatettu) ristiriita?
+// scope='hytti' ei osallistu vertailuun samasta syystä kuin laskeMenoja():ssa
+// — oma opiskelu-/työmeno ei ole osa perheen ristiriitatarkastelua.
 function onkoPaivanRistiriita(rivit, isoPvm) {
-  const tapahtumat = rivit.filter(function(r) { return (!r._tyyppi || r._tyyppi === 'tapahtuma') && r.event_time; });
+  const tapahtumat = rivit.filter(function(r) { return (!r._tyyppi || r._tyyppi === 'tapahtuma') && r._scope !== 'hytti' && r.event_time; });
   for (let i = 0; i < tapahtumat.length; i++) {
     for (let j = i + 1; j < tapahtumat.length; j++) {
       if (!onkoAjallisestiPaallekkainen(tapahtumat[i], tapahtumat[j])) continue;
@@ -688,12 +692,14 @@ async function lataaKalenteri() {
   // omistajan ja scopen FK-suhteen (syote_id) kautta samassa kyselyssä —
   // kaikki null jos käsin lisätty tapahtuma. henkilo tarvitaan
   // päällekkäisyysmerkin vakavuusluokitteluun (ks. paallekkaisyysVakavuus()).
-  // scope='hytti' (Hytti v1 + opiskelulaajennus, 2026-07-11) SUODATETAAN POIS
-  // perheen agendasta KOKONAAN heti tässä — hytti-scopen tapahtumat kuuluvat
-  // VAIN omistajansa Hytin tänään-kaistalle/korttien kalenteriin, eivät
-  // koskaan perheen agendaan/kuittausjonoon/Kuormavahtiin edes omistajalleen
-  // itselleen. RLS (sql/027) estää TOISEN käyttäjän pääsyn tietokantatasolla,
-  // tämä suodatus on lisäksi UX-siisteyttä omistajan omalle perhenäkymälle.
+  // scope='hytti': RLS (sql/027) takaa ettei tänne koskaan tule TOISEN
+  // omistajan hytti-riviä, joten sitä ei suodateta client-puolella pois enää
+  // (Katrin 2026-07-16 linjaus — KORVAA aiemman "ei koskaan perheen agendaan"
+  // -päätöksen: hytti-scopen tapahtumat näkyvät nyt agenda/viikko/kuukausi
+  // -näkymässä omistajalleen siinä missä perhekalenterinkin). Kuittausjono
+  // (paivitaKuittausTila) ja Kuormavahti/ristiriitamerkki (laskeMenoja,
+  // onkoPaivanRistiriita) jättävät hytti-scopen edelleen erikseen pois —
+  // vain tämä NÄKYVYYS muuttui, ei kuorma-/kuittauslaskenta.
   const { data: haetut, error } = await db.from('kalenteri_tapahtumat')
     .select('*, kalenteri_syotteet(vari, henkilo, scope)')
     .gte('event_date', paivamaaraISO(haunAlku))
@@ -707,11 +713,11 @@ async function lataaKalenteri() {
   }
 
   const data = (haetut || [])
-    .filter(function(t) { return !t.kalenteri_syotteet || t.kalenteri_syotteet.scope !== 'hytti'; })
     .map(function(t) {
       return Object.assign({}, t, {
         _vari: t.kalenteri_syotteet ? t.kalenteri_syotteet.vari : null,
         _henkilo: t.kalenteri_syotteet ? t.kalenteri_syotteet.henkilo : null,
+        _scope: t.kalenteri_syotteet ? t.kalenteri_syotteet.scope : null,
       });
     });
 
@@ -728,7 +734,7 @@ async function lataaKalenteri() {
       return {
         _tyyppi: 'tapahtuma', id: t.id, title: t.title, event_date: t.event_date, event_time: t.event_time,
         event_end_time: t.event_end_time, syote_id: t.syote_id, _henkilo: t._henkilo,
-        _vari: t._vari, ical_uid: t.ical_uid, user_id: t.user_id,
+        _vari: t._vari, _scope: t._scope, ical_uid: t.ical_uid, user_id: t.user_id,
       };
     });
 
@@ -988,8 +994,14 @@ async function paivitaKuitatutUidt() {
 // muu kuin minä TAI tekijää ei tunnistettu (user_id NULL, turvallinen
 // oletus), ja en ole vielä kuitannut sitä. Käsin lisätyt (ical_uid null)
 // eivät voi olla "uusia" — ne ovat aina omia, kuittausjono ei koske niitä.
+// scope='hytti' ei voi olla "uusi" edes rakenteellisesti: organizer-tunnistus
+// (kalenteri_tekijat) ei tunne opiskelu-/työsyötteiden organizereita, joten
+// user_id jäisi NULLiksi ja rivi näyttäisi väärin "uudelta" omalta
+// opiskelutapahtumalta — hytti pysyy täysin kuittausjonon ulkopuolella,
+// kuten paivitaKuittausTila() jo tekee erikseen kuittausjonolle itselleen.
 function onkoUusiMinulle(rivi) {
   if (!rivi.ical_uid) return false;
+  if (rivi._scope === 'hytti') return false;
   if (rivi.user_id === currentUserId) return false;
   return !kuitatutUidt.has(rivi.ical_uid);
 }
