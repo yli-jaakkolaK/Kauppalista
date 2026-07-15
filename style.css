@@ -1159,7 +1159,7 @@ h1 {
    (ks. script.js:n lataaAnkkurit()) rajattu pois tästä säännöstä ja saa oman
    enintään 4-rivisen line-clamp-säännön alla — välimuoto Varaston (ei koskaan
    ellipsis) ja elävien listojen (aina yksirivinen) välillä. */
-.list li:not(.varasto-rivi):not(.laituri-ehdotus-rivi):not(.anchor-candidate-row):not(.ankkuri-rivi) span:not(.kalenteri-aika):not(.kalenteri-vari):not(.kalenteri-uusi-merkki):not(.hytti-tanaan-aika):not(.hytti-tehtava-erapaiva):not(.hytti-rivi-erapaiva):not(.history-time):not(.muistutus-aika):not(.laituri-text):not(.laituri-meta) {
+.list li:not(.varasto-rivi):not(.laituri-ehdotus-rivi):not(.anchor-candidate-row):not(.ankkuri-rivi):not(.elava-rivi) span:not(.kalenteri-aika):not(.kalenteri-vari):not(.kalenteri-uusi-merkki):not(.hytti-tanaan-aika):not(.hytti-tehtava-erapaiva):not(.hytti-rivi-erapaiva):not(.history-time):not(.muistutus-aika):not(.laituri-text):not(.laituri-meta) {
   flex: 1;
   min-width: 0;
   overflow: hidden;
@@ -1186,7 +1186,7 @@ h1 {
 }
 
 /* Ankkurit (2026-07-14, "Ankkuririvien tekstikatkaisu"): välimuoto Varaston
-   (ei koskaan ellipsis) ja elävien listojen (aina yksirivinen) välillä —
+   (ei koskaan ellipsis) ja Kalenterin/Hytin (aina yksirivinen) välillä —
    teksti saa rivittyä enintään 4 riville (testattu Piispanristin-esimerkillä, 3 ei riittänyt), ellipsis vasta jos senkin jälkeen jää
    ylimääräistä. `-webkit-line-clamp` on iOS Safarin (kohdealustan) täysin
    tukema, vaikka nimessä on vielä webkit-etuliite. */
@@ -1212,6 +1212,36 @@ h1 {
 .list li.ankkuri-rivi .check-btn,
 .list li.ankkuri-rivi .anchor-btn,
 .list li.ankkuri-rivi .muistutus-wrap {
+  margin-top: 2px;
+}
+
+/* Muistilaput/Kauppalista (2026-07-15, koonti 2:n kohta 6, ks.
+   muistiinpanot.md "Rivitys eläville listoille"): sama välimuoto-malli kuin
+   Ankkureilla — Testipäivä-listan ohjerivit olivat lukukelvottomia
+   yksirivisenä ellipsis-katkaisuna. 4 riviä riittää yhtä hyvin kuin
+   Ankkureille (lyhyempi ikonikaista tässä: check+⚓+⋯, ei erillistä
+   muistutus-nappia — ⏰ on jo ⋯-valikon takana, ks. Rivien UI-remontti). */
+.list li.elava-rivi {
+  align-items: flex-start;
+  padding: 6px 0;
+}
+
+.list li.elava-rivi span:not(.muistutus-aika):not(.history-time) {
+  flex: 1;
+  min-width: 0;
+  white-space: normal;
+  word-break: break-word;
+  display: -webkit-box;
+  -webkit-line-clamp: 4;
+  line-clamp: 4;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.list li.elava-rivi .check-btn,
+.list li.elava-rivi .anchor-btn,
+.list li.elava-rivi .overflow-btn {
   margin-top: 2px;
 }
 

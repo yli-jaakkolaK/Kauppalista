@@ -3441,7 +3441,15 @@ function paivitaNaytto(tuotteet) {
     // koko leveyden. Vain hiljainen "⋯" (muokkaus/poisto) jää, samoin kuin
     // eläville listoille, mutta ilman muita toimintoja.
     const isVarasto = currentList && currentList.category === 'varasto';
-    if (isVarasto) item.classList.add('varasto-rivi');
+    if (isVarasto) {
+      item.classList.add('varasto-rivi');
+    } else {
+      // Rivitys eläville listoille (2026-07-15, koonti 2:n kohta 6, ks.
+      // muistiinpanot.md) — sama line-clamp-malli kuin Ankkureilla: teksti
+      // saa rivittyä muutamalle riville ennen ellipsis-katkaisua, sen
+      // sijaan että katkeaisi heti ensimmäisen rivin jälkeen.
+      item.classList.add('elava-rivi');
+    }
 
     // Vasemmalla: yliviivaustoiminto (ei Varastossa)
     if (!isVarasto) {
