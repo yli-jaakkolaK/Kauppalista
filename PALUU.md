@@ -44,6 +44,8 @@ Täysi ohje (asennus, mistä yhteysosoite löytyy) on **BACKUP.md**:ssä.
 
 **⚠ sql/050–052 — UUSIA, TIISTAIN LÖYDÖKSET + ILTA-KIILA (14.7.), AJA ENNEN OSA R:ää.** `050_muistutukset_laituri_source.sql` (lisää puuttuvan 'laituri'-arvon muistutukset.source-CHECK-rajoitteeseen — ilman tätä Laiturin murun muistutus-kohde kaatuu virheeseen), `051_ankkurit_manual_migraatio_laituriin.sql` (migroi kaikki vanhat käsin luodut ankkurit Laituri-pohjaisiksi — luo jokaiselle murun, sisältö säilyy, RAISE NOTICE -diagnostiikka), `052_testipaiva_tiistain_loydokset_rivit.sql` (uusi "OSA I" -väliotsikko + uusintatestirivit). Aja järjestyksessä 050→051→052 — **050 ENNEN 051:tä on tärkeää** vain jos testaat muistutuksen asettamista Laiturin murulle ennen ankkuri-migraatiota, muuten järjestys 051→050 toimisi yhtä hyvin.
 
+**⚠ sql/053_kalenteri_syotteet_scope_rls.sql — UUSI, AJA ENNEN OSA T:tä.** Korjaa aukon jossa `kalenteri_syotteet`-taulun rivit (myös hytti-scopen, esim. Juhan tuleva Oma-kalenteri) näkyivät KENELLE TAHANSA kirjautuneelle — vain itse tapahtumat (`kalenteri_tapahtumat`) olivat aiemmin suojattu (sql/027). Ei riipu muista tämän erän migraatioista.
+
 ---
 
 ## OSA A — Muistutusten ajastin
@@ -409,6 +411,38 @@ delete from aly_evaluated where laituri_id in (
 );
 ```
 Laukaise sitten yöajo käsin (GitHub-repo → Actions → "Muistutusten ja kalenterisynkan ajastin" → Run workflow, TAI odota cron-job.org:n seuraavaa 5 min pingausta kun se on asennettu) ja tarkista Vercelin Logs `/api/aly-nightly`-kutsuista `[aly-nightly]`-rivit — pitäisi nyt näkyä joko osuma tai `users_failed:0`.
+
+---
+
+## OSA T — Hytti-scopen tapahtumat eivät näy: diagnoosi + korjaus (2026-07-15)
+
+Aja **`sql/053`** ensin (korjaa varmuudella todetun aukon, ks. alla kohta 4). Sen jälkeen aja nämä LUKEVAT (turvalliset) SQL-kyselyt Supabasen SQL Editorissa löytääksesi mikä KOLMESTA mahdollisesta syystä koskee juuri sinun 201 Lukkarikone-riviäsi — koodikatselmus ei pystynyt varmistamaan mikä niistä on kyseessä ilman oikeaa dataa.
+
+**1) Onko syöte oikein leimattu, ja onko rivit ylipäätään kannassa?**
+```sql
+-- Feed itse — pitäisi näyttää scope='hytti', henkilo='katri'
+select id, name, tyyppi, tunniste, scope, henkilo, enabled, last_synced_at
+from kalenteri_syotteet
+where name in ('Lukkarikone', 'Itslearning');
+
+-- Tapahtumat, syote_id:n mukaan ryhmiteltynä + pvm-jakauma
+select k.name as syote, count(*) as maara, min(t.event_date) as ensimmainen, max(t.event_date) as viimeinen
+from kalenteri_tapahtumat t
+join kalenteri_syotteet k on k.id = t.syote_id
+where k.name in ('Lukkarikone', 'Itslearning')
+group by k.name;
+```
+Jos jälkimmäinen kysely ei palauta MITÄÄN riviä (vaikka `last_synced_at` on tuore) → tapahtumat eivät koskaan päätyneet kantaan asti, vaikka synkan JSON-vastaus väitti löytäneensä ne — kerro Claudelle, tämä on eri (ja vakavampi) vika kuin näkyvyys.
+
+**2) Osuuko "Kortin kalenteri" -osion 7 päivän ikkuna ollenkaan syyskuuhun?** EI TÄNÄÄN (15.7.) — `lataaHyttiKorttiKalenteri()` näyttää VAIN tulevat 7 päivää, kiinteä ikkuna, koodissa tarkoituksellinen "tämä viikko" -rajaus. Tämä TARKOITTAA että vaikka scope/RLS olisi täysin kunnossa, "Kortin kalenteri" ei voi näyttää syyskuun luentoja heinäkuussa — tämä ei ole se sama vika kuin scope/RLS, mutta tuottaa saman lopputuloksen ("ei näy"). Jos halusit nimenomaan NÄHDÄ syyskuun rivit UI:sta jo nyt (mekanismitestinä), kerro Claudelle — ikkunan voi laajentaa tilapäisesti/pysyvästi, mutta se on tietoinen suunnittelupäätös (glanceable "tämä viikko") jota ei haluttu muuttaa kysymättä.
+
+**3) Täsmääkö kortin `kalenterisuodatin` oikeisiin otsikoihin?** Tarkista mikä Hytti-kortti odottaa näitä tapahtumia ja mikä sen `kalenterisuodatin`-arvo on (Kortin asetuksista, tai suoraan):
+```sql
+select id, name, kalenterisuodatin from hytti_kortit where kalenterisuodatin is not null;
+```
+Vertaa tätä oikeisiin Lukkarikone-tapahtumien otsikoihin (kohdan 1 kyselyn rinnalle `select title from kalenteri_tapahtumat t join kalenteri_syotteet k on k.id=t.syote_id where k.name='Lukkarikone' limit 5;`) — suodatin täsmää `ilike '%suodatin%'`-vertailulla, eli sen pitää olla OSA otsikkoa, ei koko otsikko eikä eri sanajärjestyksessä.
+
+**4) VARMUUDELLA KORJATTU aukko (ei liity yllä olevaan näkymättömyyteen, mutta liittyy suoraan "sama mekanismi suojaa Juhan Omaa" -huoleen):** `kalenteri_syotteet`-taululla EI OLLUT RLS:ää joka rajaisi KENEN TAHANSA kirjautuneen pääsyä NÄKEMÄÄN toisen käyttäjän hytti-scopen SYÖTE-rivin metatiedot (nimi, scope, henkilo, ympäristömuuttujan nimi — ei itse .ics-linkkiä/tokenia). Tämä oli sql/027:n aukko: se korjasi vain `kalenteri_tapahtumat`-taulun (itse tapahtumat), unohti `kalenteri_syotteet`-taulun (feed-rivin itsensä). `sql/053` korjaa tämän — testaa Juhan Oma-kalenterin kanssa: kun hänen `scope='hytti'`-syötteensä joskus lisätään, VARMISTA Katrin tililtä ettei `select * from kalenteri_syotteet` (appin normaalilla, ei service_role-yhteydellä) näytä Juhan riviä.
 
 ---
 
