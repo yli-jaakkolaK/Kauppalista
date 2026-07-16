@@ -546,4 +546,46 @@ Ei uusia migraatioita (kaikki neljä ovat client/query-tason muutoksia olemassa 
 
 ---
 
+## OSA X — Ristiriitapaketti (2026-07-17, vaatii KAHDEN käyttäjän testin aamulla)
+
+**Aja `sql/059` ja `sql/060`** (kuittaustaulu+RLS+realtime, sitten testirivit) ennen testausta.
+
+**Tausta:** koko paketti rakentuu OLEMASSA OLEVAN päällekkäisyysmerkin päälle (`onkoAjallisestiPaallekkainen`/`paallekkaisyysVakavuus`) muuttamatta sen ydinlogiikkaa — jos huomisen perusmerkkitesti (kohta 1 alla) paljastaa vian, korjaus osuu perustaan, ei tähän pakettiin. **TÄRKEÄ KÄYTÖSMUUTOS:** kahden ERI henkilön päällekkäiset menot merkitään nyt AINA punaisella ("kuka hoitaa?") — aiempi "kaksi aikuista, kaksi paikkaa on normaalia" (`ei_koskaan`) -sääntö on KUMOTTU, koska juuri se tilanne on nyt se josta pitäisi keskustella.
+
+**Testiaskeleet järjestyksessä:**
+
+### 1. Perusmerkki, kahden käyttäjän portti
+- Katri ja Juha lisäävät kumpikin tapahtuman SAMALLE kellonajalle samana päivänä (eri kalentereihin/henkilöinä) → punainen "päällekkäin"-lippu ilmestyy molemmille.
+- Sama testi ERI kellonajalla (ei päällekkäin) → EI merkkiä lainkaan.
+
+### 2. Lippu: napautus → vahvistus → kuittaus
+1. Napauta punaista merkkiä → avautuu "Päällekkäin tänä päivänä" -vahvistus, listaa molemmat tapahtumat (aika + henkilö + otsikko).
+2. "Keskusteltu ✓" → merkki muuttuu kultaiseksi ohuemmaksi renkaaksi ("keskusteltu ✓") MOLEMMILLA käyttäjillä (realtime, ei vaadi sivun päivitystä).
+3. Napauta uudelleen kuitattua merkkiä → vahvistus avautuu yhä (näkee kenen menot), mutta "Keskusteltu"-nappi on piilotettu (jo kuitattu).
+
+### 3. Uusi päällekkäisyys herättää lipun uudelleen
+- Lisää KOLMAS tapahtuma joka menee päällekkäin jommankumman kuitatun kanssa samana päivänä → merkki muuttuu takaisin punaiseksi (eri tapahtumajoukko = eri allekirjoitus = ei enää sama kuittaus).
+
+### 4. Vakavuusluokat
+- Saman henkilön KAKSI omaa menoa päällekkäin (esim. Katrin oma kahdenlainen varaus) → kevyt ambri "huomaa"-merkki, EI punainen, EI napautettava.
+- Kahden ERI henkilön menot päällekkäin → punainen, napautettava (ks. kohta 1).
+- (Jos rauhoitus-ikkuna on asetettu, ks. alla) hytti-scopen tapahtuma vs. arjen rutiini rauhoitus-ikkunan sisällä → vaimenee "huomaa"-tasolle vaikka olisi muuten eri henkilöiden välinen.
+
+### 5. Pallurat
+- Kotinäkymän Kalenteri-laatan pallura kasvaa heti kun kuittaamaton punainen ristiriita ilmestyy lähitulevaisuuteen (60 pv) — EI vaadi Kalenterin avaamista kertaakaan.
+- Pallura pienenee kun ristiriita kuitataan TAI poistuu (esim. toinen tapahtuma perutaan).
+
+**Rauhoitus-ikkuna (kohta 3, EI vielä asetettu käyttöliittymästä):** oletuksena TYHJÄ = ei vaikutusta. Jos halutaan testata, aseta suoraan SQL Editorista:
+```sql
+insert into asetukset (key, value) values
+  ('rauhoitus_alku', '2026-08-01'),
+  ('rauhoitus_loppu', '2026-12-20')
+on conflict (key) do update set value = excluded.value;
+```
+Poista rivit (tai aseta tyhjäksi merkkijonoksi) kytkeäksesi pois.
+
+Ei client-cachen ohitusta erikseen vaadi — `sw.js` bumpattu tämän erän mukana.
+
+---
+
 Kysy Claudelta jos joku kohta ei täsmää tai jokin näistä napeista/valikoista ei löydy — käyttöliittymät muuttuvat välillä hieman.

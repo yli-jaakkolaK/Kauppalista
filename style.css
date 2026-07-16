@@ -436,6 +436,26 @@ h1 {
   background: var(--vaara);
 }
 
+/* Ristiriitapaketti (2026-07-17, ks. muistiinpanot.md): "Keskusteltu"-tila
+   saa oman MUODON (rengas, ei täytetty kiekko) täytetyn punaisen tilalle —
+   sama "muoto kertoo tilan, ei väri yksin" -periaate kuin ⚓-korjauksessa.
+   Kevyt "huomio"-taso (saman henkilön oma tupla, tms.) on pienempi täytetty
+   piste eri sävyssä — erottuu sekä koosta että väristä täydestä ristiriidasta. */
+.kalenteri-kuukausi-piste--keskustellaan {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  border: 1.5px solid var(--accent);
+  background: transparent;
+}
+
+.kalenteri-kuukausi-piste--huomio {
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: var(--huomio);
+}
+
 .kalenteri-kuukausi-piste--kuorma {
   min-width: 14px;
   height: 13px;
@@ -1904,6 +1924,15 @@ h1 {
 .paiva-merkki--keskustellaan {
   color: var(--accent);
   border: 1px dashed var(--accent);
+}
+
+/* Ristiriitapaketti (2026-07-17): kevyt "huomio"-taso — saman henkilön oma
+   tupla, tai rauhoitus-ikkunan sisällä vaimennettu hytti-päällekkäisyys.
+   Sama sävy kuin Kuormavahdin merkillä (huomio-taso, ei koskaan punainen),
+   EI napautettava (pelkkä tieto, ei lippua/kuittausta) — siksi ei cursor:pointeria. */
+.paiva-merkki--ristiriita-huomio {
+  color: var(--huomio);
+  border: 1px dashed var(--huomio);
 }
 
 #kalenteri-kuittaus-lista {

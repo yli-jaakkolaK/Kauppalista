@@ -216,6 +216,7 @@ async function lataaKotinakyma() {
   lataaOsiot();
   lataaAnkkurit();
   loadAnchorCandidates();
+  paivitaRistiriitaPallura();
   paivitaPaivamaara();
 }
 
@@ -377,26 +378,48 @@ function onkoRauhoitettuPaiva(isoPvm) {
   return !lomalla;
 }
 
-// Vakavuus kahden päällekkäisen tapahtuman välillä:
-//  - 'aina'       saman syötteen (kalenterin) sisäinen päällekkäisyys —
-//                 merkitään AINA, myös rauhoitetun ikkunan aikana (Poikkeus A)
-//  - 'ei_koskaan' kaksi ERI henkilön OMAA henkilökohtaista kalenteria (esim.
-//                 Katri vs. Juha) — kaksi aikuista, kaksi paikkaa on normaalia,
-//                 EI automaattimerkkiä koskaan (tuleva "keskustellaan"-lippu
-//                 koskee näitä, ei tätä merkkiä)
-//  - 'merkitse'/'rauhoitettu' kaikki muu (jaettu perhekalenteri mukana,
-//                 tai käsin lisätty ilman syötettä) — merkitään PAITSI jos
-//                 PÄÄLLEKKÄISYYDEN OMA ajanjakso mahtuu kokonaan rauhoitetun
-//                 päivän klo 9-15 -ikkunaan (jos päällekkäisyys ulottuu vaikka
-//                 vain hetkeksi ikkunan ulkopuolelle, se silti merkitään —
-//                 turvallisempi oletus kuin hiljentää osittain).
-// Käsin lisätyt tapahtumat (ei syote_id, ei henkilo) osuvat oletuksena
-// 'merkitse'/'rauhoitettu'-haaraan — tietoinen yksinkertaistus, ei koskaan
-// 'ei_koskaan' koska emme tiedä kenen ne ovat.
+// "Rauhoitus-ikkuna" hytti-melulle (Ristiriitapaketti, kohta 3, 2026-07-17,
+// ks. muistiinpanot.md) — YKSINKERTAINEN absoluuttinen päivämääräväli
+// (EI kiertävä kuten yllä oleva kausi), oma pari asetuksia
+// (rauhoitus_alku/rauhoitus_loppu, molemmat YYYY-MM-DD). Oletus TYHJÄ =
+// ei rauhoitusta ollenkaan — Katri asettaa arvon myöhemmin kun haluaa.
+// Tarkoitettu VAIN vaimentamaan toistuvia hytti-scopen rutiinipäällekkäisyyksiä
+// (esim. viikoittainen luento vs. arjen vakiokuvio), ei mitään muuta —
+// ks. paallekkaisyysVakavuus() alla.
+function onkoRauhoitusIkkunassa(isoPvm) {
+  const alku = haeAsetusTeksti('rauhoitus_alku', '');
+  const loppu = haeAsetusTeksti('rauhoitus_loppu', '');
+  if (!alku || !loppu) return false;
+  return isoPvm >= alku && isoPvm <= loppu;
+}
+
+// Kolmiportainen vakavuus kahden päällekkäisen tapahtuman välillä (Ristiriita-
+// paketti, 2026-07-17 — KORVAA aiemman kaksiportaisen 'aina'/'ei_koskaan'/
+// 'merkitse'/'rauhoitettu'-mallin):
+//  - 'full'      saman syötteen sisäinen päällekkäisyys (aina), TAI kahden ERI
+//                henkilön omat menot päällekkäin ("kuka hoitaa?" — Katrin
+//                2026-07-17 linjaus KUMOAA aiemman 'ei_koskaan'-säännön: kaksi
+//                aikuista kahdessa eri paikassa EI enää ole automaattisesti
+//                normaalia, se on juuri se tilanne josta pitää keskustella).
+//  - 'attention' saman henkilön kaksi omaa menoa (hänen oma päällekkäisyytensä,
+//                ei perheen kriisi), TAI mikä tahansa muu päällekkäisyys joka
+//                osuu rauhoitetun koulupäivän klo 9-15 -ikkunan ULKOPUOLELLE,
+//                TAI hytti-scopen päällekkäisyys erillisen rauhoitus-ikkunan
+//                (kohta 3) sisällä (muuten olisi 'full').
+//  - 'none'      ei mitään signaalia: tuntematon/perhetapahtuma+yksilö -pari
+//                jonka koko ajanjakso mahtuu rauhoitetun koulupäivän klo 9-15
+//                -ikkunaan (olemassa oleva sääntö, ks. onkoRauhoitettuPaiva).
 function paallekkaisyysVakavuus(a, b, isoPvm) {
-  if (a.syote_id && b.syote_id && a.syote_id === b.syote_id) return 'aina';
-  if (a._henkilo && b._henkilo && a._henkilo !== b._henkilo) return 'ei_koskaan';
-  if (!onkoRauhoitettuPaiva(isoPvm)) return 'merkitse';
+  if (a.syote_id && b.syote_id && a.syote_id === b.syote_id) return 'full';
+
+  const hyttiaMukana = a._scope === 'hytti' || b._scope === 'hytti';
+  if (hyttiaMukana && onkoRauhoitusIkkunassa(isoPvm)) return 'attention';
+
+  if (a._henkilo && b._henkilo) {
+    return a._henkilo !== b._henkilo ? 'full' : 'attention';
+  }
+
+  if (!onkoRauhoitettuPaiva(isoPvm)) return 'attention';
 
   const aLoppu = a.event_end_time || a.event_time;
   const bLoppu = b.event_end_time || b.event_time;
@@ -405,42 +428,135 @@ function paallekkaisyysVakavuus(a, b, isoPvm) {
   const kloAlkaa = haeAsetusTeksti('ristiriita_klo_alkaa', '09:00');
   const kloLoppuu = haeAsetusTeksti('ristiriita_klo_loppuu', '15:00');
   const kokoPaallekkaisyysIkkunassa = paallekkaisAlku.slice(0, 5) >= kloAlkaa && paallekkaisLoppu.slice(0, 5) <= kloLoppuu;
-  return kokoPaallekkaisyysIkkunassa ? 'rauhoitettu' : 'merkitse';
+  return kokoPaallekkaisyysIkkunassa ? 'none' : 'attention';
 }
 
-// Onko annetulla päivällä vähintään yksi todellinen (ei suodatettu) ristiriita?
-// scope='hytti' OSALLISTUU vertailuun (Katrin 2026-07-16 korjattu linjaus) —
-// paallekkaisyysVakavuus():n olemassa oleva 'ei_koskaan'-sääntö (eri henkilön
-// omat kalenterit) hoitaa jo oikean lopputuloksen, ei tarvitse erillistä poissulkua.
-function onkoPaivanRistiriita(rivit, isoPvm) {
+// Analysoi annetun päivän KAIKKI päällekkäisyydet kerralla — korvaa aiemman
+// pelkän totuusarvon palauttavan onkoPaivanRistiriita():n (Ristiriitapaketti,
+// 2026-07-17). Palauttaa { vakavuus: 'full'|'attention'|'none', fullIds }
+// — fullIds on JÄRJESTETTY, ainutkertainen taulukko niiden tapahtumien id:istä
+// jotka osallistuvat VÄHINTÄÄN yhteen 'full'-tason pariin sinä päivänä.
+// fullIds on "Keskusteltu"-lipun allekirjoitus (ks. ristiriitaAvain alla):
+// jos allekirjoitus muuttuu (uusi tapahtuma liittyy mukaan), aiempi kuittaus
+// ei enää täsmää eikä siis peitä UUTTA päällekkäisyyttä.
+function analysoiPaivanRistiriidat(rivit, isoPvm) {
   const tapahtumat = rivit.filter(function(r) { return (!r._tyyppi || r._tyyppi === 'tapahtuma') && r.event_time; });
+  let vakavuus = 'none';
+  const fullIdSet = new Set();
   for (let i = 0; i < tapahtumat.length; i++) {
     for (let j = i + 1; j < tapahtumat.length; j++) {
       if (!onkoAjallisestiPaallekkainen(tapahtumat[i], tapahtumat[j])) continue;
-      const vakavuus = paallekkaisyysVakavuus(tapahtumat[i], tapahtumat[j], isoPvm);
-      if (vakavuus === 'aina' || vakavuus === 'merkitse') return true;
+      const pari = paallekkaisyysVakavuus(tapahtumat[i], tapahtumat[j], isoPvm);
+      if (pari === 'full') {
+        vakavuus = 'full';
+        fullIdSet.add(tapahtumat[i].id);
+        fullIdSet.add(tapahtumat[j].id);
+      } else if (pari === 'attention' && vakavuus === 'none') {
+        vakavuus = 'attention';
+      }
     }
   }
-  return false;
+  const fullIds = Array.from(fullIdSet).sort(function(x, y) { return x - y; });
+  return { vakavuus: vakavuus, fullIds: fullIds };
+}
+
+// Rakentaa "Keskusteltu"-kuittauksen allekirjoitusavaimen (event_date +
+// osallistuvien tapahtumien id-joukko) — ks. analysoiPaivanRistiriidat.
+function ristiriitaAvain(fullIds) {
+  return fullIds.join(',');
+}
+
+// Onko annetun päivän 'full'-tason ristiriita jo kuitattu TÄSMÄLLEEN samalla
+// tapahtumajoukolla? Kartta ladataan paivitaRistiriitaKuittaukset():lla.
+let ristiriitaKuitatutAvaimet = new Set();
+function onkoRistiriitaKuitattu(isoPvm, fullIds) {
+  if (fullIds.length === 0) return false;
+  return ristiriitaKuitatutAvaimet.has(isoPvm + '|' + ristiriitaAvain(fullIds));
+}
+
+async function paivitaRistiriitaKuittaukset() {
+  const { data, error } = await db.from('kalenteri_ristiriita_kuittaukset').select('event_date, tapahtuma_avaimet');
+  if (error) {
+    console.error('Ristiriitakuittausten haku epäonnistui:', error);
+    return;
+  }
+  ristiriitaKuitatutAvaimet = new Set((data || []).map(function(r) { return r.event_date + '|' + r.tapahtuma_avaimet; }));
+}
+
+// "Keskusteltu"-vahvistus (Ristiriitapaketti, 2026-07-17, ks. muistiinpanot.md
+// "Ristiriitapaketti: Ristiriitalippu 'Keskustellaan'") — napautus ristiriita-
+// merkistä avaa tämän. Näyttää kenen menot ovat päällekkäin (aika + henkilö +
+// otsikko), tarjoaa "Keskusteltu ✓" -kuittauksen. Kuittaus EI POISTA mitään —
+// vain lisää rivin kalenteri_ristiriita_kuittaukset-tauluun, merkki rauhoittuu
+// (punainen → kulta "keskustellaan"-tyyli) kunnes päivälle ilmestyy UUSI,
+// eri tapahtumajoukolla oleva 'full'-ristiriita (ks. ristiriitaAvain).
+function avaaRistiriitaVahvistus(isoPvm, rivit, fullIds) {
+  const fullIdSet = new Set(fullIds);
+  const osalliset = rivit
+    .filter(function(r) { return fullIdSet.has(r.id); })
+    .sort(function(a, b) { return (a.event_time || '').localeCompare(b.event_time || ''); });
+  const kuvaus = osalliset.map(function(r) {
+    const aika = r.event_time ? r.event_time.slice(0, 5) : '';
+    const henkilo = r._henkilo ? henkiloNimi(r._henkilo) + ': ' : '';
+    return aika + ' ' + henkilo + r.title;
+  }).join('\n');
+
+  const jo = onkoRistiriitaKuitattu(isoPvm, fullIds);
+  document.getElementById('ristiriita-body').textContent = kuvaus;
+  const keskusteltuNappi = document.getElementById('ristiriita-keskusteltu-btn');
+  keskusteltuNappi.style.display = jo ? 'none' : '';
+  document.getElementById('ristiriita-overlay').style.display = 'flex';
+
+  keskusteltuNappi.onclick = async function() {
+    const { error } = await db.from('kalenteri_ristiriita_kuittaukset').upsert(
+      { event_date: isoPvm, tapahtuma_avaimet: ristiriitaAvain(fullIds), acked_by: currentUserId },
+      { onConflict: 'event_date,tapahtuma_avaimet', ignoreDuplicates: true }
+    );
+    document.getElementById('ristiriita-overlay').style.display = 'none';
+    if (error) {
+      console.error('Ristiriidan kuittaus epäonnistui:', error);
+      naytaIlmoitus('Kuittaus epäonnistui — yritä uudelleen');
+      return;
+    }
+    await paivitaRistiriitaKuittaukset();
+    lataaKalenteri();
+  };
 }
 
 // Luo yhtenäisen päivätason merkkipillerin (ks. muistiinpanot.md "Kalenterin
-// merkkikieli") — savy on 'kuorma' | 'ristiriita' | 'keskustellaan'.
-function luoPaivaMerkki(savy, teksti, title) {
+// merkkikieli") — savy on 'kuorma' | 'ristiriita' | 'ristiriita-huomio' |
+// 'keskustellaan'. onClick on valinnainen (vain napautettavalle ristiriitaliputukselle).
+function luoPaivaMerkki(savy, teksti, title, onClick) {
   const merkki = document.createElement('span');
   merkki.className = 'paiva-merkki paiva-merkki--' + savy;
   merkki.textContent = teksti;
   if (title) merkki.title = title;
+  if (onClick) {
+    merkki.style.cursor = 'pointer';
+    merkki.addEventListener('click', onClick);
+  }
   return merkki;
 }
 
 // Piirtää päiväotsikon tekstin ja lisää perään ristiriita- (jos on) ja
 // kuorma- (jos raja täyttyy) -merkit tässä järjestyksessä, koska
-// päällekkäisyys on kiireellisempi huomata.
+// päällekkäisyys on kiireellisempi huomata. 'full'-tason merkki on
+// napautettava — avaa "Keskusteltu"-vahvistuksen (Ristiriitapaketti,
+// 2026-07-17). 'attention'-taso on pelkkä tieto (ei lippu, ei napautusta,
+// sama kuin Kuormavahdin merkki) — vain 'full' ansaitsee kuittausmekanismin.
 function paivitaPaivanOtsikko(otsikkoEl, teksti, rivit, isoPvm, kuormaraja) {
   otsikkoEl.textContent = teksti;
-  if (onkoPaivanRistiriita(rivit, isoPvm)) {
-    otsikkoEl.appendChild(luoPaivaMerkki('ristiriita', 'päällekkäin', 'Kaksi tapahtumaa menee päällekkäin tänä päivänä'));
+  const analyysi = analysoiPaivanRistiriidat(rivit, isoPvm);
+  if (analyysi.vakavuus === 'full') {
+    const kuitattu = onkoRistiriitaKuitattu(isoPvm, analyysi.fullIds);
+    otsikkoEl.appendChild(luoPaivaMerkki(
+      kuitattu ? 'keskustellaan' : 'ristiriita',
+      kuitattu ? 'keskusteltu ✓' : 'päällekkäin',
+      kuitattu ? 'Keskusteltu — napauta nähdäksesi kenen menot' : 'Kaksi eri henkilön (tai saman syötteen) menoa menee päällekkäin — napauta',
+      function() { avaaRistiriitaVahvistus(isoPvm, rivit, analyysi.fullIds); }
+    ));
+  } else if (analyysi.vakavuus === 'attention') {
+    otsikkoEl.appendChild(luoPaivaMerkki('ristiriita-huomio', 'huomaa', 'Kevyt päällekkäisyys tänä päivänä — ei vaadi toimenpidettä'));
   }
   const maara = laskeMenoja(rivit);
   if (maara >= kuormaraja) {
@@ -770,6 +886,7 @@ async function lataaKalenteri() {
   await paivitaAnkkuroidutAvaimet();
   await paivitaAsetukset();
   await paivitaMuistutuksetKartta();
+  await paivitaRistiriitaKuittaukset();
 
   const sisalto = document.getElementById('kalenteri-sisalto');
   sisalto.innerHTML = '';
@@ -898,10 +1015,20 @@ function piirraKuukausiPaiva(pvm, kaikkiTapahtumat, linjat, linjojaViikolla, kul
   // Kuukausiruutu on liian pieni täydelle merkkipillerille (ks. Kuormavahti/
   // ristiriitamerkki agenda- ja viikkonäkymässä) — sama kolmiportainen
   // väriohjaus tiivistettynä pieneksi pisteeksi päivänumeron viereen.
-  if (onkoPaivanRistiriita(paivanKaikki, iso)) {
+  // Napautus (koko ruutu jo napautettava, ks. alempana) vie päivänäkymään
+  // jossa varsinainen "Keskusteltu"-lippu on napautettavissa — pisteen ei
+  // tarvitse itse avata vahvistusta.
+  const paivanRistiriita = analysoiPaivanRistiriidat(paivanKaikki, iso);
+  if (paivanRistiriita.vakavuus === 'full') {
+    const kuitattu = onkoRistiriitaKuitattu(iso, paivanRistiriita.fullIds);
     const piste = document.createElement('span');
-    piste.className = 'kalenteri-kuukausi-piste kalenteri-kuukausi-piste--ristiriita';
-    piste.title = 'Päällekkäin';
+    piste.className = 'kalenteri-kuukausi-piste ' + (kuitattu ? 'kalenteri-kuukausi-piste--keskustellaan' : 'kalenteri-kuukausi-piste--ristiriita');
+    piste.title = kuitattu ? 'Keskusteltu' : 'Päällekkäin';
+    pvmRivi.appendChild(piste);
+  } else if (paivanRistiriita.vakavuus === 'attention') {
+    const piste = document.createElement('span');
+    piste.className = 'kalenteri-kuukausi-piste kalenteri-kuukausi-piste--huomio';
+    piste.title = 'Kevyt päällekkäisyys';
     pvmRivi.appendChild(piste);
   } else if (laskeMenoja(paivanKaikki) >= kuormaraja) {
     const piste = document.createElement('span');
@@ -1106,20 +1233,62 @@ async function paivitaKuittausTila() {
     linkki.onclick = function() { avaaKuittausOverlay(kuittausjonoUudet); };
   }
 
-  // Huomiopallura (2026-07-13, ks. "HUOMIOPALLURAT"-osio): sama luku jota
-  // "🆕 N uutta" -linkki jo näyttää, ei duplikoitua laskentaa.
-  huomioPallurat.kalenteri = kuittausjonoUudet.length;
+  paivitaKalenteriBadge();
+}
 
+// Kalenteri-laatan pallura = kuittausjono + ristiriitapaketin kuittaamattomat
+// 'full'-ristiriidat yhteenlaskettuna (Ristiriitapaketti kohta 4, 2026-07-17,
+// ks. muistiinpanot.md) — molemmat ovat "kalenteri kaipaa reaktiota" -signaaleja,
+// jaettu yhteen palluraan ettei etusivulle tule kahta erillistä kalenterimerkkiä.
+function paivitaKalenteriBadge() {
+  huomioPallurat.kalenteri = kuittausjonoUudet.length + ristiriitaPalluraMaara;
   const badge = document.querySelector('.tile-badge[data-osio-key="kalenteri"]');
   if (badge) {
-    if (kuittausjonoUudet.length) {
-      badge.textContent = kuittausjonoUudet.length;
+    if (huomioPallurat.kalenteri) {
+      badge.textContent = huomioPallurat.kalenteri;
       badge.style.display = 'flex';
     } else {
       badge.style.display = 'none';
     }
   }
   paivitaSovelluskuvakeBadge();
+}
+
+// Skannaa lähitulevaisuuden (60 pv eteenpäin — mennyttä ristiriitaa ei voi
+// enää sopia) VAIN etusivun/laatan palluraa varten, kevyt kysely riippumaton
+// siitä onko Kalenteri-näkymä koskaan avattu tällä istunnolla (Vilkaisuarvo:
+// väsyneen käyttäjän ei pidä tarvita avata kalenteria nähdäkseen tämän).
+const RISTIRIITA_PALLURA_PAIVIA_ETEENPAIN = 60;
+let ristiriitaPalluraMaara = 0;
+async function paivitaRistiriitaPallura() {
+  const tanaan = paivamaaraISO(new Date());
+  const loppu = new Date();
+  loppu.setDate(loppu.getDate() + RISTIRIITA_PALLURA_PAIVIA_ETEENPAIN);
+  const { data, error } = await db.from('kalenteri_tapahtumat')
+    .select('id, event_date, event_time, event_end_time, syote_id, kalenteri_syotteet(henkilo, scope)')
+    .gte('event_date', tanaan)
+    .lte('event_date', paivamaaraISO(loppu))
+    .not('event_time', 'is', null);
+  if (error) {
+    console.error('Ristiriitapalluran haku epäonnistui:', error);
+    return;
+  }
+  const rivitPaivittain = {};
+  (data || []).forEach(function(t) {
+    const rivi = Object.assign({}, t, {
+      _henkilo: t.kalenteri_syotteet ? t.kalenteri_syotteet.henkilo : null,
+      _scope: t.kalenteri_syotteet ? t.kalenteri_syotteet.scope : null,
+    });
+    (rivitPaivittain[t.event_date] = rivitPaivittain[t.event_date] || []).push(rivi);
+  });
+  await paivitaRistiriitaKuittaukset();
+  let maara = 0;
+  Object.keys(rivitPaivittain).forEach(function(pvm) {
+    const analyysi = analysoiPaivanRistiriidat(rivitPaivittain[pvm], pvm);
+    if (analyysi.vakavuus === 'full' && !onkoRistiriitaKuitattu(pvm, analyysi.fullIds)) maara++;
+  });
+  ristiriitaPalluraMaara = maara;
+  paivitaKalenteriBadge();
 }
 
 // Piirtää kuittauskortit (otsikko + pvm/aika + värillinen lähdemerkintä +
@@ -4355,6 +4524,14 @@ document.getElementById('muistutus-sulje').addEventListener('click', suljeMuistu
 document.getElementById('muistutus-overlay').addEventListener('click', function(e) {
   if (e.target === document.getElementById('muistutus-overlay')) suljeMuistutusPaneeli();
 });
+
+function suljeRistiriitaVahvistus() {
+  document.getElementById('ristiriita-overlay').style.display = 'none';
+}
+document.getElementById('ristiriita-sulje').addEventListener('click', suljeRistiriitaVahvistus);
+document.getElementById('ristiriita-overlay').addEventListener('click', function(e) {
+  if (e.target === document.getElementById('ristiriita-overlay')) suljeRistiriitaVahvistus();
+});
 document.getElementById('muistutus-asetuksiin-btn').addEventListener('click', function() {
   suljeMuistutusPaneeli();
   avaaOsio({ route: 'asetukset' });
@@ -4420,9 +4597,17 @@ const laituriRealtimeChannel = db.channel('laituri-pallura')
 const kalenteriPalluraChannel = db.channel('kalenteri-pallura')
   .on('postgres_changes', { event: '*', schema: 'public', table: 'kalenteri_tapahtumat' }, () => {
     paivitaKuittausTila();
+    paivitaRistiriitaPallura();
   })
   .on('postgres_changes', { event: '*', schema: 'public', table: 'kalenteri_kuittaukset' }, () => {
     paivitaKuittausTila();
+  })
+  // Ristiriitapaketti (2026-07-17): "Keskusteltu"-kuittaus näkyy molemmille
+  // reaaliajassa, sama malli kuin kuittausjonolla — kumpi tahansa kuittaa,
+  // toisen etusivun pallura/avoin Kalenteri-näkymä rauhoittuu heti.
+  .on('postgres_changes', { event: '*', schema: 'public', table: 'kalenteri_ristiriita_kuittaukset' }, () => {
+    paivitaRistiriitaPallura();
+    if (document.getElementById('kalenteri-view').style.display !== 'none') lataaKalenteri();
   })
   .subscribe();
 
