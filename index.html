@@ -358,21 +358,41 @@
       <div id="muistutus-lomake">
         <div id="muistutus-lista"></div>
 
-        <div class="muistutus-pikanapit" id="muistutus-pikanapit" style="display:none">
-          <button class="dialog-btn dialog-btn-cancel" data-min="15">15 min ennen</button>
-          <button class="dialog-btn dialog-btn-cancel" data-min="60">1 h ennen</button>
-          <button class="dialog-btn dialog-btn-cancel" data-min="1440">1 vrk ennen</button>
+        <div class="muistutus-tila-valinta">
+          <button class="kalenteri-tila-btn muistutus-tila-btn active" data-tila="pika">Pika</button>
+          <button class="kalenteri-tila-btn muistutus-tila-btn" data-tila="kellonaika">Kellonaika</button>
         </div>
 
-        <div class="muistutus-rulla-rivi">
-          <select id="muistutus-maara"></select>
-          <select id="muistutus-yksikko">
-            <option value="min">min</option>
-            <option value="tunti">tunti</option>
-            <option value="vrk">vrk</option>
-            <option value="viikko">viikko</option>
-          </select>
-          <button class="dialog-btn" id="muistutus-lisaa-btn">Aseta</button>
+        <div id="muistutus-pika-tila">
+          <div class="muistutus-pikanapit" id="muistutus-pikanapit" style="display:none">
+            <button class="dialog-btn dialog-btn-cancel" data-min="15">15 min ennen</button>
+            <button class="dialog-btn dialog-btn-cancel" data-min="60">1 h ennen</button>
+            <button class="dialog-btn dialog-btn-cancel" data-min="1440">1 vrk ennen</button>
+          </div>
+
+          <div class="muistutus-rulla-rivi">
+            <select id="muistutus-maara"></select>
+            <select id="muistutus-yksikko">
+              <option value="min">min</option>
+              <option value="tunti">tunti</option>
+              <option value="vrk">vrk</option>
+              <option value="viikko">viikko</option>
+            </select>
+            <button class="dialog-btn" id="muistutus-lisaa-btn">Aseta</button>
+          </div>
+        </div>
+
+        <div id="muistutus-kellonaika-tila" style="display:none">
+          <div class="muistutus-pikanapit">
+            <button class="dialog-btn dialog-btn-cancel" id="muistutus-pvm-tanaan">Tänään</button>
+            <button class="dialog-btn dialog-btn-cancel" id="muistutus-pvm-huomenna">Huomenna</button>
+          </div>
+
+          <div class="muistutus-rulla-rivi">
+            <input type="date" id="muistutus-pvm-input">
+            <input type="time" id="muistutus-klo-input">
+            <button class="dialog-btn" id="muistutus-kellonaika-lisaa-btn">Aseta</button>
+          </div>
         </div>
       </div>
 

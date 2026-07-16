@@ -126,28 +126,49 @@ function isoDate(d) {
   return d.toISOString().slice(0, 10);
 }
 
+// BUGIKORJAUS (2026-07-16, "Hetki-muru nousee joka aamu" — ks. muistiinpanot.md):
+// aiemmin tämä prompti antoi AINA ajokerran OMAN päivän "tänään"/"huomenna"
+// -ankkureiksi, riippumatta siitä milloin muru oikeasti kirjoitettiin. Jos
+// muru ("palaveri huomenna klo 14") jäi jostain syystä arvioimatta
+// kirjoitusiltaansa myöhemmin (ajo ohitettiin/epäonnistui, tai eligibility
+// aktivoitui uudelleen), "huomenna" tulkittiin SEN YÖN mukaan — "huomenna"
+// on siis IKUISESTI seuraava päivä suhteessa ajohetkeen, ei koskaan osu
+// oikeaan päivään eikä siksi koskaan "vanhene" oikein. Korjattu: jokainen
+// muru saa OMAN kirjoituspäivänsä ("written_on", murun created_at) mukaan
+// promptiin, ja suhteelliset ajanmääreet JÄÄDYTETÄÄN sen mukaan — "huomenna"
+// tarkoittaa AINA "kirjoituspäivä + 1", ei "tämä ajokerta + 1". Äly palauttaa
+// nyt myös absoluuttisen "date"-kentän KAIKILLE osumille (ei vain ikkunan
+// "deadline"), jotta järjestelmä (ei vain äly) voi tarkistaa onko hetki jo
+// mennyt ohi ennen ehdokkaan luomista (ks. handler alla).
 function buildPrompt(notes) {
   const today = new Date();
-  const tomorrow = new Date(today);
-  tomorrow.setDate(tomorrow.getDate() + 1);
 
-  const noteList = notes.map(function(n) { return { id: n.id, text: n.content }; });
+  const noteList = notes.map(function(n) {
+    return { id: n.id, text: n.content, written_on: isoDate(new Date(n.created_at)) };
+  });
 
-  return 'Tänään on ' + isoDate(today) + ', huomenna on ' + isoDate(tomorrow) + '.\n\n' +
+  return 'Tänään on ' + isoDate(today) + '.\n\n' +
     'Seuraavat ovat käyttäjän kirjoittamia lyhyitä muistilappuja, jotka odottavat vielä sijoittamista jonnekin. ' +
+    'Jokaisella on "written_on" — päivä jolloin KYSEINEN muistilappu kirjoitettiin. TÄRKEÄÄ: tulkitse ' +
+    'suhteelliset ajanmääreet ("huomenna", "ylihuomenna", "ensi tiistaina", "kolmen päivän päästä") AINA ' +
+    'SUHTEESSA KYSEISEN MURUN OMAAN written_on-päivään, EI tämänpäiväiseen ("tänään"-kenttään) — "huomenna" ' +
+    'tarkoittaa AINA "written_on + 1 päivä", vaikka murun arviointi tapahtuisi vasta myöhemmin. ' +
     'Tunnista NÄISTÄ VAIN ne jotka viittaavat SELVÄSTI johonkin ajankohtaan tai takarajaan JA sisältävät kellonajan ' +
     'tai muun yksiselitteisen ajanmääreen (esim. "huomenna klo 16", "osta liput 24.7. mennessä"). Jos olet ' +
     'epävarma, JÄTÄ POIS — älä koskaan arvaa.\n\n' +
-    'Jokaiselle osumalle määritä LAJI ("category"):\n' +
-    '- "hetki" = yksittäinen ajankohta (esim. "huomenna klo 16 hammaslääkäri", "ti aamulla palautus")\n' +
+    'Jokaiselle osumalle määritä LAJI ("category") JA absoluuttinen päivämäärä ("date", YYYY-MM-DD, laskettuna ' +
+    'written_on-päivästä yllä olevan säännön mukaan):\n' +
+    '- "hetki" = yksittäinen ajankohta (esim. "huomenna klo 16 hammaslääkäri", "ti aamulla palautus") — ' +
+    '"date" on se päivä jolloin ajankohta on\n' +
     '- "ikkuna" = takaraja jota kohti kuljetaan, toiminta on mahdollinen monena päivänä ennen sitä ' +
-    '(esim. "osta liput 24.7. mennessä", "ilmoittaudu perjantaihin mennessä") — anna myös "deadline" ' +
-    '(viimeinen päivä, YYYY-MM-DD)\n' +
+    '(esim. "osta liput 24.7. mennessä", "ilmoittaudu perjantaihin mennessä") — "date" ja "deadline" ovat ' +
+    'sama päivä (viimeinen päivä, YYYY-MM-DD)\n' +
     'Jos et ole varma kummasta on kyse, käytä "hetki".\n\n' +
     'Muistilaput: ' + JSON.stringify(noteList) + '\n\n' +
     'Vastaa VAIN JSON-muodossa, ei mitään muuta tekstiä, ei markdown-koodilohkoja:\n' +
     '{"matches": [{"id": <muistilapun id numerona>, "content": "<lyhyt suomenkielinen kuvaus ankkurille>", ' +
-    '"time": "<HH:MM tai null>", "category": "hetki"|"ikkuna", "deadline": "<YYYY-MM-DD tai null, VAIN jos category=ikkuna>"}]}\n' +
+    '"time": "<HH:MM tai null>", "category": "hetki"|"ikkuna", "date": "<YYYY-MM-DD, absoluuttinen päivä>", ' +
+    '"deadline": "<YYYY-MM-DD tai null, VAIN jos category=ikkuna, sama kuin date>"}]}\n' +
     'Jos yhtään ei osu, vastaa {"matches": []}.';
 }
 
@@ -255,7 +276,7 @@ module.exports = async function handler(req, res) {
   // against DIFFERENT text than it currently has (the user edited it
   // since — new content means a fresh chance, ks. bugfix note above).
   const [notesRes, evaluatedRes, suggestedRes] = await Promise.all([
-    supabaseFetch('laituri?select=id,user_id,content&status=eq.uusi'),
+    supabaseFetch('laituri?select=id,user_id,content,created_at&status=eq.uusi'),
     supabaseFetch('aly_evaluated?select=laituri_id,content'),
     supabaseFetch('ankkurit?select=source_ref&source=eq.aly'),
   ]);
@@ -355,6 +376,22 @@ module.exports = async function handler(req, res) {
       const isWindow = match.category === 'ikkuna' && typeof match.deadline === 'string' && VALID_ISO_DATE.test(match.deadline);
       const category = isWindow ? 'ikkuna' : 'hetki';
       const deadline = isWindow ? match.deadline : null;
+      const resolvedDate = typeof match.date === 'string' && VALID_ISO_DATE.test(match.date) ? match.date : deadline;
+
+      // BUGIKORJAUS (2026-07-16, "Hetki-muru nousee joka aamu"): jos tämän
+      // muistilapun arviointi viivästyi (ajo ohitettiin/epäonnistui yhtenä
+      // tai useampana yönä) niin paljon että sen OMA, written_on-päivästä
+      // jäädytetty hetki on JO MENNYT OHI ennen kuin ehdokas ehdittiin edes
+      // luoda, ehdokkaan luominen nyt näyttäisi vanhentunutta tietoa. Silloin
+      // hiljaisuus ON vastaus — merkitään suoraan käsitellyksi ilman
+      // ehdokasta, ei koskaan luoda ankkuria menneelle hetkelle. Koskee vain
+      // "hetkeä" — "ikkuna" saa yhä olla mennyt kokonaan ohi vasta deadlinen
+      // jälkeen, sama logiikka kuin osan 1 deadlineHasPassed()-tarkistuksessa.
+      if (category === 'hetki' && resolvedDate && resolvedDate < isoDate(new Date())) {
+        await markEvaluated(note.id, note.content);
+        console.log('[aly-nightly] Hetki "' + match.content + '" (id ' + note.id + ') oli jo mennyt ohi arviointihetkellä (' + resolvedDate + ') — ei ehdokasta, merkitty käsitellyksi.');
+        continue;
+      }
 
       const anchorRes = await supabaseFetch('ankkurit', {
         method: 'POST',

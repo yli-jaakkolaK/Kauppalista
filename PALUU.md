@@ -511,4 +511,39 @@ Ei sw-bump-erillisvaihetta tälle (samassa `sw.js` v63 -bumpissa kuin Kalenterin
 
 ---
 
+## OSA W — Tiistain löydösten koonti 2, loput (kohdat 7–10, 2026-07-16)
+
+Ei uusia migraatioita (kaikki neljä ovat client/query-tason muutoksia olemassa oleviin tauluihin). `sw.js` v64.
+
+### 1. Aikavalitsin: KELLONAIKA-tila
+
+1. Avaa ⏰ mistä tahansa rivistä (Muistilaput/Kalenteri/Ankkuri) → paneeli avautuu PIKA-välilehdelle kuten ennenkin.
+2. Vaihda "Kellonaika"-välilehdelle → näkyy Tänään/Huomenna-napit + päivä/kellonaika-kentät.
+3. Napauta "Huomenna" → päivä täyttyy automaattisesti, aseta kellonaika (esim. 09:00) → Aseta.
+4. Tarkista että muistutus asettui oikealle absoluuttiselle ajankohdalle (ei suhteellisena "N min tästä hetkestä").
+5. iPhonella: tarkista että päivä/kellonaika-kentät avautuvat natiiveina wheel-valitsimina (ei tekstikenttinä).
+
+### 2. Täppäys/poisto siivoaa muistutukset
+
+1. Aseta jollekin listan riville muistutus (⏰).
+2. Täppää rivi tehdyksi → näkyy "Myös 1 muistutus poistetaan [Kumoa]" -toast.
+3. Odota 5s koskematta → muistutus poistuu (tarkista Asetuksista/uudelleenavauksella ettei ⏰-nappi enää näytä aktiivista tilaa).
+4. Toista, mutta paina tällä kertaa "Kumoa" 5s sisällä → muistutus SÄILYY.
+5. Toista sama poistolle (×) yhdellä toisella rivillä.
+
+### 3. Laiturin "Sijoita…" käsikohdevalinta
+
+1. Laituri → napauta jonkin oman murun → -nappia → avautuu pudotusvalikko listoista + Hytin aktiivisista korteista (🚪-etuliitteellä).
+2. Valitse jokin Muistilaput/Varasto-lista → tarkista että rivi OIKEASTI ilmestyy sinne (avaa kyseinen lista).
+3. Toinen muru: valitse jokin Hytin kortti → tarkista että rivi ilmestyy sen kortin sisään.
+4. Molemmissa: Laiturin muru merkittiin "sijoitettu" + oikea kohdenimi näkyy meta-rivillä.
+5. ✨-oikotie: pyydä äly-ehdotus jollekin murulle → jos ehdotus täsmää johonkin oikeaan listaan/korttiin, "Sopii" kirjoittaa suoraan (ei avaa valikkoa uudelleen) → tarkista Vercelin Logsista/konsolista ettei mitään jäänyt puolitiehen.
+
+### 4. ✨-promptidiagnoosi
+
+1. Pyydä ✨-ehdotus jollekin ajankohtaan sitomattomalle ostosmurulle (esim. "osta uudet kengät") → tarkista ettei äly ehdota enää muistutusta/ajankohtaa tälle.
+2. Avaa selaimen konsoli ennen ✨-napin painallusta → tarkista että `[laituri-ehdotus] prompti:` -rivi näkyy täydellä prompti-tekstillä kohteiden luonnehdintoineen.
+
+---
+
 Kysy Claudelta jos joku kohta ei täsmää tai jokin näistä napeista/valikoista ei löydy — käyttöliittymät muuttuvat välillä hieman.

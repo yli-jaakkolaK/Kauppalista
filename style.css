@@ -796,6 +796,7 @@ h1 {
 }
 
 .laituri-row {
+  position: relative; /* ankkuroi "Sijoita…"-valikon (.row-menu) juuri rivin alle */
   display: flex;
   align-items: center;
   min-height: 52px;
@@ -1514,6 +1515,16 @@ h1 {
   border-bottom: none;
 }
 
+/* Aikavalitsin (2026-07-16, ks. muistiinpanot.md kohta 7): kaksi syöttötilaa
+   samassa jaetussa komponentissa — PIKA (suhteellinen, olemassa ollut) ja
+   KELLONAIKA (päivä + kellonaika, uusi). Sama .kalenteri-tila-btn-tyyli
+   uudelleenkäytettynä välilehtinä, ei uutta napkielta. */
+.muistutus-tila-valinta {
+  display: flex;
+  gap: 8px;
+  margin: 10px 0;
+}
+
 .muistutus-pikanapit {
   display: flex;
   flex-wrap: wrap;
@@ -1553,6 +1564,27 @@ h1 {
 }
 
 .muistutus-rulla-rivi #muistutus-lisaa-btn {
+  flex-shrink: 0;
+}
+
+/* KELLONAIKA-tila: natiivi date/time-input toimii jo itsessään "rullana"
+   iOS:ssä (natiivi wheel-valitsin) ja "suorana syöttönä" muualla — ei
+   tarvinnut rakentaa kahta erillistä toteutusta, natiivi input kattaa
+   molemmat spesifioidut syöttötavat samalla elementillä. */
+#muistutus-pvm-input,
+#muistutus-klo-input {
+  font-family: 'Courier New', Courier, monospace;
+  font-size: 15px;
+  color: var(--text);
+  background: var(--ground);
+  border: 1px solid var(--border-dash);
+  border-radius: 4px;
+  padding: 8px 4px;
+  flex: 1;
+  min-width: 0;
+}
+
+#muistutus-kellonaika-tila .muistutus-rulla-rivi #muistutus-kellonaika-lisaa-btn {
   flex-shrink: 0;
 }
 

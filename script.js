@@ -506,7 +506,11 @@ function piirraKalenteriRivi(rivi) {
     checkNappi.addEventListener('click', async function() {
       tuntopalauteValmis();
       const { error } = await db.from('hytti_rivit').update({ done: true, done_at: new Date().toISOString() }).eq('id', rivi.id);
-      if (error) console.error('Hytti-tehtävän merkintä epäonnistui:', error);
+      if (error) {
+        console.error('Hytti-tehtävän merkintä epäonnistui:', error);
+      } else {
+        siivoaMuistutuksetKumottavasti('hytti_rivi', rivi.id);
+      }
       lataaKalenteri();
     });
     li.appendChild(checkNappi);
@@ -533,7 +537,11 @@ function piirraKalenteriRivi(rivi) {
     checkNappi.addEventListener('click', async function() {
       tuntopalauteValmis();
       const { error } = await db.from('ankkurit').update({ done: true, done_at: new Date().toISOString() }).eq('id', rivi._ankkuriId);
-      if (error) console.error('Ankkurin merkintä epäonnistui:', error);
+      if (error) {
+        console.error('Ankkurin merkintä epäonnistui:', error);
+      } else {
+        siivoaMuistutuksetKumottavasti('ankkuri', rivi._ankkuriId);
+      }
       lataaKalenteri();
     });
     li.appendChild(checkNappi);
@@ -639,8 +647,9 @@ function piirraKalenteriRivi(rivi) {
         const { error } = await db.from('kalenteri_tapahtumat').delete().eq('id', rivi.id);
         if (error) {
           console.error('Tapahtuman poisto epäonnistui:', error);
+        } else {
+          siivoaMuistutuksetKumottavasti('kalenteri', rivi.id);
         }
-        await db.from('muistutukset').delete().eq('source', 'kalenteri').eq('source_ref', String(rivi.id));
         lataaKalenteri();
       },
     });
@@ -1301,7 +1310,11 @@ function piirraHyttiTehtavaRivi(rivi) {
   checkNappi.addEventListener('click', async function() {
     tuntopalauteValmis();
     const { error } = await db.from('hytti_rivit').update({ done: true, done_at: new Date().toISOString() }).eq('id', rivi.id);
-    if (error) console.error('Hytti-tehtävän merkintä epäonnistui:', error);
+    if (error) {
+      console.error('Hytti-tehtävän merkintä epäonnistui:', error);
+    } else {
+      siivoaMuistutuksetKumottavasti('hytti_rivi', rivi.id);
+    }
     lataaHyttiPaanakyma();
   });
   li.appendChild(checkNappi);
@@ -1468,8 +1481,11 @@ async function poistaHyttiRivi(rivi) {
     paivitaHyttiLisaysKohde();
   }
   const { error } = await db.from('hytti_rivit').delete().eq('id', rivi.id);
-  if (error) console.error('Hytti-rivin poisto epäonnistui:', error);
-  await db.from('muistutukset').delete().eq('source', 'hytti_rivi').eq('source_ref', String(rivi.id));
+  if (error) {
+    console.error('Hytti-rivin poisto epäonnistui:', error);
+  } else {
+    siivoaMuistutuksetKumottavasti('hytti_rivi', rivi.id);
+  }
   lataaHyttiKortti();
 }
 
@@ -1956,6 +1972,8 @@ async function lataaAnkkurit() {
       const { error } = await db.from('ankkurit').update({ done: true, done_at: new Date().toISOString() }).eq('id', ankkuri.id);
       if (error) {
         console.error('Ankkurin merkintä epäonnistui:', error);
+      } else {
+        siivoaMuistutuksetKumottavasti('ankkuri', ankkuri.id);
       }
       lataaAnkkurit();
     });
@@ -2618,6 +2636,7 @@ async function lataaLaituri(hakusana) {
   (data || []).forEach(function(rivi) {
     const li = document.createElement('li');
     li.className = 'laituri-row' + (rivi.status === 'sijoitettu' ? ' sijoitettu' : '');
+    li.dataset.tuoteId = rivi.id;
 
     const sisalto = document.createElement('div');
     sisalto.className = 'laituri-content';
@@ -2720,8 +2739,9 @@ async function lataaLaituri(hakusana) {
       const sijoitaNappi = document.createElement('button');
       sijoitaNappi.className = 'place-btn';
       sijoitaNappi.textContent = '→';
+      sijoitaNappi.title = 'Sijoita listalle tai Hyttiin';
       sijoitaNappi.addEventListener('click', function() {
-        sijoitaLaituriRivi(rivi);
+        avaaSijoitaValikko(rivi, li);
       });
       li.appendChild(sijoitaNappi);
 
@@ -2783,8 +2803,9 @@ async function lataaLaituri(hakusana) {
       const { error } = await db.from('laituri').delete().eq('id', rivi.id);
       if (error) {
         console.error('Laiturin rivin poisto epäonnistui:', error);
+      } else {
+        siivoaMuistutuksetKumottavasti('laituri', rivi.id);
       }
-      await db.from('muistutukset').delete().eq('source', 'laituri').eq('source_ref', String(rivi.id));
       await db.from('ankkurit').delete().eq('source', 'laituri').eq('source_ref', String(rivi.id));
       lataaLaituri(document.getElementById('laituri-search').value.trim());
       paivitaLaituriBadge();
@@ -2813,15 +2834,74 @@ async function lataaLaituri(hakusana) {
 // kirjoittaa oikeasti `muistutukset`-tauluun), (2) suora ⚓-ankkurointi
 // (ks. lataaLaituri, kirjoittaa oikeasti `ankkurit`-tauluun). Kumpikaan ei
 // vaadi tätä prompt()-pohjaista itseilmoitusta ollenkaan.
-async function sijoitaLaituriRivi(rivi, oletusTeksti) {
-  const minne = prompt('Minne sijoitit tämän?', oletusTeksti || '');
-  if (!minne || !minne.trim()) return;
-  const { error } = await db.from('laituri').update({ status: 'sijoitettu', placed_where: minne.trim() }).eq('id', rivi.id);
-  if (error) {
-    console.error('Sijoitus epäonnistui:', error);
+// BUGIKORJAUS (2026-07-16, ks. muistiinpanot.md kohta 9, "Laiturin 'Sijoita…'
+// käsikohdevalinta"): aiempi "Minne sijoitit tämän?" oli VAPAAMUOTOINEN
+// itseilmoitus (ei kirjoittanut mitään) — käsipolku on nyt AITO kirjoitustie:
+// listat (Muistilaput/Varasto) ja Hytin aktiiviset kortit kirjoitetaan
+// tosiasiallisesti, sama periaate kuin ⚓-oikotiellä ("Kalenteri-sijoitus ei
+// kirjoita mitään" -bugikorjaus) — ehdotus- ja toteutuskerroksen pitää olla
+// samaa mieltä sovelluksen kyvyistä.
+
+// Kaikki konkreettiset sijoituskohteet dynaamisesti: listat (RLS rajaa jo
+// omiin/jaettuihin) + Hytin AKTIIVISET kortit (arkistoituihin ei sijoiteta).
+async function haeSijoitusKohteet() {
+  const [{ data: listat, error: listatError }, { data: kortit, error: kortitError }] = await Promise.all([
+    db.from('lists').select('id, name, category').in('category', ['muistilaput', 'varasto']),
+    db.from('hytti_kortit').select('id, name').eq('status', 'aktiivinen'),
+  ]);
+  if (listatError) console.error('Listojen haku sijoitusta varten epäonnistui:', listatError);
+  if (kortitError) console.error('Hytin korttien haku sijoitusta varten epäonnistui:', kortitError);
+  const listaKohteet = (listat || []).map(function(l) { return { tyyppi: 'lista', id: l.id, nimi: l.name, category: l.category }; });
+  const hyttiKohteet = (kortit || []).map(function(k) { return { tyyppi: 'hytti', id: k.id, nimi: k.name }; });
+  return listaKohteet.concat(hyttiKohteet);
+}
+
+// BUGIKORJAUS (2026-07-16, ks. muistiinpanot.md kohta 10, "✨-promptidiagnoosi"):
+// pelkkä listan/kortin NIMI ei kerro älylle mitään kohteen LUONTEESTA — alkuperäinen
+// oire (kalenteriin-ehdotus aikamäärettömälle ostosmurulle) syntyi juuri tästä
+// signaalin puutteesta. Jokainen kohde saa nyt lyhyen luonnehdinnan nimen lisäksi
+// (vain kuvaus, ei nimeä — nimi lisätään erikseen promptiin ettei se toistu).
+function kohteenKuvaus(kohde) {
+  if (kohde.tyyppi === 'hytti') return 'Hytin kortti — oma projekti/kurssi, tehtävät ja työn alla olevat';
+  if (kohde.category === 'varasto') return 'varastopohja — malli/pakkauslista, EI ajankohtainen asia';
+  return 'muistilaput/tehtävälista — eläviä muistiinpanoja ja tehtäviä';
+}
+
+// Kirjoittaa murun sisällön OIKEASTI valittuun kohteeseen (tuotteet-rivi
+// listalle, tai hytti_rivit-rivi kortille) ja merkitsee vasta ONNISTUNEEN
+// kirjoituksen JÄLKEEN sijoitetuksi ("Vahvistus seuraa todellisuutta").
+async function suoritaSijoitus(rivi, kohde) {
+  const { error: kirjoitusError } = kohde.tyyppi === 'hytti'
+    ? await db.from('hytti_rivit').insert({ content: rivi.content, kortti_id: kohde.id })
+    : await db.from('tuotteet').insert({ nimi: rivi.content, tehty: false, list_id: kohde.id });
+  if (kirjoitusError) {
+    console.error('Sijoitus epäonnistui:', kirjoitusError);
+    naytaIlmoitus('Sijoitus epäonnistui — yritä uudelleen');
+    return;
   }
+  const { error } = await db.from('laituri').update({ status: 'sijoitettu', placed_where: kohde.nimi }).eq('id', rivi.id);
+  if (error) console.error('Sijoitusmerkintä epäonnistui:', error);
+  naytaIlmoitus('Sijoitettu: ' + kohde.nimi);
   lataaLaituri(document.getElementById('laituri-search').value.trim());
   paivitaLaituriBadge();
+}
+
+// Avaa käsikohdevalinnan (⋯-tyylinen pudotusvalikko, ks. openRowMenu) —
+// käsipolku on ensisijainen tapa sijoittaa, ✨ on vain oikotie samaan
+// toteutukseen (ks. piirraLaituriEhdotusKortti).
+async function avaaSijoitaValikko(rivi, li) {
+  const kohteet = await haeSijoitusKohteet();
+  if (kohteet.length === 0) {
+    naytaIlmoitus('Ei yhtään sijoituskohdetta löytynyt');
+    return;
+  }
+  const items = kohteet.map(function(kohde) {
+    return {
+      label: kohde.tyyppi === 'hytti' ? '🚪 ' + kohde.nimi : kohde.nimi,
+      onClick: function() { suoritaSijoitus(rivi, kohde); },
+    };
+  });
+  openRowMenu(li, items);
 }
 
 // Merkitsee murun sijoitetuksi VASTA kun muistutus on VARMISTETUSTI
@@ -2876,11 +2956,12 @@ function naytaLaituriEhdotusVirhe(li, viesti) {
 const LAITURI_MUISTUTUS_KOHDE = 'muistutus (ajankohtaan sidottu asia)';
 
 // Piirtää äly-ehdotuksen kuittikorttina rivin alle: "→ <ehdotus> · <perustelu>"
-// + Sopii/Ei-napit. EI KOSKAAN kirjoita tietokantaan mitään itse PAITSI
-// muistutus-kohteelle (ks. LAITURI_MUISTUTUS_KOHDE) — "Sopii" avaa silloin
-// oikean muistutuspaneelin (aito kirjoituspolku), muille kohteille saman
-// vapaamuotoisen itseilmoitusdialogin jota →-nappikin käyttää.
-function piirraLaituriEhdotusKortti(rivi, li, ehdotus) {
+// + Sopii/Ei-napit. "Sopii" kirjoittaa OIKEASTI (ks. suoritaSijoitus) jos
+// ehdotus täsmää tarkalleen johonkin oikeaan kohteeseen (oikotie — säästää
+// käsivalinnan), tai avaa käsikohdevalinnan jos täsmäystä ei löydy (esim.
+// äly kirjoitti kohteen nimen hieman eri asussa) — ei koskaan pelkkä
+// itseilmoitusdialogi, kaikki tiet johtavat aitoon kirjoitukseen.
+function piirraLaituriEhdotusKortti(rivi, li, ehdotus, kohteet) {
   poistaLaituriEhdotusKortti(li);
 
   const kortti = document.createElement('li');
@@ -2902,8 +2983,13 @@ function piirraLaituriEhdotusKortti(rivi, li, ehdotus) {
       avaaMuistutusPaneeli('laituri', rivi.id, rivi.content, null, null, function() {
         merkitseLaituriMuistutuksella(rivi);
       });
+      return;
+    }
+    const kohde = kohteet.find(function(k) { return k.nimi === ehdotus.ehdotus; });
+    if (kohde) {
+      suoritaSijoitus(rivi, kohde);
     } else {
-      sijoitaLaituriRivi(rivi, ehdotus.ehdotus);
+      avaaSijoitaValikko(rivi, li);
     }
   });
   napit.appendChild(sopiiNappi);
@@ -2944,30 +3030,36 @@ async function pyydaLaituriEhdotus(rivi, nappi, li) {
   const alkuperainenTeksti = nappi.textContent;
   nappi.textContent = '…';
 
-  // Käyttäjän näkyvissä olevien listojen (Muistilaput + Varasto, sama
-  // `lists`-taulu) nimet DYNAAMISESTI joka kutsulla — EI kovakoodattua
-  // listaa, jottei tarvitse muistaa päivittää tätä kun listoja lisätään/
-  // poistetaan/nimetään uudelleen. RLS rajaa tuloksen jo automaattisesti
-  // kirjautuneen näkyviin listoihin (omat + jaetut).
-  const { data: listat, error: listatError } = await db.from('lists').select('name');
-  if (listatError) {
-    console.error('Listojen haku ehdotusta varten epäonnistui:', listatError);
-  }
+  // Kaikki konkreettiset sijoituskohteet (listat + Hytin aktiiviset kortit)
+  // DYNAAMISESTI joka kutsulla — EI kovakoodattua listaa, jottei tarvitse
+  // muistaa päivittää tätä kun listoja/kortteja lisätään/poistetaan/nimetään
+  // uudelleen. RLS rajaa tuloksen jo automaattisesti kirjautuneen näkyviin
+  // listoihin/kortteihin (omat + jaetut).
+  const kohteet = await haeSijoitusKohteet();
   // BUGIKORJAUS (2026-07-17): 'kalenteriin' POISTETTU kohdevalikoimasta —
   // Satamalla EI OLE kalenterikirjoituspolkua (ei omaan kalenterinäkymään,
   // ei tietenkään iCloudiin), joten se oli itseilmoituskohteista ainoa joka
   // näytti tuottavan jotain vaikka ei tuottanut mitään. Tilalla aidosti
   // toteutettavissa oleva muistutus (ks. LAITURI_MUISTUTUS_KOHDE ja
   // piirraLaituriEhdotusKortti) — ehdotus- ja toteutuskerroksen pitää olla
-  // samaa mieltä sovelluksen kyvyistä.
-  const kohteet = (listat || []).map(function(l) { return l.name; })
-    .concat([LAITURI_MUISTUTUS_KOHDE, 'hytin kortille', 'ei mikään näistä']);
-
+  // samaa mieltä sovelluksen kyvyistä. "hytin kortille" (geneerinen, ei
+  // yksilöity) POISTETTU 2026-07-16 (kohta 10) — Hytin AKTIIVISET kortit
+  // ovat nyt mukana yksilöityinä nimillään kohteet-listassa, ei tarvitse
+  // enää epämääräistä yleisnimikettä.
   const prompti = 'Tässä on lyhyt muistiinpano perheen "Laituri"-muistilistalta: "' + rivi.content + '"\n\n' +
-    'Mahdolliset sijoituskohteet: ' + kohteet.map(function(k) { return '"' + k + '"'; }).join(', ') + '.\n\n' +
-    'Ehdota YKSI näistä kohteista johon tämä muistiinpano todennäköisimmin kuuluisi. ' +
+    'Mahdolliset sijoituskohteet (nimi — luonnehdinta kohteen luonteesta):\n' +
+    kohteet.map(function(k) { return '- "' + k.nimi + '" — ' + kohteenKuvaus(k); }).join('\n') + '\n' +
+    '- "' + LAITURI_MUISTUTUS_KOHDE + '" — ajankohtaan/kellonaikaan sidottu asia (esim. "huomenna klo 16")\n' +
+    '- "ei mikään näistä" — jos mikään ei sovi tai olet epävarma\n\n' +
+    'Ehdota YKSI näistä kohteista johon tämä muistiinpano todennäköisimmin kuuluisi, kohteen LUONNEHDINNAN perusteella — ' +
+    'älä ehdota ajankohtaan sidottua kohdetta ellei muistiinpanossa ole selvä ajanmääre. ' +
     'Vastaa VAIN JSON-muodossa, ei mitään muuta tekstiä, ei markdown-koodilohkoja:\n' +
-    '{"ehdotus": "<kohteen nimi tarkalleen listalta>", "perustelu": "<max 10 sanaa suomeksi>"}';
+    '{"ehdotus": "<kohteen nimi TARKALLEEN yllä olevalta listalta, ilman luonnehdintaa>", "perustelu": "<max 10 sanaa suomeksi>"}';
+
+  // Diagnostiikka (2026-07-16, kohta 10): koko lähetetty prompti näkyviin
+  // konsoliin joka kutsulla — helpottaa jatkossa sen näkemistä TARKALLEEN
+  // mitä äly sai syötteekseen, ei tarvitse arvailla mistä väärä ehdotus johtui.
+  console.log('[laituri-ehdotus] prompti:', prompti);
 
   let tulos = null;
   let virhe = null;
@@ -2999,7 +3091,7 @@ async function pyydaLaituriEhdotus(rivi, nappi, li) {
     return;
   }
 
-  piirraLaituriEhdotusKortti(rivi, li, ehdotus);
+  piirraLaituriEhdotusKortti(rivi, li, ehdotus, kohteet);
 }
 
 // Muuttaa listan nimen inline-muokattavaksi kotinäkymässä
@@ -3218,8 +3310,9 @@ async function poistaTuote(tuote) {
     const { error } = await db.from('tuotteet').delete().eq('id', tuote.id);
     if (error) {
       console.error('Poisto epäonnistui:', error);
+    } else {
+      siivoaMuistutuksetKumottavasti('rivi', tuote.id);
     }
-    await db.from('muistutukset').delete().eq('source', 'rivi').eq('source_ref', String(tuote.id));
     logEvent('deleted', tuote.is_header ? 'header' : 'item', tuote.id, tuote.nimi, tuote.list_id);
     lataaLista();
   } else {
@@ -3288,6 +3381,29 @@ function naytaKumottavaIlmoitus(teksti, varsinaisToiminto, peruttuCallback) {
     sulje();
     if (peruttuCallback) peruttuCallback();
   });
+}
+
+// BUGIKORJAUS (2026-07-16, ks. muistiinpanot.md kohta 8, "Löydetyt bugit ja
+// opit"): rivin täppäys tehdyksi tai poisto ei aiemmin käsitellyt riville
+// asetettua elävää muistutusta lainkaan (paitsi muutamassa paikassa, jotka
+// siivosivat sen HILJAA) — käyttäjälle ei koskaan kerrottu, ja push joka
+// saapuu jo hoidetusta/kadonneesta asiasta opettaa ohittamaan hälytykset.
+// Kutsutaan HETI kun rivi on täpätty/poistettu (rivin oma toiminto ei
+// odota mitään) — VAIN itse muistutuksen poisto on kumottavissa 5s ajan,
+// sama malli kuin muillakin tuhoavilla eleillä.
+async function siivoaMuistutuksetKumottavasti(source, sourceRef) {
+  const { data, error } = await db.from('muistutukset').select('id')
+    .eq('source', source).eq('source_ref', String(sourceRef)).is('sent_at', null);
+  if (error || !data || data.length === 0) return;
+  const maara = data.length;
+  naytaKumottavaIlmoitus(
+    'Myös ' + maara + (maara === 1 ? ' muistutus poistetaan' : ' muistutusta poistetaan'),
+    async function() {
+      await db.from('muistutukset').delete().eq('source', source).eq('source_ref', String(sourceRef)).is('sent_at', null);
+      await paivitaMuistutuksetKartta();
+    },
+    function() {}
+  );
 }
 
 // Pakkauslistan automaattinollaus: jos avoinna olevan listan nimessä on
@@ -3612,6 +3728,7 @@ function paivitaNaytto(tuotteet) {
             console.error('Tuotteen merkintä epäonnistui:', error);
           }
           logEvent(eventAction, 'item', tuote.id, tuote.nimi, tuote.list_id);
+          if (!error && updateData.tehty) siivoaMuistutuksetKumottavasti('rivi', tuote.id);
           await lataaLista();
           if (!error && updateData.tehty) tarkistaPakkauslistanNollaus();
         } else {
@@ -4203,6 +4320,37 @@ document.querySelectorAll('#muistutus-pikanapit button').forEach(function(btn) {
   });
 });
 
+// Aikavalitsin — KELLONAIKA-tila (2026-07-16, ks. muistiinpanot.md kohta 7):
+// arjen muistutukset ajatellaan kellonaikoina ("huomenna klo 9"), ei
+// minuuttilaskuina — tämä välilehti täydentää PIKA-tilaa (yllä), ei korvaa
+// sitä. Välilehtivaihto piilottaa/näyttää sisällön, ei vaadi muuta tilaa.
+document.querySelectorAll('.muistutus-tila-btn').forEach(function(btn) {
+  btn.addEventListener('click', function() {
+    document.querySelectorAll('.muistutus-tila-btn').forEach(function(b) { b.classList.toggle('active', b === btn); });
+    document.getElementById('muistutus-pika-tila').style.display = btn.dataset.tila === 'pika' ? 'block' : 'none';
+    document.getElementById('muistutus-kellonaika-tila').style.display = btn.dataset.tila === 'kellonaika' ? 'block' : 'none';
+  });
+});
+
+document.getElementById('muistutus-pvm-tanaan').addEventListener('click', function() {
+  document.getElementById('muistutus-pvm-input').value = paivamaaraISO(new Date());
+});
+document.getElementById('muistutus-pvm-huomenna').addEventListener('click', function() {
+  const huomenna = new Date();
+  huomenna.setDate(huomenna.getDate() + 1);
+  document.getElementById('muistutus-pvm-input').value = paivamaaraISO(huomenna);
+});
+
+document.getElementById('muistutus-kellonaika-lisaa-btn').addEventListener('click', function() {
+  const pvm = document.getElementById('muistutus-pvm-input').value;
+  const klo = document.getElementById('muistutus-klo-input').value;
+  if (!pvm || !klo) {
+    naytaIlmoitus('Valitse sekä päivä että kellonaika');
+    return;
+  }
+  lisaaMuistutus(new Date(pvm + 'T' + klo));
+});
+
 document.getElementById('muistutus-sulje').addEventListener('click', suljeMuistutusPaneeli);
 document.getElementById('muistutus-overlay').addEventListener('click', function(e) {
   if (e.target === document.getElementById('muistutus-overlay')) suljeMuistutusPaneeli();
@@ -4501,6 +4649,14 @@ async function avaaMuistutusPaneeli(source, sourceRef, content, eventDate, event
   document.getElementById('muistutus-ei-pushia').style.display = pushiaEiOle ? 'block' : 'none';
   document.getElementById('muistutus-lomake').style.display = pushiaEiOle ? 'none' : 'block';
   document.getElementById('muistutus-pikanapit').style.display = (source === 'kalenteri' && eventDate && eventTime) ? 'flex' : 'none';
+
+  // Aina PIKA-tilaan avattaessa (ennustettava oletus, ks. kohta 7) ja
+  // KELLONAIKA-tilan päivä esitäytetään tänään:ksi ettei se jää tyhjäksi.
+  document.querySelectorAll('.muistutus-tila-btn').forEach(function(b) { b.classList.toggle('active', b.dataset.tila === 'pika'); });
+  document.getElementById('muistutus-pika-tila').style.display = 'block';
+  document.getElementById('muistutus-kellonaika-tila').style.display = 'none';
+  document.getElementById('muistutus-pvm-input').value = paivamaaraISO(new Date());
+  document.getElementById('muistutus-klo-input').value = '';
 
   await paivitaMuistutusLista();
   document.getElementById('muistutus-overlay').style.display = 'flex';
