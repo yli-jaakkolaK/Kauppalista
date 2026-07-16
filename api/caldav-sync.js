@@ -500,20 +500,64 @@ module.exports = async function handler(req, res) {
     }
   });
 
+  // BUGIKORJAUS (2026-07-17, "Uudet iCal-tapahtumat eivät päädy kantaan" —
+  // ks. muistiinpanot.md): kaksi eri syotetta voivat kuvata SAMAA fyysistä
+  // iCloud-tapahtumaa (esim. jaettu perhekalenteri haettu SEKÄ Katrin että
+  // Juhan tilin kautta, ks. "Yhteinen kalenteri (Juhan tili)" ja
+  // "Perhekalenteri" — todistetusti samat ical_uid:t) — tällöin
+  // kaikkiUudetRivit sisälsi KAKSI riviä samalla ical_uid:lla SAMASSA
+  // POST-pyynnössä. Postgresin "ON CONFLICT DO UPDATE" ei salli saman rivin
+  // päivittämistä kahdesti YHDEN lauseen sisällä ("ON CONFLICT DO UPDATE
+  // command cannot affect row a second time") — koko 327 rivin bulk-upsert
+  // KAATUI kokonaisuudessaan tästä, EIKÄ KUKAAN HUOMANNUT koska paluuarvoa
+  // ei koskaan tarkistettu: käyttäjälle raportoitiin silti success:true ja
+  // kirjoitettuja=327, vaikka TIETOKANTAAN ei kirjoittunut YHTÄÄN uutta riviä.
+  // Näin uudet tapahtumat (esim. 17.–18.7.) katosivat näkymättömiin vaikka
+  // syötteet sisälsivät ne oikein — vanhat rivit näkyivät koska ne oli
+  // kirjoitettu ONNISTUNEESTI ENNEN kuin kaksoiskappale-UID alkoi esiintyä.
+  //
+  // Korjattu kahdella riippumattomalla tavalla (defense in depth):
+  // 1) Rivit YHDISTETÄÄN ical_uid:n mukaan ennen lähetystä — sama fyysinen
+  //    tapahtuma kirjoitetaan vain KERRAN vaikka useampi syöte sen tuottaisi.
+  // 2) POST:in vastaus TARKISTETAAN — epäonnistunut kirjoitus näkyy nyt
+  //    virheenä paluuarvossa eikä koskaan enää valeonnistumisena ("Vahvistus
+  //    seuraa todellisuutta" -periaate, ks. muistiinpanot.md).
+  const rivitIcalUidin = new Map();
+  kaikkiUudetRivit.forEach(function(rivi) {
+    if (!rivi.ical_uid) return;
+    const olemassa = rivitIcalUidin.get(rivi.ical_uid);
+    // Suositaan riviä jolla on tunnistettu tekijä (user_id), koska se on
+    // informatiivisempi kuittausjonon/ristiriitamerkin kannalta — muuten
+    // järjestyksellä ei ole väliä, sama fyysinen tapahtuma joka tapauksessa.
+    if (!olemassa || (!olemassa.user_id && rivi.user_id)) {
+      rivitIcalUidin.set(rivi.ical_uid, rivi);
+    }
+  });
+  const yhdistetytRivit = Array.from(rivitIcalUidin.values());
+  const kaksoiskappaleitaPoistettu = kaikkiUudetRivit.length - yhdistetytRivit.length;
+
   // PEILISÄÄNTÖ, muutos-osuus: merge-duplicates (EI ignore-duplicates) —
   // sama ical_uid PÄIVITTÄÄ olemassa olevan rivin (esim. iCloudissa siirretty
   // aika tai muokattu otsikko), ei vain ohita sitä hiljaa.
-  if (kaikkiUudetRivit.length) {
-    await supabaseFetch('kalenteri_tapahtumat?on_conflict=ical_uid', {
+  let kirjoitusVirhe = null;
+  if (yhdistetytRivit.length) {
+    const kirjoitusVastaus = await supabaseFetch('kalenteri_tapahtumat?on_conflict=ical_uid', {
       method: 'POST',
       headers: { Prefer: 'return=minimal,resolution=merge-duplicates' },
-      body: JSON.stringify(kaikkiUudetRivit),
+      body: JSON.stringify(yhdistetytRivit),
     });
+    if (!kirjoitusVastaus.ok) {
+      const virheteksti = await kirjoitusVastaus.text();
+      console.error('[caldav-sync] Tapahtumien kirjoitus epäonnistui:', kirjoitusVastaus.status, virheteksti);
+      kirjoitusVirhe = 'HTTP ' + kirjoitusVastaus.status + ': ' + virheteksti.slice(0, 500);
+    }
   }
 
-  return res.status(200).json({
-    success: true,
+  return res.status(kirjoitusVirhe ? 500 : 200).json({
+    success: !kirjoitusVirhe,
     syotteet: tulokset,
-    kirjoitettuja: kaikkiUudetRivit.length,
+    kirjoitettuja: kirjoitusVirhe ? 0 : yhdistetytRivit.length,
+    kaksoiskappaleita_poistettu: kaksoiskappaleitaPoistettu,
+    kirjoitusvirhe: kirjoitusVirhe,
   });
 };
