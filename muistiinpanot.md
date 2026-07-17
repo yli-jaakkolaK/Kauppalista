@@ -398,7 +398,21 @@ Tämä osio on lyhyt päiväkirjamainen kooste — tarkka sisältö löytyy aina
 
 **Opittu:** ULKOISEN datan (tässä: kaksi eri tiliä samasta jaetusta kalenterista) voi tuottaa TEKNISESTI päällekkäistä tietoa vaikka lähde on looginen ja odotettu — bulkkikirjoitukset joita EI kontrolloida (usean rivin `INSERT ... ON CONFLICT` yhdellä kertaa) pitää AINA joko deduplikoida ensin TAI varautua tietokannan omaan rajoitukseen. JA: **jokaisen ulos menevän kirjoitus-API-kutsun paluuarvo on TARKISTETTAVA** — `await fetch(...)` ilman `response.ok`-tarkistusta on aina piilevä "success:true vaikka epäonnistui" -riski, sama luonnevirhe kuin Bugi 14/16:ssa mutta tällä kertaa koko kalenterisynkan ydintoiminnossa, ei sivupolulla.
 
-**Korjaus:** `api/caldav-sync.js`. Ei client-muutosta, ei sw-bump, ei migraatiota. **EI VIELÄ VARMISTETTU tuotannossa** — vahvistetaan heti push+deployn jälkeen ajamalla synkka uudelleen ja tarkistamalla `kirjoitusvirhe`/`kaksoiskappaleita_poistettu`-kentät, sekä pyytämällä Katria selaamaan Kalenteria 17.–18.7. varmistaakseen että molemmat tapahtumat näkyvät.
+**Korjaus:** `api/caldav-sync.js`. Ei client-muutosta, ei sw-bump, ei migraatiota. **VAHVISTETTU tuotannossa heti push+deployn jälkeen** — synkka-ajo palautti `success:true`, `kirjoitettuja:271`, `kaksoiskappaleita_poistettu:56`, `kirjoitusvirhe:null`, ja Katri vahvisti myöhemmin arjessa (4 min viiveellä uusi tapahtuma näkyi, molemmat suunnat/laitteet ✓).
+
+### Bugi 24 — Ristiriitamerkin napautus ei avannut vahvistusta (löydetty/korjattu 2026-07-17, Katrin oma testi heti Ristiriitapaketin julkaisun jälkeen)
+
+**Oire:** punainen "päällekkäin"-merkki syttyi oikein (portti ja realtime kunnossa), mutta merkin napautus ei avannut "Keskusteltu"-vahvistusta — ei kuukausi- eikä viikkonäkymässä, kummallakaan laitteella.
+
+**Juurisyy, kaksi erillistä (koodikatselmuksella todistettu — deployattu koodi tarkistettu suoraan `curl`illa tuotannosta, täsmäsi paikalliseen):**
+1. **Kuukausinäkymän piste ei koskaan ollut napautettava** — tietoinen (mutta virheellinen) rajaus alkuperäisessä toteutuksessa oletti että koko päiväruudun napautus (joka jo vie päivänäkymään) riittäisi, pisteelle itselleen ei koskaan liitetty click-kuuntelijaa.
+2. **Päivä-/viikkonäkymän pilleri OLI teknisesti napautettava** (click-kuuntelija oli oikein kiinnitetty, todistettu deployatusta koodista), mutta hit-alue oli VAIN pillerin omat pikselit (13px fonttia + pieni padding) — liian pieni luotettavaksi kosketuskohteeksi puhelimella, helppo hipaista ohi.
+
+**Korjaus:** (1) koko `otsikkoEl` (päivän teksti + kaikki merkit yhdessä, ei enää pelkkä pilleri) on nyt napautettava kun vakavuus on 'full' — isompi, luotettavampi kosketusalue päivä-/viikkonäkymässä; (2) kuukausinäkymän piste sai click-kuuntelijan JA saman `::before`-hit-slop-laajennuksen (~20×20px) kuin muillakin pienillä rivinapeilla (`.check-btn` ym.), `stopPropagation()` ettei ruudun oma "vie päivänäkymään" -napautus laukea samalla.
+
+**Opittu:** "click-kuuntelija on kiinnitetty oikein" ei riitä todisteeksi toimivuudesta puhelimella — hit-alueen KOKO on yhtä tärkeä kuin sen olemassaolo, ja tämä on jo kolmas kerta projektissa kun pieni kosketuskohde (ks. `.check-btn`/`.anchor-btn`-hit-slopit 2026-07-14) piti korjata jälkikäteen. Uuden napautettavan elementin koon pitäisi olla osa suunnittelua alusta asti, ei jälkikäteinen korjaus.
+
+**Korjaus:** `script.js` (`paivitaPaivanOtsikko`, `piirraKuukausiPaiva`), `style.css` (`.kalenteri-kuukausi-piste--napautettava` + `::before`). `sw.js` v66. **EI VIELÄ TESTATTU korjauksen jälkeen** — Katri testaa uudelleen kun deployattu.
 
 ---
 
@@ -1744,6 +1758,8 @@ Päällekkäisyyspäivän merkin voi kuitata napauttamalla — avautuu vahvistus
 
 Kumpi tahansa käyttäjä voi kuitata, kuittaus näkyy MOLEMMILLE reaaliajassa (Supabase Realtime, sama malli kuin Huomiopallurat) — jaettua perhetietoa, ei henkilökohtaista, joten RLS on avoin kaikille kirjautuneille (select+insert, ei update/delete — kuittaus on pysyvä loki).
 
+**Kolmas toiminto lisätty 2026-07-17: "Ehdota keskustelua 💬"** — "Keskusteltu ✓" -napin rinnalle, EI korvaa sitä (ristiriita pysyy punaisena kunnes joku oikeasti kuittaa keskustellun). EI UUTTA VIESTIKANAVAA/CHAT-OMINAISUUTTA — sama olemassa oleva 💬-ehdotusputki kuin "Ankkurin ehdottaminen toiselle" (ks. oma osionsa): napautus luo ensin taustalla murun Laituriin (ehdottajan oma "koti", `content` = valmiiksi täytetty "Katsotaan yhdessä ke 22.7. — päällekkäin: 15:00 Katri: Hammaslääkäri + 15:00 Juha: Palaveri työssä" -tyyppinen teksti), sitten ankkuriehdokkaan vastaanottajalle (`source='ehdotus'`, sama koneisto). Vastaanottaja näkee sen omassa ankkuriehdokaslistassaan katkoviivakehyksessä ("💬 [Lähettäjä]: ..."), hyväksyy tavalliseksi ankkurikseen tai kuittaa suoraan tehdyksi. Uudelleenkäytti kokonaan olemassa olevaa arkkitehtuuria — ei uutta taulua, ei uutta RLS-poikkeusta (sql/056:n ehdotus-insert-policy kattaa jo tämän).
+
 ### 2. Vakavuusluokat (hienosäädetty `paallekkaisyysVakavuus`)
 
 **KESKEISIN MUUTOS, tarkoituksellinen käytösreversio:** aiempi sääntö "kaksi ERI henkilöä päällekkäin → EI KOSKAAN merkkiä (`ei_koskaan`, kaksi aikuista kahdessa paikassa on normaalia)" on KUMOTTU. Uusi sääntö: **kaksi ERI henkilöä päällekkäin = 'full' (punainen, "kuka hoitaa?")** — juuri tämä tilanne on se josta pitää keskustella, ei sivuutettava tapaus. Kolme tasoa nyt:
@@ -1761,7 +1777,7 @@ Uusi, ERILLINEN päivämääräväli (`onkoRauhoitusIkkunassa()`, asetukset `rau
 
 Kuittaamaton 'full'-tason ristiriita sytyttää SAMAN Kalenteri-laatan palluran jota kuittausjonokin käyttää (`huomioPallurat.kalenteri = kuittausjonoUudet.length + ristiriitaPalluraMaara`, ei kahta erillistä merkkiä samasta laatasta) — sammuu kun lippu kuitataan tai ristiriita poistuu. Uusi `paivitaRistiriitaPallura()` skannaa 60 päivää eteenpäin (kevyt kysely) ja kutsutaan `lataaKotinakyma()`:sta — TOISIN kuin kuittausjono, joka nykyisellään herää vasta Kalenterin avaamisesta, tämä pallura on oikeasti näkyvissä HETI etusivulla ilman että kalenteria on koskaan avattava (Vilkaisuarvo). Realtime kattaa myös tämän (`kalenteri_ristiriita_kuittaukset`-taulun muutokset).
 
-**Korjaus:** `script.js` (`onkoRauhoitusIkkunassa`, `paallekkaisyysVakavuus` uudelleenkirjoitettu, `analysoiPaivanRistiriidat` korvaa `onkoPaivanRistiriita`:n, `ristiriitaAvain`/`onkoRistiriitaKuitattu`/`paivitaRistiriitaKuittaukset`/`avaaRistiriitaVahvistus`/`paivitaRistiriitaPallura` uusia, `luoPaivaMerkki` sai valinnaisen onClick-parametrin), `style.css` (`.paiva-merkki--ristiriita-huomio`, `.kalenteri-kuukausi-piste--keskustellaan`/`--huomio`), `index.html` (`#ristiriita-overlay`-dialogi). `sql/059` (uusi taulu+RLS+realtime), `sql/060` (uusintatestirivit, OSA M). `sw.js` v65. Testiaskeleet PALUU.md OSA X:ssä. Todennettu Playwright-kuvakaappauksella (kaikki uudet merkkitilat + dialogi, molemmat teemat). **EI VIELÄ TESTATTU kahden käyttäjän oikealla sessiolla** — huomisaamun ensimmäinen testi.
+**Korjaus:** `script.js` (`onkoRauhoitusIkkunassa`, `paallekkaisyysVakavuus` uudelleenkirjoitettu, `analysoiPaivanRistiriidat` korvaa `onkoPaivanRistiriita`:n, `ristiriitaAvain`/`onkoRistiriitaKuitattu`/`paivitaRistiriitaKuittaukset`/`avaaRistiriitaVahvistus`/`paivitaRistiriitaPallura` uusia, `luoPaivaMerkki` sai valinnaisen onClick-parametrin), `style.css` (`.paiva-merkki--ristiriita-huomio`, `.kalenteri-kuukausi-piste--keskustellaan`/`--huomio`), `index.html` (`#ristiriita-overlay`-dialogi). `sql/059` (uusi taulu+RLS+realtime), `sql/060` (uusintatestirivit, OSA M). Testiaskeleet PALUU.md OSA X:ssä. Todennettu Playwright-kuvakaappauksella (kaikki uudet merkkitilat + dialogi, molemmat teemat). **Sama päivä, myöhemmin — kaksi jatkokorjausta:** (a) napautuksen hit-alue korjattu, ks. Bugi 24; (b) "Ehdota keskustelua 💬" -kolmas toiminto lisätty vahvistukseen. `sw.js` v66 (kattaa molemmat). **EI VIELÄ TESTATTU kahden käyttäjän oikealla sessiolla** — huomisaamun ensimmäinen testi, nyt korjatulla napautuksella.
 
 ## Ulkokäytettävyys ja kontrasti (kirjattu 2026-07-10, Katrin testipalaute: "testattu ulkona auringossa, kontrasti ei riitä")
 

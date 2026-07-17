@@ -456,6 +456,24 @@ h1 {
   background: var(--huomio);
 }
 
+/* BUGIKORJAUS (2026-07-17, "OSA X kohta 2 ei toimi" — ks. muistiinpanot.md):
+   piste itsessään on liian pieni luotettavaksi kosketuskohteeksi (4-6px) —
+   sama ::before-hit-slop -malli kuin .check-btn/.anchor-btn ym. rivinapeilla,
+   laajentaa todellisen napautusalueen n. 20x20px:iin ilman visuaalista
+   muutosta. Vaatii position:relative pisteelle itselleen (::before ankkuroituu
+   siihen, ei koko päiväruutuun). */
+.kalenteri-kuukausi-piste--napautettava {
+  position: relative;
+  cursor: pointer;
+}
+
+.kalenteri-kuukausi-piste--napautettava::before {
+  content: '';
+  position: absolute;
+  inset: -8px;
+  z-index: 1;
+}
+
 .kalenteri-kuukausi-piste--kuorma {
   min-width: 14px;
   height: 13px;

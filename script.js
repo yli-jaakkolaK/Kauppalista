@@ -490,6 +490,16 @@ async function paivitaRistiriitaKuittaukset() {
 // vain lisää rivin kalenteri_ristiriita_kuittaukset-tauluun, merkki rauhoittuu
 // (punainen → kulta "keskustellaan"-tyyli) kunnes päivälle ilmestyy UUSI,
 // eri tapahtumajoukolla oleva 'full'-ristiriita (ks. ristiriitaAvain).
+// Lyhyt viikonpäivä+pvm ("ke 22.7.") "Ehdota keskustelua" -murun valmiiksi
+// täytettyyn sisältöön — eri muoto kuin KALENTERI_PAIVAT (kokonaiset nimet,
+// otsikoihin) tai VIIKONPAIVA_LYHENTEET (isot kirjaimet, kuukausiruudukkoon).
+const VIIKONPAIVA_LYHYT = ['su', 'ma', 'ti', 'ke', 'to', 'pe', 'la'];
+function lyhytPvmTeksti(isoPvm) {
+  const osat = isoPvm.split('-').map(Number);
+  const d = new Date(osat[0], osat[1] - 1, osat[2]);
+  return VIIKONPAIVA_LYHYT[d.getDay()] + ' ' + d.getDate() + '.' + (d.getMonth() + 1) + '.';
+}
+
 function avaaRistiriitaVahvistus(isoPvm, rivit, fullIds) {
   const fullIdSet = new Set(fullIds);
   const osalliset = rivit
@@ -505,6 +515,8 @@ function avaaRistiriitaVahvistus(isoPvm, rivit, fullIds) {
   document.getElementById('ristiriita-body').textContent = kuvaus;
   const keskusteltuNappi = document.getElementById('ristiriita-keskusteltu-btn');
   keskusteltuNappi.style.display = jo ? 'none' : '';
+  const ehdotaNappi = document.getElementById('ristiriita-ehdota-btn');
+  ehdotaNappi.style.display = toinenKayttaja ? '' : 'none';
   document.getElementById('ristiriita-overlay').style.display = 'flex';
 
   keskusteltuNappi.onclick = async function() {
@@ -520,6 +532,41 @@ function avaaRistiriitaVahvistus(isoPvm, rivit, fullIds) {
     }
     await paivitaRistiriitaKuittaukset();
     lataaKalenteri();
+  };
+
+  // "Ehdota keskustelua" (2026-07-17, ks. muistiinpanot.md "Ristiriitapaketti")
+  // — EI uusi viestikanava, sama 💬-ehdotusputki kuin Laiturin murujen
+  // ehdottamisella (ks. "Ankkurin ehdottaminen toiselle"): luo ensin taustalla
+  // muru Laituriin (ehdottajan oma "koti", ei koskaan tyhjän päällä), sitten
+  // ankkuriehdokas vastaanottajalle valmiiksi täytetyllä sisällöllä. EI kuittaa
+  // ristiriitaa (lippu pysyy punaisena — keskustelu ei ole vielä tapahtunut,
+  // vasta "Keskusteltu ✓" merkitsee sen käydyksi).
+  ehdotaNappi.onclick = async function() {
+    if (!toinenKayttaja) return;
+    const teksti = 'Katsotaan yhdessä ' + lyhytPvmTeksti(isoPvm) + ' — päällekkäin: ' + kuvaus.split('\n').join(' + ');
+    const { data: muruData, error: muruError } = await db.from('laituri')
+      .insert({ content: teksti, user_id: currentUserId, status: 'uusi' })
+      .select().single();
+    if (muruError) {
+      console.error('Ehdotuksen murun luonti epäonnistui:', muruError);
+      naytaIlmoitus('Ehdotus epäonnistui — yritä uudelleen');
+      return;
+    }
+    const { error } = await db.from('ankkurit').insert({
+      content: teksti,
+      source: 'ehdotus',
+      source_ref: String(muruData.id),
+      user_id: toinenKayttaja.user_id,
+      is_candidate: true,
+      proposed_by: currentUserId,
+    });
+    document.getElementById('ristiriita-overlay').style.display = 'none';
+    if (error) {
+      console.error('Keskustelun ehdotus epäonnistui:', error);
+      naytaIlmoitus('Ehdotus epäonnistui — yritä uudelleen');
+      return;
+    }
+    naytaIlmoitus('Ehdotettu ' + henkiloNimi(toinenKayttaja.henkilo) + ':lle');
   };
 }
 
@@ -538,23 +585,33 @@ function luoPaivaMerkki(savy, teksti, title, onClick) {
   return merkki;
 }
 
-// Piirtää päiväotsikon tekstin ja lisää perään ristiriita- (jos on) ja
-// kuorma- (jos raja täyttyy) -merkit tässä järjestyksessä, koska
-// päällekkäisyys on kiireellisempi huomata. 'full'-tason merkki on
-// napautettava — avaa "Keskusteltu"-vahvistuksen (Ristiriitapaketti,
-// 2026-07-17). 'attention'-taso on pelkkä tieto (ei lippu, ei napautusta,
-// sama kuin Kuormavahdin merkki) — vain 'full' ansaitsee kuittausmekanismin.
+// BUGIKORJAUS (2026-07-17, "OSA X kohta 2 ei toimi" — ks. muistiinpanot.md):
+// napautus TOIMI koodikatselmuksella (merkin oma click-kuuntelija oli oikein
+// kiinnitetty), mutta hit-alue oli VAIN pienen pillerin pikselit — helppo
+// hipaista ohi puhelimella, varsinkin viikkonäkymän pienemmällä fontilla.
+// Ratkaisu: koko otsikkoEl (päivän teksti + kaikki merkit yhdessä) on nyt
+// napautettava aina kun vakavuus on 'full', ei enää pelkkä pilleri itse —
+// isompi, luotettavampi kosketusalue samalla koodilla. .onclick (ei
+// addEventListener) nollataan JOKA piirrolla ettei vanhoja kuuntelijoita jää
+// kertymään samaan, uudelleenkäytettyyn otsikkoEl-elementtiin (esim.
+// #kalenteri-otsikko pysyy samana DOM-solmuna päivästä toiseen).
 function paivitaPaivanOtsikko(otsikkoEl, teksti, rivit, isoPvm, kuormaraja) {
   otsikkoEl.textContent = teksti;
+  otsikkoEl.onclick = null;
+  otsikkoEl.style.cursor = '';
   const analyysi = analysoiPaivanRistiriidat(rivit, isoPvm);
   if (analyysi.vakavuus === 'full') {
     const kuitattu = onkoRistiriitaKuitattu(isoPvm, analyysi.fullIds);
     otsikkoEl.appendChild(luoPaivaMerkki(
       kuitattu ? 'keskustellaan' : 'ristiriita',
       kuitattu ? 'keskusteltu ✓' : 'päällekkäin',
-      kuitattu ? 'Keskusteltu — napauta nähdäksesi kenen menot' : 'Kaksi eri henkilön (tai saman syötteen) menoa menee päällekkäin — napauta',
-      function() { avaaRistiriitaVahvistus(isoPvm, rivit, analyysi.fullIds); }
+      kuitattu ? 'Keskusteltu — napauta nähdäksesi kenen menot' : 'Kaksi eri henkilön (tai saman syötteen) menoa menee päällekkäin — napauta'
     ));
+    otsikkoEl.style.cursor = 'pointer';
+    otsikkoEl.onclick = function(e) {
+      e.stopPropagation();
+      avaaRistiriitaVahvistus(isoPvm, rivit, analyysi.fullIds);
+    };
   } else if (analyysi.vakavuus === 'attention') {
     otsikkoEl.appendChild(luoPaivaMerkki('ristiriita-huomio', 'huomaa', 'Kevyt päällekkäisyys tänä päivänä — ei vaadi toimenpidettä'));
   }
@@ -1015,15 +1072,21 @@ function piirraKuukausiPaiva(pvm, kaikkiTapahtumat, linjat, linjojaViikolla, kul
   // Kuukausiruutu on liian pieni täydelle merkkipillerille (ks. Kuormavahti/
   // ristiriitamerkki agenda- ja viikkonäkymässä) — sama kolmiportainen
   // väriohjaus tiivistettynä pieneksi pisteeksi päivänumeron viereen.
-  // Napautus (koko ruutu jo napautettava, ks. alempana) vie päivänäkymään
-  // jossa varsinainen "Keskusteltu"-lippu on napautettavissa — pisteen ei
-  // tarvitse itse avata vahvistusta.
+  // BUGIKORJAUS (2026-07-17, "OSA X kohta 2 ei toimi"): piste EI ollut
+  // napautettava — koko ruudun napautus vei vain päivänäkymään, ei koskaan
+  // avannut vahvistusta suoraan. Piste on nyt itse napautettava (isompi
+  // hit-alue ::before-pseudoelementillä, ks. style.css) ja pysäyttää
+  // tapahtuman (stopPropagation) ettei ruudun oma navigointi laukea samalla.
   const paivanRistiriita = analysoiPaivanRistiriidat(paivanKaikki, iso);
   if (paivanRistiriita.vakavuus === 'full') {
     const kuitattu = onkoRistiriitaKuitattu(iso, paivanRistiriita.fullIds);
     const piste = document.createElement('span');
-    piste.className = 'kalenteri-kuukausi-piste ' + (kuitattu ? 'kalenteri-kuukausi-piste--keskustellaan' : 'kalenteri-kuukausi-piste--ristiriita');
-    piste.title = kuitattu ? 'Keskusteltu' : 'Päällekkäin';
+    piste.className = 'kalenteri-kuukausi-piste kalenteri-kuukausi-piste--napautettava ' + (kuitattu ? 'kalenteri-kuukausi-piste--keskustellaan' : 'kalenteri-kuukausi-piste--ristiriita');
+    piste.title = kuitattu ? 'Keskusteltu — napauta nähdäksesi kenen menot' : 'Päällekkäin — napauta nähdäksesi kenen menot';
+    piste.addEventListener('click', function(e) {
+      e.stopPropagation();
+      avaaRistiriitaVahvistus(iso, paivanKaikki, paivanRistiriita.fullIds);
+    });
     pvmRivi.appendChild(piste);
   } else if (paivanRistiriita.vakavuus === 'attention') {
     const piste = document.createElement('span');

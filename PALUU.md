@@ -559,9 +559,13 @@ Ei uusia migraatioita (kaikki neljä ovat client/query-tason muutoksia olemassa 
 - Sama testi ERI kellonajalla (ei päällekkäin) → EI merkkiä lainkaan.
 
 ### 2. Lippu: napautus → vahvistus → kuittaus
-1. Napauta punaista merkkiä → avautuu "Päällekkäin tänä päivänä" -vahvistus, listaa molemmat tapahtumat (aika + henkilö + otsikko).
+
+**(Korjattu 2026-07-17, Bugi 24 — hit-alue oli liian pieni, ks. muistiinpanot.md.) Nyt koko päiväotsikkorivi (viikko/päivä) TAI kuukausiruudun piste on napautettava, ei enää pelkkä pilleri.**
+
+1. Napauta punaista merkkiä (tai koko päivän otsikkoriviä, tai kuukausiruudun pistettä) → avautuu "Päällekkäin tänä päivänä" -vahvistus, listaa molemmat tapahtumat (aika + henkilö + otsikko).
 2. "Keskusteltu ✓" → merkki muuttuu kultaiseksi ohuemmaksi renkaaksi ("keskusteltu ✓") MOLEMMILLA käyttäjillä (realtime, ei vaadi sivun päivitystä).
 3. Napauta uudelleen kuitattua merkkiä → vahvistus avautuu yhä (näkee kenen menot), mutta "Keskusteltu"-nappi on piilotettu (jo kuitattu).
+4. **"Ehdota keskustelua 💬"** (uusi kolmas nappi) → napauta → toiselle käyttäjälle ilmestyy uusi ankkuriehdokas ("💬 [Lähettäjä]: Katsotaan yhdessä ke ... — päällekkäin: ...") — sama koneisto kuin "Ankkurin ehdottaminen toiselle". Ristiriitamerkki EI muutu (pysyy punaisena — ehdotus ei ole vielä keskustelu).
 
 ### 3. Uusi päällekkäisyys herättää lipun uudelleen
 - Lisää KOLMAS tapahtuma joka menee päällekkäin jommankumman kuitatun kanssa samana päivänä → merkki muuttuu takaisin punaiseksi (eri tapahtumajoukko = eri allekirjoitus = ei enää sama kuittaus).
