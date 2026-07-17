@@ -568,6 +568,12 @@ function avaaRistiriitaVahvistus(isoPvm, rivit, fullIds) {
       user_id: toinenKayttaja.user_id,
       is_candidate: true,
       proposed_by: currentUserId,
+      // Keskusteluehdotuksen erityissääntö (2026-07-17, ks. muistiinpanot.md
+      // "💬-ehdotuksen elinkaari"): näiden kahden sarakkeen LÄSNÄOLO on
+      // ainoa signaali joka erottaa tämän "keskustelulajiksi" tavallisesta
+      // delegointiehdotuksesta — ei hylkäystä, vain Keskusteltu/Siirrä.
+      ristiriita_pvm: isoPvm,
+      ristiriita_avain: ristiriitaAvain(fullIds),
     });
     document.getElementById('ristiriita-overlay').style.display = 'none';
     if (error) {
@@ -2213,12 +2219,41 @@ function ankkurinKotiMuistutusLahde(ankkuri) {
 }
 const ANKKURI_KOTI_NIMI = { muistilaput: 'Muistilapuista', kalenteri: 'Kalenterista', hytti: 'Hytistä', laituri: 'Laiturista', aly: 'Laiturista' };
 
+// "Siirrä myöhemmäksi" (2026-07-17, ks. muistiinpanot.md "💬-ehdotuksen
+// elinkaari") — yleinen apufunktio KAIKILLE ankkuri-/ehdokasriveille (aiemmin
+// vain ihmislähtöisellä ehdotuksella): tarve "en ehdikään tänään" ei katoa
+// hyväksynnän jälkeen, joten siirto kuuluu jokaiselle ankkurille. Piilottaa
+// rivin nykyisestä näkymästä ja nostaa sen uudelleen valitun tuntimäärän
+// päästä (`visible_from`) — EI poista mitään, sisältö säilyy koko ajan.
+function siirraNappi(ankkuriId, jalkeenPaivitys, naytaLabel) {
+  const nappi = document.createElement('button');
+  nappi.textContent = naytaLabel ? '⏭ Siirrä' : '⏭';
+  nappi.className = 'postpone-btn';
+  nappi.title = 'Siirrä myöhemmäksi';
+  nappi.addEventListener('click', async function() {
+    const vastaus = prompt('Nouse uudelleen kuinka monen tunnin päästä?', '24');
+    if (vastaus === null) return;
+    const tunteja = parseInt(vastaus, 10);
+    if (!tunteja || tunteja < 1) return;
+    const uusiHetki = new Date();
+    uusiHetki.setHours(uusiHetki.getHours() + tunteja);
+    const { error } = await db.from('ankkurit').update({ visible_from: uusiHetki.toISOString() }).eq('id', ankkuriId);
+    if (error) console.error('Ankkurin siirto epäonnistui:', error);
+    jalkeenPaivitys();
+  });
+  return nappi;
+}
+
 async function lataaAnkkurit() {
   if (raahattavaRivi) return;
   // is_candidate-rivit (E3-keskiportaan AI-ehdotukset, ks. loadAnchorCandidates())
   // EIVÄT kuulu tähän listaan eivätkä "3 tärkeintä" -rajaan — ne näytetään
-  // erikseen omana ryhmänään ehdotusten hyväksymistä varten.
-  const { data, error } = await db.from('ankkurit').select().eq('done', false).eq('is_candidate', false).eq('user_id', currentUserId).order('sort_order');
+  // erikseen omana ryhmänään ehdotusten hyväksymistä varten. visible_from
+  // suodattaa pois myöhemmäksi siirretyt (ks. siirraNappi yllä).
+  const nytIso = new Date().toISOString();
+  const { data, error } = await db.from('ankkurit').select().eq('done', false).eq('is_candidate', false).eq('user_id', currentUserId)
+    .or('visible_from.is.null,visible_from.lte.' + nytIso)
+    .order('sort_order');
   if (error) {
     console.error('Ankkureiden haku epäonnistui:', error);
     return;
@@ -2341,6 +2376,11 @@ async function lataaAnkkurit() {
     });
     li.appendChild(irrotaNappi);
 
+    // Siirto myös TAVALLISILLE ankkureille (ei enää vain ehdotuksille), ks.
+    // "💬-ehdotuksen elinkaari": hyväksytty ehdotus muuttuu tavalliseksi
+    // ankkuriksi eikä tarve siirtää sitä katoa hyväksymisen myötä.
+    li.appendChild(siirraNappi(ankkuri.id, lataaAnkkurit));
+
     li.appendChild(luoMuistutusNappi('ankkuri', ankkuri.id, ankkuri.content, null, ankkuri.event_time, lataaAnkkurit));
 
     listEl.appendChild(li);
@@ -2409,6 +2449,63 @@ async function loadAnchorCandidates() {
   naytettavat.forEach(function(candidate) {
     const li = document.createElement('li');
     li.className = 'anchor-candidate-row';
+    // BUGIKORJAUS (2026-07-17, "💬-ehdotuksen elinkaari" — ks. muistiinpanot.md):
+    // selkeät tekstilabelit eivät enää mahdu samalle riville tekstin kanssa
+    // kapealla näytöllä — sisältö (check+teksti) ja toiminnot ovat nyt omilla
+    // riveillään (ks. .anchor-candidate-content/-napit style.css:ssä).
+    const sisaltoRivi = document.createElement('div');
+    sisaltoRivi.className = 'anchor-candidate-content';
+    const napitRivi = document.createElement('div');
+    napitRivi.className = 'anchor-candidate-napit';
+
+    // Keskusteluehdotuksen erityissääntö (2026-07-17, Katrin linjaus, ks.
+    // muistiinpanot.md "💬-ehdotuksen elinkaari"): ristiriidasta lähetetty
+    // ehdotus (ristiriita_pvm+ristiriita_avain asetettu) on ERI LAJI kuin
+    // tavallinen delegointiehdotus ("osta liput") — hylkäys EI OLE
+    // vaihtoehto (keskustelupyyntöä ei voi ohittaa hiljaa). Vain kaksi
+    // toimintoa: Keskusteltu ✓ (kuittaa MYÖS kalenterin ristiriitalipun
+    // samalla kertaa) tai Siirrä ⏭. Ei check-nappia, ei muokkausta, ei
+    // erillistä "hyväksy"-askelta — Keskusteltu ✓ on sekä hyväksyntä että
+    // valmistuminen yhdessä eleessä.
+    const onKeskustelulaji = candidate.source === 'ehdotus' && candidate.ristiriita_pvm && candidate.ristiriita_avain;
+
+    const text = document.createElement('span');
+    text.textContent = candidate.source === 'ehdotus'
+      ? '💬 ' + henkiloNimi(toinenKayttaja ? toinenKayttaja.henkilo : null) + ': ' + candidate.content
+      : '✨ ' + candidate.content;
+
+    if (onKeskustelulaji) {
+      sisaltoRivi.appendChild(text);
+      li.appendChild(sisaltoRivi);
+
+      const keskusteltuNappi = document.createElement('button');
+      keskusteltuNappi.textContent = 'Keskusteltu ✓';
+      keskusteltuNappi.className = 'dialog-btn';
+      keskusteltuNappi.addEventListener('click', async function() {
+        const { error } = await db.from('ankkurit')
+          .update({ is_candidate: false, done: true, done_at: new Date().toISOString() })
+          .eq('id', candidate.id);
+        if (error) {
+          console.error('Keskustelun kuittaus epäonnistui:', error);
+          naytaIlmoitus('Kuittaus epäonnistui — yritä uudelleen');
+          return;
+        }
+        const { error: ackError } = await db.from('kalenteri_ristiriita_kuittaukset').upsert(
+          { event_date: candidate.ristiriita_pvm, tapahtuma_avaimet: candidate.ristiriita_avain, acked_by: currentUserId },
+          { onConflict: 'event_date,tapahtuma_avaimet', ignoreDuplicates: true }
+        );
+        if (ackError) console.error('Kalenterin ristiriitalipun kuittaus epäonnistui:', ackError);
+        await paivitaRistiriitaKuittaukset();
+        loadAnchorCandidates();
+        lataaAnkkurit();
+        if (document.getElementById('kalenteri-view').style.display !== 'none') lataaKalenteri();
+      });
+      napitRivi.appendChild(keskusteltuNappi);
+      napitRivi.appendChild(siirraNappi(candidate.id, loadAnchorCandidates, true));
+      li.appendChild(napitRivi);
+      listEl.appendChild(li);
+      return;
+    }
 
     const checkButton = document.createElement('button');
     checkButton.textContent = '○';
@@ -2419,7 +2516,7 @@ async function loadAnchorCandidates() {
       if (error) console.error('Ankkuriehdokkaan merkintä epäonnistui:', error);
       loadAnchorCandidates();
     });
-    li.appendChild(checkButton);
+    sisaltoRivi.appendChild(checkButton);
 
     // BUGIKORJAUS (2026-07-17, "Ankkurin muokkaus puuttuu"): ✨-ehdokkaan
     // muokkaus = "ota omiin + muokattu" — pelkkä tekstin korjaus on jo
@@ -2428,10 +2525,6 @@ async function loadAnchorCandidates() {
     // merkissä: ✨ koneelta, lähettäjän nimi + 💬 ihmiseltä (kahden hengen
     // perheessä lähettäjä on aina "toinenKayttaja", ei tarvitse erillistä
     // proposed_by->henkilo-hakua).
-    const text = document.createElement('span');
-    text.textContent = candidate.source === 'ehdotus'
-      ? '💬 ' + henkiloNimi(toinenKayttaja ? toinenKayttaja.henkilo : null) + ': ' + candidate.content
-      : '✨ ' + candidate.content;
     text.title = 'Muokkaus ottaa ehdotuksen omaksi ankkuriksi';
     text.addEventListener('click', function() {
       let peruttu = false;
@@ -2465,10 +2558,17 @@ async function loadAnchorCandidates() {
         if (e.key === 'Escape') { peruttu = true; inputti.blur(); }
       });
     });
-    li.appendChild(text);
+    sisaltoRivi.appendChild(text);
+    li.appendChild(sisaltoRivi);
 
+    // BUGIKORJAUS (2026-07-17, "💬-ehdotuksen elinkaari" — ks. muistiinpanot.md):
+    // pelkkä ⚓-ikoni jätti epäselväksi mitä nappi tekee uudelle, vähemmän
+    // tutulle 💬-ehdotukselle — käyttäjä painoi arvaamalla ja osui väärään
+    // nappiin. Ihmislähtöiselle ehdotukselle napit saavat nyt selkeän
+    // tekstilabelin ikonin lisäksi; ✨-koneehdokas pysyy ennallaan (tuttu,
+    // ei valitusta).
     const acceptButton = document.createElement('button');
-    acceptButton.textContent = '⚓';
+    acceptButton.textContent = candidate.source === 'ehdotus' ? '⚓ Hyväksy' : '⚓';
     acceptButton.className = 'anchor-btn';
     acceptButton.title = 'Ota omaksi ankkuriksi';
     acceptButton.addEventListener('click', async function() {
@@ -2477,30 +2577,11 @@ async function loadAnchorCandidates() {
       loadAnchorCandidates();
       lataaAnkkurit();
     });
-    li.appendChild(acceptButton);
+    napitRivi.appendChild(acceptButton);
 
-    // "Siirrä myöhemmäksi" — vain ihmislähtöiselle ehdotukselle (spesifioitu
-    // Katrin toimesta, ✨-koneehdokkailla ei tätä reaktiota). Hetki/ikkuna-
-    // koneiston sukulainen (ks. design-periaate): siirto = uusi nousupäivä,
-    // ei muuta sisältöä eikä poista mitään.
-    if (candidate.source === 'ehdotus') {
-      const postponeButton = document.createElement('button');
-      postponeButton.textContent = '⏭';
-      postponeButton.className = 'postpone-btn';
-      postponeButton.title = 'Siirrä myöhemmäksi';
-      postponeButton.addEventListener('click', async function() {
-        const vastaus = prompt('Nouse uudelleen kuinka monen päivän päästä?', '1');
-        if (vastaus === null) return;
-        const paivia = parseInt(vastaus, 10);
-        if (!paivia || paivia < 1) return;
-        const uusiPvm = new Date();
-        uusiPvm.setDate(uusiPvm.getDate() + paivia);
-        const { error } = await db.from('ankkurit').update({ visible_from: uusiPvm.toISOString() }).eq('id', candidate.id);
-        if (error) console.error('Ehdotuksen siirto epäonnistui:', error);
-        loadAnchorCandidates();
-      });
-      li.appendChild(postponeButton);
-    }
+    // "Siirrä myöhemmäksi" — nyt KAIKILLE ehdokkaille (✨ ja 💬), ks.
+    // "💬-ehdotuksen elinkaari": tarve siirtää ei rajoitu ihmisehdotuksiin.
+    napitRivi.appendChild(siirraNappi(candidate.id, loadAnchorCandidates, candidate.source === 'ehdotus'));
 
     // BUGIKORJAUS (2026-07-14, "Ankkurien hätäkorjaus"): sama 5s kumottava
     // toast kuin varsinaisilla ankkureilla, konsistenssin vuoksi ("jokainen
@@ -2508,7 +2589,7 @@ async function loadAnchorCandidates() {
     // Laiturissa (ks. aly_log-linkki), pelkkä yksi yhteinen malli on
     // helpompi muistaa kuin kaksi eri sääntöä.
     const dismissButton = document.createElement('button');
-    dismissButton.textContent = '×';
+    dismissButton.textContent = candidate.source === 'ehdotus' ? '× Hylkää' : '×';
     dismissButton.className = 'delete-btn';
     dismissButton.title = 'Poista ehdotus';
     dismissButton.addEventListener('click', function() {
@@ -2535,7 +2616,8 @@ async function loadAnchorCandidates() {
         }
       );
     });
-    li.appendChild(dismissButton);
+    napitRivi.appendChild(dismissButton);
+    li.appendChild(napitRivi);
 
     listEl.appendChild(li);
   });

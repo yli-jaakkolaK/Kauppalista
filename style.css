@@ -1328,16 +1328,38 @@ h1 {
    erottunut muusta sisällöstä millään tavalla. Korjattu MUODOLLA (kulta
    katkoviivakehys), EI himmeydellä — opacity ei ole saavutettava viesti,
    eikä sitä käytetä tässä. Teksti pysyy täydellä --text-värillä (ks. yllä). */
+/* BUGIKORJAUS (2026-07-17, "💬-ehdotuksen elinkaari" — ks. muistiinpanot.md):
+   selkeät tekstilabelit ("⚓ Hyväksy", "⏭ Siirrä", "× Hylkää") eivät enää
+   mahdu samalle riville tekstin kanssa kapealla puhelinnäytöllä — sama
+   kaksiriviratkaisu kuin .laituri-ehdotus-rivi:llä (teksti omalla rivillään,
+   toiminnot ryhmiteltynä alle .anchor-candidate-napit-säiliöön). */
 .list li.anchor-candidate-row {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 6px;
   border: 1px dashed var(--accent);
   border-bottom: 1px dashed var(--accent);
   border-radius: 4px;
-  padding: 4px 6px;
+  padding: 6px 8px;
   margin-bottom: 6px;
 }
 
 .list li.anchor-candidate-row:last-child {
   margin-bottom: 0;
+}
+
+.anchor-candidate-content {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.anchor-candidate-napit {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
 }
 
 .edit-input {

@@ -602,4 +602,26 @@ Ei client-cachen ohitusta erikseen vaadi — `sw.js` bumpattu tämän erän muka
 
 ---
 
+## OSA Y — 💬-ehdotuksen elinkaari (2026-07-17)
+
+**Aja `sql/062`** (ankkurit.ristiriita_pvm/ristiriita_avain-sarakkeet) ennen testausta.
+
+### 1. Keskusteluehdotus (ristiriidasta) — EI hylkäystä
+1. Katri (tai Juha) avaa ristiriitavahvistuksen → "Ehdota keskustelua 💬" → vastaanottajan etusivulle ilmestyy ehdokas.
+2. Tarkista rivi: teksti omalla rivillään, alla VAIN kaksi nappia — "Keskusteltu ✓" ja "⏭ Siirrä". EI ×-nappia, EI check-nappia.
+3. "⏭ Siirrä" → kysyy tuntimäärän → ehdotus katoaa listasta väliaikaisesti, palaa takaisin kun aika koittaa.
+4. "Keskusteltu ✓" → ehdotus katoaa listasta (valmis) JA kalenterin punainen ristiriitalippu SAMALLE päivälle rauhoittuu (kultainen "keskusteltu ✓") — tarkista Kalenterista, molemmilla käyttäjillä (realtime).
+
+### 2. Tavallinen 💬-ehdotus (delegointi) — säilyy ennallaan
+1. Laiturista "💬 Ehdota [toiselle]:lle" jollekin omalle murulle → vastaanottajan etusivulle ehdokas.
+2. Rivillä nyt SELKEÄT tekstilabelit: "⚓ Hyväksy" / "⏭ Siirrä" / "× Hylkää" (ei enää pelkkiä ikoneita).
+3. "× Hylkää" → 5s kumottava toast → jos ei kumota, ehdotus katoaa jäljettömiin vastaanottajalta (lähettäjän oma muru pysyy koskemattomana Laiturissa, ei raportointia hylkäyksestä).
+
+### 3. Siirto kaikille ankkureille (yleinen)
+1. Tavallinen (ei-ehdotus, ei-ehdokas) ankkuri "Ankkurit"-listassa → tarkista että sillä on nyt myös ⏭-nappi ⚓:n vieressä.
+2. Napauta ⏭ → kysyy tuntimäärän → ankkuri katoaa listasta väliaikaisesti, palaa näkyviin valitun ajan kuluttua — sisältö säilyy koko ajan.
+4. Sama ✨-koneehdokkaalla — tarkista että ⏭ toimii siellä samalla tavalla.
+
+---
+
 Kysy Claudelta jos joku kohta ei täsmää tai jokin näistä napeista/valikoista ei löydy — käyttöliittymät muuttuvat välillä hieman.

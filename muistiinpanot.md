@@ -450,6 +450,36 @@ Tämä osio on lyhyt päiväkirjamainen kooste — tarkka sisältö löytyy aina
 
 ---
 
+## 💬-ehdotuksen elinkaari (korjattu/laajennettu 2026-07-17, Katrin testilöydös + kaksi tarkennusta)
+
+**Lähde:** Katri testasi "Ankkurin ehdottaminen toiselle" -ominaisuutta oikeasti (Juha ehdotti → Katri hyväksyi ankkuriin) ja löysi kaksi puutetta, minkä jälkeen hän vielä KORJASI oman speksinsä kolmannella viestillä ristiriitaehdotuksille — tämä osio kuvaa LOPULLISEN, korjatun mallin.
+
+### Puute 1: siirto katosi hyväksynnän jälkeen (yleinen korjaus)
+
+Hyväksytty ehdokas muuttui tavalliseksi ankkuriksi, jolloin ⏭-siirto (joka oli aiemmin VAIN ehdokkailla) ei ollut enää saatavilla — mutta "en ehdikään tänään" syntyy usein vasta myöhemmin. **Korjaus:** uusi jaettu `siirraNappi()`-apufunktio, käytössä nyt KAIKILLA ankkuri-/ehdokasriveillä (✨-koneehdokkaat, 💬-ehdotukset, JA tavalliset ankkurit `lataaAnkkurit()`-listassa) — kysyy tuntimäärän (oletus 24), asettaa `ankkurit.visible_from`-aikaleiman. `lataaAnkkurit()`:n kysely suodattaa nyt myös `visible_from`-tulevaisuuden pois (`.or('visible_from.is.null,visible_from.lte.<nyt>')`), sama suodatus jonka `loadAnchorCandidates()` jo teki asiakaspuolella ehdokkaille.
+
+### Puute 2 + korjattu speksi: keskusteluehdotuksen erityissääntö
+
+Katrin ALKUPERÄINEN pyyntö (ristiriidasta syntyneen ehdotuksen "Keskusteltu ✓" -kuittaus ankkurista kuittaisi myös kalenterin lipun, ja poisto-ilman-kuittausta palauttaisi ehdotuksen Laituriin) **KORVATTIIN kolmannella, tiukemmalla viestillä**: ristiriitajuurellinen ehdotus on ERI LAJI ("keskustelulaji") jolla EI OLE hylkäysvaihtoehtoa lainkaan — "appi ei saa tarjota teknistä tapaa väistää puolison keskustelupyyntöä jälkettä." Perustelu: perheen oma "no questions" -sääntö vietynä rakenteeseen.
+
+**Tekninen erottelu:** uudet `ankkurit.ristiriita_pvm`/`ristiriita_avain`-sarakkeet (`sql/062`, samaa muotoa kuin `kalenteri_ristiriita_kuittaukset`). NIIDEN LÄSNÄOLO (ei mikään erillinen lippu) päättää onko rivi keskustelulajia — asetetaan `avaaRistiriitaVahvistus()`:n "Ehdota keskustelua 💬" -haarassa (ks. "Ristiriitapaketti"-osio).
+
+**Keskustelulajin toiminnot ovat VAIN kaksi**, ei check-nappia, ei muokkausta, ei erillistä "hyväksy"-askelta, EI hylkäystä:
+- **Keskusteltu ✓** — YHDESSÄ eleessä: `is_candidate:false, done:true` ANKKURILLE + upsert `kalenteri_ristiriita_kuittaukset`-tauluun `ristiriita_pvm`/`ristiriita_avain`-arvoilla. Jos Kalenteri-näkymä on auki, päivittyy heti; joka tapauksessa realtime vie tiedon molemmille laitteille.
+- **Siirrä ⏭** — sama yleinen `siirraNappi()`, "ei nyt mutta ei kadonnut".
+
+Ehdotus pysyy näkyvissä (ei raukea, ei putoa Laituriin anonyyminä, ei koskaan katoa) kunnes JOMPIKUMPI näistä tehdään — koska is_candidate pysyy `true`:na koko odotusajan, keskustelulaji-rivi elää AINA `loadAnchorCandidates()`:n listassa (etusivu), ei koskaan siirry tavalliseen ankkurit-listaan erillisenä välivaiheena — tämä yksinkertaistaa elinkaaren kahteen tilaan (odottaa / valmis) kolmen sijaan.
+
+**Tavallinen 💬-ehdotus** (delegointi, "osta liput") säilyttää KAIKKI aiemmat oikeudet ennallaan: hylkäys + 5s kumottava toast, RLS-näkymättömyys lähettäjälle, erillinen hyväksy-askel.
+
+### Puute 3: piilotoiminnot etusivun 💬-lapussa
+
+Katri erehtyi napin painalluksessa (arvasi väärin, ehdotus putosi Laituriin muruna — turvainvariantti piti ✓, mutta tapaus osoitti napit olivat liian arvailtavia). **Korjaus:** kaikki 💬-ehdotusrivin (ja nyt myös ✨-koneehdokkaan siirto-toiminnon) napit saivat SELKEÄT TEKSTILABELIT ("⚓ Hyväksy", "⏭ Siirrä", "× Hylkää") pelkkien ikonien sijaan — johdonmukaisuussääntö: sama asia, samat toiminnot, joka paikassa jossa se näkyy. Rivin ULKOASU muutettu kaksiriviseksi (sisältö omalla rivillään, toiminnot ryhmiteltynä alle, sama malli kuin ✨-ehdotuskortilla Laiturissa) — pelkät ikonit + kolme tekstilabelia eivät mahtuneet yhdelle riville kapealla näytöllä (testattu Playwrightilla, korjattu ennen julkaisua).
+
+**Korjaus:** `script.js` (`siirraNappi()` uusi jaettu apufunktio, `loadAnchorCandidates()` uudelleenkirjoitettu kaksiriviseksi + keskustelulaji-haara, `lataaAnkkurit()` sai `visible_from`-suodatuksen + siirtonapin, `avaaRistiriitaVahvistus()` tallentaa `ristiriita_pvm`/`ristiriita_avain`), `style.css` (`.anchor-candidate-content`/`.anchor-candidate-napit`, `.list li.anchor-candidate-row` kaksiriviseksi). `sql/062` (uudet sarakkeet). `sw.js` v68. Todennettu Playwright-kuvakaappauksella (keskustelulaji/tavallinen ehdotus/✨-ehdokas, molemmat teemat). **EI VIELÄ TESTATTU oikealla kahden käyttäjän datalla.**
+
+---
+
 ## Sanasto — Saman omat käsitteet
 
 Näitä nimiä käytetään ympäri tätä tiedostoa ilman että niitä aina selitetään uudelleen — jos joku (Copilot mukaan lukien) törmää johonkin näistä ensimmäistä kertaa, tästä löytyy nopea selitys. Tarkempi kuvaus löytyy aina omasta osiostaan.
