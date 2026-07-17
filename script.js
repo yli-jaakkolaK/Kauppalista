@@ -144,6 +144,32 @@ async function ehdotaSisaltoToiselle(sisalto) {
   return true;
 }
 
+// Laukaisusana Laiturissa (2026-07-18, ks. muistiinpanot.md "Laukaisusana
+// Laiturissa") — "Juhalle:" tai "laita Juhalle:" RIVIN ALUSSA (Katrin päässä
+// vastaavasti "Katrille:"/"laita Katrille:") ohjaa murun suoraan toisen
+// ankkuriehdokkaaksi ehdotaSisaltoToiselle()-putkea pitkin, ilman että
+// kumpaakaan valitsinta (💬-nappi, kohdevalinta) tarvitsee koskea. Nimet
+// KOVAKOODATTU allatiivimuotoineen (ei yritetä taivuttaa nimiä ohjelmallisesti
+// — kahden hengen perheessä kiinteä taulukko on luotettavampi kuin
+// yleinen suomen kielioppi). SAMA logiikka toistettu api/laituri-add.js:ssä
+// Siri/pikakomento-reittiä varten (ei jaettua moduulia selaimen ja Vercel-
+// funktion välillä tässä projektissa) — pidä nämä kaksi synkassa.
+const HENKILO_ALLATIIVI = { katri: 'Katrille', juha: 'Juhalle' };
+
+// Tunnistaa VAIN täsmällisen rivinalkuisen laukaisun — pelkkä nimen maininta
+// tekstin sisällä ("juttelin Juhalle eilen") EI SAA osua. Epäselvässä
+// tapauksessa (ei täsmää) palautetaan null — mieluummin ohittaa kuin ehdottaa
+// väärin. Palauttaa laukaisusanasta riisutun sisällön, tai null.
+function tunnistaEhdotusLaukaisu(teksti, kohdeHenkilo) {
+  const allatiivi = HENKILO_ALLATIIVI[kohdeHenkilo];
+  if (!allatiivi) return null;
+  const kuvio = new RegExp('^(?:laita\\s+)?' + allatiivi + '\\s*:\\s*(.+)$', 'is');
+  const osuma = teksti.match(kuvio);
+  if (!osuma) return null;
+  const loppuosa = osuma[1].trim();
+  return loppuosa || null;
+}
+
 // Näyttää/piilottaa Ankkurit-lisäyksen "Itselle/[Nimi]:lle" -kohdevalinnan sen
 // mukaan onko toinen käyttäjä tunnistettu — kutsutaan heti kun henkilökartta
 // on haettu (ks. paivitaHenkiloKartta), koska se voi valmistua vasta kotinäkymän
@@ -4652,6 +4678,20 @@ document.getElementById('laituri-add-btn').addEventListener('click', async funct
   const laituriInput = document.getElementById('laituri-input');
   const teksti = laituriInput.value.trim();
   if (teksti === '') { laituriInput.focus(); return; }
+
+  // Laukaisusana (2026-07-18, ks. muistiinpanot.md "Laukaisusana Laiturissa"):
+  // "Juhalle:"/"laita Juhalle:" rivin alussa ohittaa tavallisen lisäyksen
+  // kokonaan ja ohjaa murun suoraan ehdotukseksi, samaa putkea kuin
+  // 💬-nappi/kohdevalinta (ehdotaSisaltoToiselle luo kotimurun + ehdokkaan).
+  const ehdotusSisalto = toinenKayttaja ? tunnistaEhdotusLaukaisu(teksti, toinenKayttaja.henkilo) : null;
+  if (ehdotusSisalto) {
+    const onnistui = await ehdotaSisaltoToiselle(ehdotusSisalto);
+    naytaIlmoitus(onnistui ? ('Ehdotettu ' + henkiloNimi(toinenKayttaja.henkilo) + ':lle') : 'Ehdotuksen lähetys epäonnistui');
+    laituriInput.value = '';
+    tyhjennaLaituriLuonnos();
+    lataaLaituri(document.getElementById('laituri-search').value.trim());
+    return;
+  }
 
   const { error } = await db.from('laituri').insert({ user_id: currentUserId, content: teksti });
   if (error) {
