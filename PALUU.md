@@ -548,7 +548,7 @@ Ei uusia migraatioita (kaikki neljä ovat client/query-tason muutoksia olemassa 
 
 ## OSA X — Ristiriitapaketti (2026-07-17, vaatii KAHDEN käyttäjän testin aamulla)
 
-**Aja `sql/059` ja `sql/060`** (kuittaustaulu+RLS+realtime, sitten testirivit) ennen testausta.
+**Aja `sql/059`, `sql/060` ja `sql/061`** (kuittaustaulu+RLS+realtime, testirivit, iCal-värit) ennen testausta.
 
 **Tausta:** koko paketti rakentuu OLEMASSA OLEVAN päällekkäisyysmerkin päälle (`onkoAjallisestiPaallekkainen`/`paallekkaisyysVakavuus`) muuttamatta sen ydinlogiikkaa — jos huomisen perusmerkkitesti (kohta 1 alla) paljastaa vian, korjaus osuu perustaan, ei tähän pakettiin. **TÄRKEÄ KÄYTÖSMUUTOS:** kahden ERI henkilön päällekkäiset menot merkitään nyt AINA punaisella ("kuka hoitaa?") — aiempi "kaksi aikuista, kaksi paikkaa on normaalia" (`ei_koskaan`) -sääntö on KUMOTTU, koska juuri se tilanne on nyt se josta pitäisi keskustella.
 
@@ -570,14 +570,24 @@ Ei uusia migraatioita (kaikki neljä ovat client/query-tason muutoksia olemassa 
 ### 3. Uusi päällekkäisyys herättää lipun uudelleen
 - Lisää KOLMAS tapahtuma joka menee päällekkäin jommankumman kuitatun kanssa samana päivänä → merkki muuttuu takaisin punaiseksi (eri tapahtumajoukko = eri allekirjoitus = ei enää sama kuittaus).
 
-### 4. Vakavuusluokat
-- Saman henkilön KAKSI omaa menoa päällekkäin (esim. Katrin oma kahdenlainen varaus) → kevyt ambri "huomaa"-merkki, EI punainen, EI napautettava.
+### 4. Vakavuusluokat (KORJATTU 2026-07-17, Bugi 25 — ks. muistiinpanot.md)
+- Saman henkilön KAKSI omaa menoa päällekkäin → PUNAINEN, napautettava (korjattu — oli virheellisesti kevyt "huomaa"-taso ensimmäisessä versiossa).
 - Kahden ERI henkilön menot päällekkäin → punainen, napautettava (ks. kohta 1).
-- (Jos rauhoitus-ikkuna on asetettu, ks. alla) hytti-scopen tapahtuma vs. arjen rutiini rauhoitus-ikkunan sisällä → vaimenee "huomaa"-tasolle vaikka olisi muuten eri henkilöiden välinen.
+- Perhetapahtuma (esim. Perhekalenterin meno) + KENEN TAHANSA henkilökohtainen meno päällekkäin → PUNAINEN (korjattu — perhetapahtuma olettaa molempien läsnäolon).
+- Kaksi TÄYSIN käsin lisättyä tapahtumaa (ei syotetta, ei henkilöä kummallakaan) → ainoa jäljellä oleva kevyt/ei-mitään-tapaus, rauhoitetun koulupäivän ikkuna vaikuttaa vain tähän.
+- (Jos rauhoitus-ikkuna on asetettu, ks. alla) hytti-scopen tapahtuma rauhoitus-ikkunan sisällä → vaimenee "huomaa"-tasolle vaikka olisi muuten punainen.
+
+### 4b. Omistajamerkki + värit (uusi 2026-07-17)
+- Jokaisella agenda/viikkorivillä näkyy väripisteen vieressä pieni K/J/P-kirjainmerkki (kenen meno).
+- Ristiriitavahvistuksen teksti muotoa "Otsikko (omistaja) aika" — tarkista että "(perhe)" näkyy perhetapahtumille.
+- Kalenteriväreiksi pitäisi näkyä: perhe/yhteinen = liila, Katri = punainen, Juha = sininen (samat kuin iCloudissa) — jos vanhat värit näkyvät yhä, tarkista onko `sql/061` ajettu.
 
 ### 5. Pallurat
 - Kotinäkymän Kalenteri-laatan pallura kasvaa heti kun kuittaamaton punainen ristiriita ilmestyy lähitulevaisuuteen (60 pv) — EI vaadi Kalenterin avaamista kertaakaan.
 - Pallura pienenee kun ristiriita kuitataan TAI poistuu (esim. toinen tapahtuma perutaan).
+
+### 6. Suorituskyky (uusi 2026-07-17)
+- Vaihda kuukausinäkymässä kuukaudesta toiseen (varsinkin syyskuu, jossa paljon Lukkarikone-luentoja) → vaihdon pitäisi olla käytännössä välitön (< 1s), ei enää 15–30 sekunnin jumitusta.
 
 **Rauhoitus-ikkuna (kohta 3, EI vielä asetettu käyttöliittymästä):** oletuksena TYHJÄ = ei vaikutusta. Jos halutaan testata, aseta suoraan SQL Editorista:
 ```sql

@@ -394,30 +394,36 @@ function onkoRauhoitusIkkunassa(isoPvm) {
 }
 
 // Kolmiportainen vakavuus kahden päällekkäisen tapahtuman välillä (Ristiriita-
-// paketti, 2026-07-17 — KORVAA aiemman kaksiportaisen 'aina'/'ei_koskaan'/
-// 'merkitse'/'rauhoitettu'-mallin):
-//  - 'full'      saman syötteen sisäinen päällekkäisyys (aina), TAI kahden ERI
-//                henkilön omat menot päällekkäin ("kuka hoitaa?" — Katrin
-//                2026-07-17 linjaus KUMOAA aiemman 'ei_koskaan'-säännön: kaksi
-//                aikuista kahdessa eri paikassa EI enää ole automaattisesti
-//                normaalia, se on juuri se tilanne josta pitää keskustella).
-//  - 'attention' saman henkilön kaksi omaa menoa (hänen oma päällekkäisyytensä,
-//                ei perheen kriisi), TAI mikä tahansa muu päällekkäisyys joka
-//                osuu rauhoitetun koulupäivän klo 9-15 -ikkunan ULKOPUOLELLE,
-//                TAI hytti-scopen päällekkäisyys erillisen rauhoitus-ikkunan
-//                (kohta 3) sisällä (muuten olisi 'full').
-//  - 'none'      ei mitään signaalia: tuntematon/perhetapahtuma+yksilö -pari
-//                jonka koko ajanjakso mahtuu rauhoitetun koulupäivän klo 9-15
-//                -ikkunaan (olemassa oleva sääntö, ks. onkoRauhoitettuPaiva).
+// paketti, 2026-07-17, KORJATTU samana päivänä Katrin OSA X -testilöydöksestä
+// — ks. muistiinpanot.md Bugi 25): nyrkkisääntö on "voiko fyysisesti toteutua
+// ilman että kukaan on kahdessa paikassa? Jos ei → FULL."
+//  - 'full'      saman syötteen sisäinen päällekkäisyys (aina), TAI KUMPI
+//                TAHANSA puoli on TUNNISTETTU (oma henkilökohtainen meno
+//                `_henkilo`, TAI oikealta kalenterisyötteeltä tuleva
+//                `syote_id` — myös jaettu perhetapahtuma jonka henkilo on
+//                NULL, koska perhetapahtuma OLETTAA MOLEMPIEN läsnäolon
+//                kunnes toisin sovitaan ja törmää siis kenen tahansa muuhun
+//                menoon täydellä voimalla). KORJATTU 2026-07-17: TÄMÄ KOSKEE
+//                MYÖS saman henkilön kahta omaa menoa — eilinen kevennys
+//                ("hänen oma päällekkäisyytensä, ei perheen kriisi") oli
+//                väärin, kukaan ei voi olla kahdessa paikassa itsekään.
+//  - 'attention' hytti-scopen päällekkäisyys erillisen rauhoitus-ikkunan
+//                (kohta 3) sisällä (muuten olisi 'full'), TAI kaksi TÄYSIN
+//                tuntematonta tapahtumaa (ei syote_id, ei henkilo kummallakaan
+//                puolella — ei mitään tunnistetta) rauhoitetun koulupäivän
+//                klo 9-15 -ikkunan ULKOPUOLELLA.
+//  - 'none'      kaksi täysin tuntematonta tapahtumaa joiden koko ajanjakso
+//                mahtuu rauhoitetun koulupäivän klo 9-15 -ikkunaan (olemassa
+//                oleva sääntö, ks. onkoRauhoitettuPaiva) — ainoa jäljellä
+//                oleva aidosti epävarma tapaus, kun kummallakaan puolella ei
+//                ole mitään tunnistetta ollenkaan.
 function paallekkaisyysVakavuus(a, b, isoPvm) {
   if (a.syote_id && b.syote_id && a.syote_id === b.syote_id) return 'full';
 
   const hyttiaMukana = a._scope === 'hytti' || b._scope === 'hytti';
   if (hyttiaMukana && onkoRauhoitusIkkunassa(isoPvm)) return 'attention';
 
-  if (a._henkilo && b._henkilo) {
-    return a._henkilo !== b._henkilo ? 'full' : 'attention';
-  }
+  if (a._henkilo || b._henkilo || a.syote_id || b.syote_id) return 'full';
 
   if (!onkoRauhoitettuPaiva(isoPvm)) return 'attention';
 
@@ -505,10 +511,13 @@ function avaaRistiriitaVahvistus(isoPvm, rivit, fullIds) {
   const osalliset = rivit
     .filter(function(r) { return fullIdSet.has(r.id); })
     .sort(function(a, b) { return (a.event_time || '').localeCompare(b.event_time || ''); });
+  // Muoto "Otsikko (omistaja) aika" (2026-07-17, Katrin OSA X -löydös) —
+  // omistaja AINA näkyvissä (myös "(perhe)"), koska ristiriidan LUONNE (kuka
+  // törmää keneen) ei ollut aiemmin pääteltävissä pelkästä listasta.
   const kuvaus = osalliset.map(function(r) {
     const aika = r.event_time ? r.event_time.slice(0, 5) : '';
-    const henkilo = r._henkilo ? henkiloNimi(r._henkilo) + ': ' : '';
-    return aika + ' ' + henkilo + r.title;
+    const omistaja = r._henkilo ? henkiloNimi(r._henkilo) : 'perhe';
+    return r.title + ' (' + omistaja + ') ' + aika;
   }).join('\n');
 
   const jo = onkoRistiriitaKuitattu(isoPvm, fullIds);
@@ -762,6 +771,17 @@ function piirraKalenteriRivi(rivi) {
     vari.style.backgroundColor = rivi._vari;
     li.appendChild(vari);
   }
+
+  // Omistajamerkki (2026-07-17, ks. muistiinpanot.md "Ristiriitapaketti" —
+  // Katrin OSA X -löydös): väripiste (yllä) kertoo FEEDIN, ei KENEN meno on —
+  // käyttäjä ei voinut ennustaa ristiriitalogiikkaa ilman tätä. Kirjain EI
+  // luota pelkkään väriin ("muoto kertoo tilan, ei väri yksin") — P=perhe
+  // (ei henkilo-tietoa, jaettu/käsin lisätty), muuten henkilön alkukirjain.
+  const omistaja = document.createElement('span');
+  omistaja.className = 'kalenteri-omistaja';
+  omistaja.textContent = rivi._henkilo ? rivi._henkilo.charAt(0).toUpperCase() : 'P';
+  omistaja.title = rivi._henkilo ? henkiloNimi(rivi._henkilo) : 'Perhe (kaikille yhteinen)';
+  li.appendChild(omistaja);
 
   li.dataset.tuoteId = rivi.id;
 
@@ -1052,14 +1072,21 @@ function laskeViikonLinjat(viikonTapahtumat) {
 // Piirtää yhden päiväruudun sisällön: päivänumero, monipäiväisten
 // tapahtumien palkkirivit (linjan mukaisessa järjestyksessä) ja sen jälkeen
 // yksipäiväiset tapahtumat pienenä tekstinä.
-function piirraKuukausiPaiva(pvm, kaikkiTapahtumat, linjat, linjojaViikolla, kuluvaKuukausi, kuormaraja) {
+// SUORITUSKYKYKORJAUS (2026-07-17, ks. muistiinpanot.md "Kuukausinäkymän
+// hitaus") — paivittainYksipaivaiset on esilaskettu Map (event_date -> rivit,
+// ks. piirraKuukausiRuudukko) ja monipaivaiset on jo valmiiksi suodatettu
+// pienempi joukko, joten tämä funktio ei enää tee YHTÄÄN O(n) .filter()-
+// läpikäyntiä koko kuukauden datasta per päiväruutu (aiemmin kolme).
+function piirraKuukausiPaiva(pvm, paivittainYksipaivaiset, monipaivaiset, linjat, linjojaViikolla, kuluvaKuukausi, kuormaraja) {
   const iso = paivamaaraISO(pvm);
   const solu = document.createElement('div');
   solu.className = 'kalenteri-kuukausi-paiva';
   if (pvm.getMonth() !== kuluvaKuukausi) solu.classList.add('ulkopuolinen');
   if (iso === paivamaaraISO(new Date())) solu.classList.add('tanaan');
 
-  const paivanKaikki = kaikkiTapahtumat.filter(function(t) { return tapahtumaKattaaPaivan(t, iso); });
+  const paivanYksipaivaiset = paivittainYksipaivaiset.get(iso) || [];
+  const paivanMonipaivaisetKattavat = monipaivaiset.filter(function(t) { return tapahtumaKattaaPaivan(t, iso); });
+  const paivanKaikki = paivanYksipaivaiset.concat(paivanMonipaivaisetKattavat);
 
   const pvmRivi = document.createElement('div');
   pvmRivi.className = 'kalenteri-kuukausi-pvm-rivi';
@@ -1077,7 +1104,12 @@ function piirraKuukausiPaiva(pvm, kaikkiTapahtumat, linjat, linjojaViikolla, kul
   // avannut vahvistusta suoraan. Piste on nyt itse napautettava (isompi
   // hit-alue ::before-pseudoelementillä, ks. style.css) ja pysäyttää
   // tapahtuman (stopPropagation) ettei ruudun oma navigointi laukea samalla.
-  const paivanRistiriita = analysoiPaivanRistiriidat(paivanKaikki, iso);
+  // Vain päivät joilla on vähintään kaksi kellonaikaan sidottua tapahtumaa
+  // voivat ylipäätään olla päällekkäin — vältetään O(k²)-parivertailu (ja
+  // pelkkä funktiokutsu) turhaan yleisimmässä tapauksessa (0-1 ajallista
+  // tapahtumaa päivässä).
+  const paivanAjallisiaMaara = paivanKaikki.filter(function(t) { return t.event_time; }).length;
+  const paivanRistiriita = paivanAjallisiaMaara > 1 ? analysoiPaivanRistiriidat(paivanKaikki, iso) : { vakavuus: 'none', fullIds: [] };
   if (paivanRistiriita.vakavuus === 'full') {
     const kuitattu = onkoRistiriitaKuitattu(iso, paivanRistiriita.fullIds);
     const piste = document.createElement('span');
@@ -1103,13 +1135,11 @@ function piirraKuukausiPaiva(pvm, kaikkiTapahtumat, linjat, linjojaViikolla, kul
 
   solu.appendChild(pvmRivi);
 
-  const paivanMonipaivaiset = kaikkiTapahtumat.filter(function(t) { return onkoMonipaivainen(t) && tapahtumaKattaaPaivan(t, iso); });
-
   if (linjojaViikolla > 0) {
     const palkitEl = document.createElement('div');
     palkitEl.className = 'kalenteri-kuukausi-palkit';
     for (let linja = 0; linja < linjojaViikolla; linja++) {
-      const tapahtuma = paivanMonipaivaiset.find(function(t) { return linjat.get(t.id) === linja; });
+      const tapahtuma = paivanMonipaivaisetKattavat.find(function(t) { return linjat.get(t.id) === linja; });
       const palkki = document.createElement('div');
       if (tapahtuma) {
         palkki.className = 'kalenteri-kuukausi-palkki';
@@ -1132,9 +1162,8 @@ function piirraKuukausiPaiva(pvm, kaikkiTapahtumat, linjat, linjojaViikolla, kul
   // kompaktiksi lukumerkinnäksi ("▫N") sen sijaan että jokainen luento veisi
   // oman rivinsä — kuukausiruutu on liian pieni listaamaan koko lukujärjestystä,
   // agenda/viikkonäkymä (piirraKalenteriRivi) näyttää ne silti yksitellen.
-  const kaikkiYksipaivaiset = kaikkiTapahtumat.filter(function(t) { return !onkoMonipaivainen(t) && tapahtumaKattaaPaivan(t, iso); });
-  const yksipaivaiset = kaikkiYksipaivaiset.filter(function(t) { return t._scope !== 'hytti'; });
-  const hyttiYksipaivaiset = kaikkiYksipaivaiset.filter(function(t) { return t._scope === 'hytti'; });
+  const yksipaivaiset = paivanYksipaivaiset.filter(function(t) { return t._scope !== 'hytti'; });
+  const hyttiYksipaivaiset = paivanYksipaivaiset.filter(function(t) { return t._scope === 'hytti'; });
   if (yksipaivaiset.length > 0 || hyttiYksipaivaiset.length > 0) {
     const listaEl = document.createElement('div');
     listaEl.className = 'kalenteri-kuukausi-tapahtumat';
@@ -1179,6 +1208,24 @@ function piirraKuukausiRuudukko(sisalto, kaikkiTapahtumat, kuluvaKuukausi) {
   });
   ruudukko.appendChild(otsikkorivi);
 
+  // SUORITUSKYKYKORJAUS (2026-07-17, ks. muistiinpanot.md "Kuukausinäkymän
+  // hitaus"): yksipäiväiset tapahtumat ryhmitellään event_date:n mukaan
+  // YHDELLÄ läpikäynnillä koko kuukauden datasta, ennen kuin yhtään
+  // päiväruutua piirretään — jokainen ruutu tekee sen jälkeen vain yhden
+  // O(1) Map-haun 42 erillisen O(n) suodatuksen sijaan. Monipäiväiset
+  // tapahtumat (yleensä paljon harvinaisempia) pysyvät omana, jo valmiiksi
+  // suodatettuna pienempänä joukkonaan.
+  const yksipaivaisetPaivittain = new Map();
+  const monipaivaiset = [];
+  kaikkiTapahtumat.forEach(function(t) {
+    if (onkoMonipaivainen(t)) {
+      monipaivaiset.push(t);
+      return;
+    }
+    if (!yksipaivaisetPaivittain.has(t.event_date)) yksipaivaisetPaivittain.set(t.event_date, []);
+    yksipaivaisetPaivittain.get(t.event_date).push(t);
+  });
+
   const kuunEnsimmainen = new Date(kalenteriPvm.getFullYear(), kuluvaKuukausi, 1);
   const kuunViimeinen = new Date(kalenteriPvm.getFullYear(), kuluvaKuukausi + 1, 0);
   const ruudukonAlku = viikonAlku(kuunEnsimmainen);
@@ -1195,8 +1242,8 @@ function piirraKuukausiRuudukko(sisalto, kaikkiTapahtumat, kuluvaKuukausi) {
 
     const viikonAlkuIso = paivamaaraISO(viikonPaivat[0]);
     const viikonLoppuIso = paivamaaraISO(viikonPaivat[6]);
-    const viikonMonipaivaiset = kaikkiTapahtumat.filter(function(t) {
-      return onkoMonipaivainen(t) && t.event_date <= viikonLoppuIso && (t.event_end_date || t.event_date) >= viikonAlkuIso;
+    const viikonMonipaivaiset = monipaivaiset.filter(function(t) {
+      return t.event_date <= viikonLoppuIso && (t.event_end_date || t.event_date) >= viikonAlkuIso;
     });
     const linjat = laskeViikonLinjat(viikonMonipaivaiset);
     const linjojaViikolla = new Set(linjat.values()).size;
@@ -1204,7 +1251,7 @@ function piirraKuukausiRuudukko(sisalto, kaikkiTapahtumat, kuluvaKuukausi) {
     const viikkorivi = document.createElement('div');
     viikkorivi.className = 'kalenteri-kuukausi-viikko';
     viikonPaivat.forEach(function(pvm) {
-      viikkorivi.appendChild(piirraKuukausiPaiva(pvm, kaikkiTapahtumat, linjat, linjojaViikolla, kuluvaKuukausi, kuormaraja));
+      viikkorivi.appendChild(piirraKuukausiPaiva(pvm, yksipaivaisetPaivittain, monipaivaiset, linjat, linjojaViikolla, kuluvaKuukausi, kuormaraja));
     });
     ruudukko.appendChild(viikkorivi);
   }

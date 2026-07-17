@@ -412,7 +412,41 @@ Tämä osio on lyhyt päiväkirjamainen kooste — tarkka sisältö löytyy aina
 
 **Opittu:** "click-kuuntelija on kiinnitetty oikein" ei riitä todisteeksi toimivuudesta puhelimella — hit-alueen KOKO on yhtä tärkeä kuin sen olemassaolo, ja tämä on jo kolmas kerta projektissa kun pieni kosketuskohde (ks. `.check-btn`/`.anchor-btn`-hit-slopit 2026-07-14) piti korjata jälkikäteen. Uuden napautettavan elementin koon pitäisi olla osa suunnittelua alusta asti, ei jälkikäteinen korjaus.
 
-**Korjaus:** `script.js` (`paivitaPaivanOtsikko`, `piirraKuukausiPaiva`), `style.css` (`.kalenteri-kuukausi-piste--napautettava` + `::before`). `sw.js` v66. **EI VIELÄ TESTATTU korjauksen jälkeen** — Katri testaa uudelleen kun deployattu.
+**Korjaus:** `script.js` (`paivitaPaivanOtsikko`, `piirraKuukausiPaiva`), `style.css` (`.kalenteri-kuukausi-piste--napautettava` + `::before`). `sw.js` v66. **VAHVISTETTU TOIMIVAKSI** — Katri pääsi testaamaan vahvistusta OSA X:ssä ja löysi seuraavat (aidosti sisällölliset, ei enää napautusongelma) puutteet alla.
+
+### Bugi 25 — Vakavuusluokittelu päästi läpi todellisen kahden-paikan-ristiriidan kevyemmälle tasolle (löydetty/korjattu 2026-07-17, Katrin OSA X -testilöydös)
+
+**Oire:** "Perhetyön puhelu" (Perhekalenteri, koskee molempia) + "Katrin harjoittelu" (Katri-kalenteri) samaan aikaan luokittui vain ATTENTION-tasolle (kevyt ambri-huomio) — VÄÄRIN, tämä on juuri se tilanne josta pitäisi keskustella (kumpi hoitaa/perutaanko toinen).
+
+**Juurisyy — kaksi virhettä samassa säännössä (molemmat samana päivänä aiemmin kirjoitetussa Ristiriitapaketissa):**
+1. **Saman henkilön oma tupla oli tarkoituksella kevennetty** ATTENTION-tasolle ("hänen oma päällekkäisyytensä, ei perheen kriisi") — väärin: kukaan ei voi olla kahdessa paikassa itsekään, tämä on yhtä lailla FULL.
+2. **Perhetapahtuma (henkilo=NULL) EI koskaan päätynyt FULL-sääntöön**, koska ehto vaati `a._henkilo && b._henkilo` (MOLEMMILLA puolilla henkilö) — perhetapahtumalla ei koskaan ole henkiloa, joten pari "perhe + yksilön oma meno" ei täsmännyt tähän sääntöön lainkaan ja putosi kevyempään haaraan.
+
+**Katrin nyrkkisääntö korjaukselle:** *"Voiko fyysisesti toteutua ilman että kukaan on kahdessa paikassa? Jos ei → FULL."* Perhetapahtuma OLETTAA MOLEMPIEN läsnäolon kunnes toisin sovitaan — se törmää siis KENEN TAHANSA muuhun menoon täydellä voimalla, ei vain toisen henkilön eri kalenteriin.
+
+**Korjaus:** `paallekkaisyysVakavuus()` — FULL nyt aina kun KUMPI TAHANSA puoli on tunnistettu (`_henkilo` TAI `syote_id`, ei enää vaadi MOLEMPIA). Jäljelle jää ATTENTION/NONE-haaraan enää vain kaksi TÄYSIN käsin lisättyä tapahtumaa (ei syotetta, ei henkiloa kummallakaan) — ainoa aidosti epävarma tapaus. Hytti-rauhoitusikkuna (kohta 3) pysyy omana poikkeuksenaan ennallaan.
+
+**Opittu:** kun sääntö vaatii "MOLEMMILLA puolilla X", tarkista aina ERIKSEEN mitä tapahtuu kun vain TOISELLA puolella on X — tässä "perhetapahtuma" (rakenteellisesti AINA `_henkilo`-tiedoton) putosi ohi säännöstä juuri koska kirjoitin ehdon symmetriseksi (`a._henkilo && b._henkilo`) miettimättä epäsymmetristä tapausta erikseen.
+
+### Omistajamerkki + iCal-värit (lisätty 2026-07-17, Katrin OSA X -löydös + värilinjaus)
+
+**Oire/tarve:** Satamassa ei nähnyt mistään kumpi meno on kenen kalenterista — käyttäjä ei voinut ymmärtää eikä ennustaa ristiriitalogiikkaa, ja "kenen meno tämä on" on muutenkin arjen perustieto.
+
+**Korjaus:** uusi `.kalenteri-omistaja`-merkki (K/J/P-kirjain neutraalissa reunuksellisessa ympyrässä, EI luota pelkkään väriin) jokaisella agenda/viikkorivillä olemassa olevan `.kalenteri-vari`-väripisteen vieressä. Ristiriitavahvistuksen kuvausteksti muotoiltu uudelleen: "Otsikko (omistaja) aika" (esim. "Perhetyön puhelu (perhe) 14:00") — omistaja AINA näkyvissä myös "(perhe)"-muodossa, ei vain henkilöille. Sama teksti kulkee myös "Ehdota keskustelua" -murun sisältöön.
+
+**Samalla Katrin väriohje:** Sataman kalenteriväritys yhtenäistetty iCloudissa jo käytössä oleviin väreihin — yhteinen/perhekalenteri = liila (`#8E44AD`), Katrin oma = punainen (`#D32F2F`), Juhan oma = sininen (`#1976D2`). Sama fyysinen kalenteri (ks. Bugi 23:n duplikaattiparit — "Perhekalenteri"/"Yhteinen kalenteri (Juhan tili)" jne.) saa saman värin riippumatta kumman tilin kautta se on haettu. `sql/061` (plain UPDATE, ei kosketa hytti-scopen opiskelusyötteitä).
+
+**Korjaus:** `script.js` (`piirraKalenteriRivi`, `avaaRistiriitaVahvistus`), `style.css` (`.kalenteri-omistaja`), `sql/061` (värit). **EI VIELÄ TESTATTU visuaalisesti oikealla laitteella.**
+
+### Suorituskykykorjaus: kuukausinäkymän vaihto hidastui (löydetty/korjattu 2026-07-17, Katrin raportti)
+
+**Oire:** kuukausinäkymän vaihto (esim. elokuu→syyskuu) kesti 15–30 sekuntia — alkoi Ristiriitapaketin/Kalenterin kerrosarkkitehtuurin päivitysten jälkeen.
+
+**Epäily/löydös:** jokainen kuukausiruudukon 42 päiväruudusta teki KOLME erillistä O(n) `.filter()`-läpikäyntiä koko kuukauden datasta (yksipäiväiset, monipäiväiset, ja niiden hytti-jako) — 126 täyttä läpikäyntiä per kuukausivaihto. Tämä paheni merkittävästi kun hytti-scopen Lukkarikone-luennot (200+ riviä) alkoivat virrata pääkalenteriin (Kalenterin kerrosarkkitehtuuri, 16.7.) — n kasvoi rajusti juuri niinä kuukausina joissa luentoja on paljon, täsmälleen Katrin oma epäily. Ei löydetty await-kutsuja render-silmukasta (tarkistettu erikseen, kohta d).
+
+**Korjaus:** yksipäiväiset tapahtumat ryhmitellään `event_date`:n mukaan YHDELLÄ läpikäynnillä (`Map<event_date, rivit[]>`) ENNEN ruudukon piirtoa — jokainen päiväruutu tekee sen jälkeen yhden O(1) Map-haun kolmen O(n) suodatuksen sijaan. Monipäiväiset (yleensä paljon harvinaisempia) pysyvät omana pienempänä, jo esisuodatettuna joukkonaan. Lisäksi ristiriitalaskenta (`analysoiPaivanRistiriidat`) ohitetaan kokonaan päivinä joilla on alle kaksi kellonaikaan sidottua tapahtumaa (ei edes funktiokutsua).
+
+**Korjaus:** `script.js` (`piirraKuukausiRuudukko`, `piirraKuukausiPaiva`). Ei client-cachen ohitusta erikseen tälle, sisältyy tämän erän `sw.js`-bumppiin. **EI VIELÄ TESTATTU nopeuden osalta oikealla laitteella/datalla** — testikriteeri: kuukausivaihto < 1s myös syyskuussa (201 luentoa mukana).
 
 ---
 
@@ -1777,7 +1811,7 @@ Uusi, ERILLINEN päivämääräväli (`onkoRauhoitusIkkunassa()`, asetukset `rau
 
 Kuittaamaton 'full'-tason ristiriita sytyttää SAMAN Kalenteri-laatan palluran jota kuittausjonokin käyttää (`huomioPallurat.kalenteri = kuittausjonoUudet.length + ristiriitaPalluraMaara`, ei kahta erillistä merkkiä samasta laatasta) — sammuu kun lippu kuitataan tai ristiriita poistuu. Uusi `paivitaRistiriitaPallura()` skannaa 60 päivää eteenpäin (kevyt kysely) ja kutsutaan `lataaKotinakyma()`:sta — TOISIN kuin kuittausjono, joka nykyisellään herää vasta Kalenterin avaamisesta, tämä pallura on oikeasti näkyvissä HETI etusivulla ilman että kalenteria on koskaan avattava (Vilkaisuarvo). Realtime kattaa myös tämän (`kalenteri_ristiriita_kuittaukset`-taulun muutokset).
 
-**Korjaus:** `script.js` (`onkoRauhoitusIkkunassa`, `paallekkaisyysVakavuus` uudelleenkirjoitettu, `analysoiPaivanRistiriidat` korvaa `onkoPaivanRistiriita`:n, `ristiriitaAvain`/`onkoRistiriitaKuitattu`/`paivitaRistiriitaKuittaukset`/`avaaRistiriitaVahvistus`/`paivitaRistiriitaPallura` uusia, `luoPaivaMerkki` sai valinnaisen onClick-parametrin), `style.css` (`.paiva-merkki--ristiriita-huomio`, `.kalenteri-kuukausi-piste--keskustellaan`/`--huomio`), `index.html` (`#ristiriita-overlay`-dialogi). `sql/059` (uusi taulu+RLS+realtime), `sql/060` (uusintatestirivit, OSA M). Testiaskeleet PALUU.md OSA X:ssä. Todennettu Playwright-kuvakaappauksella (kaikki uudet merkkitilat + dialogi, molemmat teemat). **Sama päivä, myöhemmin — kaksi jatkokorjausta:** (a) napautuksen hit-alue korjattu, ks. Bugi 24; (b) "Ehdota keskustelua 💬" -kolmas toiminto lisätty vahvistukseen. `sw.js` v66 (kattaa molemmat). **EI VIELÄ TESTATTU kahden käyttäjän oikealla sessiolla** — huomisaamun ensimmäinen testi, nyt korjatulla napautuksella.
+**Korjaus:** `script.js` (`onkoRauhoitusIkkunassa`, `paallekkaisyysVakavuus` uudelleenkirjoitettu, `analysoiPaivanRistiriidat` korvaa `onkoPaivanRistiriita`:n, `ristiriitaAvain`/`onkoRistiriitaKuitattu`/`paivitaRistiriitaKuittaukset`/`avaaRistiriitaVahvistus`/`paivitaRistiriitaPallura` uusia, `luoPaivaMerkki` sai valinnaisen onClick-parametrin), `style.css` (`.paiva-merkki--ristiriita-huomio`, `.kalenteri-kuukausi-piste--keskustellaan`/`--huomio`), `index.html` (`#ristiriita-overlay`-dialogi). `sql/059` (uusi taulu+RLS+realtime), `sql/060` (uusintatestirivit, OSA M). Testiaskeleet PALUU.md OSA X:ssä. Todennettu Playwright-kuvakaappauksella (kaikki uudet merkkitilat + dialogi, molemmat teemat). **Sama päivä, myöhemmin — kaksi jatkokorjausta:** (a) napautuksen hit-alue korjattu, ks. Bugi 24; (b) "Ehdota keskustelua 💬" -kolmas toiminto lisätty vahvistukseen. `sw.js` v66 (kattaa molemmat). **EI VIELÄ TESTATTU kahden käyttäjän oikealla sessiolla** — huomisaamun ensimmäinen testi, nyt korjatulla napautuksella. **Sama päivä, vielä myöhemmin — Katrin OSA X -testilöydökset, kolme korjausta:** (1) **Bugi 25, vakavuusluokittelu korjattu** — "kukaan ei voi olla kahdessa paikassa" pätee nyt myös saman henkilön omaan tuplaan JA perhetapahtuma+yksilö-pariin (molemmat olivat virheellisesti pudonneet ATTENTION-tasolle). (2) **Omistajamerkki** (K/J/P) lisätty agenda/viikkoriveille ja ristiriitavahvistukseen — käyttäjä näkee nyt aina KENEN meno on kyseessä, ei vain väripisteen kautta pääteltävissä. Samalla Sataman kalenteriväritys yhtenäistetty iCloudin väreihin (perhe=liila, Katri=punainen, Juha=sininen, `sql/061`). (3) **Suorituskykykorjaus** — kuukausinäkymän vaihto hidastui 15–30 sekuntiin kun hytti-scopen 200+ luentoa alkoivat virrata pääkalenteriin; korjattu ryhmittelemällä tapahtumat kerran `event_date`:n mukaan (Map) 126 toistuvan O(n)-suodatuksen sijaan. Ks. Bugi 25 ja omat osionsa. `script.js`/`style.css`/`sw.js` v67, `sql/061` uusi. **EI VIELÄ TESTATTU** (visuaalinen omistajamerkki, nopeuskorjaus).
 
 ## Ulkokäytettävyys ja kontrasti (kirjattu 2026-07-10, Katrin testipalaute: "testattu ulkona auringossa, kontrasti ei riitä")
 

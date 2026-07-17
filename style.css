@@ -1871,6 +1871,30 @@ h1 {
   flex-shrink: 0;
 }
 
+/* Omistajamerkki (2026-07-17, ks. muistiinpanot.md "Ristiriitapaketti"):
+   kertoo KENEN meno rivi on (K/J/P) — ei luota pelkkään .kalenteri-vari-
+   väripisteeseen, koska väri kertoo FEEDIN eikä käyttäjä voinut aiemmin
+   päätellä siitä henkilöä. Neutraali reunuskirjain, ei täytetty väri —
+   erottuu MUODOLLA/tekstillä, ei väririippuvainen. */
+.kalenteri-omistaja {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  min-width: 16px;
+  padding: 0;
+  line-height: 1;
+  border-radius: 50%;
+  border: 1px solid var(--border-dash);
+  color: var(--muted);
+  font-size: 9px;
+  font-weight: bold;
+  margin-right: 6px;
+  flex-shrink: 0;
+  flex-grow: 0;
+}
+
 /* Hytti-scopen (oma opiskelu/työ) tapahtuma pääkalenterin agenda/viikko
    -näkymässä (Katrin 2026-07-16 linjaus): toissijainen ilme MUODOLLA, ei
    himmeydellä — reunapalkki + pieni glyyfi (.kalenteri-hytti-glyyfi) korvaa
