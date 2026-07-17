@@ -997,7 +997,14 @@ async function lataaKalenteri() {
     );
 
     if (tanaanIso === paivamaaraISO(new Date())) {
-      const { data: ankkuridata, error: ankkuriError } = await db.from('ankkurit').select().eq('done', false).eq('user_id', currentUserId);
+      // Bugi 26 (2026-07-17): puuttui is_candidate+visible_from-suodatus, joten
+      // siirretty ("⏭ Siirrä") ankkuri näkyi silti tässä kalenteriagendassa
+      // vaikka se katosi jo oikein lataaAnkkurit()-listasta — sama sääntö
+      // tähänkin, samat ehdot kuin lataaAnkkurit()/loadAnchorCandidates().
+      const nytIso2 = new Date().toISOString();
+      const { data: ankkuridata, error: ankkuriError } = await db.from('ankkurit').select()
+        .eq('done', false).eq('is_candidate', false).eq('user_id', currentUserId)
+        .or('visible_from.is.null,visible_from.lte.' + nytIso2);
       if (ankkuriError) {
         console.error('Ankkureiden haku kalenteriin epäonnistui:', ankkuriError);
       } else {

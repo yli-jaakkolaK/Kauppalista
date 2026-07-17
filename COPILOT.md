@@ -1,6 +1,6 @@
 # COPILOT.md — tekninen jatko-opas
 
-Tämä tiedosto on eri asia kuin **muistiinpanot.md** (projektin historia, päätökset, konteksti — "miksi asiat ovat kuten ovat") ja **PALUU.md**/**BACKUP.md** (kertaluontoiset käsintehtävät toimenpiteet). COPILOT.md on paikka jonne kirjataan **"miten tähän järjestelmään lisätään uutta"** -tyyppinen tekninen ohjeistus — kirjoita tänne kun rakennat jotain jonka päälle ODOTETAAN rakennettavan lisää myöhemmin (kuten äly-putki alla). Jos vain korjaat bugin tai lisäät kertaluontoisen ominaisuuden, se kuuluu muistiinpanot.md:hen, ei tänne.
+Tämä tiedosto on eri asia kuin **muistiinpanot.md** (projektin historia, päätökset, konteksti — "miksi asiat ovat kuten ovat", sisältää myös kesken olevan testauslistan) ja **BACKUP.md** (kertaluontoiset käsintehtävät toimenpiteet). COPILOT.md on paikka jonne kirjataan **"miten tähän järjestelmään lisätään uutta"** -tyyppinen tekninen ohjeistus — kirjoita tänne kun rakennat jotain jonka päälle ODOTETAAN rakennettavan lisää myöhemmin (kuten äly-putki alla). Jos vain korjaat bugin tai lisäät kertaluontoisen ominaisuuden, se kuuluu muistiinpanot.md:hen, ei tänne. **(PALUU.md poistettu 2026-07-17 — sisältö siirretty muistiinpanot.md:n "Testauslista — kesken" -osioon.)**
 
 ---
 
@@ -146,6 +146,6 @@ Muistutukset (`api/muistutukset-laheta.js`), kalenterisynkka (`api/caldav-sync.j
 
 Todistettu 2026-07-14/15 illan diagnoosissa ("Ajastetut muistutukset eivät tule perille" -bugi, ks. muistiinpanot.md): `cron: '*/5 * * * *'` EI tarkoita että workflow todella herää 5 min välein. GitHub Actionsin `schedule`-triggerit ovat matalan prioriteetin jono — havaitut toteuma-aikaleimat olivat 60–180 min välein, ei 5 min. Tämä EI ollut koodivika (muistutus tallentui, cron poimi sen, push lähti — kaikki todistettu toimivaksi kun ajo vihdoin pyörähti), vain väärä LAUKAISIJA aikakriittiselle työlle.
 
-**Korjaus: ulkoinen cron-palvelu (cron-job.org) ensisijaiseksi laukaisijaksi, GitHub Actions jää varalaukaisijaksi (ei poisteta — ilmainen, ei haittaa, molemmat kutsuvat samoja idempotentteja endpointteja turvallisesti päällekkäinkin).** Katrin oma asennusaskel (vaatii ulkoisen tilin, ei tehtävissä koodista) — täydet ohjeet PALUU.md:n OSA S:ssä.
+**Korjaus: ulkoinen cron-palvelu (cron-job.org) ensisijaiseksi laukaisijaksi, GitHub Actions jää varalaukaisijaksi (ei poisteta — ilmainen, ei haittaa, molemmat kutsuvat samoja idempotentteja endpointteja turvallisesti päällekkäinkin).** Katrin oma asennusaskel (vaatii ulkoisen tilin, ei tehtävissä koodista) — jo tehty ja vahvistettu (ks. muistiinpanot.md 2026-07-15).
 
 **Yleistettävä oppi:** jos rakennat JATKOSSA jotain aikakriittistä (esim. Viikkokatsaus, Horisontti-rytmioppija) tämän saman `muistutukset-cron.yml`-workflow'n varaan, MUISTA että sen toteuma-aikataulu on suuntaa-antava, ei taattu — 20h+ -välein tapahtuvalle työlle (kuten E3:n yöajo) tämä on lähes huomaamaton, mutta minuuttitason tarkkuutta vaativalle (muistutukset) se on merkittävä riski jota ei näy testauksessa ellei nimenomaan mittaa toteuma-aikaleimoja.
