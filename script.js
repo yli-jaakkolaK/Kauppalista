@@ -102,6 +102,7 @@ async function paivitaHenkiloKartta() {
     return;
   }
   toinenKayttaja = (data || []).find(function(rivi) { return rivi.user_id !== currentUserId; }) || null;
+  paivitaAnkkuriKohdeValinta();
 }
 function henkiloNimi(henkilo) {
   return henkilo ? henkilo.charAt(0).toUpperCase() + henkilo.slice(1) : 'kumppanille';
@@ -110,6 +111,50 @@ function henkiloNimi(henkilo) {
 // vahinkokaksoisklikkauksen, EI kysele takaisin onko ehdotus hyväksytty/
 // hylätty (ks. "hylkäys ei koskaan raportoidu lähettäjälle" -turvasääntö).
 let ehdotetutTassaIstunnossa = new Set();
+
+// BUGIKORJAUS (2026-07-18, "💬-ehdotuksen löydettävyys" — ks. muistiinpanot.md):
+// Katri etsi "ehdota toiselle" -toimintoa 15 min Ankkureiden äärellä, koska
+// delegointiajatus syntyy siellä ("tämä kuuluu toisen päivään" on ankkuri-ele)
+// — mutta toiminto asui vain Laiturin rivikohtaisessa 💬-napissa. Lisätty KAKSI
+// uutta lähtöpistettä Ankkureihin (lisäysvaihe + olemassa olevan oman ankkurin
+// ⋯-valikko), molemmat kutsuvat tätä samaa jaettua pohjafunktiota. EI muutoksia
+// Laiturin omaan 💬-nappiin (se käyttää OLEMASSA OLEVAA laituri-riviä kotina,
+// tämä funktio sen sijaan LUO uuden — kaksi eri, molemmat oikeaa, tilannetta).
+async function ehdotaSisaltoToiselle(sisalto) {
+  if (!toinenKayttaja) return false;
+  const { data: muru, error: muruError } = await db.from('laituri')
+    .insert({ content: sisalto, user_id: currentUserId, status: 'uusi' })
+    .select().single();
+  if (muruError) {
+    console.error('Ehdotuksen taustamurun luonti epäonnistui:', muruError);
+    return false;
+  }
+  const { error } = await db.from('ankkurit').insert({
+    content: sisalto,
+    source: 'ehdotus',
+    source_ref: String(muru.id),
+    user_id: toinenKayttaja.user_id,
+    is_candidate: true,
+    proposed_by: currentUserId,
+  });
+  if (error) {
+    console.error('Ehdotuksen lähetys epäonnistui:', error);
+    return false;
+  }
+  return true;
+}
+
+// Näyttää/piilottaa Ankkurit-lisäyksen "Itselle/[Nimi]:lle" -kohdevalinnan sen
+// mukaan onko toinen käyttäjä tunnistettu — kutsutaan heti kun henkilökartta
+// on haettu (ks. paivitaHenkiloKartta), koska se voi valmistua vasta kotinäkymän
+// ensimmäisen piirron jälkeen (ei odoteta, ks. siirryKirjautumisenJalkeen).
+function paivitaAnkkuriKohdeValinta() {
+  const valinta = document.getElementById('ankkuri-kohde-valinta');
+  const toiselleBtn = document.getElementById('ankkuri-kohde-toiselle-btn');
+  if (!valinta || !toiselleBtn) return;
+  valinta.style.display = toinenKayttaja ? 'flex' : 'none';
+  if (toinenKayttaja) toiselleBtn.textContent = henkiloNimi(toinenKayttaja.henkilo) + ':lle';
+}
 
 // Hakee mitkä rivit (mistä tahansa lähteestä) KIRJAUTUNUT ITSE on jo
 // nostanut Ankkureihin — ankkurit ovat henkilökohtaisia (2026-07-11), joten
@@ -2390,6 +2435,29 @@ async function lataaAnkkurit() {
 
     li.appendChild(luoMuistutusNappi('ankkuri', ankkuri.id, ankkuri.content, null, ankkuri.event_time, lataaAnkkurit));
 
+    // "Ehdota [Nimi]:lle" toiselle lähtöpisteenä (2026-07-18, ks.
+    // muistiinpanot.md "💬-ehdotuksen löydettävyys") — tilanne "kirjoitin
+    // itselleni, tajusin että kuuluukin hänelle". Harvemmin tarvittu (vain
+    // korjaava tapaus, ei pääkäyttötapa) → ⋯-valikkoon eikä omaksi napiksi,
+    // rivillä on jo viisi ikonia. Luo UUDEN Laituri-murun kotina (ei käytä
+    // tämän ankkurin omaa lähdettä — se voi olla mikä tahansa taulu, ei aina
+    // laituri), täsmälleen sama koneisto kuin lisäysvaiheen kohdevalinnalla.
+    if (toinenKayttaja) {
+      const ankkuriAvain = 'ankkuri:' + ankkuri.id;
+      li.appendChild(createOverflowButton(li, [{
+        label: 'Ehdota ' + henkiloNimi(toinenKayttaja.henkilo) + ':lle',
+        onClick: async function() {
+          if (ehdotetutTassaIstunnossa.has(ankkuriAvain)) {
+            naytaIlmoitus('Jo ehdotettu ' + henkiloNimi(toinenKayttaja.henkilo) + ':lle');
+            return;
+          }
+          const onnistui = await ehdotaSisaltoToiselle(ankkuri.content);
+          naytaIlmoitus(onnistui ? ('Ehdotettu ' + henkiloNimi(toinenKayttaja.henkilo) + ':lle') : 'Ehdotuksen lähetys epäonnistui');
+          if (onnistui) ehdotetutTassaIstunnossa.add(ankkuriAvain);
+        },
+      }]));
+    }
+
     listEl.appendChild(li);
   });
 
@@ -4500,6 +4568,22 @@ document.getElementById('visibility-toggle').addEventListener('change', async fu
 });
 
 // Ankkurit
+// Kohdevalinta "Itselle"/"[Nimi]:lle" lisäysvaiheessa (2026-07-18, ks.
+// muistiinpanot.md "💬-ehdotuksen löydettävyys") — palautuu AINA "itselle"
+// jokaisen onnistuneen ehdotuksen jälkeen, ettei seuraava täysin erillinen
+// ankkuri menisi vahingossa toiselle samalla oletuksella.
+let ankkuritLisaysKohde = 'itselle';
+document.querySelectorAll('.ankkuri-kohde-btn').forEach(function(btn) {
+  btn.addEventListener('click', function() {
+    ankkuritLisaysKohde = btn.dataset.kohde;
+    document.querySelectorAll('.ankkuri-kohde-btn').forEach(function(b) { b.classList.toggle('active', b === btn); });
+  });
+});
+function nollaaAnkkuriKohdeValinta() {
+  ankkuritLisaysKohde = 'itselle';
+  document.querySelectorAll('.ankkuri-kohde-btn').forEach(function(b) { b.classList.toggle('active', b.dataset.kohde === 'itselle'); });
+}
+
 // BUGIKORJAUS (2026-07-14, "Ankkuriarkkitehtuuri: jokaisella ankkurilla on
 // koti"): käsin kirjoitettu ankkuri EI enää OLE itse sisältö (jonka lasku
 // tuhoaisi) — se luo taustalla murun Laituriin ja nostaa SEN, täsmälleen
@@ -4510,6 +4594,18 @@ document.getElementById('ankkurit-add-btn').addEventListener('click', async func
   const ankkuriInput = document.getElementById('ankkurit-input');
   const teksti = ankkuriInput.value.trim();
   if (teksti === '') { ankkuriInput.focus(); return; }
+
+  if (ankkuritLisaysKohde === 'toiselle' && toinenKayttaja) {
+    const onnistui = await ehdotaSisaltoToiselle(teksti);
+    if (onnistui) {
+      naytaIlmoitus('Ehdotettu ' + henkiloNimi(toinenKayttaja.henkilo) + ':lle');
+      ankkuriInput.value = '';
+      nollaaAnkkuriKohdeValinta();
+    } else {
+      naytaIlmoitus('Ehdotuksen lähetys epäonnistui');
+    }
+    return;
+  }
 
   const { data: muru, error: muruError } = await db.from('laituri')
     .insert({ content: teksti, user_id: currentUserId, status: 'uusi' })

@@ -1259,6 +1259,11 @@ h1 {
   align-items: flex-start;
   min-height: 44px;
   padding: 6px 0;
+  /* Viides ikoni (2026-07-18, ⋯-valikko "Ehdota [Nimi]:lle" -toiminnolle,
+     ks. muistiinpanot.md "💬-ehdotuksen löydettävyys") ahtautti tekstisarakkeen
+     entisestään — kaventuu ilman kosketuskohteiden pienentämistä, Playwright-
+     kuvakaappauksella todennettu ero (5 vs. 6 riviä pitkälle tekstille). */
+  gap: 3px;
 }
 
 .list li.ankkuri-rivi span:not(.muistutus-aika):not(.muistutus-wrap) {
@@ -1583,6 +1588,15 @@ h1 {
   display: flex;
   gap: 8px;
   margin: 10px 0;
+}
+
+/* Ankkurit-lisäyksen kohdevalinta (2026-07-18, ks. muistiinpanot.md
+   "💬-ehdotuksen löydettävyys") — sama visuaali kuin muistutus-tila-valinta.
+   Näkyvyys (display:flex/none) asetetaan aina JS:stä (paivitaAnkkuriKohdeValinta),
+   sen mukaan onko toinen käyttäjä tunnistettu. */
+.ankkuri-kohde-valinta {
+  gap: 8px;
+  margin: 8px 0;
 }
 
 .muistutus-pikanapit {

@@ -29,6 +29,13 @@
     <p class="section-link" id="ankkurit-laajenna" style="display:none"></p>
     <p class="anchor-candidates-title" id="anchor-candidates-title" style="display:none">Ehdotukset</p>
     <ul class="list" id="anchor-candidates-list"></ul>
+    <!-- Kohdevalinta lisäysvaiheeseen (2026-07-18, ks. muistiinpanot.md
+         "💬-ehdotuksen löydettävyys") — piilossa oletuksena, näkyy vasta kun
+         toinen käyttäjä on tunnistettu (ks. paivitaAnkkuriKohdeValinta). -->
+    <div class="ankkuri-kohde-valinta" id="ankkuri-kohde-valinta" style="display:none">
+      <button class="kalenteri-tila-btn ankkuri-kohde-btn active" data-kohde="itselle">Itselle</button>
+      <button class="kalenteri-tila-btn ankkuri-kohde-btn" data-kohde="toiselle" id="ankkuri-kohde-toiselle-btn">Toiselle</button>
+    </div>
     <div class="add-item">
       <span class="prefix">›</span>
       <input type="text" id="ankkurit-input" placeholder="uusi ankkuri...">
