@@ -2405,6 +2405,28 @@ async function lataaAnkkurit() {
   }
 }
 
+// BUGIKORJAUS (2026-07-17, Bugi 27, ks. sql/063 ja design-periaate
+// "Suhteellinen aika jäädytetään kirjoitushetkeen" muistiinpanot.md:ssä):
+// käyttäjän oma hylkäys (× ehdokaskortilla, "Kumoa" Äly-lokista) ON vastaus
+// siinä missä yöajon hiljainen raukeaminenkin (ks. api/aly-nightly.js) —
+// ilman tätä merkintää lähdemuru jäisi arvioitavaksi seuraavana yönä, ja
+// koska jäädytetty "huomenna"-hetki saattaa olla vielä sama kalenteripäivä
+// hylkäyshetkellä, se saattoi nousta ankkuriehdokkaaksi uudelleen vielä
+// kerran ennen kuin "jo mennyt ohi" -tarkistus lopulta pysäytti sen. Koskee
+// VAIN source='aly' (koneen omia ehdotuksia) — 'ehdotus' (toisen käyttäjän
+// lähettämä) ei koskaan liity aly_evaluated-tauluun.
+async function merkitseAlyMuruKasitellyksi(sourceRef) {
+  const noteId = Number(sourceRef);
+  if (!noteId) return;
+  const { data: muru, error: muruError } = await db.from('laituri').select('content').eq('id', noteId).maybeSingle();
+  if (muruError || !muru) {
+    console.error('Ankkuriehdotuksen käsittelymerkintä epäonnistui (murua ei löytynyt):', muruError);
+    return;
+  }
+  const { error } = await db.from('aly_evaluated').upsert({ laituri_id: noteId, content: muru.content }, { onConflict: 'laituri_id' });
+  if (error) console.error('Ankkuriehdotuksen käsittelymerkintä epäonnistui:', error);
+}
+
 // E3 mid-tier V1 ("äly toimii, ihminen valvoo", ks. muistiinpanot.md) — AI-
 // suggested anchor candidates, shown BELOW the real anchors, never inside
 // the "3 most important" limit. New code, English names (house rule, ks.
@@ -2614,6 +2636,9 @@ async function loadAnchorCandidates() {
           // päivitettävää täällä.
           if (candidate.source === 'aly') {
             await db.from('aly_log').update({ undone_at: new Date().toISOString(), undo_reason: 'dismissed' }).eq('anchor_id', candidate.id).is('undone_at', null);
+            // Bugi 27 -korjaus (ks. sql/063): hylkäys on lopullinen vastaus,
+            // ei jätä murua odottamaan uutta yöajon arviointia.
+            await merkitseAlyMuruKasitellyksi(candidate.source_ref);
           }
           loadAnchorCandidates();
         },
@@ -2964,6 +2989,9 @@ async function loadAiLog() {
         }
         const { error } = await db.from('aly_log').update({ undone_at: new Date().toISOString(), undo_reason: 'manual' }).eq('id', entry.id);
         if (error) console.error('Äly-lokin kumoaminen epäonnistui:', error);
+        // Bugi 27 -korjaus (ks. sql/063): sama kuin ehdokaskortin ×-hylkäys —
+        // "Kumoa" on lopullinen vastaus, ei jätä murua uuden yöajon varaan.
+        if (entry.source_ref) await merkitseAlyMuruKasitellyksi(entry.source_ref);
         loadAiLog();
         loadAnchorCandidates();
         lataaAnkkurit();
@@ -4659,24 +4687,38 @@ document.getElementById('kuormaraja-input').addEventListener('change', async fun
 });
 
 // === MUISTUTUSPANEELIN NAPIT JA RULLAT ===
-// Numerorulla 1-59 täytetään kerran sivun latauksessa — kevein iOS:ssä
-// rullalta tuntuva toteutus on natiivi <select>, ei mikään erillinen kirjasto.
+// KORJATTU (2026-07-17, koonti 2 kohta 7 — "yksiköt eivät yhdisty"): vanha
+// yksi määrä + yksi yksikkö (min/tunti/vrk/viikko) -pari ei sallinut
+// yhdistelmiä ("10 h 13 min") — piti valita jompikumpi. Kolme erillistä
+// rullaa (päivää/tuntia/minuuttia) LASKETAAN YHTEEN, natiivit <select>-
+// elementit täytetään kerran sivun latauksessa (kevein iOS:ssä rullalta
+// tuntuva toteutus, ei mikään erillinen kirjasto).
 (function() {
-  const maaraSelect = document.getElementById('muistutus-maara');
-  for (let i = 1; i <= 59; i++) {
-    const optio = document.createElement('option');
-    optio.value = i;
-    optio.textContent = i;
-    maaraSelect.appendChild(optio);
+  function taytaRulla(id, maxIncl, oletus) {
+    const select = document.getElementById(id);
+    for (let i = 0; i <= maxIncl; i++) {
+      const optio = document.createElement('option');
+      optio.value = i;
+      optio.textContent = i;
+      if (i === oletus) optio.selected = true;
+      select.appendChild(optio);
+    }
   }
+  taytaRulla('muistutus-paivaa', 14, 0);
+  taytaRulla('muistutus-tuntia', 23, 0);
+  taytaRulla('muistutus-minuuttia', 59, 15);
 })();
 
-const MUISTUTUS_YKSIKKO_MS = { min: 60 * 1000, tunti: 60 * 60 * 1000, vrk: 24 * 60 * 60 * 1000, viikko: 7 * 24 * 60 * 60 * 1000 };
-
 document.getElementById('muistutus-lisaa-btn').addEventListener('click', function() {
-  const maara = parseInt(document.getElementById('muistutus-maara').value, 10);
-  const yksikko = document.getElementById('muistutus-yksikko').value;
-  lisaaMuistutus(new Date(Date.now() + maara * MUISTUTUS_YKSIKKO_MS[yksikko]));
+  const paivia = parseInt(document.getElementById('muistutus-paivaa').value, 10) || 0;
+  const tunteja = parseInt(document.getElementById('muistutus-tuntia').value, 10) || 0;
+  const minuutteja = parseInt(document.getElementById('muistutus-minuuttia').value, 10) || 0;
+  const ms = paivia * 86400000 + tunteja * 3600000 + minuutteja * 60000;
+  if (ms <= 0) {
+    naytaIlmoitus('Valitse ainakin yksi arvo (päivä/tunti/minuutti)');
+    return;
+  }
+  lisaaMuistutus(new Date(Date.now() + ms));
 });
 
 document.querySelectorAll('#muistutus-pikanapit button').forEach(function(btn) {
@@ -4700,23 +4742,30 @@ document.querySelectorAll('.muistutus-tila-btn').forEach(function(btn) {
   });
 });
 
+// Pikanapit säilyttävät jo asetetun kellonajan (jos käyttäjä on jo pyörittänyt
+// rullaa) ja vaihtavat vain päivän — muuten "Huomenna"-napin painaminen
+// kellonajan valinnan JÄLKEEN nollaisi juuri tehdyn valinnan.
+function asetaKellonaikaPikanappiPaiva(paivaOffset) {
+  const input = document.getElementById('muistutus-hetki-input');
+  const nykyinenKlo = input.value && input.value.indexOf('T') !== -1 ? input.value.split('T')[1] : '09:00';
+  const pvm = new Date();
+  pvm.setDate(pvm.getDate() + paivaOffset);
+  input.value = paivamaaraISO(pvm) + 'T' + nykyinenKlo;
+}
 document.getElementById('muistutus-pvm-tanaan').addEventListener('click', function() {
-  document.getElementById('muistutus-pvm-input').value = paivamaaraISO(new Date());
+  asetaKellonaikaPikanappiPaiva(0);
 });
 document.getElementById('muistutus-pvm-huomenna').addEventListener('click', function() {
-  const huomenna = new Date();
-  huomenna.setDate(huomenna.getDate() + 1);
-  document.getElementById('muistutus-pvm-input').value = paivamaaraISO(huomenna);
+  asetaKellonaikaPikanappiPaiva(1);
 });
 
 document.getElementById('muistutus-kellonaika-lisaa-btn').addEventListener('click', function() {
-  const pvm = document.getElementById('muistutus-pvm-input').value;
-  const klo = document.getElementById('muistutus-klo-input').value;
-  if (!pvm || !klo) {
+  const hetki = document.getElementById('muistutus-hetki-input').value;
+  if (!hetki) {
     naytaIlmoitus('Valitse sekä päivä että kellonaika');
     return;
   }
-  lisaaMuistutus(new Date(pvm + 'T' + klo));
+  lisaaMuistutus(new Date(hetki));
 });
 
 document.getElementById('muistutus-sulje').addEventListener('click', suljeMuistutusPaneeli);
@@ -5039,8 +5088,7 @@ async function avaaMuistutusPaneeli(source, sourceRef, content, eventDate, event
   document.querySelectorAll('.muistutus-tila-btn').forEach(function(b) { b.classList.toggle('active', b.dataset.tila === 'pika'); });
   document.getElementById('muistutus-pika-tila').style.display = 'block';
   document.getElementById('muistutus-kellonaika-tila').style.display = 'none';
-  document.getElementById('muistutus-pvm-input').value = paivamaaraISO(new Date());
-  document.getElementById('muistutus-klo-input').value = '';
+  document.getElementById('muistutus-hetki-input').value = paivamaaraISO(new Date()) + 'T09:00';
 
   await paivitaMuistutusLista();
   document.getElementById('muistutus-overlay').style.display = 'flex';

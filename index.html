@@ -385,13 +385,9 @@
           </div>
 
           <div class="muistutus-rulla-rivi">
-            <select id="muistutus-maara"></select>
-            <select id="muistutus-yksikko">
-              <option value="min">min</option>
-              <option value="tunti">tunti</option>
-              <option value="vrk">vrk</option>
-              <option value="viikko">viikko</option>
-            </select>
+            <select id="muistutus-paivaa"></select><span class="muistutus-rulla-yksikko">pv</span>
+            <select id="muistutus-tuntia"></select><span class="muistutus-rulla-yksikko">h</span>
+            <select id="muistutus-minuuttia"></select><span class="muistutus-rulla-yksikko">min</span>
             <button class="dialog-btn" id="muistutus-lisaa-btn">Aseta</button>
           </div>
         </div>
@@ -402,9 +398,15 @@
             <button class="dialog-btn dialog-btn-cancel" id="muistutus-pvm-huomenna">Huomenna</button>
           </div>
 
-          <div class="muistutus-rulla-rivi">
-            <input type="date" id="muistutus-pvm-input">
-            <input type="time" id="muistutus-klo-input">
+          <!-- Yksi datetime-local-kenttä kahden erillisen (date+time) sijaan —
+               iOS näyttää tämän yhtenä yhtenäisenä rullana (sama ele kuin
+               natiivissa Muistutukset/Kalenteri-sovelluksessa), toisin kuin
+               kaksi vierekkäistä pientä inputtia. Pystysuunta (oma rivi
+               kentälle ja napille) koska datetime-local tarvitsee riittävän
+               leveyden näyttääkseen sekä päivän että kellonajan leikkautumatta
+               — kapealla dialogilla vierekkäin ei olisi tilaa. -->
+          <div class="muistutus-rulla-rivi muistutus-rulla-rivi--pysty">
+            <input type="datetime-local" id="muistutus-hetki-input">
             <button class="dialog-btn" id="muistutus-kellonaika-lisaa-btn">Aseta</button>
           </div>
         </div>
