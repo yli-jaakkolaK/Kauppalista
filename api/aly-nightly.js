@@ -52,6 +52,14 @@ const DEFAULT_MODEL = 'claude-sonnet-4-6';
 const MAX_TOKENS = 500; // moderate — this only ever returns a short JSON list
 const MIN_HOURS_BETWEEN_RUNS = 20;
 const VALID_ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
+// BUGIKORJAUS (2026-07-18, "Ankkuri nousee liian aikaisin kaukaiselle
+// hetkelle" — ks. muistiinpanot.md): oletusarvo sille kuinka monta päivää
+// ENNEN "hetki"-kohdepäivää ehdokas tulee näkyviin. Katrin oma ehdotus
+// ("kohdepäivän aamuna", herätyspäivä-konsepti) = 0 päivää ennalta, ei
+// vuorokausia aiemmin. Säädettävä ilman koodimuutosta `asetukset`-taulun
+// avaimella `hetki_ennakkopaivat`, sama "data ei koodia" -periaate kuin
+// rauhoitus-ikkunalla.
+const HETKI_ENNAKKO_PAIVAT_OLETUS = 0;
 
 async function supabaseFetch(path, options) {
   options = options || {};
@@ -126,6 +134,28 @@ function isoDate(d) {
   return d.toISOString().slice(0, 10);
 }
 
+// BUGIKORJAUS (2026-07-18, "Ankkuri nousee liian aikaisin kaukaiselle
+// hetkelle"): ankkurit on TÄMÄN PÄIVÄN kärkilista, ei tulevaisuuden
+// muistilista — "hetki" (tarkka, kertaluontoinen ajankohta) ei siis saa
+// nousta ehdokkaaksi heti kun äly löytää sen, jos kohdepäivä on viikkojen
+// päässä. "ikkuna" (takaraja jota kohti kuljetaan monena päivänä) EI kärsi
+// tästä ja jää tarkoituksella koskematta — se HYÖTYY varhaisesta
+// näkyvyydestä (tarvitaan aikaa toimia ennen takarajaa), koskee siis VAIN
+// kutsujaa jotka käsittelevät "hetkeä".
+//
+// Uudelleenkäyttää olemassa olevan visible_from-mekanismin (ks. siirraNappi()
+// script.js:ssä, sama sarake) sen sijaan että keksisi uuden: ehdokas LUODAAN
+// heti kuten ennenkin (ei toisteta samaa äly-kutsua joka yö turhaan
+// pelkästään tämän takia, ks. "Maksimiautomaatio, minimikustannus"), mutta
+// pysyy PIILOSSA `loadAnchorCandidates()`:n visible_from-suodattimen takana
+// kunnes kohdepäivä on lähellä. Palauttaa null (näkyy heti) jos kohde on jo
+// lähempänä kuin ennakkopäivien ikkuna, muuten ISO-aikaleiman.
+function laskeHetkiNakyvyys(resolvedDate, ennakkoPaivia) {
+  const kohde = new Date(resolvedDate + 'T00:00:00.000Z');
+  kohde.setUTCDate(kohde.getUTCDate() - ennakkoPaivia);
+  return kohde.getTime() > Date.now() ? kohde.toISOString() : null;
+}
+
 // BUGIKORJAUS (2026-07-16, "Hetki-muru nousee joka aamu" — ks. muistiinpanot.md):
 // aiemmin tämä prompti antoi AINA ajokerran OMAN päivän "tänään"/"huomenna"
 // -ankkureiksi, riippumatta siitä milloin muru oikeasti kirjoitettiin. Jos
@@ -188,6 +218,8 @@ module.exports = async function handler(req, res) {
   if (toggle !== 'on') {
     return res.status(200).json({ success: true, skipped: 'toggle_off' });
   }
+
+  const ennakkoPaivia = parseInt(await getSetting('hetki_ennakkopaivat'), 10) || HETKI_ENNAKKO_PAIVAT_OLETUS;
 
   const lastRun = await getSetting('aly_yoajo_last_run');
   if (lastRun) {
@@ -393,6 +425,12 @@ module.exports = async function handler(req, res) {
         continue;
       }
 
+      // BUGIKORJAUS (2026-07-18, "Ankkuri nousee liian aikaisin kaukaiselle
+      // hetkelle" — ks. laskeHetkiNakyvyys() yllä): koskee VAIN "hetkeä" —
+      // "ikkuna" jätetään tarkoituksella koskematta (visible_from pysyy
+      // nullina, näkyy heti kuten ennenkin).
+      const visibleFrom = category === 'hetki' && resolvedDate ? laskeHetkiNakyvyys(resolvedDate, ennakkoPaivia) : null;
+
       const anchorRes = await supabaseFetch('ankkurit', {
         method: 'POST',
         headers: { Prefer: 'return=representation' },
@@ -403,6 +441,7 @@ module.exports = async function handler(req, res) {
           is_candidate: true,
           user_id: userId,
           event_time: match.time || null,
+          visible_from: visibleFrom,
         }),
       });
       const anchorRows = await anchorRes.json();
