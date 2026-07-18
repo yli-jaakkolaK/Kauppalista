@@ -911,35 +911,11 @@ h1 {
   color: var(--accent-text);
 }
 
-/* Laituri-avustaja (2026-07-12, ensimmäinen oikea älyominaisuus) — sama
-   kokoluokka kuin muillakin rivinapeilla, ei omaa erikoisväriä (ei koristele
-   "tämä on äly" -tunnetta enempää kuin muutkaan toiminnot). */
-.aly-ehdotus-btn {
-  min-width: 44px;
-  min-height: 44px;
-  background: none;
-  border: none;
-  outline: none;
-  appearance: none;
-  -webkit-appearance: none;
-  font-size: 18px;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  -webkit-tap-highlight-color: transparent;
-  opacity: 0.6;
-}
-
-.aly-ehdotus-btn:disabled {
-  opacity: 0.3;
-  cursor: default;
-}
-
-/* "Ankkurin ehdottaminen toiselle" (2026-07-16, ks. muistiinpanot.md) — sama
-   kokoluokka kuin muillakin rivinapeilla, .restore-btn:n kaltainen neutraali
-   sävy (ei ensisijainen ele omalla murulla, mutta ei myöskään piiloteltu). */
-.suggest-btn,
+/* UI-BUGI-korjaus (2026-07-20, ks. muistiinpanot.md): .aly-ehdotus-btn ja
+   .suggest-btn (Laiturin rivin ✨/💬-napit) poistettiin käytöstä script.js:stä
+   kun ne siirrettiin ⋯-valikkoon rivin ikonimäärän ahtaudenkorjauksessa —
+   .postpone-btn on yhä käytössä (Ankkurien ⏭-nappi), jäänyt tähän omana
+   sääntönään entisen yhteisen .suggest-btn/.postpone-btn-säännön tilalle. */
 .postpone-btn {
   min-width: 44px;
   min-height: 44px;
@@ -955,11 +931,6 @@ h1 {
   align-items: center;
   justify-content: center;
   -webkit-tap-highlight-color: transparent;
-}
-
-.suggest-btn:disabled {
-  opacity: 0.4;
-  cursor: default;
 }
 
 /* Äly-ehdotuskortti: kuittityylinen rivi Laiturin rivin alla, katkoviiva-
@@ -2251,11 +2222,33 @@ h1 {
   color: var(--muted);
 }
 
+/* UI-PALAUTE (2026-07-20, ks. muistiinpanot.md "Murun arkistointi"): arkisto
+   asuu Laiturin OMAN listan alla kokoontaitettavana osiona, ei erillisenä
+   dialogina — vahvasti himmennetty (opacity, ei vain harmaa teksti) viestii
+   "nämä vain ovat täällä, eivät action itemejä", sama periaate kuin
+   .laituri-row.sijoitettu:llä jo on. */
+.laituri-arkisto-osio {
+  margin-top: 4px;
+}
+
+.laituri-arkisto-toggle {
+  width: 100%;
+  background: none;
+  border: none;
+  font-size: 12px;
+  letter-spacing: 0.04em;
+  color: var(--muted);
+  text-align: center;
+  padding: 8px 0;
+  cursor: pointer;
+}
+
 .list li.laituri-arkisto-rivi {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 8px;
+  opacity: 0.55;
 }
 
 .list li.laituri-arkisto-rivi span {

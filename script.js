@@ -3291,16 +3291,15 @@ async function lataaLaituri(hakusana) {
 
     li.appendChild(sisalto);
 
+    // UI-BUGI (2026-07-20, Katrin kuvakaappaus): kuusi ikonia (✨⚓→💬⋯×)
+    // vei rivin koko leveyden kapealla näytöllä, teksti puristui lähes
+    // merkki/rivi lukukelvottomaksi — "vilkaisuarvo": sisältö on rivin
+    // pääasia, toiminnot toissijaisia. Sama korjaustapa kuin elävillä
+    // listoilla jo aiemmin (Rivien UI-remontti, 2026-07-16): vain kaksi
+    // yleisintä/nopeinta tointa (⚓/→) jäävät aina näkyviin, harvemmin
+    // tarvitut (✨ kysy ehdotus, 💬 ehdota toiselle) siirretty ⋯-valikkoon
+    // 🗄 Arkistoi:n rinnalle.
     if (rivi.status !== 'sijoitettu') {
-      const alyNappi = document.createElement('button');
-      alyNappi.className = 'aly-ehdotus-btn';
-      alyNappi.textContent = '✨';
-      alyNappi.title = 'Kysy älyltä ehdotus mihin tämä kuuluisi';
-      alyNappi.addEventListener('click', function() {
-        pyydaLaituriEhdotus(rivi, alyNappi, li);
-      });
-      li.appendChild(alyNappi);
-
       // Suora ⚓-oikotie (2026-07-17, ks. "Kalenteri-sijoitus ei kirjoita
       // mitään" -bugikorjaus): nostaa murun sellaisenaan tälle päivälle
       // ankkuriksi ilman sijoitusvirtaa — sama todistettu, oikeasti
@@ -3326,37 +3325,6 @@ async function lataaLaituri(hakusana) {
         avaaSijoitaValikko(rivi, li);
       });
       li.appendChild(sijoitaNappi);
-
-      // "Ankkurin ehdottaminen toiselle" (2026-07-16, ks. muistiinpanot.md) —
-      // vain omalle murulle, koska ehdotus on ehdottajan OMA ajatus (ei
-      // partnerin murun uudelleenehdotus). Kirjoittaa suoraan toisen
-      // ankkureihin CANDIDATE-rivinä (is_candidate=true, RLS sallii tämän
-      // yhden tarkkaan rajatun poikkeuksen, ks. sql/056) — ei koskaan
-      // "oikeana" ankkurina, vastaanottaja päättää lopputuloksen kokonaan.
-      if (rivi.user_id === currentUserId && toinenKayttaja) {
-        const ehdotaNappi = document.createElement('button');
-        ehdotaNappi.className = 'suggest-btn';
-        const joEhdotettu = ehdotetutTassaIstunnossa.has(rivi.id);
-        ehdotaNappi.textContent = joEhdotettu ? '✓' : '💬';
-        ehdotaNappi.disabled = joEhdotettu;
-        ehdotaNappi.title = joEhdotettu
-          ? 'Ehdotettu ' + henkiloNimi(toinenKayttaja.henkilo) + ':lle'
-          : 'Ehdota ' + henkiloNimi(toinenKayttaja.henkilo) + ':lle ankkuriksi';
-        ehdotaNappi.addEventListener('click', async function() {
-          const { error } = await db.from('ankkurit').insert({
-            content: rivi.content,
-            source: 'ehdotus',
-            source_ref: String(rivi.id),
-            user_id: toinenKayttaja.user_id,
-            is_candidate: true,
-            proposed_by: currentUserId,
-          });
-          if (ilmoitaKirjoitusvirheesta(error, 'Ehdotuksen lähetys')) return;
-          ehdotetutTassaIstunnossa.add(rivi.id);
-          lataaLaituri(document.getElementById('laituri-search').value.trim());
-        });
-        li.appendChild(ehdotaNappi);
-      }
     } else {
       // "↺ palauta sijoittamattomaksi" (2026-07-17, ks. "Kalenteri-sijoitus
       // ei kirjoita mitään" -bugikorjaus) — sijoitettu-merkintä voi olla
@@ -3373,15 +3341,46 @@ async function lataaLaituri(hakusana) {
       li.appendChild(palautaNappi);
     }
 
-    // Arkistointi (2026-07-19, ks. muistiinpanot.md "Murun arkistointi") —
-    // "⋯"-valikossa eikä omana nappina, koska rivillä on jo enimmillään
-    // viisi näkyvää nappia (sama tilanahtaus-oppi kuin aiemmin ankkuri-rivillä).
+    // ⋯-valikko: harvemmin tarvitut toiminnot (ks. UI-BUGI-kommentti yllä).
+    // Arkistointi (2026-07-19, ks. muistiinpanot.md "Murun arkistointi") oli
+    // täällä ensin — ✨/💬 siirretty mukaan 2026-07-20 rivin ahtauskorjauksessa.
+    const menuKohdat = [];
+    if (rivi.status !== 'sijoitettu') {
+      menuKohdat.push({
+        label: '✨ Kysy ehdotus',
+        onClick: function() { pyydaLaituriEhdotus(rivi, {}, li); },
+      });
+      // "Ankkurin ehdottaminen toiselle" (2026-07-16) — vain omalle murulle
+      // (ehdotus on ehdottajan OMA ajatus, ei partnerin murun uudelleenehdotus),
+      // ja vain jos ei jo ehdotettu tässä istunnossa (ei tarvitse näyttää
+      // kuitattua kohtaa valikossa — pois listalta riittää, sama "kevyt"
+      // periaate kuin muuallakin tässä erässä).
+      if (rivi.user_id === currentUserId && toinenKayttaja && !ehdotetutTassaIstunnossa.has(rivi.id)) {
+        menuKohdat.push({
+          label: '💬 Ehdota ' + henkiloNimi(toinenKayttaja.henkilo) + ':lle',
+          onClick: async function() {
+            const { error } = await db.from('ankkurit').insert({
+              content: rivi.content,
+              source: 'ehdotus',
+              source_ref: String(rivi.id),
+              user_id: toinenKayttaja.user_id,
+              is_candidate: true,
+              proposed_by: currentUserId,
+            });
+            if (ilmoitaKirjoitusvirheesta(error, 'Ehdotuksen lähetys')) return;
+            ehdotetutTassaIstunnossa.add(rivi.id);
+            lataaLaituri(document.getElementById('laituri-search').value.trim());
+          },
+        });
+      }
+    }
     // Sama laituri.status-tilakenttä kuin OSA A:n "siirretty Kauppalistalle" —
     // "arkistoitu" vain kolmas arvo, ei erillinen mekanismi.
-    li.appendChild(createOverflowButton(li, [{
+    menuKohdat.push({
       label: '🗄 Arkistoi',
       onClick: function() { arkistoiLaituriRivi(rivi); },
-    }]));
+    });
+    li.appendChild(createOverflowButton(li, menuKohdat));
 
     const poistoNappi = document.createElement('button');
     poistoNappi.className = 'delete-btn';
@@ -3406,7 +3405,7 @@ async function lataaLaituri(hakusana) {
     piirraKauppaEhdotusKortti(rivi, li);
   });
 
-  paivitaLaituriArkistoLinkki();
+  paivitaLaituriArkisto();
 }
 
 // "Yksi luukku" erä 1 — kauppatavaraehdotus (2026-07-19, ks. muistiinpanot.md
@@ -3626,29 +3625,34 @@ async function arkistoiLaituriRivi(rivi) {
 async function palautaLaituriArkistosta(rivi) {
   const { error } = await db.from('laituri').update({ status: 'uusi', placed_where: null }).eq('id', rivi.id);
   if (ilmoitaKirjoitusvirheesta(error, 'Murun palautus arkistosta')) return;
-  await avaaLaituriArkistoOverlay();
   lataaLaituri(document.getElementById('laituri-search').value.trim());
 }
 
-// Hakee arkistoitujen murujen määrän ja näyttää/piilottaa Arkisto-linkin —
-// sama malli kuin paivitaHyttiArkistoLinkki().
-async function paivitaLaituriArkistoLinkki() {
-  const linkki = document.getElementById('laituri-arkisto-linkki');
-  const { count } = await db.from('laituri').select('id', { count: 'exact', head: true }).eq('status', 'arkistoitu');
-  linkki.style.display = count ? 'block' : 'none';
-}
+// UI-PALAUTE (2026-07-20, ks. muistiinpanot.md "Murun arkistointi"): alkuperäinen
+// erillinen dialog-overlay-arkisto vaihdettu Katrin testilöydöksen jälkeen
+// kokoontaitettavaksi osioksi Laiturin OMAN listan alle — arkisto asuu nyt
+// Laiturin sisällä, ei erillisenä "poissa silmistä" -paikkana ("se vain on
+// siinä" -periaate). Oletuksena kiinni (vilkaisuarvo: aktiivinen näkymä pysyy
+// puhtaana), napautus laajentaa saman näkymän sisällä. Kutsutaan aina
+// lataaLaituri()-kutsun yhteydessä, jotta määrä+rivit pysyvät tuoreina —
+// säilyttää käyttäjän auki/kiinni-valinnan, jos osio oli jo auki kesken istunnon.
+async function paivitaLaituriArkisto() {
+  const osio = document.getElementById('laituri-arkisto-osio');
+  const lista = document.getElementById('laituri-arkisto-lista');
+  const oliAuki = lista.style.display !== 'none';
 
-// Näyttää arkistoitujen murujen listan — "kevyt: pelkkä lista riittää"
-// (käyttäjän oma rajaus tälle erälle), kunkin rivin ↺ palauttaa suoraan.
-async function avaaLaituriArkistoOverlay() {
   const { data, error } = await db.from('laituri').select().eq('status', 'arkistoitu').order('created_at', { ascending: false });
   if (error) {
     console.error('Laiturin arkiston haku epäonnistui:', error);
     return;
   }
-  const lista = document.getElementById('laituri-arkisto-lista');
+  const rivit = data || [];
+
+  osio.style.display = rivit.length > 0 ? 'block' : 'none';
+  document.getElementById('laituri-arkisto-toggle').textContent = '🗄 Arkisto (' + rivit.length + ')';
+
   lista.innerHTML = '';
-  (data || []).forEach(function(rivi) {
+  rivit.forEach(function(rivi) {
     const li = document.createElement('li');
     li.className = 'laituri-arkisto-rivi';
     const teksti = document.createElement('span');
@@ -3664,12 +3668,12 @@ async function avaaLaituriArkistoOverlay() {
     li.appendChild(palautaNappi);
     lista.appendChild(li);
   });
-  document.getElementById('laituri-arkisto-overlay').style.display = 'flex';
+  lista.style.display = oliAuki ? 'block' : 'none';
 }
 
-document.getElementById('laituri-arkisto-linkki').addEventListener('click', avaaLaituriArkistoOverlay);
-document.getElementById('laituri-arkisto-sulje').addEventListener('click', function() {
-  document.getElementById('laituri-arkisto-overlay').style.display = 'none';
+document.getElementById('laituri-arkisto-toggle').addEventListener('click', function() {
+  const lista = document.getElementById('laituri-arkisto-lista');
+  lista.style.display = lista.style.display === 'none' ? 'block' : 'none';
 });
 
 // Siivoaa rivin (li) jälkeen mahdollisesti jo olevan ehdotuskortin pois
