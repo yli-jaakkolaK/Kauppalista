@@ -2,6 +2,8 @@
 
 Tämä tiedosto on eri asia kuin **muistiinpanot.md** (projektin historia, päätökset, konteksti — "miksi asiat ovat kuten ovat", sisältää myös kesken olevan testauslistan) ja **BACKUP.md** (kertaluontoiset käsintehtävät toimenpiteet). COPILOT.md on paikka jonne kirjataan **"miten tähän järjestelmään lisätään uutta"** -tyyppinen tekninen ohjeistus — kirjoita tänne kun rakennat jotain jonka päälle ODOTETAAN rakennettavan lisää myöhemmin (kuten äly-putki alla). Jos vain korjaat bugin tai lisäät kertaluontoisen ominaisuuden, se kuuluu muistiinpanot.md:hen, ei tänne. **(PALUU.md poistettu 2026-07-17 — sisältö siirretty muistiinpanot.md:n "Testauslista — kesken" -osioon.)**
 
+**Lue myös KONSEPTIKIRJA.md** — se kertoo miksi asiat ovat niin kuin ovat ja mitä on suunniteltu rakentamatta.
+
 ---
 
 ## Koodikieli: uusi koodi englanniksi (talon sääntö, kirjattu 2026-07-13)
