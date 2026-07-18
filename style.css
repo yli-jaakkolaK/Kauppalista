@@ -1586,15 +1586,6 @@ h1 {
   opacity: 0.4;
 }
 
-/* Ankkurit-lisäyksen kohdevalinta (2026-07-18, ks. muistiinpanot.md
-   "💬-ehdotuksen löydettävyys") — sama visuaali kuin muistutus-tila-valinta.
-   Näkyvyys (display:flex/none) asetetaan aina JS:stä (paivitaAnkkuriKohdeValinta),
-   sen mukaan onko toinen käyttäjä tunnistettu. */
-.ankkuri-kohde-valinta {
-  gap: 8px;
-  margin: 8px 0;
-}
-
 .muistutus-pikanapit {
   display: flex;
   flex-wrap: wrap;

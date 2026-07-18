@@ -102,7 +102,6 @@ async function paivitaHenkiloKartta() {
     return;
   }
   toinenKayttaja = (data || []).find(function(rivi) { return rivi.user_id !== currentUserId; }) || null;
-  paivitaAnkkuriKohdeValinta();
 }
 function henkiloNimi(henkilo) {
   return henkilo ? henkilo.charAt(0).toUpperCase() + henkilo.slice(1) : 'kumppanille';
@@ -148,13 +147,22 @@ async function ehdotaSisaltoToiselle(sisalto) {
 // Laiturissa") — "Juhalle:" tai "laita Juhalle:" RIVIN ALUSSA (Katrin päässä
 // vastaavasti "Katrille:"/"laita Katrille:") ohjaa murun suoraan toisen
 // ankkuriehdokkaaksi ehdotaSisaltoToiselle()-putkea pitkin, ilman että
-// kumpaakaan valitsinta (💬-nappi, kohdevalinta) tarvitsee koskea. Nimet
-// KOVAKOODATTU allatiivimuotoineen (ei yritetä taivuttaa nimiä ohjelmallisesti
-// — kahden hengen perheessä kiinteä taulukko on luotettavampi kuin
-// yleinen suomen kielioppi). SAMA logiikka toistettu api/laituri-add.js:ssä
-// Siri/pikakomento-reittiä varten (ei jaettua moduulia selaimen ja Vercel-
-// funktion välillä tässä projektissa) — pidä nämä kaksi synkassa.
+// 💬-toimintoa tarvitsee koskea. Nimet KOVAKOODATTU allatiivimuotoineen (ei
+// yritetä taivuttaa nimiä ohjelmallisesti — kahden hengen perheessä kiinteä
+// taulukko on luotettavampi kuin yleinen suomen kielioppi). SAMA logiikka
+// toistettu api/laituri-add.js:ssä Siri/pikakomento-reittiä varten (ei
+// jaettua moduulia selaimen ja Vercel-funktion välillä tässä projektissa) —
+// pidä nämä kaksi synkassa.
 const HENKILO_ALLATIIVI = { katri: 'Katrille', juha: 'Juhalle' };
+
+// UI-KORJAUS (2026-07-21, ks. muistiinpanot.md): korvaa väärän
+// `henkiloNimi(x) + ':lle'`-kaavan (tuotti "Juha:lle" — kaksoispiste EI ole
+// suomen kielioppia, oikea allatiivi on "Juhalle") kaikkialla missä nimi
+// pitää taivuttaa ihmiselle näkyvässä viestissä. Käyttää samaa kovakoodattua
+// taulukkoa kuin laukaisusanan tunnistus yllä.
+function henkiloAllatiivi(henkilo) {
+  return HENKILO_ALLATIIVI[henkilo] || (henkiloNimi(henkilo) + 'lle');
+}
 
 // Tunnistaa VAIN täsmällisen rivinalkuisen laukaisun — pelkkä nimen maininta
 // tekstin sisällä ("juttelin Juhalle eilen") EI SAA osua. Epäselvässä
@@ -180,17 +188,6 @@ function tunnistaEhdotusLaukaisu(teksti, kohdeHenkilo) {
   return loppuosa || null;
 }
 
-// Näyttää/piilottaa Ankkurit-lisäyksen "Itselle/[Nimi]:lle" -kohdevalinnan sen
-// mukaan onko toinen käyttäjä tunnistettu — kutsutaan heti kun henkilökartta
-// on haettu (ks. paivitaHenkiloKartta), koska se voi valmistua vasta kotinäkymän
-// ensimmäisen piirron jälkeen (ei odoteta, ks. siirryKirjautumisenJalkeen).
-function paivitaAnkkuriKohdeValinta() {
-  const valinta = document.getElementById('ankkuri-kohde-valinta');
-  const toiselleBtn = document.getElementById('ankkuri-kohde-toiselle-btn');
-  if (!valinta || !toiselleBtn) return;
-  valinta.style.display = toinenKayttaja ? 'flex' : 'none';
-  if (toinenKayttaja) toiselleBtn.textContent = henkiloNimi(toinenKayttaja.henkilo) + ':lle';
-}
 
 // Hakee mitkä rivit (mistä tahansa lähteestä) KIRJAUTUNUT ITSE on jo
 // nostanut Ankkureihin — ankkurit ovat henkilökohtaisia (2026-07-11), joten
@@ -662,7 +659,7 @@ function avaaRistiriitaVahvistus(isoPvm, rivit, fullIds) {
       naytaIlmoitus('Ehdotus epäonnistui — yritä uudelleen');
       return;
     }
-    naytaIlmoitus('Ehdotettu ' + henkiloNimi(toinenKayttaja.henkilo) + ':lle');
+    naytaIlmoitus('Ehdotettu ' + henkiloAllatiivi(toinenKayttaja.henkilo));
   };
 }
 
@@ -2481,14 +2478,14 @@ async function lataaAnkkurit() {
     if (toinenKayttaja) {
       const ankkuriAvain = 'ankkuri:' + ankkuri.id;
       li.appendChild(createOverflowButton(li, [{
-        label: 'Ehdota ' + henkiloNimi(toinenKayttaja.henkilo) + ':lle',
+        label: 'Ehdota ' + henkiloAllatiivi(toinenKayttaja.henkilo),
         onClick: async function() {
           if (ehdotetutTassaIstunnossa.has(ankkuriAvain)) {
-            naytaIlmoitus('Jo ehdotettu ' + henkiloNimi(toinenKayttaja.henkilo) + ':lle');
+            naytaIlmoitus('Jo ehdotettu ' + henkiloAllatiivi(toinenKayttaja.henkilo));
             return;
           }
           const onnistui = await ehdotaSisaltoToiselle(ankkuri.content);
-          naytaIlmoitus(onnistui ? ('Ehdotettu ' + henkiloNimi(toinenKayttaja.henkilo) + ':lle') : 'Ehdotuksen lähetys epäonnistui');
+          naytaIlmoitus(onnistui ? ('Ehdotettu ' + henkiloAllatiivi(toinenKayttaja.henkilo)) : 'Ehdotuksen lähetys epäonnistui');
           if (onnistui) ehdotetutTassaIstunnossa.add(ankkuriAvain);
         },
       }]));
@@ -3337,7 +3334,7 @@ async function lataaLaituri(hakusana) {
       // periaate kuin muuallakin tässä erässä).
       if (rivi.user_id === currentUserId && toinenKayttaja && !ehdotetutTassaIstunnossa.has(rivi.id)) {
         menuKohdat.push({
-          label: '💬 Ehdota ' + henkiloNimi(toinenKayttaja.henkilo) + ':lle',
+          label: '💬 Ehdota ' + henkiloAllatiivi(toinenKayttaja.henkilo),
           onClick: async function() {
             const { error } = await db.from('ankkurit').insert({
               content: rivi.content,
@@ -4907,22 +4904,15 @@ document.getElementById('visibility-toggle').addEventListener('change', async fu
 });
 
 // Ankkurit
-// Kohdevalinta "Itselle"/"[Nimi]:lle" lisäysvaiheessa (2026-07-18, ks.
-// muistiinpanot.md "💬-ehdotuksen löydettävyys") — palautuu AINA "itselle"
-// jokaisen onnistuneen ehdotuksen jälkeen, ettei seuraava täysin erillinen
-// ankkuri menisi vahingossa toiselle samalla oletuksella.
-let ankkuritLisaysKohde = 'itselle';
-document.querySelectorAll('.ankkuri-kohde-btn').forEach(function(btn) {
-  btn.addEventListener('click', function() {
-    ankkuritLisaysKohde = btn.dataset.kohde;
-    document.querySelectorAll('.ankkuri-kohde-btn').forEach(function(b) { b.classList.toggle('active', b === btn); });
-  });
-});
-function nollaaAnkkuriKohdeValinta() {
-  ankkuritLisaysKohde = 'itselle';
-  document.querySelectorAll('.ankkuri-kohde-btn').forEach(function(b) { b.classList.toggle('active', b.dataset.kohde === 'itselle'); });
-}
-
+// UI-KORJAUS (2026-07-21, ks. muistiinpanot.md "UI-korjaus ankkurin
+// kohdevalitsimeen") — pysyvä "Itselle/[Nimi]:lle"-kohdevalinta poistettu
+// kokonaan: rakentaja (Katri) luuli sitä jumiin jääneiksi ehdokaslapuiksi
+// (katkoviiva = ehdokaskieli muualla), ja tahmea "Toiselle"-tila oli ansa
+// (huolimaton ankkuri lentäisi väärälle ihmiselle). Kohde on nyt ELE, ei
+// TILA — sama kieli kuin Laiturin 💬:ssä: uusi ankkuri kirjoitetaan AINA
+// itselle (nolla valintaa), delegointi hoituu jälkikäteen ⋯-valikon
+// "Ehdota [Nimi]:lle" -toiminnolla (ks. alempana lataaAnkkurit()-listauksessa).
+//
 // BUGIKORJAUS (2026-07-14, "Ankkuriarkkitehtuuri: jokaisella ankkurilla on
 // koti"): käsin kirjoitettu ankkuri EI enää OLE itse sisältö (jonka lasku
 // tuhoaisi) — se luo taustalla murun Laituriin ja nostaa SEN, täsmälleen
@@ -4933,18 +4923,6 @@ document.getElementById('ankkurit-add-btn').addEventListener('click', async func
   const ankkuriInput = document.getElementById('ankkurit-input');
   const teksti = ankkuriInput.value.trim();
   if (teksti === '') { ankkuriInput.focus(); return; }
-
-  if (ankkuritLisaysKohde === 'toiselle' && toinenKayttaja) {
-    const onnistui = await ehdotaSisaltoToiselle(teksti);
-    if (onnistui) {
-      naytaIlmoitus('Ehdotettu ' + henkiloNimi(toinenKayttaja.henkilo) + ':lle');
-      ankkuriInput.value = '';
-      nollaaAnkkuriKohdeValinta();
-    } else {
-      naytaIlmoitus('Ehdotuksen lähetys epäonnistui');
-    }
-    return;
-  }
 
   const { data: muru, error: muruError } = await db.from('laituri')
     .insert({ content: teksti, user_id: currentUserId, status: 'uusi' })
@@ -5004,7 +4982,7 @@ document.getElementById('laituri-add-btn').addEventListener('click', async funct
   const ehdotusSisalto = toinenKayttaja ? tunnistaEhdotusLaukaisu(teksti, toinenKayttaja.henkilo) : null;
   if (ehdotusSisalto) {
     const onnistui = await ehdotaSisaltoToiselle(ehdotusSisalto);
-    naytaIlmoitus(onnistui ? ('Ehdotettu ' + henkiloNimi(toinenKayttaja.henkilo) + ':lle') : 'Ehdotuksen lähetys epäonnistui');
+    naytaIlmoitus(onnistui ? ('Ehdotettu ' + henkiloAllatiivi(toinenKayttaja.henkilo)) : 'Ehdotuksen lähetys epäonnistui');
     laituriInput.value = '';
     tyhjennaLaituriLuonnos();
     lataaLaituri(document.getElementById('laituri-search').value.trim());
