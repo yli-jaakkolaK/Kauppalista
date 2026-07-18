@@ -3403,9 +3403,52 @@ async function lataaLaituri(hakusana) {
 
     listEl.appendChild(li);
     piirraKauppaEhdotusKortti(rivi, li);
+    piirraHetkiSiltaKortti(rivi, li);
   });
 
   paivitaLaituriArkisto();
+}
+
+// Kalenterisilta aikaistettu (2026-07-20, Katrin tarkennus, ks. muistiinpanot.md
+// "Kalenterisilta aikaistettu") — äly kirjoittaa TÄMÄN suoraan murun omalle
+// riville (laituri.ai_hetki_ehdotus, ks. api/aly-nightly.js ja
+// api/laituri-add.js) HETI kun "hetki" tunnistetaan, riippumatta ankkuri-
+// ehdokkaan omasta visible_from-viiveestä (ks. Bugi 28) — muuten ajanvaraus
+// näkyisi kalenterisiltana vasta lähellä kohdehetkeä. LISÄYS aikaiseen
+// siltaan, EI korvaa ankkuriehdokasta (se toimii yhä muistutuksena
+// kohdepäivänä ennallaan). Sama .ics-generointi (avaaKalenteriSilta) kuin
+// ankkuriehdokkaalla — vain aikaisemmassa vaiheessa putkea.
+function piirraHetkiSiltaKortti(rivi, li) {
+  const ehdotus = rivi.ai_hetki_ehdotus;
+  if (!ehdotus || !ehdotus.date) return;
+
+  const kortti = document.createElement('li');
+  kortti.className = 'laituri-ehdotus-rivi';
+
+  const d = new Date(ehdotus.date + 'T00:00:00');
+  const pvmTeksti = d.getDate() + '.' + (d.getMonth() + 1) + '.';
+  const aikaTeksti = ehdotus.time ? ' klo ' + ehdotus.time.slice(0, 5) : '';
+  const teksti = document.createElement('span');
+  teksti.textContent = '🕐 ' + pvmTeksti + aikaTeksti;
+  kortti.appendChild(teksti);
+
+  // Sama ehto kuin ankkuriehdokkaan omalla ➕-napilla (ks. loadAnchorCandidates):
+  // .ics-tapahtuma tarvitsee sekä päivän ETTÄ kellonajan.
+  if (ehdotus.time) {
+    const napit = document.createElement('span');
+    napit.className = 'laituri-ehdotus-napit';
+    const kalenteriNappi = document.createElement('button');
+    kalenteriNappi.textContent = '➕ Lisää kalenteriin';
+    kalenteriNappi.className = 'dialog-btn dialog-btn-cancel';
+    kalenteriNappi.title = 'Avaa valmiiksi täytettynä puhelimen omaan Kalenteriin';
+    kalenteriNappi.addEventListener('click', function() {
+      avaaKalenteriSilta({ content: ehdotus.content || rivi.content, event_date: ehdotus.date, event_time: ehdotus.time });
+    });
+    napit.appendChild(kalenteriNappi);
+    kortti.appendChild(napit);
+  }
+
+  li.insertAdjacentElement('afterend', kortti);
 }
 
 // "Yksi luukku" erä 1 — kauppatavaraehdotus (2026-07-19, ks. muistiinpanot.md

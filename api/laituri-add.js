@@ -172,6 +172,22 @@ async function classifyImmediately(muru) {
       visibleFrom = laskeHetkiNakyvyys(resolvedDate, ennakkoPaivia);
     }
 
+    // Kalenterisilta aikaistettu (2026-07-20, Katrin tarkennus, ks.
+    // muistiinpanot.md "Kalenterisilta aikaistettu") — sama varhaismerkintä
+    // kuin api/aly-nightly.js:ssä, HETI Siri-sanelun heti-luokittelun
+    // yhteydessä (ei odota ankkuriehdokkaan visible_from:ia). Riippumaton
+    // ankkuriehdokkaan onnistumisesta, epäonnistuminen vain lokitetaan.
+    if (category === 'hetki') {
+      const hetkiRes = await supabaseFetch('laituri?id=eq.' + muru.id, {
+        method: 'PATCH',
+        headers: { Prefer: 'return=minimal' },
+        body: JSON.stringify({ ai_hetki_ehdotus: { content: match.content, date: resolvedDate, time: match.time || null } }),
+      });
+      if (!hetkiRes.ok) {
+        console.error('[laituri-add] Kalenterisillan varhaismerkinnän kirjaus epäonnistui murulle ' + muru.id + ':', hetkiRes.status, await hetkiRes.text());
+      }
+    }
+
     const anchorRes = await supabaseFetch('ankkurit', {
       method: 'POST',
       headers: { Prefer: 'return=representation' },

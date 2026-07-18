@@ -422,6 +422,29 @@ module.exports = async function handler(req, res) {
       // nullina, näkyy heti kuten ennenkin).
       const visibleFrom = category === 'hetki' && resolvedDate ? laskeHetkiNakyvyys(resolvedDate, ennakkoPaivia) : null;
 
+      // Kalenterisilta aikaistettu (2026-07-20, Katrin tarkennus, ks.
+      // muistiinpanot.md "Kalenterisilta aikaistettu"): ankkuriehdokkaan oma
+      // ➕-nappi ei näy ennen kuin visible_from koittaa (kohdepäivän lähelle
+      // asti "hetkelle") — kalenteriin lisäys saatiin siis usein vasta kun
+      // ajanvaraus oli lähes myöhässä. Kirjoitetaan sama {content,date,time}
+      // HETI murun omalle riville (ei odota visible_from:ia, ei riipu
+      // ankkuriehdokkaan onnistumisesta ollenkaan — riippumaton, aikaisempi
+      // silta, EI korvaa ankkuriehdokasta joka toimii yhä muistutuksena
+      // kohdepäivänä ennallaan). Vain "hetki", ei "ikkuna" (Katrin rajaus —
+      // ikkuna-ehdokas näkyy jo heti ilman viivettä, sillä ei ole tätä
+      // ongelmaa). Epäonnistuminen ei saa katkaista tavallista ehdokasvirtaa
+      // — vain lokitetaan.
+      if (category === 'hetki') {
+        const hetkiRes = await supabaseFetch('laituri?id=eq.' + note.id, {
+          method: 'PATCH',
+          headers: { Prefer: 'return=minimal' },
+          body: JSON.stringify({ ai_hetki_ehdotus: { content: match.content, date: resolvedDate, time: match.time || null } }),
+        });
+        if (!hetkiRes.ok) {
+          console.error('[aly-nightly] Kalenterisillan varhaismerkinnän kirjaus epäonnistui murulle ' + note.id + ':', hetkiRes.status, await hetkiRes.text());
+        }
+      }
+
       const anchorRes = await supabaseFetch('ankkurit', {
         method: 'POST',
         headers: { Prefer: 'return=representation' },
