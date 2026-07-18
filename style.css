@@ -1874,6 +1874,16 @@ h1 {
   appearance: none;
   -webkit-appearance: none;
   -webkit-tap-highlight-color: transparent;
+  /* Kalenterisilta-korjaus (2026-07-21, ks. muistiinpanot.md): ➕-nappi on
+     nyt aito <a href>-linkki <button>:n sijaan (natiivi navigointi, ei
+     JS — ks. kalenterisiltaUrl()) — nämä säännöt pitävät sen näyttämältä
+     täsmälleen samalta kuin painike, <a> ei muuten keskitä/alleviivaa
+     tekstiään kuten <button> tekee oletuksena. */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  text-decoration: none;
 }
 
 .dialog-btn-cancel {

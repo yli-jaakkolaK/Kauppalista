@@ -2548,17 +2548,25 @@ async function merkitseAlyMuruKasitellyksi(sourceRef) {
 // Safarissa, ✓✓ hyppäsi suoraan Applen esitäytettyyn näkymään): asennettu
 // PWA (standalone-tila) NIELEE `window.location.href`-navigoinnin ei-HTML-
 // vastaukseen — nappi näytti aktiivityylin muttei siirtynyt mihinkään.
-// Selain (Safari-välilehti) käsittelee saman osoitteen oikein, koska
-// standalone-webview ei anna järjestelmän ottaa vastausta hoitaakseen
-// samalla tavalla kuin täysi Safari tekee. Korjattu avaamalla osoite
-// eksplisiittisesti UUTEEN kontekstiin `window.open(url, '_blank')`:lla —
-// iOS-PWA:ssa tämä avautuu yleensä Safarin omaan näkymään, jonka WebKit
-// KÄSITTELEE oikein (todistettu juuri tällä testillä).
-function avaaKalenteriSilta(candidate) {
-  const url = '/api/ics?otsikko=' + encodeURIComponent(candidate.content) +
+// Selain (Safari-välilehti) käsittelee saman osoitteen oikein. Korjattu
+// avaamalla osoite `window.open(url, '_blank')`:lla — EI RIITTÄNYT
+// (ks. KORJAUS 3): Katri vahvisti useilla sulje+avaa-kierroksilla että
+// window.open TODELLA avaa uuden ikkunan iOS-PWA:sta, mutta se ikkuna jää
+// TYHJÄKSI (valkoinen sivu) — tunnettu iOS-PWA-oikku, `window.open` ei aina
+// saa oikeaa selainkontekstia ei-HTML-vastaukselle standalone-tilasta käsin.
+//
+// KORJAUS 3 (2026-07-21, Katrin jatkodiagnoosi): kumpikaan JS-pohjainen
+// navigointitapa (`location.href`, `window.open`) ei toiminut PWA:sta, vain
+// KÄSIN Safariin avattu osoite toimi. Johtopäätös: ongelma on nimenomaan
+// JS:N KAUTTA laukaistussa navigoinnissa, ei itse osoitteessa/vastauksessa
+// (jo todistettu oikeaksi). Korjattu poistamalla JS-navigointi kokonaan —
+// ➕-"nappi" on nyt AITO `<a href="...">`-linkkielementti ilman
+// target-attribuuttia ja ilman click-käsittelijää, jota selain/PWA käsittelee
+// natiivina linkkinä (sama reitti jota iOS jo käsittelee oikein Safarissa).
+function kalenterisiltaUrl(candidate) {
+  return '/api/ics?otsikko=' + encodeURIComponent(candidate.content) +
     '&pvm=' + encodeURIComponent(candidate.event_date) +
     '&aika=' + encodeURIComponent(candidate.event_time);
-  window.open(url, '_blank');
 }
 
 // E3 mid-tier V1 ("äly toimii, ihminen valvoo", ks. muistiinpanot.md) — AI-
@@ -2751,13 +2759,11 @@ async function loadAnchorCandidates() {
     // koskaan 💬-ihmisehdotuksille (niillä ei ole event_date/event_time,
     // eikä äly ole koskaan käsitellyt niiden ajankohtaa).
     if (candidate.event_date && candidate.event_time) {
-      const kalenteriNappi = document.createElement('button');
+      const kalenteriNappi = document.createElement('a');
       kalenteriNappi.textContent = '➕ Lisää kalenteriin';
       kalenteriNappi.className = 'dialog-btn dialog-btn-cancel';
       kalenteriNappi.title = 'Avaa valmiiksi täytettynä puhelimen omaan Kalenteriin';
-      kalenteriNappi.addEventListener('click', function() {
-        avaaKalenteriSilta(candidate);
-      });
+      kalenteriNappi.href = kalenterisiltaUrl(candidate);
       napitRivi.appendChild(kalenteriNappi);
     }
 
@@ -3393,7 +3399,7 @@ async function lataaLaituri(hakusana) {
 // ehdokkaan omasta visible_from-viiveestä (ks. Bugi 28) — muuten ajanvaraus
 // näkyisi kalenterisiltana vasta lähellä kohdehetkeä. LISÄYS aikaiseen
 // siltaan, EI korvaa ankkuriehdokasta (se toimii yhä muistutuksena
-// kohdepäivänä ennallaan). Sama .ics-generointi (avaaKalenteriSilta) kuin
+// kohdepäivänä ennallaan). Sama .ics-generointi (kalenterisiltaUrl) kuin
 // ankkuriehdokkaalla — vain aikaisemmassa vaiheessa putkea.
 function piirraHetkiSiltaKortti(rivi, li) {
   const ehdotus = rivi.ai_hetki_ehdotus;
@@ -3414,13 +3420,11 @@ function piirraHetkiSiltaKortti(rivi, li) {
   if (ehdotus.time) {
     const napit = document.createElement('span');
     napit.className = 'laituri-ehdotus-napit';
-    const kalenteriNappi = document.createElement('button');
+    const kalenteriNappi = document.createElement('a');
     kalenteriNappi.textContent = '➕ Lisää kalenteriin';
     kalenteriNappi.className = 'dialog-btn dialog-btn-cancel';
     kalenteriNappi.title = 'Avaa valmiiksi täytettynä puhelimen omaan Kalenteriin';
-    kalenteriNappi.addEventListener('click', function() {
-      avaaKalenteriSilta({ content: ehdotus.content || rivi.content, event_date: ehdotus.date, event_time: ehdotus.time });
-    });
+    kalenteriNappi.href = kalenterisiltaUrl({ content: ehdotus.content || rivi.content, event_date: ehdotus.date, event_time: ehdotus.time });
     napit.appendChild(kalenteriNappi);
     kortti.appendChild(napit);
   }
