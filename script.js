@@ -1353,10 +1353,16 @@ function piirraKuukausiRuudukko(sisalto, kaikkiTapahtumat, kuluvaKuukausi) {
 // saavat "uusi"-merkinnän kunnes KUITATAAN — kuittaus on "nähty", ei portti,
 // EI koskaan poista tapahtumaa (jos meno on väärässä kalenterissa, se
 // siirretään iPhonen Kalenterissa, synkka peilaa muutoksen tänne).
-function synkkaaICloud() {
-  fetch('/api/caldav-sync').then(function() {
+// Lähettää oman istunnon access_tokenin mukana (2026-07-20, ks. muistiinpanot.md
+// "RLS-/yksityisyysauditointi") — endpoint vaatii nyt todennuksen, aiemmin
+// täysin avoin.
+async function synkkaaICloud() {
+  try {
+    const { data: sessioData } = await db.auth.getSession();
+    const token = sessioData.session ? sessioData.session.access_token : null;
+    await fetch('/api/caldav-sync', { headers: { Authorization: 'Bearer ' + token } });
     paivitaKuittausTila();
-  }).catch(function() {});
+  } catch (e) {}
 }
 
 // Kirjautuneen käyttäjän omat kuittaukset — sama Set-pohjainen kuvio kuin
@@ -5723,7 +5729,9 @@ async function synkkaaKalenteriNyt() {
   const alkuperainenTeksti = nappi.textContent;
   nappi.textContent = 'Haetaan...';
   try {
-    const vastaus = await fetch('/api/caldav-sync');
+    const { data: sessioData } = await db.auth.getSession();
+    const token = sessioData.session ? sessioData.session.access_token : null;
+    const vastaus = await fetch('/api/caldav-sync', { headers: { Authorization: 'Bearer ' + token } });
     const tulos = await vastaus.json();
     if (!vastaus.ok) {
       naytaIlmoitus('Kalenterisynkka epäonnistui: ' + (tulos.error || vastaus.status));

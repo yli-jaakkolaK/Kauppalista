@@ -10,7 +10,11 @@ name: Muistutusten ja kalenterisynkan ajastin
 # ks. muistiinpanot.md "E3-keskiporras" -osio). aly-nightly tekee itse
 # työtä vain kerran ~20h välein (tila asetukset-taulussa) vaikka tätä
 # workfow'ta pingataan 5 min välein — sama jaettu MUISTUTUKSET_CRON_SECRET
-# uudelleenkäytetty, ei vaadi uutta salaisuutta.
+# uudelleenkäytetty kaikilla kolmella reitillä, ei vaadi uutta salaisuutta.
+# /api/caldav-sync sai tämän vaatimuksen vasta 2026-07-20 RLS-/yksityisyys-
+# auditoinnin jäljiltä (ks. muistiinpanot.md) — oli aiemmin täysin
+# autentikoimaton, mikä paljasti Hytti-scopen kalenteritietoa kenelle
+# tahansa URL:n löytävälle.
 #
 # HUOM: GitHub Actionsin cron-aikataulu on "parhaan yrityksen" periaatteella
 # — GitHub voi viivästyttää ajoa ruuhka-aikoina. Muistutusten ±5 min
@@ -30,7 +34,7 @@ jobs:
           curl -fsS "https://kauppalista-nine.vercel.app/api/muistutukset-laheta?avain=${{ secrets.MUISTUTUKSET_CRON_SECRET }}" || true
       - name: Synkkaa kalenteri
         run: |
-          curl -fsS "https://kauppalista-nine.vercel.app/api/caldav-sync" || true
+          curl -fsS "https://kauppalista-nine.vercel.app/api/caldav-sync?avain=${{ secrets.MUISTUTUKSET_CRON_SECRET }}" || true
       - name: Aja E3-keskiportaan yöajo (tekee itse vain kerran ~20h välein)
         run: |
           curl -fsS "https://kauppalista-nine.vercel.app/api/aly-nightly?key=${{ secrets.MUISTUTUKSET_CRON_SECRET }}" || true

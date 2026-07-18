@@ -93,6 +93,37 @@ const PAIVIA_ETEENPAIN = 365;   // ~12 kk
 // toistot voivat katketa kesken hakuikkunan.
 const MAX_ESIINTYMAA_SARJASSA = PAIVIA_TAAKSEPAIN + PAIVIA_ETEENPAIN + 30;
 
+// Todennus (2026-07-20, ks. muistiinpanot.md "RLS-/yksityisyysauditointi") —
+// tällä endpointilla ei ollut aiemmin MINKÄÄNLAISTA todennusta, toisin kuin
+// muilla cron-poluilla (api/aly-nightly.js, api/muistutukset-laheta.js,
+// molemmat vaativat MUISTUTUKSET_CRON_SECRET-avaimen). Tuotannossa elävä
+// vakio-URL, jonka ?listaa=/?esikatsele=-diagnostiikkaparametrit paljastivat
+// kummankin perheenjäsenen yksityiset kalenterinimet/tapahtumaotsikot+
+// organizerit kenelle tahansa URL:n löytävälle — sama "Hytti ei saa vuotaa
+// millään reitillä" -invariantti kuin RLS-auditoinnissa muualla.
+//
+// Kaksi hyväksyttyä reittiä, koska kutsujia on kahta lajia: (a) GitHub
+// Actionsin cron (ei kirjautunutta käyttäjää) — sama jaettu
+// MUISTUTUKSET_CRON_SECRET ?avain=-parametrissa, uudelleenkäytetty kuten
+// muillakin cron-poluilla, ei vaadi uutta salaisuutta; (b) sovelluksen oma
+// selainkoodi (script.js, kirjautunut perheenjäsen) — validi Supabase-
+// istunnon access_token Authorization-headerissa, sama malli kuin
+// api/aly.js:ssä. Kumpi tahansa perheenjäsen kelpaa, koska molemmat ovat
+// yhtä luotettuja tämän sovelluksen sisällä — kyse on vain siitä ettei
+// tuntematon ulkopuolinen pääse URL:ään käsiksi.
+async function onkoValtuutettu(req) {
+  const secret = process.env.MUISTUTUKSET_CRON_SECRET;
+  if (secret && (req.query || {}).avain === secret) return true;
+
+  const authHeader = req.headers.authorization || '';
+  const token = authHeader.replace(/^Bearer\s+/i, '');
+  if (!token) return false;
+  const vastaus = await fetch(SUPABASE_URL + '/auth/v1/user', {
+    headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + token },
+  });
+  return vastaus.ok;
+}
+
 async function supabaseFetch(polku, valinnat) {
   valinnat = valinnat || {};
   return fetch(SUPABASE_URL + '/rest/v1/' + polku, Object.assign({}, valinnat, {
@@ -382,6 +413,10 @@ async function siivoaPoistetut(syoteId, alkuPvm, loppuPvm, nahdytUidit) {
 }
 
 module.exports = async function handler(req, res) {
+  if (!(await onkoValtuutettu(req))) {
+    return res.status(401).json({ error: 'Ei valtuutettu' });
+  }
+
   // Diagnostiikka: /api/caldav-sync?listaa=katri (tai ?listaa=juha) palauttaa
   // sen tilin kalentereiden TÄSMÄLLISET näyttönimet, ei synkkaa mitään. Näin
   // saa selville mikä arvo kalenteri_syotteet.tunniste-sarakkeeseen pitää
