@@ -16,6 +16,23 @@ Tämä tiedosto on eri asia kuin **muistiinpanot.md** (projektin historia, pää
 
 ---
 
+## Uusi testattava toiminnallisuus → aina myös testirivit apin omalle listalle (talon sääntö, kirjattu 2026-07-18)
+
+**Aina kun rakennat uutta testattavaa toiminnallisuutta, tuota SAMASSA ERÄSSÄ myös migraatio joka lisää sitä vastaavat testirivit Sataman OMALLE "Testipäivä to 16.7." -listalle** (Muistilaput, ks. sql/036 alkuperäinen luonti + sql/054/057/060/064 mallit myöhemmästä lisäyksestä). Ei koskaan pelkkä muistiinpanot.md-merkintä yksinään.
+
+**Miksi:** Katri testaa konkreettisesti puhelimella (mm. bussimatkalla, yhdellä peukalolla täppäillen) — apin oma lista ON se todellinen testauskäyttöliittymä, ei muistiinpanot.md jota ei lueta puhelimella kesken arjen. Kaksi eri roolia, molemmat pidettävä ajan tasalla SAMALLA työllä:
+- **muistiinpanot.md:n "Testauslista — kesken"** = Copilotin/Claude Coden oma tekninen työmuistio (mitä pitää muistaa tutkia/korjata, viitaten koodiin ja bugeihin).
+- **Sataman oma lista** = Katrin käytännön täppäyskäyttöliittymä (mitä pitää kokeilla kädessä, rivi kerrallaan).
+
+**Malli (idempotentti, KRIITTINEN):**
+1. Hae listan id nimellä `'Testipäivä to 16.7.'` — jos ei löydy, `raise exception`.
+2. Idempotenssitarkistus YHDELLÄ tunnistettavalla rivinimellä (`exists (select 1 from tuotteet where list_id = v_list_id and nimi = ...)`) — jos jo olemassa, `return` heti tekemättä mitään.
+3. Hae `coalesce(max(sort_order), 0)` ja lisää KAIKKI uudet rivit sen jälkeen (`+10`, `+20`, ...) — EI KOSKAAN toisteta koko listaa (kuten sql/036 tekee kertaluontoisesti), EI KOSKAAN nollata jo täpättyjä rivejä.
+4. Ryhmittele uusi `'OSA <seuraava kirjain> · <kuvaus>'` -otsikkoriviksi (`is_header:true`) ennen sen alle kuuluvia testirivejä (`is_header:false`) — tarkista aina VIIMEISIN käytetty OSA-kirjain (`grep -rho "OSA [A-Z]* ·" sql/*.sql`) ettei kirjaimia törmää.
+5. Jos testi vaatii kahden käyttäjän session tai vuorokauden yli menevän odotuksen, mainitse se rivissä/otsikossa eksplisiittisesti (sama käytäntö kuin OSA L/M/R/S:ssä).
+
+---
+
 ## Äly-putki (`api/aly.js`, rakennettu 2026-07-11, todistettu + ensimmäinen oikea ominaisuus 2026-07-12)
 
 ### Mikä tämä on
