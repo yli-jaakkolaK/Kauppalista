@@ -384,6 +384,23 @@
           <button class="kalenteri-tila-btn muistutus-tila-btn" data-tila="kellonaika">Kellonaika</button>
         </div>
 
+        <!-- Valmistautumisvaihe (2026-07-18, ks. muistiinpanot.md) — valinnainen
+             toinen, aikaisempi tönäisy joka syntyy/poistuu päämuistutuksen
+             mukana. Sama koskee kumpaakin yllä olevaa välilehteä, siksi oma
+             riittää eikä sitä toisteta kummassakin tila-divissä. -->
+        <label class="muistutus-valmistaudu-rivi">
+          <input type="checkbox" id="muistutus-valmistaudu-check">
+          <span>🎒 Valmistaudu</span>
+          <select id="muistutus-valmistaudu-min" disabled>
+            <option value="15">15 min</option>
+            <option value="30" selected>30 min</option>
+            <option value="45">45 min</option>
+            <option value="60">1 h</option>
+            <option value="90">1,5 h</option>
+          </select>
+          <span>ennen</span>
+        </label>
+
         <div id="muistutus-pika-tila">
           <div class="muistutus-pikanapit" id="muistutus-pikanapit" style="display:none">
             <button class="dialog-btn dialog-btn-cancel" data-min="15">15 min ennen</button>

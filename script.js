@@ -2521,6 +2521,75 @@ async function merkitseAlyMuruKasitellyksi(sourceRef) {
   if (error) console.error('Ankkuriehdotuksen käsittelymerkintä epäonnistui:', error);
 }
 
+// Kalenterisilta (2026-07-18, ks. muistiinpanot.md "Kalenterisilta") — Satama
+// EI KIRJOITA iCloudiin ("yksi totuus" -periaate, ks. huomio dokumentin
+// alussa), mutta voi ESITÄYTTÄÄ Applen oman "uusi tapahtuma" -näkymän: äly
+// esitäyttää, ihminen kuittaa Applen omalla Lisää-napilla, järjestelmä
+// (iCloud+caldav-sync) toteuttaa lopulta synkkana takaisin. Sataman oma
+// koodi ei koskaan lisää/poista mitään kalenterista suoraan.
+//
+// RFC 5545 -tekstipaon minimi tälle käyttötapaukselle (lyhyet suomenkieliset
+// otsikot) — pilkku/puolipiste/kenoviiva ovat ainoat merkit joita SUMMARY
+// realistisesti sisältää.
+function icsEscape(teksti) {
+  return String(teksti).replace(/\\/g, '\\\\').replace(/\n/g, '\\n').replace(/,/g, '\\,').replace(/;/g, '\\;');
+}
+
+// "YYYYMMDDTHHMMSS" .ics-muotoon — Date-oliota käytetään PELKKÄNÄ
+// vuorokaudenylityksen laskurina (getUTC*-metodit, ei todellinen UTC-hetki),
+// koska pvm+aika on jo Europe/Helsinki-seinäkelloaikaa (ks. DTSTART/DTEND;TZID
+// alla) eikä ajokoneen omaa aikavyöhykettä saa päästää sotkemaan laskua.
+function muotoileIcsAika(d) {
+  const pad = function(n) { return String(n).padStart(2, '0'); };
+  return d.getUTCFullYear() + pad(d.getUTCMonth() + 1) + pad(d.getUTCDate()) + 'T' + pad(d.getUTCHours()) + pad(d.getUTCMinutes()) + '00';
+}
+
+// Kellonaika jäädytetty jo kirjoitushetkellä (ks. design-periaate "Suhteellinen
+// aika jäädytetään kirjoitushetkeen") — tämä vain muotoilee sen .ics-kentiksi.
+// Kesto oletetaan 1h (ei tiedetä todellista kestoa) — käyttäjä säätää sen
+// itse Applen omassa näkymässä ennen Lisää-napin painamista. Loppuaika
+// LASKETAAN Date-aritmetiikalla (ei modulo+sama-päivä-oletuksella) jotta
+// puolenyön ylittävä tapahtuma (esim. 23:30) saa DTEND:n OIKEALLE
+// seuraavalle päivälle sen sijaan että loppu näyttäisi olevan ennen alkua.
+function rakennaIcsTapahtuma(otsikko, pvm, aika) {
+  const pvmOsat = pvm.split('-').map(function(s) { return parseInt(s, 10); });
+  const aikaOsat = aika.split(':').map(function(s) { return parseInt(s, 10); });
+  const alku = new Date(Date.UTC(pvmOsat[0], pvmOsat[1] - 1, pvmOsat[2], aikaOsat[0], aikaOsat[1], 0));
+  const loppu = new Date(alku.getTime() + 60 * 60 * 1000);
+  const dtstamp = new Date().toISOString().replace(/[-:]/g, '').split('.')[0] + 'Z';
+  const uid = 'satama-' + Date.now() + '-' + Math.random().toString(36).slice(2) + '@kauppalista-nine.vercel.app';
+  return [
+    'BEGIN:VCALENDAR',
+    'VERSION:2.0',
+    'PRODID:-//Satama//Kalenterisilta//FI',
+    'BEGIN:VEVENT',
+    'UID:' + uid,
+    'DTSTAMP:' + dtstamp,
+    'DTSTART;TZID=Europe/Helsinki:' + muotoileIcsAika(alku),
+    'DTEND;TZID=Europe/Helsinki:' + muotoileIcsAika(loppu),
+    'SUMMARY:' + icsEscape(otsikko),
+    'END:VEVENT',
+    'END:VCALENDAR',
+  ].join('\r\n');
+}
+
+// Avaa .ics-tapahtuman iOS:n natiiviin "uusi tapahtuma" -näkymään data-URI:na
+// (ei blob: — tunnettu epäluotettava iOS Safari/PWA-kontekstissa useiden
+// versioiden yli, ks. muistiinpanot.md tekninen huomio). EI VIELÄ TESTATTU
+// oikealla laitteella tämän kirjoitushetkellä — jos avaus osoittautuu
+// epäluotettavaksi, tätä yhtä funktiota voi kokeilla vaihtaa blob:/webcal:-
+// pohjaiseksi koskematta mihinkään muuhun.
+function avaaKalenteriSilta(candidate) {
+  const ics = rakennaIcsTapahtuma(candidate.content, candidate.event_date, candidate.event_time);
+  const linkki = document.createElement('a');
+  linkki.href = 'data:text/calendar;charset=utf-8,' + encodeURIComponent(ics);
+  linkki.target = '_blank';
+  linkki.rel = 'noopener';
+  document.body.appendChild(linkki);
+  linkki.click();
+  document.body.removeChild(linkki);
+}
+
 // E3 mid-tier V1 ("äly toimii, ihminen valvoo", ks. muistiinpanot.md) — AI-
 // suggested anchor candidates, shown BELOW the real anchors, never inside
 // the "3 most important" limit. New code, English names (house rule, ks.
@@ -2701,6 +2770,22 @@ async function loadAnchorCandidates() {
       lataaAnkkurit();
     });
     napitRivi.appendChild(acceptButton);
+
+    // Kalenterisilta (2026-07-18, ks. muistiinpanot.md) — vain ✨-koneehdokkaille
+    // joilla on SEKÄ päivä ETTÄ kellonaika (= "selkeä ajanvaraus", sama
+    // tunnistus joka jo luo tämän ehdokkaan, ks. api/aly-nightly.js). Ei
+    // koskaan 💬-ihmisehdotuksille (niillä ei ole event_date/event_time,
+    // eikä äly ole koskaan käsitellyt niiden ajankohtaa).
+    if (candidate.event_date && candidate.event_time) {
+      const kalenteriNappi = document.createElement('button');
+      kalenteriNappi.textContent = '➕ Lisää kalenteriin';
+      kalenteriNappi.className = 'dialog-btn dialog-btn-cancel';
+      kalenteriNappi.title = 'Avaa valmiiksi täytettynä puhelimen omaan Kalenteriin';
+      kalenteriNappi.addEventListener('click', function() {
+        avaaKalenteriSilta(candidate);
+      });
+      napitRivi.appendChild(kalenteriNappi);
+    }
 
     // "Siirrä myöhemmäksi" — nyt KAIKILLE ehdokkaille (✨ ja 💬), ks.
     // "💬-ehdotuksen elinkaari": tarve siirtää ei rajoitu ihmisehdotuksiin.
@@ -4878,6 +4963,13 @@ document.querySelectorAll('.muistutus-tila-btn').forEach(function(btn) {
   });
 });
 
+// Valmistautumisvaihe (2026-07-18, ks. muistiinpanot.md) — minuuttivalitsin
+// aktivoituu vain kun tönäisy on kytketty päälle, sama selkeys-periaate
+// kuin muualla (ei koskaan aktiivisen näköinen kontrolli joka ei vaikuta mihinkään).
+document.getElementById('muistutus-valmistaudu-check').addEventListener('change', function(e) {
+  document.getElementById('muistutus-valmistaudu-min').disabled = !e.target.checked;
+});
+
 // Pikanapit säilyttävät jo asetetun kellonajan (jos käyttäjä on jo pyörittänyt
 // rullaa) ja vaihtavat vain päivän — muuten "Huomenna"-napin painaminen
 // kellonajan valinnan JÄLKEEN nollaisi juuri tehdyn valinnan.
@@ -5226,6 +5318,19 @@ async function avaaMuistutusPaneeli(source, sourceRef, content, eventDate, event
   document.getElementById('muistutus-kellonaika-tila').style.display = 'none';
   document.getElementById('muistutus-hetki-input').value = paivamaaraISO(new Date()) + 'T09:00';
 
+  // Valmistautumisvaihe (2026-07-18): EI oletuksena päällä, palautuu
+  // pois joka avauksella — valinnainen per muistutus, ei pysyvä tila.
+  // Oletusminuutit haetaan datasta (asetukset.valmistaudu_oletus_min,
+  // fallback 30) vain jos se täsmää yhteen tarjolla olevista optioista.
+  const valmistauduCheck = document.getElementById('muistutus-valmistaudu-check');
+  const valmistauduMin = document.getElementById('muistutus-valmistaudu-min');
+  valmistauduCheck.checked = false;
+  valmistauduMin.disabled = true;
+  const oletusMin = String(haeAsetusNumero('valmistaudu_oletus_min', 30));
+  if (Array.from(valmistauduMin.options).some(function(o) { return o.value === oletusMin; })) {
+    valmistauduMin.value = oletusMin;
+  }
+
   await paivitaMuistutusLista();
   document.getElementById('muistutus-overlay').style.display = 'flex';
 }
@@ -5234,6 +5339,13 @@ function suljeMuistutusPaneeli() {
   document.getElementById('muistutus-overlay').style.display = 'none';
   muistutusKohde = null;
 }
+
+// Valmistautumisvaihe (2026-07-18, ks. muistiinpanot.md): sisältöetuliite
+// kertoo mini-listassa kumpi rivi on (koska molemmat päämuistutus ja
+// valmistautumis-tönäisy jakavat saman source/source_ref:in, ainoa ero on
+// sisältö+aika) — sama merkkijono kirjoitetaan INSERTissä (lisaaMuistutus)
+// ja luetaan täällä NÄYTTÖÄ varten, pidä nämä synkassa jos joskus muuttuu.
+const VALMISTAUDU_ETULIITE = '🎒 Valmistaudu: ';
 
 async function paivitaMuistutusLista() {
   if (!muistutusKohde) return;
@@ -5261,7 +5373,8 @@ async function paivitaMuistutusLista() {
     rivi.className = 'muistutus-rivi';
 
     const teksti = document.createElement('span');
-    teksti.textContent = muotoileMuistutusAika(m.remind_at);
+    const onValmistautumis = m.content.indexOf(VALMISTAUDU_ETULIITE) === 0;
+    teksti.textContent = (onValmistautumis ? '🎒 ' : '') + muotoileMuistutusAika(m.remind_at);
     rivi.appendChild(teksti);
 
     const poisto = document.createElement('button');
@@ -5282,19 +5395,42 @@ async function paivitaMuistutusLista() {
 
 async function lisaaMuistutus(remindAtDate) {
   if (!muistutusKohde) return;
-  const { error } = await db.from('muistutukset').insert({
+  const { data: paaMuistutus, error } = await db.from('muistutukset').insert({
     user_id: currentUserId,
     source: muistutusKohde.source,
     source_ref: muistutusKohde.sourceRef,
     content: muistutusKohde.content,
     remind_at: remindAtDate.toISOString(),
-  });
+  }).select().single();
   if (error) {
     console.error('Muistutuksen tallennus epäonnistui:', error);
     naytaIlmoitus('Muistutuksen tallennus epäonnistui');
     return;
   }
-  naytaIlmoitus('Muistutus asetettu');
+
+  // Valmistautumisvaihe (2026-07-18, ks. muistiinpanot.md): valinnainen
+  // TOINEN, aikaisempi tönäisy — kevyt ensiversio ilman älylaskentaa, VAIN
+  // kiinteä minuuttimäärä ennen. parent_id + sql/066:n "on delete cascade"
+  // tekee siivouksesta ilmaisen (poistuu automaattisesti kun päämuistutus
+  // poistetaan, ei tarvitse omaa sovelluskoodia sille).
+  const valmistauduCheck = document.getElementById('muistutus-valmistaudu-check');
+  let valmistautumisOnnistui = null;
+  if (valmistauduCheck && valmistauduCheck.checked) {
+    const minuutit = parseInt(document.getElementById('muistutus-valmistaudu-min').value, 10) || 30;
+    const valmistautumisHetki = new Date(remindAtDate.getTime() - minuutit * 60000);
+    const { error: valmistautumisError } = await db.from('muistutukset').insert({
+      user_id: currentUserId,
+      source: muistutusKohde.source,
+      source_ref: muistutusKohde.sourceRef,
+      content: VALMISTAUDU_ETULIITE + muistutusKohde.content,
+      remind_at: valmistautumisHetki.toISOString(),
+      parent_id: paaMuistutus.id,
+    });
+    if (valmistautumisError) console.error('Valmistautumis-tönäisyn tallennus epäonnistui:', valmistautumisError);
+    valmistautumisOnnistui = !valmistautumisError;
+  }
+
+  naytaIlmoitus(valmistautumisOnnistui ? 'Muistutus + valmistautumistönäisy asetettu' : 'Muistutus asetettu');
   await paivitaMuistutuksetKartta();
   await paivitaMuistutusLista();
   if (muistutusKohde.jalkeenPaivitys) muistutusKohde.jalkeenPaivitys();

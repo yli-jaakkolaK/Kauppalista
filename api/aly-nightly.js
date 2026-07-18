@@ -441,6 +441,11 @@ module.exports = async function handler(req, res) {
           is_candidate: true,
           user_id: userId,
           event_time: match.time || null,
+          // Kalenterisilta (2026-07-18, ks. muistiinpanot.md "Kalenterisilta"):
+          // tallennetaan absoluuttinen kohdepäivä ensi kertaa pysyvästi (ei
+          // vain hetkellisesti visible_from-laskuun) — "➕ Lisää kalenteriin"
+          // -nappi tarvitsee tämän .ics-tapahtuman DTSTART/DTEND-kenttiin.
+          event_date: resolvedDate || null,
           visible_from: visibleFrom,
         }),
       });

@@ -1590,6 +1590,31 @@ h1 {
   margin: 10px 0;
 }
 
+/* Valmistautumisvaihe (2026-07-18, ks. muistiinpanot.md) — kevyt rivi
+   päämuistutuksen välilehtien alla, koskee kumpaakin (Pika/Kellonaika). */
+.muistutus-valmistaudu-rivi {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--muted);
+  margin-bottom: 4px;
+}
+
+.muistutus-valmistaudu-rivi select {
+  font-family: 'Courier New', Courier, monospace;
+  font-size: 13px;
+  color: var(--text);
+  background: var(--ground);
+  border: 1px solid var(--border-dash);
+  border-radius: 4px;
+  padding: 4px;
+}
+
+.muistutus-valmistaudu-rivi select:disabled {
+  opacity: 0.4;
+}
+
 /* Ankkurit-lisäyksen kohdevalinta (2026-07-18, ks. muistiinpanot.md
    "💬-ehdotuksen löydettävyys") — sama visuaali kuin muistutus-tila-valinta.
    Näkyvyys (display:flex/none) asetetaan aina JS:stä (paivitaAnkkuriKohdeValinta),
