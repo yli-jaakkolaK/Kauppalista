@@ -26,8 +26,25 @@
 
 const VALID_ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 
+// Palauttaa YYYY-MM-DD Europe/Helsinki-aikavyöhykkeellä — EI palvelimen omaa
+// kalenteripäivää (Vercel ajaa funktiot UTC:ssa). BUGIKORJAUS (2026-07-21,
+// "Aikakäsittelyauditointi", ks. muistiinpanot.md): aiempi
+// `d.toISOString().slice(0,10)` palautti UTC-kalenteripäivän, joka Helsingin
+// puolella yön ~00:00–02:00/03:00 (talvi/kesäaika) välillä on YKSI PÄIVÄ
+// JÄLJESSÄ todellista Suomen kalenteripäivää — täsmälleen sama bugiperhe
+// kuin Bugi 22/27/28 ("written_on"-jäädytys, "jo mennyt ohi" -tarkistukset),
+// vain tässä uudemmassa moduulissa. Tämä yksi funktio ratkaisee KAIKKI
+// "mikä päivä nyt on" -kysymykset koko äly-lajittelun putkessa (kutsutaan
+// sekä api/aly-nightly.js:stä että api/laituri-add.js:stä), joten yksi
+// korjaus tässä korjaa written_on-laskennan JA kaikki "jo mennyt ohi"
+// -tarkistukset kerralla. Sama Intl-tekniikka kuin api/caldav-sync.js:n
+// pvmJaAika()-funktiossa, joka törmäsi samaan UTC-vs-Helsinki-ongelmaan.
 function isoDate(d) {
-  return d.toISOString().slice(0, 10);
+  const osat = new Intl.DateTimeFormat('fi-FI', {
+    timeZone: 'Europe/Helsinki',
+    year: 'numeric', month: '2-digit', day: '2-digit',
+  }).formatToParts(d).reduce(function(acc, o) { acc[o.type] = o.value; return acc; }, {});
+  return osat.year + '-' + osat.month + '-' + osat.day;
 }
 
 // Strips ```-code-fences a model may add despite instructions not to, then

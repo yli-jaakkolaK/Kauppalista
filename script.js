@@ -1356,13 +1356,29 @@ function piirraKuukausiRuudukko(sisalto, kaikkiTapahtumat, kuluvaKuukausi) {
 // Lähettää oman istunnon access_tokenin mukana (2026-07-20, ks. muistiinpanot.md
 // "RLS-/yksityisyysauditointi") — endpoint vaatii nyt todennuksen, aiemmin
 // täysin avoin.
+// BUGIKORJAUS (2026-07-21, "Riippuvuudet ja rajat" -auditointi, ks.
+// muistiinpanot.md): tämä on Kalenteri-näkymän AUTOMAATTINEN, taustalla
+// ajettava synkka (paljon useammin käytetty kuin "Hae kalenteri nyt"
+// -käsinappi) — tyhjä `catch(e){}` nieli KAIKKI virheet täysin hiljaa, eikä
+// koodi edes tarkistanut `response.ok`:a, joten myös palvelimen omat
+// virhevastaukset (esim. 401 puuttuvasta todennuksesta, tai selkeä
+// kirjoitusvirhe-viesti) katosivat jäljettömiin. Ei toastia joka
+// näkymänavauksella (liian häiritsevä, jos vika on pysyvä — käsinappi
+// tarjoaa jo toastin), mutta virhe pitää EDES näkyä konsolissa, ei olla
+// todistetusti näkymätön.
 async function synkkaaICloud() {
   try {
     const { data: sessioData } = await db.auth.getSession();
     const token = sessioData.session ? sessioData.session.access_token : null;
-    await fetch('/api/caldav-sync', { headers: { Authorization: 'Bearer ' + token } });
+    const vastaus = await fetch('/api/caldav-sync', { headers: { Authorization: 'Bearer ' + token } });
+    if (!vastaus.ok) {
+      console.error('Kalenterin taustasynkka epäonnistui:', vastaus.status);
+      return;
+    }
     paivitaKuittausTila();
-  } catch (e) {}
+  } catch (e) {
+    console.error('Kalenterin taustasynkka epäonnistui:', e.message);
+  }
 }
 
 // Kirjautuneen käyttäjän omat kuittaukset — sama Set-pohjainen kuvio kuin
@@ -5411,23 +5427,37 @@ async function pyydaIlmoitusLupa() {
     return;
   }
 
-  const rekisterointi = await navigator.serviceWorker.ready;
-  const tilaus = await rekisterointi.pushManager.subscribe({
-    userVisibleOnly: true,
-    applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY),
-  });
+  // BUGIKORJAUS (2026-07-21, "Riippuvuudet ja rajat" -auditointi, ks.
+  // muistiinpanot.md): pushManager.subscribe() voi heittää poikkeuksen (esim.
+  // push-palvelun tilapäinen rekisteröintivirhe, epätavallinen PWA-tila
+  // iOS Safarissa) — ilman try/catchia koko funktio keskeytyi silloin ennen
+  // paivitaPushTila()-kutsua, jolloin nappi ei koskaan piirtynyt uudelleen
+  // eikä käyttäjä nähnyt MITÄÄN vahvistusta tai virhettä OS:n lupadialogin
+  // hyväksymisen jälkeen. Sama try/catch-malli kuin laheteTestipush()
+  // heti alla.
+  try {
+    const rekisterointi = await navigator.serviceWorker.ready;
+    const tilaus = await rekisterointi.pushManager.subscribe({
+      userVisibleOnly: true,
+      applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY),
+    });
 
-  const json = tilaus.toJSON();
-  const { error } = await db.from('push_tilaukset').upsert({
-    user_id: currentUserId,
-    endpoint: json.endpoint,
-    p256dh: json.keys.p256dh,
-    auth: json.keys.auth,
-  }, { onConflict: 'endpoint' });
+    const json = tilaus.toJSON();
+    const { error } = await db.from('push_tilaukset').upsert({
+      user_id: currentUserId,
+      endpoint: json.endpoint,
+      p256dh: json.keys.p256dh,
+      auth: json.keys.auth,
+    }, { onConflict: 'endpoint' });
 
-  if (error) {
-    console.error('Push-tilauksen tallennus epäonnistui:', error);
-    document.getElementById('push-tila-teksti').textContent = 'Tilauksen tallennus epäonnistui, yritä uudelleen.';
+    if (error) {
+      console.error('Push-tilauksen tallennus epäonnistui:', error);
+      document.getElementById('push-tila-teksti').textContent = 'Tilauksen tallennus epäonnistui, yritä uudelleen.';
+      return;
+    }
+  } catch (e) {
+    console.error('Ilmoitustilauksen luonti epäonnistui:', e.message);
+    document.getElementById('push-tila-teksti').textContent = 'Ilmoitusten käyttöönotto epäonnistui, yritä uudelleen.';
     return;
   }
 

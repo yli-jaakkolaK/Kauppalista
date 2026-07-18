@@ -88,53 +88,87 @@ async function getSetting(key) {
   return Array.isArray(rows) && rows.length > 0 ? rows[0].value : null;
 }
 
-// BUGIKORJAUS (2026-07-19, ks. muistiinpanot.md "Kirjoituspolkujen
-// auditointi"): vastauksen tila EI ollut aiemmin tarkistettu — jos tämä
-// epäonnistuisi hiljaa (esim. aly_yoajo_last_run), ~20h-portti ei koskaan
-// etenisi ja yöajo voisi ajaa uudelleen tarpeettoman usein ilman mitään
-// näkyvää virhettä. Kutsuja saa nyt tiedon epäonnistumisesta.
-async function setSetting(key, value) {
+// BUGIKORJAUS (2026-07-21, "Toisto-/idempotenssiauditointi", ks.
+// muistiinpanot.md): ~20h-portti oli aiemmin "lue arvo, päättele kelpoisuus,
+// kirjoita LOPUKSI vasta koko ajon jälkeen" — kaksi limittäistä kutsua
+// (cron-job.org + GitHub Actions pingaavat molemmat samaa endpointia
+// tarkoituksella) saattoivat molemmat lukea saman vanhan
+// aly_yoajo_last_run-arvon, molemmat päätellä olevansa "due", ja molemmat
+// aloittaa KOKO ajon (Anthropic-kutsut per käyttäjä) ennen kuin kumpikaan
+// ehti kirjoittaa mitään — tuloksena tupla-ehdokkaat samalle murulle ja
+// tupla-API-kulut. Korjattu "claim ensin, tee työ vasta sen jälkeen"
+// -periaatteella: portti VÄITETÄÄN atomisesti HETI (compare-and-swap
+// ehdollisella PATCH/POST-suodattimella — Postgresin rivitason lukitus
+// takaa ettei kaksi rinnakkaista kutsujaa voi koskaan molemmat onnistua)
+// ennen yhtäkään Anthropic-kutsua. Häviäjä bailaa heti ulos, tekemättä
+// mitään työtä ollenkaan.
+async function claimNightlyRun(lastRun) {
+  const nytIso = new Date().toISOString();
+  if (lastRun) {
+    const res = await supabaseFetch('asetukset?key=eq.aly_yoajo_last_run&value=eq.' + encodeURIComponent(lastRun), {
+      method: 'PATCH',
+      headers: { Prefer: 'return=representation' },
+      body: JSON.stringify({ value: nytIso }),
+    });
+    const rivit = res.ok ? await res.json() : [];
+    return Array.isArray(rivit) && rivit.length > 0;
+  }
+  // Ei koskaan ajettu aiemmin (tai rivi puuttuu) — "insert vain jos ei jo
+  // olemassa" samalla compare-and-swap-periaatteella: ignore-duplicates
+  // palauttaa tyhjän jos joku toinen kutsuja ehti jo luoda rivin juuri äsken.
   const res = await supabaseFetch('asetukset?on_conflict=key', {
     method: 'POST',
-    headers: { Prefer: 'resolution=merge-duplicates,return=minimal' },
-    body: JSON.stringify({ key: key, value: value }),
+    headers: { Prefer: 'resolution=ignore-duplicates,return=representation' },
+    body: JSON.stringify({ key: 'aly_yoajo_last_run', value: nytIso }),
   });
-  if (!res.ok) {
-    console.error('[aly-nightly] Asetuksen "' + key + '" tallennus epäonnistui:', res.status, await res.text());
-  }
-  return res.ok;
+  const rivit = res.ok ? await res.json() : [];
+  return Array.isArray(rivit) && rivit.length > 0;
 }
 
+// BUGIKORJAUS (2026-07-21, "Riippuvuudet ja rajat" -auditointi, ks.
+// muistiinpanot.md): `response.ok`-tarkistus kattaa VAIN Anthropicin oman
+// HTTP-virhevastauksen (rate limit, auth, ylikuormitus) — se EI kata raakaa
+// verkkotason poikkeusta (DNS-virhe, yhteyden katkeaminen, Anthropicin täysi
+// tavoittamattomuus), joka aiemmin propagoitui käsittelemättömänä koko
+// handler()-funktion läpi ja kaatoi KOKO yöajon kaikilta käyttäjiltä yhden
+// verkkohäiriön takia — sen sijaan että vain sen hetken käyttäjä olisi
+// jätetty käsittelemättä. `api/laituri-add.js`:n `classifyImmediately()` on
+// jo suojattu tältä täsmälleen samalta juurisyyltä — sama suoja tähän.
 async function callClaude(prompt, userIdForLogging) {
-  const model = process.env.ALY_MALLI || DEFAULT_MODEL;
-  const response = await fetch('https://api.anthropic.com/v1/messages', {
-    method: 'POST',
-    headers: {
-      'x-api-key': ANTHROPIC_API_KEY,
-      'anthropic-version': '2023-06-01',
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
+  try {
+    const model = process.env.ALY_MALLI || DEFAULT_MODEL;
+    const response = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'x-api-key': ANTHROPIC_API_KEY,
+        'anthropic-version': '2023-06-01',
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: model,
+        max_tokens: MAX_TOKENS,
+        messages: [{ role: 'user', content: prompt }],
+      }),
+    });
+    const data = await response.json();
+    if (!response.ok) {
+      console.error('[aly-nightly] Anthropic error:', response.status, JSON.stringify(data.error || {}));
+      return null;
+    }
+    const usage = data.usage || {};
+    console.log('[aly-nightly]', JSON.stringify({
+      user_id: userIdForLogging,
       model: model,
-      max_tokens: MAX_TOKENS,
-      messages: [{ role: 'user', content: prompt }],
-    }),
-  });
-  const data = await response.json();
-  if (!response.ok) {
-    console.error('[aly-nightly] Anthropic error:', response.status, JSON.stringify(data.error || {}));
+      input_tokens: usage.input_tokens,
+      output_tokens: usage.output_tokens,
+      time: new Date().toISOString(),
+    }));
+    const text = (data.content || []).map(function(block) { return block.text || ''; }).join('');
+    return parseAiJson(text);
+  } catch (e) {
+    console.error('[aly-nightly] Anthropic-kutsu heitti poikkeuksen (verkko?) käyttäjälle ' + userIdForLogging + ':', e.message);
     return null;
   }
-  const usage = data.usage || {};
-  console.log('[aly-nightly]', JSON.stringify({
-    user_id: userIdForLogging,
-    model: model,
-    input_tokens: usage.input_tokens,
-    output_tokens: usage.output_tokens,
-    time: new Date().toISOString(),
-  }));
-  const text = (data.content || []).map(function(block) { return block.text || ''; }).join('');
-  return parseAiJson(text);
 }
 
 module.exports = async function handler(req, res) {
@@ -162,6 +196,13 @@ module.exports = async function handler(req, res) {
     if (hoursSince < MIN_HOURS_BETWEEN_RUNS) {
       return res.status(200).json({ success: true, skipped: 'not_due', hours_since_last_run: Math.round(hoursSince * 10) / 10 });
     }
+  }
+
+  const claimed = await claimNightlyRun(lastRun);
+  if (!claimed) {
+    // Toinen rinnakkainen kutsuja (cron-job.org/GitHub Actions) ehti juuri
+    // väittää tämän ajon ensin — ei virhe, vain hävitty kilpa-ajo.
+    return res.status(200).json({ success: true, skipped: 'race_lost' });
   }
 
   // 1) Expire yesterday's unclaimed candidates first — this is what makes
@@ -317,8 +358,10 @@ module.exports = async function handler(req, res) {
 
   const eligible = eligibleByAge.filter(function(n) { return !suggestedTodayIds.has(n.id); });
 
+  // aly_yoajo_last_run on jo kirjattu atomisesti claimNightlyRun()-kutsussa
+  // yllä (run-alkuhetki, ei run-loppuhetki — tämä on tarkoituksellista: se
+  // sulkee myös overlap-ikkunan koko ajon keston ajaksi, ei vain sen jälkeen).
   if (eligible.length === 0) {
-    await setSetting('aly_yoajo_last_run', new Date().toISOString());
     return res.status(200).json({ success: true, expired: expired, users_checked: 0, matches: 0, held_back_today: suggestedTodayIds.size });
   }
 
@@ -510,8 +553,6 @@ module.exports = async function handler(req, res) {
       await markEvaluated(note.id, note.content);
     }
   }
-
-  await setSetting('aly_yoajo_last_run', new Date().toISOString());
 
   return res.status(200).json({
     success: true,

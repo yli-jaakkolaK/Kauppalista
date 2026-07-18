@@ -388,10 +388,14 @@ function varattuTapahtumaksi(t) {
 // synkkauskerralla (nahdytUidit) — eli tapahtuma on poistettu/siirtynyt pois
 // iCloudin päässä. Rajattu syote_id:hen ja samaan aikaväliin joka tällä
 // kertaa oikeasti haettiin, jottei poisteta rivejä joita ei yritetty hakea.
-async function siivoaPoistetut(syoteId, alkuPvm, loppuPvm, nahdytUidit) {
+// LISÄKSI rajattu created_at < syncStartedAt (ks. kutsupaikan kommentti) —
+// suojaa rinnakkaisen, limittäisen ajon KESKEN tätä ajoa lisäämää riviä
+// tulemasta virheellisesti poistetuksi.
+async function siivoaPoistetut(syoteId, alkuPvm, loppuPvm, nahdytUidit, syncStartedAt) {
   const vastaus = await supabaseFetch(
     'kalenteri_tapahtumat?select=id,ical_uid&syote_id=eq.' + syoteId +
-    '&event_date=gte.' + alkuPvm + '&event_date=lte.' + loppuPvm + '&ical_uid=not.is.null'
+    '&event_date=gte.' + alkuPvm + '&event_date=lte.' + loppuPvm + '&ical_uid=not.is.null' +
+    '&created_at=lt.' + encodeURIComponent(syncStartedAt)
   );
   const olemassaOlevat = await vastaus.json();
   const poistettavat = (olemassaOlevat || []).filter(function(r) { return !nahdytUidit.has(r.ical_uid); });
@@ -471,6 +475,17 @@ module.exports = async function handler(req, res) {
   // EI tässä — jos vain toisen tilin tunnukset puuttuvat, toisen tilin
   // syötteet silti synkkautuvat normaalisti (Promise.allSettled alla).
 
+  // BUGIKORJAUS (2026-07-21, "Toisto-/idempotenssiauditointi", ks.
+  // muistiinpanot.md): cron-job.org ja GitHub Actions voivat pingata tätä
+  // endpointia limittäin — jos rinnakkainen ajo B ehtii kirjoittaa (upsertata)
+  // uuden tapahtuman KESKEN tämän ajon (A), ja A:n oma nahdytUidit-joukko on
+  // peräisin sitä VANHEMMASTA ICS-hausta, siivoaPoistetut() näkisi B:n juuri
+  // lisäämän rivin elävässä kannassa, ei löytäisi sen ical_uid:ia A:n
+  // (vanhentuneesta) joukosta, ja POISTAISI sen — vaikka B juuri lisäsi sen
+  // oikein. Talteen otettu ajon oma alkuhetki rajaa siivouksen koskemaan vain
+  // rivejä jotka olivat jo olemassa ENNEN tätä ajoa (ks. syncStartedAt alla).
+  const syncStartedAt = new Date().toISOString();
+
   const syotteetVastaus = await supabaseFetch('kalenteri_syotteet?select=*&enabled=eq.true');
   const syotteet = await syotteetVastaus.json();
 
@@ -523,7 +538,7 @@ module.exports = async function handler(req, res) {
     // PEILISÄÄNTÖ, poisto-osuus: tällä kertaa löytymättömät (poistettu/siirtynyt
     // pois iCloudissa) poistuvat myös Satamasta, rajattuna tälle syötteelle
     // tarkistettuun aikaväliin.
-    const poistettuja = await siivoaPoistetut(syote.id, alkuPvm, loppuPvm, nahdytUidit);
+    const poistettuja = await siivoaPoistetut(syote.id, alkuPvm, loppuPvm, nahdytUidit, syncStartedAt);
 
     const aikaleimaRes = await supabaseFetch('kalenteri_syotteet?id=eq.' + syote.id, {
       method: 'PATCH',

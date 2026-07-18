@@ -53,64 +53,91 @@ module.exports = async function handler(req, res) {
     return res.status(200).json({ success: true, lahetetty: 0, tarkistettu: 0 });
   }
 
+  // Palauttaa muistutuksen sent_at:n takaisin nulliksi — käytetään kun claim
+  // otettiin mutta lähetys sittenkin epäonnistui/kaatui kokonaan, jotta
+  // seuraava ajo yrittää uudelleen (ks. claim-kommentti alla).
+  async function palautaSentAt(id) {
+    const res = await supabaseFetch('muistutukset?id=eq.' + id, {
+      method: 'PATCH',
+      headers: { Prefer: 'return=minimal' },
+      body: JSON.stringify({ sent_at: null }),
+    });
+    if (!res.ok) {
+      console.error('[muistutukset-laheta] id=' + id + ': sent_at-palautus epäonnistui epäonnistuneen lähetyksen jälkeen — muistutus voi jäädä virheellisesti lähetetyksi merkityksi.');
+    }
+  }
+
   let lahetetty = 0;
   let jatetaanYrittamaan = 0;
   for (const muistutus of erapaivat) {
-    const tilausVastaus = await supabaseFetch('push_tilaukset?select=*&user_id=eq.' + muistutus.user_id);
-    const tilaukset = await tilausVastaus.json();
-    const payload = JSON.stringify({ title: 'Satama ⏰', body: muistutus.content });
-
-    let joku = false;
-    await Promise.all((tilaukset || []).map(async function(tilaus) {
-      try {
-        await webpush.sendNotification({
-          endpoint: tilaus.endpoint,
-          keys: { p256dh: tilaus.p256dh, auth: tilaus.auth },
-        }, payload);
-        joku = true;
-      } catch (e) {
-        if (e.statusCode === 404 || e.statusCode === 410) {
-          const poistoRes = await supabaseFetch('push_tilaukset?id=eq.' + tilaus.id, { method: 'DELETE' });
-          if (!poistoRes.ok) {
-            console.error('[muistutukset-laheta] Vanhentuneen tilauksen ' + tilaus.id + ' poisto epäonnistui:', poistoRes.status);
-          }
-        } else {
-          console.error('Muistutuksen push epäonnistui (id=' + muistutus.id + ', source=' + muistutus.source + '):', e.message);
-        }
-      }
-    }));
-
-    // BUGIKORJAUS (2026-07-14, ks. muistiinpanot.md "Ajastetut muistutukset
-    // eivät tule perille"): merkittiin AIEMMIN lähetetyksi VAIKKA KAIKKI
-    // yritykset epäonnistuisivat — "tietoinen yksinkertaistus" joka
-    // kuitenkin tarkoitti että YKSIKIN ohimenevä push-lähetysvirhe (verkko,
-    // tilapäinen 5xx palvelimelta) hävitti muistutuksen PYSYVÄSTI, hiljaa,
-    // ilman uudelleenyritystä — täsmälleen "tilamerkintä ei seurannut
-    // todellisuutta" -luonnevika. Nyt: merkitään lähetetyksi VAIN jos joku
-    // onnistui TAI tilauksia ei ollut yhtään (ei mitään yritettävää, ei siis
-    // retryttävää). Muutoin sent_at jää tyhjäksi — SEURAAVA ~5 min kuluttua
-    // ajava kierros yrittää automaattisesti uudelleen, kunnes onnistuu tai
-    // tilaus todetaan pysyvästi vanhentuneeksi (404/410, siivotaan yllä).
-    const eiRetryttavaa = !Array.isArray(tilaukset) || tilaukset.length === 0;
-    if (joku || eiRetryttavaa) {
-      const merkintaRes = await supabaseFetch('muistutukset?id=eq.' + muistutus.id, {
-        method: 'PATCH',
-        headers: { Prefer: 'return=minimal' },
-        body: JSON.stringify({ sent_at: new Date().toISOString() }),
-      });
-      // BUGIKORJAUS (2026-07-19, ks. muistiinpanot.md "Kirjoituspolkujen
-      // auditointi"): jos TÄMÄ merkintä epäonnistuu, push meni jo perille
-      // mutta rivi näyttää yhä lähettämättömältä — sama muistutus lähtisi
-      // uudelleen (tupla-push) seuraavalla ~5 min kierroksella ilman että
-      // kukaan huomaisi miksi. Lokitetaan nyt selkeästi.
-      if (!merkintaRes.ok) {
-        console.error('[muistutukset-laheta] id=' + muistutus.id + ': push lähti mutta sent_at-merkintä epäonnistui (' + merkintaRes.status + ') — sama muistutus voi lähteä uudelleen.');
-      }
-    } else {
-      jatetaanYrittamaan++;
-      console.error('[muistutukset-laheta] id=' + muistutus.id + ' (source=' + muistutus.source + ', source_ref=' + muistutus.source_ref + ') EI lähtenyt yhteenkään tilaukseen — jätetään uudelleenyritettäväksi.');
+    // BUGIKORJAUS (2026-07-21, "Toisto-/idempotenssiauditointi", ks.
+    // muistiinpanot.md): cron-job.org ja GitHub Actions pingaavat molemmat
+    // tätä endpointia, tarkoituksellisesti mahdollisesti limittäin — ilman
+    // atomista "claim"-vaihetta molemmat rinnakkaiset ajot näkisivät saman
+    // sent_at=null-rivin JA molemmat lähettäisivät saman muistutuksen
+    // KAHDESTI ennen kuin kumpikaan ehtisi merkitä sitä lähetetyksi.
+    // Ehdollinen PATCH ...&sent_at=is.null on Postgresissa atominen rivitason
+    // operaatio — vain YKSI rinnakkainen kutsuja voi koskaan saada rivin
+    // takaisin (return=representation), loput näkevät tyhjän tuloksen ja
+    // ohittavat rivin hiljaa (toinen ajo hoitaa sen jo).
+    const claimRes = await supabaseFetch('muistutukset?id=eq.' + muistutus.id + '&sent_at=is.null', {
+      method: 'PATCH',
+      headers: { Prefer: 'return=representation' },
+      body: JSON.stringify({ sent_at: new Date().toISOString() }),
+    });
+    const claimatut = claimRes.ok ? await claimRes.json() : [];
+    if (!Array.isArray(claimatut) || claimatut.length === 0) {
+      continue;
     }
-    if (joku) lahetetty++;
+
+    try {
+      const tilausVastaus = await supabaseFetch('push_tilaukset?select=*&user_id=eq.' + muistutus.user_id);
+      const tilaukset = await tilausVastaus.json();
+      const payload = JSON.stringify({ title: 'Satama ⏰', body: muistutus.content });
+
+      let joku = false;
+      await Promise.all((tilaukset || []).map(async function(tilaus) {
+        try {
+          await webpush.sendNotification({
+            endpoint: tilaus.endpoint,
+            keys: { p256dh: tilaus.p256dh, auth: tilaus.auth },
+          }, payload);
+          joku = true;
+        } catch (e) {
+          if (e.statusCode === 404 || e.statusCode === 410) {
+            const poistoRes = await supabaseFetch('push_tilaukset?id=eq.' + tilaus.id, { method: 'DELETE' });
+            if (!poistoRes.ok) {
+              console.error('[muistutukset-laheta] Vanhentuneen tilauksen ' + tilaus.id + ' poisto epäonnistui:', poistoRes.status);
+            }
+          } else {
+            console.error('Muistutuksen push epäonnistui (id=' + muistutus.id + ', source=' + muistutus.source + '):', e.message);
+          }
+        }
+      }));
+
+      // BUGIKORJAUS (2026-07-14, ks. muistiinpanot.md "Ajastetut muistutukset
+      // eivät tule perille"): merkittiin AIEMMIN lähetetyksi VAIKKA KAIKKI
+      // yritykset epäonnistuisivat — "tietoinen yksinkertaistus" joka
+      // kuitenkin tarkoitti että YKSIKIN ohimenevä push-lähetysvirhe (verkko,
+      // tilapäinen 5xx palvelimelta) hävitti muistutuksen PYSYVÄSTI, hiljaa,
+      // ilman uudelleenyritystä. Nyt: rivi on jo claimattu (sent_at asetettu
+      // yllä) — jos KAIKKI yritykset epäonnistuivat eikä ollut yhtään
+      // tilausta, sent_at PALAUTETAAN nulliksi jotta seuraava ~5 min kuluttua
+      // ajava kierros yrittää automaattisesti uudelleen.
+      const eiRetryttavaa = !Array.isArray(tilaukset) || tilaukset.length === 0;
+      if (!joku && !eiRetryttavaa) {
+        jatetaanYrittamaan++;
+        await palautaSentAt(muistutus.id);
+        console.error('[muistutukset-laheta] id=' + muistutus.id + ' (source=' + muistutus.source + ', source_ref=' + muistutus.source_ref + ') EI lähtenyt yhteenkään tilaukseen — jätetään uudelleenyritettäväksi.');
+      }
+      if (joku) lahetetty++;
+    } catch (e) {
+      // Odottamaton virhe (esim. verkko) claimin JÄLKEEN — rivi ei saa jäädä
+      // virheellisesti "lähetetyksi" merkityksi ilman että mitään oikeasti
+      // lähti, sama "vahvistus seuraa todellisuutta" -periaate kuin muualla.
+      console.error('[muistutukset-laheta] id=' + muistutus.id + ': odottamaton virhe lähetyskäsittelyssä, palautetaan sent_at:', e.message);
+      await palautaSentAt(muistutus.id);
+    }
   }
 
   return res.status(200).json({ success: true, lahetetty: lahetetty, tarkistettu: erapaivat.length, uudelleenyritetaan: jatetaanYrittamaan });
