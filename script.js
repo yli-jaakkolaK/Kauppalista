@@ -160,11 +160,21 @@ const HENKILO_ALLATIIVI = { katri: 'Katrille', juha: 'Juhalle' };
 // tekstin sisällä ("juttelin Juhalle eilen") EI SAA osua. Epäselvässä
 // tapauksessa (ei täsmää) palautetaan null — mieluummin ohittaa kuin ehdottaa
 // väärin. Palauttaa laukaisusanasta riisutun sisällön, tai null.
+//
+// KORJAUS (2026-07-19, "Siri-sanelu ei tuota kaksoispistettä" — ks.
+// muistiinpanot.md): Siri-sanelu ei koskaan tuota kaksoispistettä, joten
+// "laita Juhalle vie roskat" ei laukaissut vaikka puhuttu tarkoitus on
+// yksiselitteinen. Kaksi erillistä kuviota: (1) kaksoispiste-muoto ENNALLAAN,
+// "laita "-etuliite valinnainen ("Juhalle: X" / "laita Juhalle: X"); (2)
+// UUSI ilman kaksoispistettä, mutta VAIN kun "laita "-etuliite on mukana —
+// juuri etuliite tekee tarkoituksen yksiselitteiseksi, jottei tavallinen
+// nimen maininta ("Juhalle terveiset mummolta") ala laukaista.
 function tunnistaEhdotusLaukaisu(teksti, kohdeHenkilo) {
   const allatiivi = HENKILO_ALLATIIVI[kohdeHenkilo];
   if (!allatiivi) return null;
-  const kuvio = new RegExp('^(?:laita\\s+)?' + allatiivi + '\\s*:\\s*(.+)$', 'is');
-  const osuma = teksti.match(kuvio);
+  const kaksoispisteKuvio = new RegExp('^(?:laita\\s+)?' + allatiivi + '\\s*:\\s*(.+)$', 'is');
+  const ilmanKaksoispistettaKuvio = new RegExp('^laita\\s+' + allatiivi + '\\s+(.+)$', 'is');
+  const osuma = teksti.match(kaksoispisteKuvio) || teksti.match(ilmanKaksoispistettaKuvio);
   if (!osuma) return null;
   const loppuosa = osuma[1].trim();
   return loppuosa || null;
@@ -3185,7 +3195,10 @@ async function paivitaLaituriSijoittamattaTeksti() {
 // Hakee ja piirtää Laiturin rivit, valinnaisesti hakusanalla suodatettuna
 async function lataaLaituri(hakusana) {
   paivitaLaituriSijoittamattaTeksti();
-  let kysely = db.from('laituri').select().order('created_at', { ascending: false });
+  // Arkistoidut murut (ks. "Murun arkistointi", muistiinpanot.md) eivät kuulu
+  // aktiiviseen näkymään — samaa "murua ei koskaan poisteta" -periaatetta
+  // kuin muuallakin, ne vain suodatetaan pois täältä, ei tuhota.
+  let kysely = db.from('laituri').select().neq('status', 'arkistoitu').order('created_at', { ascending: false });
   if (hakusana) {
     kysely = kysely.ilike('content', '%' + hakusana + '%');
   }
@@ -3354,6 +3367,16 @@ async function lataaLaituri(hakusana) {
       li.appendChild(palautaNappi);
     }
 
+    // Arkistointi (2026-07-19, ks. muistiinpanot.md "Murun arkistointi") —
+    // "⋯"-valikossa eikä omana nappina, koska rivillä on jo enimmillään
+    // viisi näkyvää nappia (sama tilanahtaus-oppi kuin aiemmin ankkuri-rivillä).
+    // Sama laituri.status-tilakenttä kuin OSA A:n "siirretty Kauppalistalle" —
+    // "arkistoitu" vain kolmas arvo, ei erillinen mekanismi.
+    li.appendChild(createOverflowButton(li, [{
+      label: '🗄 Arkistoi',
+      onClick: function() { arkistoiLaituriRivi(rivi); },
+    }]));
+
     const poistoNappi = document.createElement('button');
     poistoNappi.className = 'delete-btn';
     poistoNappi.textContent = '×';
@@ -3374,7 +3397,90 @@ async function lataaLaituri(hakusana) {
     li.appendChild(poistoNappi);
 
     listEl.appendChild(li);
+    piirraKauppaEhdotusKortti(rivi, li);
   });
+
+  paivitaLaituriArkistoLinkki();
+}
+
+// "Yksi luukku" erä 1 — kauppatavaraehdotus (2026-07-19, ks. muistiinpanot.md
+// "Laiturin äly-lajittelu"). Äly kirjoittaa TÄMÄN suoraan murun omalle
+// riville (laituri.ai_kauppa_ehdotus — ks. api/aly-nightly.js ja
+// api/laituri-add.js), EI candidate-rakennetta kuten hetki/ikkuna, koska
+// tuote joko hyväksytään tai ei — ei tarvitse odottaa/vanhentua. "Kolmiporras":
+// äly EI KOSKAAN siirrä mitään itse, tämä kortti on AINA vain ehdotus +
+// kuittaus, sama .laituri-ehdotus-rivi/-napit-ulkoasu kuin piirraLaituriEhdotusKortti.
+function piirraKauppaEhdotusKortti(rivi, li) {
+  const items = rivi.ai_kauppa_ehdotus;
+  if (!Array.isArray(items) || items.length === 0) return;
+
+  const kortti = document.createElement('li');
+  kortti.className = 'laituri-ehdotus-rivi';
+
+  const teksti = document.createElement('span');
+  teksti.textContent = 'Näyttää kauppatavaralta (' + items.join(', ') + ')';
+  kortti.appendChild(teksti);
+
+  const napit = document.createElement('span');
+  napit.className = 'laituri-ehdotus-napit';
+
+  const siirraNappi = document.createElement('button');
+  siirraNappi.className = 'dialog-btn dialog-btn-cancel';
+  siirraNappi.textContent = 'Siirrä Kauppalistalle';
+  siirraNappi.addEventListener('click', function() {
+    hyvaksyKauppaEhdotus(rivi, items);
+  });
+  napit.appendChild(siirraNappi);
+
+  const eiNappi = document.createElement('button');
+  eiNappi.className = 'dialog-btn dialog-btn-cancel';
+  eiNappi.textContent = 'Ei';
+  eiNappi.addEventListener('click', function() {
+    hylkaaKauppaEhdotus(rivi);
+  });
+  napit.appendChild(eiNappi);
+
+  kortti.appendChild(napit);
+  li.insertAdjacentElement('afterend', kortti);
+}
+
+// Hyväksyntä kirjoittaa OIKEASTI Kauppalistalle (sama malli kuin "Siirrä
+// valitut Kauppalistalle" -toiminto), ja merkitsee murun sijoitetuksi vasta
+// ONNISTUNEEN kirjoituksen jälkeen ("Vahvistus seuraa todellisuutta").
+async function hyvaksyKauppaEhdotus(rivi, items) {
+  const { data: kauppalista, error: hakuError } = await db.from('lists').select('id').eq('name', 'Kauppalista').single();
+  if (hakuError || !kauppalista) {
+    console.error('Kauppalistan haku epäonnistui:', hakuError);
+    naytaIlmoitus('Kauppalistaa ei löytynyt — yritä uudelleen');
+    return;
+  }
+
+  const uudetRivit = items.map(function(nimi) { return { nimi: nimi, tehty: false, list_id: kauppalista.id, is_header: false }; });
+  const { error: kirjoitusError } = await db.from('tuotteet').insert(uudetRivit);
+  if (ilmoitaKirjoitusvirheesta(kirjoitusError, 'Kauppaehdotuksen siirto')) return;
+
+  const { error } = await db.from('laituri').update({ status: 'sijoitettu', placed_where: 'Kauppalista', ai_kauppa_ehdotus: null }).eq('id', rivi.id);
+  // Tuotteet ovat jo kirjoitettu onnistuneesti tässä vaiheessa — jos VAIN
+  // tämä merkintä epäonnistuu, muru näyttäytyy yhä sijoittamattomana ja
+  // saattaisi tuottaa duplikaattirivit jos ehdotus hyväksyttäisiin uudelleen.
+  if (error) {
+    console.error('Kauppaehdotuksen merkintä sijoitetuksi epäonnistui:', error);
+    naytaIlmoitus('Tuotteet lisätty Kauppalistalle, mutta murun merkintä sijoitetuksi epäonnistui — tarkista Laituri');
+  } else {
+    naytaIlmoitus(items.length + ' tuotetta siirretty Kauppalistalle');
+  }
+  lataaLaituri(document.getElementById('laituri-search').value.trim());
+  paivitaLaituriBadge();
+}
+
+// Hylkäys ei poista mitään — vain tyhjentää ehdotuskentän, muru jää
+// Laituriin täysin normaalina. Sama sisältö ei nouse uudelleen ennen kuin
+// käyttäjä muokkaa murua (ks. aly_evaluated-merkintä, tehty jo ehdotuksen
+// kirjoitushetkellä api/aly-nightly.js:ssä/api/laituri-add.js:ssä).
+async function hylkaaKauppaEhdotus(rivi) {
+  const { error } = await db.from('laituri').update({ ai_kauppa_ehdotus: null }).eq('id', rivi.id);
+  if (ilmoitaKirjoitusvirheesta(error, 'Kauppaehdotuksen hylkäys')) return;
+  lataaLaituri(document.getElementById('laituri-search').value.trim());
 }
 
 // BUGIKORJAUS (2026-07-17, ks. muistiinpanot.md "Kalenteri-sijoitus ei
@@ -3495,6 +3601,70 @@ async function palautaLaituriSijoittamattomaksi(rivi) {
   lataaLaituri(document.getElementById('laituri-search').value.trim());
   paivitaLaituriBadge();
 }
+
+// Murun arkistointi (2026-07-19, ks. muistiinpanot.md "Murun arkistointi",
+// konseptikirja 4.10 "Laiturin luode" — tämä erä VAIN arkistotila + nappi +
+// näkymä). Sama tila, ei erillinen mekanismi (ks. OSA A "siirretty
+// Kauppalistalle" — myös se on status='sijoitettu'). Turvainvariantti: TILA,
+// EI delete — muru pysyy aina luettavana arkistossa, palautus mahdollinen.
+async function arkistoiLaituriRivi(rivi) {
+  const { error } = await db.from('laituri').update({ status: 'arkistoitu' }).eq('id', rivi.id);
+  if (ilmoitaKirjoitusvirheesta(error, 'Murun arkistointi')) return;
+  lataaLaituri(document.getElementById('laituri-search').value.trim());
+}
+
+// "Sama ele toisinpäin" — palautus arkistosta suoraan aktiiviseksi (status
+// 'uusi', sama kuin sijoittamattomaksi-palautus yllä; ei säilytetä
+// mahdollista aiempaa placed_where-arvoa, palautettu muru näyttäytyy aina
+// tuoreena sijoittamattomana ajatuksena).
+async function palautaLaituriArkistosta(rivi) {
+  const { error } = await db.from('laituri').update({ status: 'uusi', placed_where: null }).eq('id', rivi.id);
+  if (ilmoitaKirjoitusvirheesta(error, 'Murun palautus arkistosta')) return;
+  await avaaLaituriArkistoOverlay();
+  lataaLaituri(document.getElementById('laituri-search').value.trim());
+}
+
+// Hakee arkistoitujen murujen määrän ja näyttää/piilottaa Arkisto-linkin —
+// sama malli kuin paivitaHyttiArkistoLinkki().
+async function paivitaLaituriArkistoLinkki() {
+  const linkki = document.getElementById('laituri-arkisto-linkki');
+  const { count } = await db.from('laituri').select('id', { count: 'exact', head: true }).eq('status', 'arkistoitu');
+  linkki.style.display = count ? 'block' : 'none';
+}
+
+// Näyttää arkistoitujen murujen listan — "kevyt: pelkkä lista riittää"
+// (käyttäjän oma rajaus tälle erälle), kunkin rivin ↺ palauttaa suoraan.
+async function avaaLaituriArkistoOverlay() {
+  const { data, error } = await db.from('laituri').select().eq('status', 'arkistoitu').order('created_at', { ascending: false });
+  if (error) {
+    console.error('Laiturin arkiston haku epäonnistui:', error);
+    return;
+  }
+  const lista = document.getElementById('laituri-arkisto-lista');
+  lista.innerHTML = '';
+  (data || []).forEach(function(rivi) {
+    const li = document.createElement('li');
+    li.className = 'laituri-arkisto-rivi';
+    const teksti = document.createElement('span');
+    teksti.textContent = rivi.content;
+    li.appendChild(teksti);
+    const palautaNappi = document.createElement('button');
+    palautaNappi.className = 'restore-btn';
+    palautaNappi.textContent = '↺';
+    palautaNappi.title = 'Palauta aktiiviseksi';
+    palautaNappi.addEventListener('click', function() {
+      palautaLaituriArkistosta(rivi);
+    });
+    li.appendChild(palautaNappi);
+    lista.appendChild(li);
+  });
+  document.getElementById('laituri-arkisto-overlay').style.display = 'flex';
+}
+
+document.getElementById('laituri-arkisto-linkki').addEventListener('click', avaaLaituriArkistoOverlay);
+document.getElementById('laituri-arkisto-sulje').addEventListener('click', function() {
+  document.getElementById('laituri-arkisto-overlay').style.display = 'none';
+});
 
 // Siivoaa rivin (li) jälkeen mahdollisesti jo olevan ehdotuskortin pois
 // ennen uuden piirtämistä tai virheen näyttämistä — estää korttien pinoamisen

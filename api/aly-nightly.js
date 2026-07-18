@@ -1,28 +1,37 @@
 // E3 mid-tier V1: "AI proposes, human supervises" nightly job.
 //
 // Reads unplaced Laituri notes (murut) per user, asks the AI pipeline in
-// ONE batched call per user whether any of them clearly refer to a moment
-// or a deadline with a time reference, and — for matches — creates an
-// anchor CANDIDATE (never a real anchor outright, never edits/deletes
-// anything the user wrote). This file is new code, written in English
-// per the house rule (ks. COPILOT.md "Koodikieli") — all user-facing
-// strings remain Finnish, and the Finnish-named existing tables/columns
-// (laituri, ankkurit, asetukset, muru content) are referenced as-is.
+// ONE batched call per user which of three things each note is (ks.
+// api/_lib/aly-classify.js — "Yksi luukku", extended 2026-07-19 with the
+// "kauppa" category alongside the original "hetki"/"ikkuna"), and — for
+// matches — either creates an anchor CANDIDATE (hetki/ikkuna) or writes a
+// grocery-suggestion directly onto the Laituri row (kauppa). Never edits/
+// deletes anything the user wrote. This file is new code, written in
+// English per the house rule (ks. COPILOT.md "Koodikieli") — all
+// user-facing strings remain Finnish, and the Finnish-named existing
+// tables/columns (laituri, ankkurit, asetukset, muru content) are
+// referenced as-is.
 //
 // "Hetki vs. ikkuna" (ks. muistiinpanot.md, added 2026-07-16 after the
-// first real night): every match is classified as a single MOMENT
-// ("hetki" — surfaced once, never again once its candidate expires
+// first real night): every hetki/ikkuna match is classified as a single
+// MOMENT ("hetki" — surfaced once, never again once its candidate expires
 // unclaimed) or a WINDOW towards a deadline ("ikkuna" — allowed to
 // re-surface once per day until the deadline passes). Uncertain
 // classification always defaults to "hetki", the more conservative
-// option. Ks. buildPrompt() and the expiry logic below for the full
-// reasoning.
+// option. "kauppa" (2026-07-19) has no candidate lifecycle at all — it's
+// suggested once (immediately marked evaluated) and the user acts or
+// doesn't, ks. handler below for the full reasoning.
 //
-// *** SAFETY INVARIANT: AI ONLY ADDS. It never modifies or deletes a
-// Laituri row, and never touches an existing anchor the user created. ***
-// It only ever INSERTs new `ankkurit` rows (with source='aly',
-// is_candidate=true) and `aly_log` rows, and DELETEs its OWN previously
-// unclaimed candidates on expiry. Laituri notes stay untouched forever.
+// *** SAFETY INVARIANT: AI ONLY ADDS/SUGGESTS. It never modifies or
+// deletes a Laituri row's CONTENT, and never touches an existing anchor
+// the user created. *** It only ever INSERTs new `ankkurit` rows (source
+// ='aly', is_candidate=true), writes `laituri.ai_kauppa_ehdotus` (a
+// suggestion field, not the row's content), and inserts `aly_log` rows —
+// plus DELETEs its OWN previously unclaimed hetki/ikkuna candidates on
+// expiry. Laituri notes' own content stays untouched forever, and nothing
+// is EVER moved to Kauppalista without the user's own approval (ks.
+// script.js hyvaksyKauppaEhdotus() — "Kolmiporras": äly ehdottaa, ihminen
+// kuittaa, sama koskee kauppatavaraa kuin muutakin).
 //
 // Design principles this implements (ks. muistiinpanot.md):
 // - "Maksimiautomaatio, minimikustannus": one AI call per user per night,
@@ -45,13 +54,14 @@
 //   MUISTUTUKSET_CRON_SECRET   (reused from the reminders job — same
 //                                shared secret, one less thing to set up)
 
+const { isoDate, parseAiJson, buildClassifyPrompt, normalizeMatch, laskeHetkiNakyvyys, onkoHetkiMennytOhi } = require('./_lib/aly-classify');
+
 const SUPABASE_URL = 'https://uctmxxeewoeydabuepye.supabase.co';
 const SUPABASE_KEY = process.env.SUPABASE_SERVICE_KEY;
 const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
 const DEFAULT_MODEL = 'claude-sonnet-4-6';
-const MAX_TOKENS = 500; // moderate — this only ever returns a short JSON list
+const MAX_TOKENS = 600; // moderate — slightly higher than before to leave room for "items" arrays (kauppa)
 const MIN_HOURS_BETWEEN_RUNS = 20;
-const VALID_ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 // BUGIKORJAUS (2026-07-18, "Ankkuri nousee liian aikaisin kaukaiselle
 // hetkelle" — ks. muistiinpanot.md): oletusarvo sille kuinka monta päivää
 // ENNEN "hetki"-kohdepäivää ehdokas tulee näkyviin. Katrin oma ehdotus
@@ -95,18 +105,6 @@ async function setSetting(key, value) {
   return res.ok;
 }
 
-// Strips ```-code-fences a model may add despite instructions not to, then
-// parses JSON safely — never throws, returns null on any failure.
-function parseAiJson(text) {
-  if (!text) return null;
-  const cleaned = text.trim().replace(/^```(?:json)?/i, '').replace(/```$/, '').trim();
-  try {
-    return JSON.parse(cleaned);
-  } catch (e) {
-    return null;
-  }
-}
-
 async function callClaude(prompt, userIdForLogging) {
   const model = process.env.ALY_MALLI || DEFAULT_MODEL;
   const response = await fetch('https://api.anthropic.com/v1/messages', {
@@ -137,78 +135,6 @@ async function callClaude(prompt, userIdForLogging) {
   }));
   const text = (data.content || []).map(function(block) { return block.text || ''; }).join('');
   return parseAiJson(text);
-}
-
-function isoDate(d) {
-  return d.toISOString().slice(0, 10);
-}
-
-// BUGIKORJAUS (2026-07-18, "Ankkuri nousee liian aikaisin kaukaiselle
-// hetkelle"): ankkurit on TÄMÄN PÄIVÄN kärkilista, ei tulevaisuuden
-// muistilista — "hetki" (tarkka, kertaluontoinen ajankohta) ei siis saa
-// nousta ehdokkaaksi heti kun äly löytää sen, jos kohdepäivä on viikkojen
-// päässä. "ikkuna" (takaraja jota kohti kuljetaan monena päivänä) EI kärsi
-// tästä ja jää tarkoituksella koskematta — se HYÖTYY varhaisesta
-// näkyvyydestä (tarvitaan aikaa toimia ennen takarajaa), koskee siis VAIN
-// kutsujaa jotka käsittelevät "hetkeä".
-//
-// Uudelleenkäyttää olemassa olevan visible_from-mekanismin (ks. siirraNappi()
-// script.js:ssä, sama sarake) sen sijaan että keksisi uuden: ehdokas LUODAAN
-// heti kuten ennenkin (ei toisteta samaa äly-kutsua joka yö turhaan
-// pelkästään tämän takia, ks. "Maksimiautomaatio, minimikustannus"), mutta
-// pysyy PIILOSSA `loadAnchorCandidates()`:n visible_from-suodattimen takana
-// kunnes kohdepäivä on lähellä. Palauttaa null (näkyy heti) jos kohde on jo
-// lähempänä kuin ennakkopäivien ikkuna, muuten ISO-aikaleiman.
-function laskeHetkiNakyvyys(resolvedDate, ennakkoPaivia) {
-  const kohde = new Date(resolvedDate + 'T00:00:00.000Z');
-  kohde.setUTCDate(kohde.getUTCDate() - ennakkoPaivia);
-  return kohde.getTime() > Date.now() ? kohde.toISOString() : null;
-}
-
-// BUGIKORJAUS (2026-07-16, "Hetki-muru nousee joka aamu" — ks. muistiinpanot.md):
-// aiemmin tämä prompti antoi AINA ajokerran OMAN päivän "tänään"/"huomenna"
-// -ankkureiksi, riippumatta siitä milloin muru oikeasti kirjoitettiin. Jos
-// muru ("palaveri huomenna klo 14") jäi jostain syystä arvioimatta
-// kirjoitusiltaansa myöhemmin (ajo ohitettiin/epäonnistui, tai eligibility
-// aktivoitui uudelleen), "huomenna" tulkittiin SEN YÖN mukaan — "huomenna"
-// on siis IKUISESTI seuraava päivä suhteessa ajohetkeen, ei koskaan osu
-// oikeaan päivään eikä siksi koskaan "vanhene" oikein. Korjattu: jokainen
-// muru saa OMAN kirjoituspäivänsä ("written_on", murun created_at) mukaan
-// promptiin, ja suhteelliset ajanmääreet JÄÄDYTETÄÄN sen mukaan — "huomenna"
-// tarkoittaa AINA "kirjoituspäivä + 1", ei "tämä ajokerta + 1". Äly palauttaa
-// nyt myös absoluuttisen "date"-kentän KAIKILLE osumille (ei vain ikkunan
-// "deadline"), jotta järjestelmä (ei vain äly) voi tarkistaa onko hetki jo
-// mennyt ohi ennen ehdokkaan luomista (ks. handler alla).
-function buildPrompt(notes) {
-  const today = new Date();
-
-  const noteList = notes.map(function(n) {
-    return { id: n.id, text: n.content, written_on: isoDate(new Date(n.created_at)) };
-  });
-
-  return 'Tänään on ' + isoDate(today) + '.\n\n' +
-    'Seuraavat ovat käyttäjän kirjoittamia lyhyitä muistilappuja, jotka odottavat vielä sijoittamista jonnekin. ' +
-    'Jokaisella on "written_on" — päivä jolloin KYSEINEN muistilappu kirjoitettiin. TÄRKEÄÄ: tulkitse ' +
-    'suhteelliset ajanmääreet ("huomenna", "ylihuomenna", "ensi tiistaina", "kolmen päivän päästä") AINA ' +
-    'SUHTEESSA KYSEISEN MURUN OMAAN written_on-päivään, EI tämänpäiväiseen ("tänään"-kenttään) — "huomenna" ' +
-    'tarkoittaa AINA "written_on + 1 päivä", vaikka murun arviointi tapahtuisi vasta myöhemmin. ' +
-    'Tunnista NÄISTÄ VAIN ne jotka viittaavat SELVÄSTI johonkin ajankohtaan tai takarajaan JA sisältävät kellonajan ' +
-    'tai muun yksiselitteisen ajanmääreen (esim. "huomenna klo 16", "osta liput 24.7. mennessä"). Jos olet ' +
-    'epävarma, JÄTÄ POIS — älä koskaan arvaa.\n\n' +
-    'Jokaiselle osumalle määritä LAJI ("category") JA absoluuttinen päivämäärä ("date", YYYY-MM-DD, laskettuna ' +
-    'written_on-päivästä yllä olevan säännön mukaan):\n' +
-    '- "hetki" = yksittäinen ajankohta (esim. "huomenna klo 16 hammaslääkäri", "ti aamulla palautus") — ' +
-    '"date" on se päivä jolloin ajankohta on\n' +
-    '- "ikkuna" = takaraja jota kohti kuljetaan, toiminta on mahdollinen monena päivänä ennen sitä ' +
-    '(esim. "osta liput 24.7. mennessä", "ilmoittaudu perjantaihin mennessä") — "date" ja "deadline" ovat ' +
-    'sama päivä (viimeinen päivä, YYYY-MM-DD)\n' +
-    'Jos et ole varma kummasta on kyse, käytä "hetki".\n\n' +
-    'Muistilaput: ' + JSON.stringify(noteList) + '\n\n' +
-    'Vastaa VAIN JSON-muodossa, ei mitään muuta tekstiä, ei markdown-koodilohkoja:\n' +
-    '{"matches": [{"id": <muistilapun id numerona>, "content": "<lyhyt suomenkielinen kuvaus ankkurille>", ' +
-    '"time": "<HH:MM tai null>", "category": "hetki"|"ikkuna", "date": "<YYYY-MM-DD, absoluuttinen päivä>", ' +
-    '"deadline": "<YYYY-MM-DD tai null, VAIN jos category=ikkuna, sama kuin date>"}]}\n' +
-    'Jos yhtään ei osu, vastaa {"matches": []}.';
 }
 
 module.exports = async function handler(req, res) {
@@ -334,10 +260,20 @@ module.exports = async function handler(req, res) {
   // pending, accepted, or done), and either never evaluated OR evaluated
   // against DIFFERENT text than it currently has (the user edited it
   // since — new content means a fresh chance, ks. bugfix note above).
+  //
+  // BUGIKORJAUS (2026-07-19, "laukaisusana voittaa" — ks. muistiinpanot.md
+  // "Laiturin äly-lajittelu"): source=eq.aly ei riittänyt yksinään —
+  // laukaisusanalla ("Juhalle:") delegoitu muru saa `ankkurit`-rivin
+  // source='ehdotus', EI 'aly', joten se olisi silti jäänyt "eligible"-
+  // tilaan ja äly olisi luokitellut sen UUDELLEEN samana yönä, vaikka
+  // käyttäjä on jo eksplisiittisesti reitittänyt sen delegoinniksi.
+  // Laajennettu kattamaan molemmat lähteet — kumpi tahansa olemassa oleva
+  // ankkuri-viittaus (koneen tai ihmisen tekemä) riittää sulkemaan murun
+  // pois uudesta luokittelusta.
   const [notesRes, evaluatedRes, suggestedRes] = await Promise.all([
     supabaseFetch('laituri?select=id,user_id,content,created_at&status=eq.uusi'),
     supabaseFetch('aly_evaluated?select=laituri_id,content'),
-    supabaseFetch('ankkurit?select=source_ref&source=eq.aly'),
+    supabaseFetch('ankkurit?select=source_ref&source=in.(aly,ehdotus)'),
   ]);
   const notes = (await notesRes.json()) || [];
   const evaluatedContentById = {};
@@ -364,7 +300,7 @@ module.exports = async function handler(req, res) {
   // the spec ("once per day until the deadline") never meant that.
   // Fixed by adding an INDEPENDENT, per-note calendar-day lock: check
   // aly_log for whether THIS note already got a suggestion TODAY (UTC
-  // calendar day, same definition as buildPrompt()'s today/tomorrow) —
+  // calendar day, same definition as buildClassifyPrompt()'s today/tomorrow) —
   // regardless of how many times this job has actually run. Covers both
   // silent expiry AND manual dismissal (× on the candidate card): both
   // leave an aly_log row dated today, so neither one "resets" the lock
@@ -396,11 +332,12 @@ module.exports = async function handler(req, res) {
   let usersChecked = 0;
   let usersFailed = 0;
   let matchesCreated = 0;
+  let kauppaSuggested = 0;
 
   for (const userId of Object.keys(byUser)) {
     const userNotes = byUser[userId];
     usersChecked++;
-    const result = await callClaude(buildPrompt(userNotes), userId);
+    const result = await callClaude(buildClassifyPrompt(userNotes), userId);
 
     // BUGIKORJAUS (2026-07-15, ks. muistiinpanot.md "Yöajo ei tee mitään"):
     // ennen tätä, jos äly-kutsu epäonnistui (Anthropic-virhe TAI vastaus ei
@@ -425,17 +362,44 @@ module.exports = async function handler(req, res) {
     }
     const matchedIds = new Set();
 
-    for (const match of matches) {
-      const note = userNotes.find(function(n) { return n.id === match.id; });
-      if (!note || !match.content) continue;
+    for (const rawMatch of matches) {
+      const note = userNotes.find(function(n) { return n.id === rawMatch.id; });
+      if (!note) continue;
+      // "Korkea kynnys" (ks. muistiinpanot.md "Laiturin äly-lajittelu"):
+      // normalizeMatch() palauttaa null jos osuma on rakenteellisesti
+      // epäkelpo (esim. kauppa-luokka ilman yhtään validia tuotenimeä) —
+      // tällöin osuma ei ole edes yritys, ei matchedIds:iin eikä mitään
+      // kirjoitusta, muru jää normaaliin "ei osumaa" -käsittelyyn alla.
+      const match = normalizeMatch(rawMatch);
+      if (!match) continue;
       matchedIds.add(note.id);
 
-      // Uncertain or malformed classification defaults to "hetki" — the
-      // more conservative option (ks. "hetki vs. ikkuna" note above).
-      const isWindow = match.category === 'ikkuna' && typeof match.deadline === 'string' && VALID_ISO_DATE.test(match.deadline);
-      const category = isWindow ? 'ikkuna' : 'hetki';
-      const deadline = isWindow ? match.deadline : null;
-      const resolvedDate = typeof match.date === 'string' && VALID_ISO_DATE.test(match.date) ? match.date : deadline;
+      // Kauppatavara-ehdotus (2026-07-19, "Yksi luukku" erä 1, ks.
+      // muistiinpanot.md "Laiturin äly-lajittelu") — EI ankkuriehdokas,
+      // EI candidate-lifecycle: kirjoitetaan suoraan murun omalle riville
+      // ("ai_kauppa_ehdotus"), näkyy inline-ehdotuksena Laiturissa
+      // (ks. piirraKauppaEhdotusKortti() script.js:ssä). Merkitään
+      // käsitellyksi HETI ehdotuksen kirjoituksen jälkeen (ei candidate-
+      // rakennetta joka muuten estäisi uudelleenkysymisen) — sama sisältö
+      // ei siis kysytä uudelleen ennen kuin käyttäjä MUOKKAA murua.
+      if (match.category === 'kauppa') {
+        const kauppaRes = await supabaseFetch('laituri?id=eq.' + note.id, {
+          method: 'PATCH',
+          headers: { Prefer: 'return=minimal' },
+          body: JSON.stringify({ ai_kauppa_ehdotus: match.items }),
+        });
+        if (!kauppaRes.ok) {
+          console.error('[aly-nightly] Kauppaehdotuksen kirjaus epäonnistui murulle ' + note.id + ':', kauppaRes.status, await kauppaRes.text());
+          continue;
+        }
+        await markEvaluated(note.id, note.content);
+        kauppaSuggested++;
+        continue;
+      }
+
+      const category = match.category;
+      const deadline = match.deadline;
+      const resolvedDate = match.resolvedDate;
 
       // BUGIKORJAUS (2026-07-16, "Hetki-muru nousee joka aamu"): jos tämän
       // muistilapun arviointi viivästyi (ajo ohitettiin/epäonnistui yhtenä
@@ -534,5 +498,6 @@ module.exports = async function handler(req, res) {
     notes_evaluated: eligible.length,
     held_back_today: suggestedTodayIds.size,
     matches: matchesCreated,
+    kauppa_suggested: kauppaSuggested,
   });
 };

@@ -2251,6 +2251,17 @@ h1 {
   color: var(--muted);
 }
 
+.list li.laituri-arkisto-rivi {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.list li.laituri-arkisto-rivi span {
+  color: var(--muted);
+}
+
 /* === LOGIN VIEW === */
 
 #login-view {
