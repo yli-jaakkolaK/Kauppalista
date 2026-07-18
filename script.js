@@ -2538,66 +2538,19 @@ async function merkitseAlyMuruKasitellyksi(sourceRef) {
 // (iCloud+caldav-sync) toteuttaa lopulta synkkana takaisin. Sataman oma
 // koodi ei koskaan lisää/poista mitään kalenterista suoraan.
 //
-// RFC 5545 -tekstipaon minimi tälle käyttötapaukselle (lyhyet suomenkieliset
-// otsikot) — pilkku/puolipiste/kenoviiva ovat ainoat merkit joita SUMMARY
-// realistisesti sisältää.
-function icsEscape(teksti) {
-  return String(teksti).replace(/\\/g, '\\\\').replace(/\n/g, '\\n').replace(/,/g, '\\,').replace(/;/g, '\\;');
-}
-
-// "YYYYMMDDTHHMMSS" .ics-muotoon — Date-oliota käytetään PELKKÄNÄ
-// vuorokaudenylityksen laskurina (getUTC*-metodit, ei todellinen UTC-hetki),
-// koska pvm+aika on jo Europe/Helsinki-seinäkelloaikaa (ks. DTSTART/DTEND;TZID
-// alla) eikä ajokoneen omaa aikavyöhykettä saa päästää sotkemaan laskua.
-function muotoileIcsAika(d) {
-  const pad = function(n) { return String(n).padStart(2, '0'); };
-  return d.getUTCFullYear() + pad(d.getUTCMonth() + 1) + pad(d.getUTCDate()) + 'T' + pad(d.getUTCHours()) + pad(d.getUTCMinutes()) + '00';
-}
-
-// Kellonaika jäädytetty jo kirjoitushetkellä (ks. design-periaate "Suhteellinen
-// aika jäädytetään kirjoitushetkeen") — tämä vain muotoilee sen .ics-kentiksi.
-// Kesto oletetaan 1h (ei tiedetä todellista kestoa) — käyttäjä säätää sen
-// itse Applen omassa näkymässä ennen Lisää-napin painamista. Loppuaika
-// LASKETAAN Date-aritmetiikalla (ei modulo+sama-päivä-oletuksella) jotta
-// puolenyön ylittävä tapahtuma (esim. 23:30) saa DTEND:n OIKEALLE
-// seuraavalle päivälle sen sijaan että loppu näyttäisi olevan ennen alkua.
-function rakennaIcsTapahtuma(otsikko, pvm, aika) {
-  const pvmOsat = pvm.split('-').map(function(s) { return parseInt(s, 10); });
-  const aikaOsat = aika.split(':').map(function(s) { return parseInt(s, 10); });
-  const alku = new Date(Date.UTC(pvmOsat[0], pvmOsat[1] - 1, pvmOsat[2], aikaOsat[0], aikaOsat[1], 0));
-  const loppu = new Date(alku.getTime() + 60 * 60 * 1000);
-  const dtstamp = new Date().toISOString().replace(/[-:]/g, '').split('.')[0] + 'Z';
-  const uid = 'satama-' + Date.now() + '-' + Math.random().toString(36).slice(2) + '@kauppalista-nine.vercel.app';
-  return [
-    'BEGIN:VCALENDAR',
-    'VERSION:2.0',
-    'PRODID:-//Satama//Kalenterisilta//FI',
-    'BEGIN:VEVENT',
-    'UID:' + uid,
-    'DTSTAMP:' + dtstamp,
-    'DTSTART;TZID=Europe/Helsinki:' + muotoileIcsAika(alku),
-    'DTEND;TZID=Europe/Helsinki:' + muotoileIcsAika(loppu),
-    'SUMMARY:' + icsEscape(otsikko),
-    'END:VEVENT',
-    'END:VCALENDAR',
-  ].join('\r\n');
-}
-
-// Avaa .ics-tapahtuman iOS:n natiiviin "uusi tapahtuma" -näkymään data-URI:na
-// (ei blob: — tunnettu epäluotettava iOS Safari/PWA-kontekstissa useiden
-// versioiden yli, ks. muistiinpanot.md tekninen huomio). EI VIELÄ TESTATTU
-// oikealla laitteella tämän kirjoitushetkellä — jos avaus osoittautuu
-// epäluotettavaksi, tätä yhtä funktiota voi kokeilla vaihtaa blob:/webcal:-
-// pohjaiseksi koskematta mihinkään muuhun.
+// KORJAUS (2026-07-21, Katrin testilöydös oikealla asennetulla iOS-PWA:lla):
+// aiempi data:text/calendar-URI-tekniikka avasi vain tyhjän valkoisen sivun —
+// ei Applen tapahtumanäkymää, ei virhettä. .ics-sisällön rakennus ja
+// tarjoilu siirretty palvelimelle (api/ics.js, oikea Content-Type:
+// text/calendar -otsikko) — perinteisesti luotettavin reitti iOS:n
+// natiiviin .ics-käsittelyyn, koska WebKit tunnistaa MIME-tyypin eikä
+// data:-skeeman sisältöä. Sama data (content/event_date/event_time) jonka
+// tämä funktio jo sai — ei uutta hakua, vain toimitustapa vaihtui.
 function avaaKalenteriSilta(candidate) {
-  const ics = rakennaIcsTapahtuma(candidate.content, candidate.event_date, candidate.event_time);
-  const linkki = document.createElement('a');
-  linkki.href = 'data:text/calendar;charset=utf-8,' + encodeURIComponent(ics);
-  linkki.target = '_blank';
-  linkki.rel = 'noopener';
-  document.body.appendChild(linkki);
-  linkki.click();
-  document.body.removeChild(linkki);
+  const url = '/api/ics?otsikko=' + encodeURIComponent(candidate.content) +
+    '&pvm=' + encodeURIComponent(candidate.event_date) +
+    '&aika=' + encodeURIComponent(candidate.event_time);
+  window.location.href = url;
 }
 
 // E3 mid-tier V1 ("äly toimii, ihminen valvoo", ks. muistiinpanot.md) — AI-
