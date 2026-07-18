@@ -205,10 +205,10 @@ async function vaihdaAnkkurointiYleinen(source, id, content, jalkeenPaivitys) {
   const idStr = String(id);
   if (ankkuroidutAvaimet.has(source + ':' + idStr)) {
     const { error } = await db.from('ankkurit').delete().eq('source', source).eq('source_ref', idStr).eq('user_id', currentUserId);
-    if (error) console.error('Ankkuroinnin poisto epäonnistui:', error);
+    if (ilmoitaKirjoitusvirheesta(error, 'Ankkuroinnin poisto')) return;
   } else {
     const { error } = await db.from('ankkurit').insert({ content: content, source: source, source_ref: idStr, user_id: currentUserId });
-    if (error) console.error('Ankkurointi epäonnistui:', error);
+    if (ilmoitaKirjoitusvirheesta(error, 'Ankkurointi')) return;
   }
   await paivitaAnkkuroidutAvaimet();
   jalkeenPaivitys();
@@ -765,11 +765,8 @@ function piirraKalenteriRivi(rivi) {
     checkNappi.addEventListener('click', async function() {
       tuntopalauteValmis();
       const { error } = await db.from('hytti_rivit').update({ done: true, done_at: new Date().toISOString() }).eq('id', rivi.id);
-      if (error) {
-        console.error('Hytti-tehtävän merkintä epäonnistui:', error);
-      } else {
-        siivoaMuistutuksetKumottavasti('hytti_rivi', rivi.id);
-      }
+      if (ilmoitaKirjoitusvirheesta(error, 'Hytti-tehtävän merkintä')) { lataaKalenteri(); return; }
+      siivoaMuistutuksetKumottavasti('hytti_rivi', rivi.id);
       lataaKalenteri();
     });
     li.appendChild(checkNappi);
@@ -796,11 +793,8 @@ function piirraKalenteriRivi(rivi) {
     checkNappi.addEventListener('click', async function() {
       tuntopalauteValmis();
       const { error } = await db.from('ankkurit').update({ done: true, done_at: new Date().toISOString() }).eq('id', rivi._ankkuriId);
-      if (error) {
-        console.error('Ankkurin merkintä epäonnistui:', error);
-      } else {
-        siivoaMuistutuksetKumottavasti('ankkuri', rivi._ankkuriId);
-      }
+      if (ilmoitaKirjoitusvirheesta(error, 'Ankkurin merkintä')) { lataaKalenteri(); return; }
+      siivoaMuistutuksetKumottavasti('ankkuri', rivi._ankkuriId);
       lataaKalenteri();
     });
     li.appendChild(checkNappi);
@@ -915,11 +909,8 @@ function piirraKalenteriRivi(rivi) {
         const vahvistus = await naytaVahvistus('Poistetaanko ' + rivi.title + '?', null, 'Poista');
         if (!vahvistus) return;
         const { error } = await db.from('kalenteri_tapahtumat').delete().eq('id', rivi.id);
-        if (error) {
-          console.error('Tapahtuman poisto epäonnistui:', error);
-        } else {
-          siivoaMuistutuksetKumottavasti('kalenteri', rivi.id);
-        }
+        if (ilmoitaKirjoitusvirheesta(error, 'Tapahtuman poisto')) { lataaKalenteri(); return; }
+        siivoaMuistutuksetKumottavasti('kalenteri', rivi.id);
         lataaKalenteri();
       },
     });
@@ -1386,13 +1377,18 @@ function onkoUusiMinulle(rivi) {
   return !kuitatutUidt.has(rivi.ical_uid);
 }
 
+// Palauttaa true jos kuittaus oikeasti kirjoittui — kutsujien pitää
+// tarkistaa tämä ennen kuin ne merkitsevät rivin/badgen kuitatuksi (ks.
+// muistiinpanot.md "Kirjoituspolkujen auditointi": kuitatutUidt-välimuistia
+// EI SAA päivittää mikäli kirjoitus oikeasti epäonnistui).
 async function kuittaa(icalUid) {
   const { error } = await db.from('kalenteri_kuittaukset').upsert(
     { ical_uid: icalUid, user_id: currentUserId },
     { onConflict: 'ical_uid,user_id' }
   );
-  if (error) console.error('Kuittaus epäonnistui:', error);
+  if (ilmoitaKirjoitusvirheesta(error, 'Kuittaus')) return false;
   kuitatutUidt.add(icalUid);
+  return true;
 }
 
 // Kaikki tällä hetkellä "uudet minulle" -rivit — tallennettu tähän "Kuittaa
@@ -1575,10 +1571,7 @@ document.getElementById('kalenteri-kuittaa-kaikki').addEventListener('click', as
   if (kuittausjonoUudet.length === 0) return;
   const rivitInsert = kuittausjonoUudet.map(function(r) { return { ical_uid: r.ical_uid, user_id: currentUserId }; });
   const { error } = await db.from('kalenteri_kuittaukset').upsert(rivitInsert, { onConflict: 'ical_uid,user_id' });
-  if (error) {
-    console.error('Kuittaa kaikki epäonnistui:', error);
-    return;
-  }
+  if (ilmoitaKirjoitusvirheesta(error, 'Kuittaa kaikki')) return;
   const maara = kuittausjonoUudet.length;
   document.getElementById('kalenteri-kuittaus-overlay').style.display = 'none';
   await paivitaKuittausTila();
@@ -1673,11 +1666,8 @@ function piirraHyttiTehtavaRivi(rivi) {
   checkNappi.addEventListener('click', async function() {
     tuntopalauteValmis();
     const { error } = await db.from('hytti_rivit').update({ done: true, done_at: new Date().toISOString() }).eq('id', rivi.id);
-    if (error) {
-      console.error('Hytti-tehtävän merkintä epäonnistui:', error);
-    } else {
-      siivoaMuistutuksetKumottavasti('hytti_rivi', rivi.id);
-    }
+    if (ilmoitaKirjoitusvirheesta(error, 'Hytti-tehtävän merkintä')) { lataaHyttiPaanakyma(); return; }
+    siivoaMuistutuksetKumottavasti('hytti_rivi', rivi.id);
     lataaHyttiPaanakyma();
   });
   li.appendChild(checkNappi);
@@ -1844,11 +1834,8 @@ async function poistaHyttiRivi(rivi) {
     paivitaHyttiLisaysKohde();
   }
   const { error } = await db.from('hytti_rivit').delete().eq('id', rivi.id);
-  if (error) {
-    console.error('Hytti-rivin poisto epäonnistui:', error);
-  } else {
-    siivoaMuistutuksetKumottavasti('hytti_rivi', rivi.id);
-  }
+  if (ilmoitaKirjoitusvirheesta(error, 'Hytti-rivin poisto')) { lataaHyttiKortti(); return; }
+  siivoaMuistutuksetKumottavasti('hytti_rivi', rivi.id);
   lataaHyttiKortti();
 }
 
@@ -1898,7 +1885,7 @@ function piirraHyttiRivi(rivi, lukutila) {
         const updateData = { done: !rivi.done, done_at: !rivi.done ? new Date().toISOString() : null };
         if (updateData.done) tuntopalauteValmis();
         const { error } = await db.from('hytti_rivit').update(updateData).eq('id', rivi.id);
-        if (error) console.error('Hytti-rivin merkintä epäonnistui:', error);
+        ilmoitaKirjoitusvirheesta(error, 'Hytti-rivin merkintä');
         lataaHyttiKortti();
       });
     }
@@ -1924,7 +1911,7 @@ function piirraHyttiRivi(rivi, lukutila) {
         const uusi = inputti.value.trim();
         if (uusi && uusi !== rivi.content) {
           const { error } = await db.from('hytti_rivit').update({ content: uusi }).eq('id', rivi.id);
-          if (error) console.error('Hytti-rivin muokkaus epäonnistui:', error);
+          ilmoitaKirjoitusvirheesta(error, 'Hytti-rivin muokkaus');
         }
         lataaHyttiKortti();
       }
@@ -1947,7 +1934,7 @@ function piirraHyttiRivi(rivi, lukutila) {
         if (syote === null) return;
         const uusiPvm = syote.trim() === '' ? null : syote.trim();
         const { error } = await db.from('hytti_rivit').update({ due_date: uusiPvm }).eq('id', rivi.id);
-        if (error) console.error('Eräpäivän tallennus epäonnistui:', error);
+        ilmoitaKirjoitusvirheesta(error, 'Eräpäivän tallennus');
         lataaHyttiKortti();
       });
     }
@@ -1963,7 +1950,7 @@ function piirraHyttiRivi(rivi, lukutila) {
       const uusiTila = !rivi.is_task;
       const updateData = uusiTila ? { is_task: true } : { is_task: false, done: false, done_at: null, due_date: null };
       const { error } = await db.from('hytti_rivit').update(updateData).eq('id', rivi.id);
-      if (error) console.error('Tehtävätilan vaihto epäonnistui:', error);
+      ilmoitaKirjoitusvirheesta(error, 'Tehtävätilan vaihto');
       lataaHyttiKortti();
     });
     li.appendChild(tehtavaNappi);
@@ -2045,8 +2032,9 @@ function muokkaaHyttiSeuraavaAskel() {
     const uusi = inputti.value.trim();
     if (uusi !== (currentHyttiKortti.seuraava_askel || '')) {
       const { error } = await db.from('hytti_kortit').update({ seuraava_askel: uusi || null }).eq('id', currentHyttiKortti.id);
-      if (error) console.error('Seuraavan askeleen tallennus epäonnistui:', error);
-      currentHyttiKortti.seuraava_askel = uusi || null;
+      if (!ilmoitaKirjoitusvirheesta(error, 'Seuraavan askeleen tallennus')) {
+        currentHyttiKortti.seuraava_askel = uusi || null;
+      }
     }
     inputti.replaceWith(askelEl);
     piirraHyttiKorttiUI();
@@ -2068,10 +2056,7 @@ async function muokkaaHyttiKalenterisuodatin() {
   if (syote === null) return;
   const uusi = syote.trim() === '' ? null : syote.trim();
   const { error } = await db.from('hytti_kortit').update({ kalenterisuodatin: uusi }).eq('id', currentHyttiKortti.id);
-  if (error) {
-    console.error('Kalenterisuodattimen tallennus epäonnistui:', error);
-    return;
-  }
+  if (ilmoitaKirjoitusvirheesta(error, 'Kalenterisuodattimen tallennus')) return;
   currentHyttiKortti.kalenterisuodatin = uusi;
   piirraHyttiKorttiUI();
   lataaHyttiKorttiKalenteri();
@@ -2148,10 +2133,7 @@ async function arkistoiHyttiKortti() {
   const vahvistus = await naytaVahvistus('Arkistoidaanko ' + currentHyttiKortti.name + '?', null, 'Arkistoi');
   if (!vahvistus) return;
   const { error } = await db.from('hytti_kortit').update({ status: 'arkistoitu' }).eq('id', currentHyttiKortti.id);
-  if (error) {
-    console.error('Kortin arkistointi epäonnistui:', error);
-    return;
-  }
+  if (ilmoitaKirjoitusvirheesta(error, 'Kortin arkistointi')) return;
   logEvent('archived', 'hytti_kortti', currentHyttiKortti.id, currentHyttiKortti.name, null);
   showHyttiView();
   lataaHyttiPaanakyma();
@@ -2159,10 +2141,7 @@ async function arkistoiHyttiKortti() {
 
 async function palautaHyttiKortti() {
   const { error } = await db.from('hytti_kortit').update({ status: 'aktiivinen' }).eq('id', currentHyttiKortti.id);
-  if (error) {
-    console.error('Kortin palautus epäonnistui:', error);
-    return;
-  }
+  if (ilmoitaKirjoitusvirheesta(error, 'Kortin palautus')) return;
   logEvent('restored', 'hytti_kortti', currentHyttiKortti.id, currentHyttiKortti.name, null);
   currentHyttiKortti.status = 'aktiivinen';
   piirraHyttiKorttiUI();
@@ -2216,11 +2195,8 @@ document.getElementById('hytti-uusi-btn').addEventListener('click', async functi
   if (nimi === '') { uusiInput.focus(); return; }
 
   const { data, error } = await db.from('hytti_kortit').insert({ name: nimi, card_type: valittuHyttiTyyppi, owner_id: currentUserId }).select().single();
-  if (error) {
-    console.error('Kortin luonti epäonnistui:', error);
-  } else {
-    logEvent('created', 'hytti_kortti', data.id, nimi, null);
-  }
+  if (ilmoitaKirjoitusvirheesta(error, 'Kortin luonti')) return;
+  logEvent('created', 'hytti_kortti', data.id, nimi, null);
   uusiInput.value = '';
   lataaHyttiPaanakyma();
 });
@@ -2245,11 +2221,8 @@ document.getElementById('hytti-rivi-add-btn').addEventListener('click', async fu
   if (kohdistettuJarjestys !== null) uusiRivi.sort_order = kohdistettuJarjestys;
 
   const { data, error } = await db.from('hytti_rivit').insert(uusiRivi).select().single();
-  if (error) {
-    console.error('Hytti-rivin lisäys epäonnistui:', error);
-  } else {
-    logEvent(onOtsikko ? 'created' : 'added', onOtsikko ? 'header' : 'hytti_rivi', data.id, teksti, null);
-  }
+  if (ilmoitaKirjoitusvirheesta(error, 'Hytti-rivin lisäys')) { inputEl.focus(); return; }
+  logEvent(onOtsikko ? 'created' : 'added', onOtsikko ? 'header' : 'hytti_rivi', data.id, teksti, null);
   inputEl.value = '';
   inputEl.focus();
   lataaHyttiKortti();
@@ -2316,7 +2289,7 @@ function siirraNappi(ankkuriId, jalkeenPaivitys, naytaLabel) {
     const uusiHetki = new Date();
     uusiHetki.setHours(uusiHetki.getHours() + tunteja);
     const { error } = await db.from('ankkurit').update({ visible_from: uusiHetki.toISOString() }).eq('id', ankkuriId);
-    if (error) console.error('Ankkurin siirto epäonnistui:', error);
+    ilmoitaKirjoitusvirheesta(error, 'Ankkurin siirto');
     jalkeenPaivitys();
   });
   return nappi;
@@ -2362,11 +2335,8 @@ async function lataaAnkkurit() {
     checkNappi.addEventListener('click', async function() {
       tuntopalauteValmis();
       const { error } = await db.from('ankkurit').update({ done: true, done_at: new Date().toISOString() }).eq('id', ankkuri.id);
-      if (error) {
-        console.error('Ankkurin merkintä epäonnistui:', error);
-      } else {
-        siivoaMuistutuksetKumottavasti('ankkuri', ankkuri.id);
-      }
+      if (ilmoitaKirjoitusvirheesta(error, 'Ankkurin merkintä')) { lataaAnkkurit(); return; }
+      siivoaMuistutuksetKumottavasti('ankkuri', ankkuri.id);
       lataaAnkkurit();
     });
     li.appendChild(checkNappi);
@@ -2396,7 +2366,7 @@ async function lataaAnkkurit() {
         const uusi = inputti.value.trim();
         if (uusi && uusi !== ankkuri.content) {
           const { error } = await db.from('ankkurit').update({ content: uusi }).eq('id', ankkuri.id);
-          if (error) console.error('Ankkurin muokkaus epäonnistui:', error);
+          ilmoitaKirjoitusvirheesta(error, 'Ankkurin muokkaus');
         }
         lataaAnkkurit();
       }
@@ -2426,9 +2396,10 @@ async function lataaAnkkurit() {
         kotiNimi ? ('Ankkuri laskettu — löytyy ' + kotiNimi) : 'Ankkuri laskettu',
         async function() {
           const { error } = await db.from('ankkurit').delete().eq('id', ankkuri.id);
-          if (error) {
-            console.error('Ankkurin irrotus epäonnistui:', error);
-          }
+          // Kumottava toasti on jo näytetty/kadonnut tähän mennessä — pysäytys
+          // (return) estää seuraavan, RIIPPUVAN muistutus-siirron ajautumasta
+          // ankkurin ollessa yhä olemassa, ja uusi toast kertoo epäonnistumisesta.
+          if (ilmoitaKirjoitusvirheesta(error, 'Ankkurin irrotus')) return;
           // BUGIKORJAUS ("Ankkuriarkkitehtuuri: jokaisella ankkurilla on
           // koti"): LASKU POISTAA VAIN NOSTON — muistutukset kuuluvat
           // sisällölle, eivät nostolle, joten ne SIIRRETÄÄN kotiin sen
@@ -2436,14 +2407,21 @@ async function lataaAnkkurit() {
           // (ei kotia) JA hyväksytty ihmislähtöinen ehdotus ('ehdotus' — koti
           // on LÄHETTÄJÄN oma Laituri, ei jotain jonne vastaanottaja pääsisi)
           // putoavat varasuunnitelmaan (poisto).
+          let muistutusVirhe;
           if (ankkuri.source && ankkuri.source !== 'manual' && ankkuri.source !== 'ehdotus' && ankkuri.source_ref) {
             const kotiLahde = ankkurinKotiMuistutusLahde(ankkuri);
-            await db.from('muistutukset')
+            const tulos = await db.from('muistutukset')
               .update({ source: kotiLahde, source_ref: String(ankkuri.source_ref) })
               .eq('source', 'ankkuri').eq('source_ref', String(ankkuri.id));
+            muistutusVirhe = tulos.error;
           } else {
-            await db.from('muistutukset').delete().eq('source', 'ankkuri').eq('source_ref', String(ankkuri.id));
+            const tulos = await db.from('muistutukset').delete().eq('source', 'ankkuri').eq('source_ref', String(ankkuri.id));
+            muistutusVirhe = tulos.error;
           }
+          // Ankkuri on jo poistettu onnistuneesti — muistutuksen siirto/poisto
+          // on toissijainen siivous, ei enää perumiskelpoinen tässä vaiheessa,
+          // joten vain lokitetaan (ei toista tointa käyttäjälle).
+          if (muistutusVirhe) console.error('Muistutuksen siirto/poisto ankkurin irrotuksessa epäonnistui:', muistutusVirhe);
           lataaAnkkurit();
         },
         function() {
@@ -2686,7 +2664,10 @@ async function loadAnchorCandidates() {
           { event_date: candidate.ristiriita_pvm, tapahtuma_avaimet: candidate.ristiriita_avain, acked_by: currentUserId },
           { onConflict: 'event_date,tapahtuma_avaimet', ignoreDuplicates: true }
         );
-        if (ackError) console.error('Kalenterin ristiriitalipun kuittaus epäonnistui:', ackError);
+        if (ackError) {
+          console.error('Kalenterin ristiriitalipun kuittaus epäonnistui:', ackError);
+          naytaIlmoitus('Keskustelu kuitattu, mutta kalenterin ristiriitalippu ei rauhoittunut — tarkista Kalenterista');
+        }
         await paivitaRistiriitaKuittaukset();
         loadAnchorCandidates();
         lataaAnkkurit();
@@ -2705,7 +2686,7 @@ async function loadAnchorCandidates() {
     checkButton.addEventListener('click', async function() {
       tuntopalauteValmis();
       const { error } = await db.from('ankkurit').update({ done: true, done_at: new Date().toISOString() }).eq('id', candidate.id);
-      if (error) console.error('Ankkuriehdokkaan merkintä epäonnistui:', error);
+      ilmoitaKirjoitusvirheesta(error, 'Ankkuriehdokkaan merkintä');
       loadAnchorCandidates();
     });
     sisaltoRivi.appendChild(checkButton);
@@ -2738,7 +2719,7 @@ async function loadAnchorCandidates() {
           const paivitys = { is_candidate: false };
           if (uusi !== candidate.content) paivitys.content = uusi;
           const { error } = await db.from('ankkurit').update(paivitys).eq('id', candidate.id);
-          if (error) console.error('Ankkuriehdokkaan muokkaus epäonnistui:', error);
+          ilmoitaKirjoitusvirheesta(error, 'Ankkuriehdokkaan muokkaus');
         }
         loadAnchorCandidates();
         lataaAnkkurit();
@@ -2765,7 +2746,7 @@ async function loadAnchorCandidates() {
     acceptButton.title = 'Ota omaksi ankkuriksi';
     acceptButton.addEventListener('click', async function() {
       const { error } = await db.from('ankkurit').update({ is_candidate: false }).eq('id', candidate.id);
-      if (error) console.error('Ankkuriehdokkaan hyväksyntä epäonnistui:', error);
+      ilmoitaKirjoitusvirheesta(error, 'Ankkuriehdokkaan hyväksyntä');
       loadAnchorCandidates();
       lataaAnkkurit();
     });
@@ -2807,14 +2788,18 @@ async function loadAnchorCandidates() {
         'Ehdotus poistettu',
         async function() {
           const { error } = await db.from('ankkurit').delete().eq('id', candidate.id);
-          if (error) console.error('Ankkuriehdokkaan poisto epäonnistui:', error);
+          // Jos poisto epäonnistuu, ehdokas on TODELLISUUDESSA yhä olemassa —
+          // merkitseAlyMuruKasitellyksi() ei saa suorittua tässä tilassa, se
+          // estäisi murun uudelleenarvioinnin ikuisesti vaikka ehdokas jäi elämään.
+          if (ilmoitaKirjoitusvirheesta(error, 'Ankkuriehdokkaan poisto')) return;
           // aly_log koskee vain koneehdotuksia (source='aly') — ihmislähtöisellä
           // ehdotuksella ei ole aly_log-riviä, eikä lähettäjälle koskaan
           // raportoida hylkäystä (ks. muistiinpanot.md "Ankkurin ehdottaminen
           // toiselle" -turvasäännöt), joten tälle sourcelle ei ole mitään
           // päivitettävää täällä.
           if (candidate.source === 'aly') {
-            await db.from('aly_log').update({ undone_at: new Date().toISOString(), undo_reason: 'dismissed' }).eq('anchor_id', candidate.id).is('undone_at', null);
+            const { error: logError } = await db.from('aly_log').update({ undone_at: new Date().toISOString(), undo_reason: 'dismissed' }).eq('anchor_id', candidate.id).is('undone_at', null);
+            if (logError) console.error('Äly-lokin merkintä hylkäyksestä epäonnistui:', logError);
             // Bugi 27 -korjaus (ks. sql/063): hylkäys on lopullinen vastaus,
             // ei jätä murua odottamaan uutta yöajon arviointia.
             await merkitseAlyMuruKasitellyksi(candidate.source_ref);
@@ -3164,10 +3149,14 @@ async function loadAiLog() {
       undoButton.className = 'aly-log-kumoa-btn';
       undoButton.addEventListener('click', async function() {
         if (entry.anchor_id) {
-          await db.from('ankkurit').delete().eq('id', entry.anchor_id);
+          const { error: poistoError } = await db.from('ankkurit').delete().eq('id', entry.anchor_id);
+          // Jos ankkurin poisto epäonnistuu, se on TODELLISUUDESSA yhä
+          // olemassa — merkitseAlyMuruKasitellyksi() ei saa suorittua (ks.
+          // sama perustelu kuin ehdokaskortin ×-hylkäyksessä).
+          if (ilmoitaKirjoitusvirheesta(poistoError, 'Ankkurin poisto')) return;
         }
         const { error } = await db.from('aly_log').update({ undone_at: new Date().toISOString(), undo_reason: 'manual' }).eq('id', entry.id);
-        if (error) console.error('Äly-lokin kumoaminen epäonnistui:', error);
+        if (ilmoitaKirjoitusvirheesta(error, 'Äly-lokin kumoaminen')) return;
         // Bugi 27 -korjaus (ks. sql/063): sama kuin ehdokaskortin ×-hylkäys —
         // "Kumoa" on lopullinen vastaus, ei jätä murua uuden yöajon varaan.
         if (entry.source_ref) await merkitseAlyMuruKasitellyksi(entry.source_ref);
@@ -3255,10 +3244,9 @@ async function lataaLaituri(hakusana) {
         const uusi = inputti.value.trim();
         if (uusi && uusi !== rivi.content) {
           const { error } = await db.from('laituri').update({ content: uusi }).eq('id', rivi.id);
-          if (error) {
-            console.error('Murun muokkaus epäonnistui:', error);
-          } else if (onAnkkuroitu) {
-            await db.from('ankkurit').update({ content: uusi }).eq('source', 'laituri').eq('source_ref', String(rivi.id));
+          if (!ilmoitaKirjoitusvirheesta(error, 'Murun muokkaus') && onAnkkuroitu) {
+            const { error: peiliError } = await db.from('ankkurit').update({ content: uusi }).eq('source', 'laituri').eq('source_ref', String(rivi.id));
+            if (peiliError) console.error('Ankkurin peilipäivitys epäonnistui:', peiliError);
           }
         }
         lataaLaituri(document.getElementById('laituri-search').value.trim());
@@ -3344,10 +3332,7 @@ async function lataaLaituri(hakusana) {
             is_candidate: true,
             proposed_by: currentUserId,
           });
-          if (error) {
-            console.error('Ehdotuksen lähetys epäonnistui:', error);
-            return;
-          }
+          if (ilmoitaKirjoitusvirheesta(error, 'Ehdotuksen lähetys')) return;
           ehdotetutTassaIstunnossa.add(rivi.id);
           lataaLaituri(document.getElementById('laituri-search').value.trim());
         });
@@ -3376,12 +3361,13 @@ async function lataaLaituri(hakusana) {
       const vahvistus = await naytaVahvistus('Poistetaanko tämä ajatus?', null, 'Poista');
       if (!vahvistus) return;
       const { error } = await db.from('laituri').delete().eq('id', rivi.id);
-      if (error) {
-        console.error('Laiturin rivin poisto epäonnistui:', error);
-      } else {
-        siivoaMuistutuksetKumottavasti('laituri', rivi.id);
-      }
-      await db.from('ankkurit').delete().eq('source', 'laituri').eq('source_ref', String(rivi.id));
+      // Jos itse murun poisto epäonnistuu, se on TODELLISUUDESSA yhä
+      // olemassa — ankkurin siivousta (rivi alla) ei saa tehdä silloin,
+      // se jättäisi orvon ankkurin murulle joka ei koskaan poistunutkaan.
+      if (ilmoitaKirjoitusvirheesta(error, 'Laiturin rivin poisto')) return;
+      siivoaMuistutuksetKumottavasti('laituri', rivi.id);
+      const { error: ankkuriError } = await db.from('ankkurit').delete().eq('source', 'laituri').eq('source_ref', String(rivi.id));
+      if (ankkuriError) console.error('Ankkurin siivous murun poiston yhteydessä epäonnistui:', ankkuriError);
       lataaLaituri(document.getElementById('laituri-search').value.trim());
       paivitaLaituriBadge();
     });
@@ -3455,8 +3441,17 @@ async function suoritaSijoitus(rivi, kohde) {
     return;
   }
   const { error } = await db.from('laituri').update({ status: 'sijoitettu', placed_where: kohde.nimi }).eq('id', rivi.id);
-  if (error) console.error('Sijoitusmerkintä epäonnistui:', error);
-  naytaIlmoitus('Sijoitettu: ' + kohde.nimi);
+  // Itse sisältö on jo kirjoitettu kohteeseen onnistuneesti tässä vaiheessa —
+  // jos VAIN tämä merkintä epäonnistuu, muru näyttäytyy yhä "sijoittamattomana"
+  // ja saattaisi päätyä sijoitetuksi UUDELLEEN myöhemmin (duplikaattiriski).
+  // "Sijoitettu"-viesti EI SAA valehdella tästä, ks. muistiinpanot.md
+  // "Kirjoituspolkujen auditointi".
+  if (error) {
+    console.error('Sijoitusmerkintä epäonnistui:', error);
+    naytaIlmoitus('Sisältö lisätty, mutta murun merkintä sijoitetuksi epäonnistui — tarkista Laituri');
+  } else {
+    naytaIlmoitus('Sijoitettu: ' + kohde.nimi);
+  }
   lataaLaituri(document.getElementById('laituri-search').value.trim());
   paivitaLaituriBadge();
 }
@@ -3485,9 +3480,7 @@ async function avaaSijoitaValikko(rivi, li) {
 // Tilamerkintä seuraa siis todellisuutta, ei aikomusta.
 async function merkitseLaituriMuistutuksella(rivi) {
   const { error } = await db.from('laituri').update({ status: 'sijoitettu', placed_where: 'muistutus asetettu' }).eq('id', rivi.id);
-  if (error) {
-    console.error('Sijoitusmerkintä epäonnistui:', error);
-  }
+  ilmoitaKirjoitusvirheesta(error, 'Sijoitusmerkintä');
   lataaLaituri(document.getElementById('laituri-search').value.trim());
   paivitaLaituriBadge();
 }
@@ -3498,9 +3491,7 @@ async function merkitseLaituriMuistutuksella(rivi) {
 // merkinnän joka ei enää pidä paikkaansa.
 async function palautaLaituriSijoittamattomaksi(rivi) {
   const { error } = await db.from('laituri').update({ status: 'uusi', placed_where: null }).eq('id', rivi.id);
-  if (error) {
-    console.error('Palautus sijoittamattomaksi epäonnistui:', error);
-  }
+  ilmoitaKirjoitusvirheesta(error, 'Palautus sijoittamattomaksi');
   lataaLaituri(document.getElementById('laituri-search').value.trim());
   paivitaLaituriBadge();
 }
@@ -3684,9 +3675,7 @@ function aloitaListanMuokkaus(teksti, lista, paivitaNakyma) {
     const uusi = inputti.value.trim();
     if (uusi && uusi !== lista.name) {
       const { error } = await db.from('lists').update({ name: uusi }).eq('id', lista.id);
-      if (error) {
-        console.error('Listan nimen muokkaus epäonnistui:', error);
-      } else {
+      if (!ilmoitaKirjoitusvirheesta(error, 'Listan nimen muokkaus')) {
         logEvent('renamed', 'list', lista.id, uusi, lista.id);
       }
     }
@@ -3849,15 +3838,29 @@ async function processQueue() {
   const remaining = [];
   for (const action of q) {
     try {
+      let error;
       if (action.type === 'insert') {
-        await db.from('tuotteet').insert(action.data);
+        ({ error } = await db.from('tuotteet').insert(action.data));
       } else if (action.type === 'update') {
         const { id, ...data } = action.data;
-        await db.from('tuotteet').update(data).eq('id', id);
+        ({ error } = await db.from('tuotteet').update(data).eq('id', id));
       } else if (action.type === 'delete') {
-        await db.from('tuotteet').delete().eq('id', action.data.id);
+        ({ error } = await db.from('tuotteet').delete().eq('id', action.data.id));
+      }
+      // BUGIKORJAUS (2026-07-19, ks. muistiinpanot.md "Kirjoituspolkujen
+      // auditointi"): supabase-js EI HEITÄ poikkeusta tietokantatason
+      // virheestä (esim. RLS/rajoite-rikkomus — sama laji kuin historiallinen
+      // caldav-duplikaattibugi) — se VAIN palauttaa error-kentän. Aiemmin
+      // tätä ei tarkistettu lainkaan, joten epäonnistunut kirjoitus katosi
+      // jonosta ANNETTUNA ONNISTUNEENA. Nyt myös DB-tason virhe pitää
+      // toimenpiteen jonossa (retry seuraavalla online-tapahtumalla) ja
+      // lokittaa sen näkyväksi kehittäjätyökaluihin.
+      if (error) {
+        console.error('Offline-jonon toimenpide epäonnistui (' + action.type + '):', error);
+        remaining.push(action);
       }
     } catch (e) {
+      console.error('Offline-jonon toimenpide heitti poikkeuksen (' + action.type + '):', e);
       remaining.push(action);
     }
   }
@@ -3883,12 +3886,12 @@ async function poistaTuote(tuote) {
 
   if (navigator.onLine) {
     const { error } = await db.from('tuotteet').delete().eq('id', tuote.id);
-    if (error) {
-      console.error('Poisto epäonnistui:', error);
-    } else {
+    // Tapahtumaloki EI SAA väittää poistoa tehdyksi jos se ei onnistunut
+    // (ks. muistiinpanot.md "Kirjoituspolkujen auditointi").
+    if (!ilmoitaKirjoitusvirheesta(error, 'Poisto')) {
       siivoaMuistutuksetKumottavasti('rivi', tuote.id);
+      logEvent('deleted', tuote.is_header ? 'header' : 'item', tuote.id, tuote.nimi, tuote.list_id);
     }
-    logEvent('deleted', tuote.is_header ? 'header' : 'item', tuote.id, tuote.nimi, tuote.list_id);
     lataaLista();
   } else {
     addToQueue({ type: 'delete', data: { id: tuote.id } });
@@ -3903,6 +3906,22 @@ async function poistaTuote(tuote) {
 // jokaisesta klikkauksesta, vain onnistumisesta. Ei kaadu jos laite ei tue.
 function tuntopalauteValmis() {
   if (navigator.vibrate) navigator.vibrate([20, 40, 20]);
+}
+
+// Kirjoituspolkujen auditointi (2026-07-19, ks. muistiinpanot.md) — jaettu
+// virheenkäsittelijä useimmille rivikohtaisille täppäys-/muokkauskirjoituksille,
+// jotka jakavat saman muodon (kirjoita, sitten lataa näkymä tuoreesta datasta
+// uudelleen). Uudelleenlataus itsessään korjaa NÄKYMÄN aina oikein
+// (epäonnistunut kirjoitus ei koskaan jää näkyviin), mutta ilman tätä
+// käyttäjä ei koskaan saanut selitystä miksi kosketus "ei tehnyt mitään" —
+// "vahvistus seuraa todellisuutta" koskee myös EPÄonnistumisen viestimistä,
+// ei vain onnistumisen. Palauttaa true jos virhe oli (kutsuja voi silloin
+// haluta pysähtyä ennen jatkokirjoituksia/-tilanpäivityksiä).
+function ilmoitaKirjoitusvirheesta(error, konteksti) {
+  if (!error) return false;
+  console.error(konteksti + ' epäonnistui:', error);
+  naytaIlmoitus(konteksti + ' epäonnistui — yritä uudelleen');
+  return true;
 }
 
 // Lyhyt itsestään katoava ilmoitus ruudun alareunassa (kuitti-tyylinen banneri)
@@ -3974,7 +3993,8 @@ async function siivoaMuistutuksetKumottavasti(source, sourceRef) {
   naytaKumottavaIlmoitus(
     'Myös ' + maara + (maara === 1 ? ' muistutus poistetaan' : ' muistutusta poistetaan'),
     async function() {
-      await db.from('muistutukset').delete().eq('source', source).eq('source_ref', String(sourceRef)).is('sent_at', null);
+      const { error: poistoError } = await db.from('muistutukset').delete().eq('source', source).eq('source_ref', String(sourceRef)).is('sent_at', null);
+      if (poistoError) console.error('Muistutusten kumottava siivous epäonnistui:', poistoError);
       await paivitaMuistutuksetKartta();
     },
     function() {}
@@ -4000,10 +4020,10 @@ function tarkistaPakkauslistanNollaus() {
   setTimeout(async function() {
     const idt = tarkistettavat.map(function(t) { return t.id; });
     const { error } = await db.from('tuotteet').update({ tehty: false, bought_at: null }).in('id', idt);
-    if (error) {
-      console.error('Pakkauslistan automaattinollaus epäonnistui:', error);
-      return;
-    }
+    // Aiempi "nollataan hetken päästä" -viesti EI SAA jäädä ainoaksi
+    // totuudeksi jos nollaus tosiasiassa epäonnistuu (ks. muistiinpanot.md
+    // "Kirjoituspolkujen auditointi").
+    if (ilmoitaKirjoitusvirheesta(error, 'Pakkauslistan automaattinollaus')) return;
     if (currentList && currentList.id === tarkistettavat[0].list_id) lataaLista();
   }, 1500);
 }
@@ -4135,11 +4155,14 @@ async function tallennaUusiJarjestys(li, kohde, asetukset) {
     uusiJarjestys = 1;
   }
 
-  kohde.sort_order = uusiJarjestys;
   const { error } = await db.from(asetukset.taulu).update({ sort_order: uusiJarjestys }).eq('id', kohde.id);
-  if (error) {
-    console.error('Järjestyksen tallennus epäonnistui:', error);
-  }
+  // Välimuistia (kohde.sort_order) EI päivitetä jos kirjoitus epäonnistui —
+  // muuten myöhemmät uudelleenjärjestykset laskisivat seuraavan sijainnin
+  // väärästä, vain paikallisesti oletetusta arvosta (ks. muistiinpanot.md
+  // "Kirjoituspolkujen auditointi"). Rivi palautuu oikealle paikalleen
+  // seuraavassa täydessä uudelleenlatauksessa.
+  if (ilmoitaKirjoitusvirheesta(error, 'Järjestyksen tallennus')) return;
+  kohde.sort_order = uusiJarjestys;
 }
 
 // Rivien "⋯"-valikko (2026-07-16, ks. "Rivien UI-remontti" muistiinpanot.md:ssä):
@@ -4299,11 +4322,12 @@ function paivitaNaytto(tuotteet) {
         if (updateData.tehty) tuntopalauteValmis();
         if (navigator.onLine) {
           const { error } = await db.from('tuotteet').update(updateData).eq('id', tuote.id);
-          if (error) {
-            console.error('Tuotteen merkintä epäonnistui:', error);
+          // Tapahtumaloki + jatkotoimet EIVÄT SAA olettaa onnistumista (ks.
+          // muistiinpanot.md "Kirjoituspolkujen auditointi").
+          if (!ilmoitaKirjoitusvirheesta(error, 'Tuotteen merkintä')) {
+            logEvent(eventAction, 'item', tuote.id, tuote.nimi, tuote.list_id);
+            if (updateData.tehty) siivoaMuistutuksetKumottavasti('rivi', tuote.id);
           }
-          logEvent(eventAction, 'item', tuote.id, tuote.nimi, tuote.list_id);
-          if (!error && updateData.tehty) siivoaMuistutuksetKumottavasti('rivi', tuote.id);
           await lataaLista();
           if (!error && updateData.tehty) tarkistaPakkauslistanNollaus();
         } else {
@@ -4354,9 +4378,7 @@ function paivitaNaytto(tuotteet) {
         if (uusi && uusi !== tuote.nimi) {
           if (navigator.onLine) {
             const { error } = await db.from('tuotteet').update({ nimi: uusi }).eq('id', tuote.id);
-            if (error) {
-              console.error('Tuotteen nimen muokkaus epäonnistui:', error);
-            }
+            ilmoitaKirjoitusvirheesta(error, 'Tuotteen nimen muokkaus');
             lataaLista();
           } else {
             addToQueue({ type: 'update', data: { id: tuote.id, nimi: uusi } });
@@ -4514,10 +4536,12 @@ button.addEventListener('click', async function() {
 
   if (navigator.onLine) {
     const { data, error } = await db.from('tuotteet').insert(uusiRivi).select().single();
-    if (error) {
-      console.error('Lisäys epäonnistui:', error);
+    // Tapahtumaloki EI SAA väittää lisäystä tehdyksi jos se ei onnistunut
+    // (ks. muistiinpanot.md "Kirjoituspolkujen auditointi") — tämä on apin
+    // yleisin yksittäinen kirjoitus, siksi erityisen tärkeä korjata.
+    if (!ilmoitaKirjoitusvirheesta(error, 'Lisäys')) {
+      logEvent(onOtsikko ? 'created' : 'added', onOtsikko ? 'header' : 'item', data ? data.id : null, teksti, listId);
     }
-    logEvent(onOtsikko ? 'created' : 'added', onOtsikko ? 'header' : 'item', data ? data.id : null, teksti, listId);
     lataaLista();
   } else {
     addToQueue({ type: 'insert', data: uusiRivi });
@@ -4590,10 +4614,7 @@ document.getElementById('valinta-kauppalistalle-btn').addEventListener('click', 
     .map(function(t) { return { nimi: t.nimi, tehty: false, list_id: kauppalista.id, is_header: false }; });
 
   const { error: insertError } = await db.from('tuotteet').insert(uudetRivit);
-  if (insertError) {
-    console.error('Rivien lisäys Kauppalistalle epäonnistui:', insertError);
-    return;
-  }
+  if (ilmoitaKirjoitusvirheesta(insertError, 'Rivien lisäys Kauppalistalle')) return;
 
   naytaIlmoitus(uudetRivit.length + ' tuotetta lisätty Kauppalistalle.');
   poistuValintatilasta();
@@ -4613,10 +4634,7 @@ document.getElementById('settings-btn').addEventListener('click', function() {
 document.getElementById('move-category-btn').addEventListener('click', async function() {
   const uusiKategoria = currentList.category === 'varasto' ? 'muistilaput' : 'varasto';
   const { error } = await db.from('lists').update({ category: uusiKategoria }).eq('id', currentList.id);
-  if (error) {
-    console.error('Kategorian vaihto epäonnistui:', error);
-    return;
-  }
+  if (ilmoitaKirjoitusvirheesta(error, 'Kategorian vaihto')) return;
   currentList.category = uusiKategoria;
   listanAvausLahde = uusiKategoria;
   logEvent(uusiKategoria === 'varasto' ? 'moved_to_varasto' : 'moved_to_muistilaput', 'list', currentList.id, currentList.name, currentList.id);
@@ -4635,25 +4653,32 @@ document.getElementById('copy-list-btn').addEventListener('click', async functio
   const { data: uusiLista, error: listaError } = await db.from('lists')
     .insert({ name: uusiNimi.trim(), type: 'checklist', owner_id: currentUserId, category: currentList.category })
     .select().single();
-  if (listaError) {
-    console.error('Kopion luonti epäonnistui:', listaError);
-    return;
-  }
+  if (ilmoitaKirjoitusvirheesta(listaError, 'Kopion luonti')) return;
 
   const { data: rivit, error: riviError } = await db.from('tuotteet').select().eq('list_id', currentList.id).order('sort_order');
+  let rivienKopiointiEpaonnistui = false;
   if (riviError) {
     console.error('Rivien haku kopiointia varten epäonnistui:', riviError);
+    rivienKopiointiEpaonnistui = true;
   } else if (rivit && rivit.length > 0) {
     const kopiot = rivit.map(function(r) {
       return { nimi: r.nimi, is_header: r.is_header, sort_order: r.sort_order, list_id: uusiLista.id, tehty: false, bought_at: null };
     });
     const { error: insertError } = await db.from('tuotteet').insert(kopiot);
-    if (insertError) console.error('Rivien kopiointi listalle epäonnistui:', insertError);
+    if (insertError) {
+      console.error('Rivien kopiointi listalle epäonnistui:', insertError);
+      rivienKopiointiEpaonnistui = true;
+    }
   }
 
   logEvent('created', 'list', uusiLista.id, uusiLista.name, uusiLista.id);
   document.getElementById('settings-overlay').style.display = 'none';
-  naytaIlmoitus('Kopio "' + uusiLista.name + '" luotu.');
+  // "Luotu"-viesti EI SAA valehdella jos rivien kopiointi epäonnistui — se
+  // näyttäisi tyhjän listan täytenä kopiona (ks. muistiinpanot.md
+  // "Kirjoituspolkujen auditointi").
+  naytaIlmoitus(rivienKopiointiEpaonnistui
+    ? ('Lista "' + uusiLista.name + '" luotu, mutta rivien kopiointi epäonnistui — tarkista lista')
+    : ('Kopio "' + uusiLista.name + '" luotu.'));
 });
 
 document.getElementById('settings-close').addEventListener('click', function() {
@@ -4728,8 +4753,13 @@ document.getElementById('ankkurit-add-btn').addEventListener('click', async func
   }
 
   const { error } = await db.from('ankkurit').insert({ content: teksti, source: 'laituri', source_ref: String(muru.id), user_id: currentUserId });
+  // Muru on jo turvassa Laiturissa tässä vaiheessa ("koti"-invariantti) —
+  // jos VAIN ankkuri-nosto epäonnistuu, sisältö ei ole kadonnut, mutta
+  // käyttäjä ei näe sitä Ankkureissa ilman selitystä (ks. muistiinpanot.md
+  // "Kirjoituspolkujen auditointi").
   if (error) {
     console.error('Ankkurin lisäys epäonnistui:', error);
+    naytaIlmoitus('Tallennettu Laituriin, mutta ei noussut Ankkureihin — tarkista Laituri');
   }
   await paivitaAnkkuroidutAvaimet();
   ankkuriInput.value = '';
@@ -4779,9 +4809,12 @@ document.getElementById('laituri-add-btn').addEventListener('click', async funct
   }
 
   const { error } = await db.from('laituri').insert({ user_id: currentUserId, content: teksti });
-  if (error) {
-    console.error('Laituri-lisäys epäonnistui:', error);
-  }
+  // "Ei koskaan kadota ajatusta" -periaate koskee myös epäonnistunutta
+  // kirjoitusta: kenttää/luonnosta EI tyhjennetä jos kirjoitus ei onnistunut,
+  // muuten juuri se turvaverkko (localStorage-luonnos) katoaisi samalla
+  // hetkellä kun sille olisi eniten tarvetta (ks. muistiinpanot.md
+  // "Kirjoituspolkujen auditointi").
+  if (ilmoitaKirjoitusvirheesta(error, 'Laituri-lisäys')) return;
   laituriInput.value = '';
   tyhjennaLaituriLuonnos();
   lataaLaituri(document.getElementById('laituri-search').value.trim());
@@ -4833,12 +4866,8 @@ document.getElementById('new-list-btn').addEventListener('click', async function
   if (nimi === '') { listInput.focus(); return; }
 
   const { data, error } = await db.from('lists').insert({ name: nimi, type: 'checklist', owner_id: currentUserId, category: 'muistilaput' }).select().single();
-  if (error) {
-    console.error('Listan luonti epäonnistui:', error);
-  }
-  if (data) {
-    logEvent('created', 'list', data.id, nimi, data.id);
-  }
+  if (ilmoitaKirjoitusvirheesta(error, 'Listan luonti')) return;
+  logEvent('created', 'list', data.id, nimi, data.id);
   listInput.value = '';
   lataaMuistilaput();
 });
@@ -4854,12 +4883,8 @@ document.getElementById('new-varasto-btn').addEventListener('click', async funct
   if (nimi === '') { varastoInput.focus(); return; }
 
   const { data, error } = await db.from('lists').insert({ name: nimi, type: 'checklist', owner_id: currentUserId, category: 'varasto' }).select().single();
-  if (error) {
-    console.error('Listan luonti epäonnistui:', error);
-  }
-  if (data) {
-    logEvent('created', 'list', data.id, nimi, data.id);
-  }
+  if (ilmoitaKirjoitusvirheesta(error, 'Listan luonti')) return;
+  logEvent('created', 'list', data.id, nimi, data.id);
   varastoInput.value = '';
   lataaVarasto();
 });
@@ -5034,9 +5059,7 @@ document.getElementById('kalenteri-add-btn').addEventListener('click', async fun
     event_date: paivamaaraISO(kalenteriPvm),
     user_id: currentUserId,
   });
-  if (error) {
-    console.error('Tapahtuman lisäys epäonnistui:', error);
-  }
+  if (ilmoitaKirjoitusvirheesta(error, 'Tapahtuman lisäys')) return;
   kalenteriInput.value = '';
   lataaKalenteri();
 });
@@ -5382,7 +5405,7 @@ async function paivitaMuistutusLista() {
     poisto.textContent = '×';
     poisto.addEventListener('click', async function() {
       const { error: poistoError } = await db.from('muistutukset').delete().eq('id', m.id);
-      if (poistoError) console.error('Muistutuksen poisto epäonnistui:', poistoError);
+      ilmoitaKirjoitusvirheesta(poistoError, 'Muistutuksen poisto');
       await paivitaMuistutuksetKartta();
       await paivitaMuistutusLista();
       if (muistutusKohde && muistutusKohde.jalkeenPaivitys) muistutusKohde.jalkeenPaivitys();

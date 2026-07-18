@@ -33,6 +33,21 @@ Tämä tiedosto on eri asia kuin **muistiinpanot.md** (projektin historia, pää
 
 ---
 
+## Uusi kirjoituspolku → nämä 4 asiaa aina (talon sääntö, kirjattu 2026-07-19 kirjoituspolkujen auditoinnin jälkeen)
+
+**Tausta:** projekti on kärsinyt VIIDESTI "success:true joka valehteli" -bugista ennen tätä kirjausta (pahin: `caldav-sync.js`:n eräkirjoitus kaatui kokonaan duplikaatti-`ical_uid`:iin viikkojen ajan ilman että kukaan koodissa tarkisti vastausta). 2026-07-19 tehty koko koodikannan auditointi (kaksi rinnakkaista tutkimusagenttia, ~104 kirjoitus-/lähetyskutsua käytiin läpi `script.js`:ssä ja kaikissa `api/*.js`-tiedostoissa) löysi saman virhemallin ~14 KOKONAAN tarkistamattomasta kirjoituksesta lisäksi kymmeniä joissa virhe kirjattiin konsoliin muttei koskaan käyttäjälle — ks. muistiinpanot.md "Kirjoituspolkujen auditointi" täydelle raportille.
+
+**Jokainen uusi Supabase-kirjoitus (insert/update/upsert/delete) tai lähetys (push, ulkoinen API) tarkistaa NÄMÄ NELJÄ asiaa, aina — ei koskaan poikkeuksena "tämä on niin pieni kirjoitus ettei sillä ole väliä":**
+
+1. **Tarkista `error`/`response.ok` JOKA kerta.** Supabase-js EI HEITÄ poikkeusta tietokantatason virheestä (RLS, rajoite-rikkomus, "cannot affect row a second time" -tyyppinen eräkirjoitusvirhe) — se palauttaa VAIN `error`-kentän. `try/catch` ei riitä yksinään, sama koskee raakoja `fetch()`-kutsuja `api/`-funktioissa (`response.ok`).
+2. **Käyttäjälle näkyvä, rehellinen virhe — ei koskaan hiljainen console.error yksin.** Käytä `script.js`:ssä jaettua `ilmoitaKirjoitusvirheesta(error, 'Konteksti')`-funktiota (palauttaa `true` jos virhe, näyttää sekä konsolilokin että `naytaIlmoitus()`-toastin). Palvelinpuolella (`api/*.js`) vähintään selkeä `console.error()` jonka Vercel Logs näyttää — käyttäjä näkee joka tapauksessa cronin oman lopputuloksen kautta (ks. kohta 4).
+3. **Älä jatka kuin kirjoitus olisi onnistunut.** Jos toiminto koostuu USEASTA peräkkäisestä kirjoituksesta (esim. sisältö + tilamerkintä, tai poisto + siivous), TARKISTA ensimmäinen ENNEN kuin teet toisen — epäonnistunut ensimmäinen ei saa koskaan johtaa toiseen kirjoitukseen joka olettaa sen onnistuneen (esimerkki: `dismissButton`-hylkäyksessä `merkitseAlyMuruKasitellyksi()` ei saa suorittua jos itse ankkurin poisto epäonnistui — se estäisi murun uudelleenarvioinnin ikuisesti vaikka ehdokas jäi elämään).
+4. **Eräkirjoitusten (batch insert/update/upsert usealle riville) JA cron-/endpoint-vastausten pitää raportoida TODELLINEN määrä, ei yritetty määrä.** `matchesCreated++`/`poistettuja`/`kirjoitettuja`-tyyppiset laskurit kasvavat VASTA kun vastaava kirjoitus on VARMISTETTU onnistuneeksi — ei ennen sitä, ei oletuksena.
+
+**Poikkeus, tietoinen:** puhtaasti sisäinen "nähty"-bookkeeping (esim. `laituri_nahty`, `aly_log_seen`) jolla ei ole käyttäjälle näkyvää seurausta jos se epäonnistuu satunnaisesti — riittää että virhe on checked+logged (kohdat 1-2), ei tarvitse omaa toast-viestiä (kohta 2:n "näkyvä" on tarkoituksella höllempi tälle luokalle, muuten jokainen taustapäivitys ränkyttäisi käyttäjää turhaan — ks. "Satama ei ränkytä" -periaate muualla tässä dokumentaatiossa).
+
+---
+
 ## Äly-putki (`api/aly.js`, rakennettu 2026-07-11, todistettu + ensimmäinen oikea ominaisuus 2026-07-12)
 
 ### Mikä tämä on

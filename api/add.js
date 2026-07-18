@@ -58,7 +58,7 @@ module.exports = async function handler(req, res) {
   const [inserted] = await response.json();
 
   try {
-    await fetch(`${SUPABASE_URL}/rest/v1/events`, {
+    const eventRes = await fetch(`${SUPABASE_URL}/rest/v1/events`, {
       method: 'POST',
       headers: {
         'apikey': SUPABASE_KEY,
@@ -75,8 +75,15 @@ module.exports = async function handler(req, res) {
         list_id: listId,
       }),
     });
+    // BUGIKORJAUS (2026-07-19, ks. muistiinpanot.md "Kirjoituspolkujen
+    // auditointi"): lokitus ei saa koskaan kaataa Siri-lisäystä (itse tuote
+    // on jo kirjoitettu onnistuneesti tässä vaiheessa), mutta epäonnistuminen
+    // EI SAA silti jäädä täysin näkymättömäksi — nyt ainakin näkyy Vercel Logsissa.
+    if (!eventRes.ok) {
+      console.error('[add] Tapahtumalokin kirjaus epäonnistui:', eventRes.status, await eventRes.text());
+    }
   } catch (e) {
-    // lokitus ei saa koskaan kaataa Siri-lisäystä
+    console.error('[add] Tapahtumalokin kirjaus heitti poikkeuksen:', e.message);
   }
 
   return res.status(200).json({ success: true });

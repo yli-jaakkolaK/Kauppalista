@@ -366,10 +366,18 @@ async function siivoaPoistetut(syoteId, alkuPvm, loppuPvm, nahdytUidit) {
   const poistettavat = (olemassaOlevat || []).filter(function(r) { return !nahdytUidit.has(r.ical_uid); });
   if (poistettavat.length === 0) return 0;
   const idLista = poistettavat.map(function(r) { return r.id; }).join(',');
-  await supabaseFetch('kalenteri_tapahtumat?id=in.(' + idLista + ')', {
+  const poistoRes = await supabaseFetch('kalenteri_tapahtumat?id=in.(' + idLista + ')', {
     method: 'DELETE',
     headers: { Prefer: 'return=minimal' },
   });
+  // BUGIKORJAUS (2026-07-19, ks. muistiinpanot.md "Kirjoituspolkujen
+  // auditointi" — sama laji virhe kuin historiallinen upsert-duplikaattibugi
+  // tässä samassa tiedostossa): palautettu määrä EI SAA väittää poistoa
+  // tehdyksi jos DELETE-pyyntö itsessään epäonnistui.
+  if (!poistoRes.ok) {
+    console.error('[caldav-sync] Poistettujen tapahtumien siivous epäonnistui (syote ' + syoteId + '):', poistoRes.status, await poistoRes.text());
+    return 0;
+  }
   return poistettavat.length;
 }
 
@@ -482,11 +490,14 @@ module.exports = async function handler(req, res) {
     // tarkistettuun aikaväliin.
     const poistettuja = await siivoaPoistetut(syote.id, alkuPvm, loppuPvm, nahdytUidit);
 
-    await supabaseFetch('kalenteri_syotteet?id=eq.' + syote.id, {
+    const aikaleimaRes = await supabaseFetch('kalenteri_syotteet?id=eq.' + syote.id, {
       method: 'PATCH',
       headers: { Prefer: 'return=minimal' },
       body: JSON.stringify({ last_synced_at: new Date().toISOString() }),
     });
+    if (!aikaleimaRes.ok) {
+      console.error('[caldav-sync] last_synced_at-päivitys epäonnistui syötteelle ' + syote.name + ':', aikaleimaRes.status, await aikaleimaRes.text());
+    }
 
     return { syote: syote.name, loydettyja: tapahtumat.length, poistettuja: poistettuja };
   }));

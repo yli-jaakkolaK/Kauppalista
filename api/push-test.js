@@ -79,14 +79,16 @@ module.exports = async function handler(req, res) {
     } catch (e) {
       if (e.statusCode === 404 || e.statusCode === 410) {
         // Tilaus ei ole enää voimassa (esim. appi poistettu laitteelta) — siivotaan pois.
-        await supabaseFetch('push_tilaukset?id=eq.' + tilaus.id, { method: 'DELETE' });
+        const poistoRes = await supabaseFetch('push_tilaukset?id=eq.' + tilaus.id, { method: 'DELETE' });
+        if (!poistoRes.ok) console.error('Vanhentuneen tilauksen poisto epäonnistui:', poistoRes.status);
       } else {
         console.error('Push-lähetys epäonnistui:', e.message);
-        await supabaseFetch('push_tilaukset?id=eq.' + tilaus.id, {
+        const patchRes = await supabaseFetch('push_tilaukset?id=eq.' + tilaus.id, {
           method: 'PATCH',
           headers: { Prefer: 'return=minimal' },
           body: JSON.stringify({ failed_count: (tilaus.failed_count || 0) + 1 }),
         });
+        if (!patchRes.ok) console.error('failed_count-päivitys epäonnistui:', patchRes.status);
       }
     }
   }));

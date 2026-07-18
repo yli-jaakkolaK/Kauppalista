@@ -78,12 +78,21 @@ async function getSetting(key) {
   return Array.isArray(rows) && rows.length > 0 ? rows[0].value : null;
 }
 
+// BUGIKORJAUS (2026-07-19, ks. muistiinpanot.md "Kirjoituspolkujen
+// auditointi"): vastauksen tila EI ollut aiemmin tarkistettu — jos tämä
+// epäonnistuisi hiljaa (esim. aly_yoajo_last_run), ~20h-portti ei koskaan
+// etenisi ja yöajo voisi ajaa uudelleen tarpeettoman usein ilman mitään
+// näkyvää virhettä. Kutsuja saa nyt tiedon epäonnistumisesta.
 async function setSetting(key, value) {
-  await supabaseFetch('asetukset?on_conflict=key', {
+  const res = await supabaseFetch('asetukset?on_conflict=key', {
     method: 'POST',
     headers: { Prefer: 'resolution=merge-duplicates,return=minimal' },
     body: JSON.stringify({ key: key, value: value }),
   });
+  if (!res.ok) {
+    console.error('[aly-nightly] Asetuksen "' + key + '" tallennus epäonnistui:', res.status, await res.text());
+  }
+  return res.ok;
 }
 
 // Strips ```-code-fences a model may add despite instructions not to, then
@@ -258,12 +267,20 @@ module.exports = async function handler(req, res) {
   const stale = await staleRes.json();
   let expired = 0;
 
+  // BUGIKORJAUS (2026-07-19, ks. muistiinpanot.md "Kirjoituspolkujen
+  // auditointi"): vastausta ei tarkistettu — hiljainen epäonnistuminen
+  // johtaa vain saman murun uudelleenarviointiin seuraavana yönä (turvallinen
+  // suunta, ei tietovirhettä), mutta pysyy silti näkymättömänä ilman lokia.
   async function markEvaluated(noteId, content) {
-    await supabaseFetch('aly_evaluated?on_conflict=laituri_id', {
+    const res = await supabaseFetch('aly_evaluated?on_conflict=laituri_id', {
       method: 'POST',
       headers: { Prefer: 'resolution=merge-duplicates,return=minimal' },
       body: JSON.stringify({ laituri_id: noteId, content: content }),
     });
+    if (!res.ok) {
+      console.error('[aly-nightly] Murun ' + noteId + ' merkintä käsitellyksi epäonnistui:', res.status, await res.text());
+    }
+    return res.ok;
   }
 
   function deadlineHasPassed(deadline) {
@@ -284,7 +301,17 @@ module.exports = async function handler(req, res) {
     (await staleLogsRes.json() || []).forEach(function(l) { staleLogByAnchorId[l.anchor_id] = l; });
 
     for (const row of stale) {
-      await supabaseFetch('ankkurit?id=eq.' + row.id, { method: 'DELETE' });
+      const deleteRes = await supabaseFetch('ankkurit?id=eq.' + row.id, { method: 'DELETE' });
+      // BUGIKORJAUS (2026-07-19, ks. muistiinpanot.md "Kirjoituspolkujen
+      // auditointi"): jos poisto epäonnistuu, ehdokas on TODELLISUUDESSA
+      // yhä olemassa (näkyy käyttäjälle) — markEvaluated() EI SAA suorittua
+      // silloin, se estäisi murun uudelleenarvioinnin ikuisesti vaikka
+      // ehdokas jäi elämään. "expired"-laskuri ei myöskään saa kasvaa
+      // rivistä jota ei oikeasti poistettu.
+      if (!deleteRes.ok) {
+        console.error('[aly-nightly] Vanhentuneen ehdokkaan ' + row.id + ' poisto epäonnistui:', deleteRes.status, await deleteRes.text());
+        continue;
+      }
       await supabaseFetch('aly_log?anchor_id=eq.' + row.id + '&undone_at=is.null', {
         method: 'PATCH',
         headers: { Prefer: 'return=minimal' },
@@ -449,10 +476,22 @@ module.exports = async function handler(req, res) {
           visible_from: visibleFrom,
         }),
       });
+      // BUGIKORJAUS (2026-07-19, ks. muistiinpanot.md "Kirjoituspolkujen
+      // auditointi" — sama laji virhe kuin historiallinen caldav-duplikaatti-
+      // bugi): jos ehdokkaan INSERT epäonnistuu, EI SAA silti kirjata
+      // aly_log-riviä (jäisi haamumerkintä anchor_id:llä null) eikä laskea
+      // matchesCreated:iin — vastauksen pitää kertoa TODELLINEN määrä.
+      // Muru jää automaattisesti uudelleen arvioitavaksi seuraavana yönä,
+      // koska mitään ankkuri-riviä ei syntynyt (isEligible()-tarkistus
+      // seuraavassa ajossa ei löydä sitä suggestedIds:stä eikä evaluatedista).
+      if (!anchorRes.ok) {
+        console.error('[aly-nightly] Ehdokkaan luonti epäonnistui murulle ' + note.id + ':', anchorRes.status, await anchorRes.text());
+        continue;
+      }
       const anchorRows = await anchorRes.json();
       const anchorId = Array.isArray(anchorRows) && anchorRows[0] ? anchorRows[0].id : null;
 
-      await supabaseFetch('aly_log', {
+      const logRes = await supabaseFetch('aly_log', {
         method: 'POST',
         headers: { Prefer: 'return=minimal' },
         body: JSON.stringify({
@@ -465,6 +504,9 @@ module.exports = async function handler(req, res) {
           deadline: deadline,
         }),
       });
+      if (!logRes.ok) {
+        console.error('[aly-nightly] aly_log-kirjaus epäonnistui ehdokkaalle ' + anchorId + ':', logRes.status, await logRes.text());
+      }
       matchesCreated++;
     }
 

@@ -70,7 +70,10 @@ module.exports = async function handler(req, res) {
         joku = true;
       } catch (e) {
         if (e.statusCode === 404 || e.statusCode === 410) {
-          await supabaseFetch('push_tilaukset?id=eq.' + tilaus.id, { method: 'DELETE' });
+          const poistoRes = await supabaseFetch('push_tilaukset?id=eq.' + tilaus.id, { method: 'DELETE' });
+          if (!poistoRes.ok) {
+            console.error('[muistutukset-laheta] Vanhentuneen tilauksen ' + tilaus.id + ' poisto epäonnistui:', poistoRes.status);
+          }
         } else {
           console.error('Muistutuksen push epäonnistui (id=' + muistutus.id + ', source=' + muistutus.source + '):', e.message);
         }
@@ -90,11 +93,19 @@ module.exports = async function handler(req, res) {
     // tilaus todetaan pysyvästi vanhentuneeksi (404/410, siivotaan yllä).
     const eiRetryttavaa = !Array.isArray(tilaukset) || tilaukset.length === 0;
     if (joku || eiRetryttavaa) {
-      await supabaseFetch('muistutukset?id=eq.' + muistutus.id, {
+      const merkintaRes = await supabaseFetch('muistutukset?id=eq.' + muistutus.id, {
         method: 'PATCH',
         headers: { Prefer: 'return=minimal' },
         body: JSON.stringify({ sent_at: new Date().toISOString() }),
       });
+      // BUGIKORJAUS (2026-07-19, ks. muistiinpanot.md "Kirjoituspolkujen
+      // auditointi"): jos TÄMÄ merkintä epäonnistuu, push meni jo perille
+      // mutta rivi näyttää yhä lähettämättömältä — sama muistutus lähtisi
+      // uudelleen (tupla-push) seuraavalla ~5 min kierroksella ilman että
+      // kukaan huomaisi miksi. Lokitetaan nyt selkeästi.
+      if (!merkintaRes.ok) {
+        console.error('[muistutukset-laheta] id=' + muistutus.id + ': push lähti mutta sent_at-merkintä epäonnistui (' + merkintaRes.status + ') — sama muistutus voi lähteä uudelleen.');
+      }
     } else {
       jatetaanYrittamaan++;
       console.error('[muistutukset-laheta] id=' + muistutus.id + ' (source=' + muistutus.source + ', source_ref=' + muistutus.source_ref + ') EI lähtenyt yhteenkään tilaukseen — jätetään uudelleenyritettäväksi.');
