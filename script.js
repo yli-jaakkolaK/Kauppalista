@@ -2538,7 +2538,7 @@ async function merkitseAlyMuruKasitellyksi(sourceRef) {
 // (iCloud+caldav-sync) toteuttaa lopulta synkkana takaisin. Sataman oma
 // koodi ei koskaan lisää/poista mitään kalenterista suoraan.
 //
-// KORJAUS (2026-07-21, Katrin testilöydös oikealla asennetulla iOS-PWA:lla):
+// KORJAUS 1 (2026-07-21, Katrin testilöydös oikealla asennetulla iOS-PWA:lla):
 // aiempi data:text/calendar-URI-tekniikka avasi vain tyhjän valkoisen sivun —
 // ei Applen tapahtumanäkymää, ei virhettä. .ics-sisällön rakennus ja
 // tarjoilu siirretty palvelimelle (api/ics.js, oikea Content-Type:
@@ -2546,11 +2546,22 @@ async function merkitseAlyMuruKasitellyksi(sourceRef) {
 // natiiviin .ics-käsittelyyn, koska WebKit tunnistaa MIME-tyypin eikä
 // data:-skeeman sisältöä. Sama data (content/event_date/event_time) jonka
 // tämä funktio jo sai — ei uutta hakua, vain toimitustapa vaihtui.
+//
+// KORJAUS 2 (2026-07-21, Katrin erottelutesti — endpoint vahvistettu oikeaksi
+// Safarissa, ✓✓ hyppäsi suoraan Applen esitäytettyyn näkymään): asennettu
+// PWA (standalone-tila) NIELEE `window.location.href`-navigoinnin ei-HTML-
+// vastaukseen — nappi näytti aktiivityylin muttei siirtynyt mihinkään.
+// Selain (Safari-välilehti) käsittelee saman osoitteen oikein, koska
+// standalone-webview ei anna järjestelmän ottaa vastausta hoitaakseen
+// samalla tavalla kuin täysi Safari tekee. Korjattu avaamalla osoite
+// eksplisiittisesti UUTEEN kontekstiin `window.open(url, '_blank')`:lla —
+// iOS-PWA:ssa tämä avautuu yleensä Safarin omaan näkymään, jonka WebKit
+// KÄSITTELEE oikein (todistettu juuri tällä testillä).
 function avaaKalenteriSilta(candidate) {
   const url = '/api/ics?otsikko=' + encodeURIComponent(candidate.content) +
     '&pvm=' + encodeURIComponent(candidate.event_date) +
     '&aika=' + encodeURIComponent(candidate.event_time);
-  window.location.href = url;
+  window.open(url, '_blank');
 }
 
 // E3 mid-tier V1 ("äly toimii, ihminen valvoo", ks. muistiinpanot.md) — AI-
