@@ -5180,6 +5180,13 @@ document.getElementById('muistutus-valmistaudu-check').addEventListener('change'
   document.getElementById('muistutus-valmistaudu-min').disabled = !e.target.checked;
 });
 
+// Sinnikäs muistutus (2026-07-19, ks. muistiinpanot.md "Sinnikäs muistutus")
+// — sama "valinnat aktivoituvat vain kun kytketty päälle" -periaate.
+document.getElementById('muistutus-sinnikas-check').addEventListener('change', function(e) {
+  document.getElementById('muistutus-sinnikas-ikkuna').disabled = !e.target.checked;
+  document.getElementById('muistutus-sinnikas-tiheys').disabled = !e.target.checked;
+});
+
 // Pikanapit säilyttävät jo asetetun kellonajan (jos käyttäjä on jo pyörittänyt
 // rullaa) ja vaihtavat vain päivän — muuten "Huomenna"-napin painaminen
 // kellonajan valinnan JÄLKEEN nollaisi juuri tehdyn valinnan.
@@ -5553,6 +5560,13 @@ async function avaaMuistutusPaneeli(source, sourceRef, content, eventDate, event
     valmistauduMin.value = oletusMin;
   }
 
+  // Sinnikäs muistutus (2026-07-19): sama "EI oletuksena päällä, palautuu
+  // pois joka avauksella" -periaate — valinnainen per muistutus.
+  const sinnikasCheck = document.getElementById('muistutus-sinnikas-check');
+  sinnikasCheck.checked = false;
+  document.getElementById('muistutus-sinnikas-ikkuna').disabled = true;
+  document.getElementById('muistutus-sinnikas-tiheys').disabled = true;
+
   await paivitaMuistutusLista();
   document.getElementById('muistutus-overlay').style.display = 'flex';
 }
@@ -5596,8 +5610,34 @@ async function paivitaMuistutusLista() {
 
     const teksti = document.createElement('span');
     const onValmistautumis = m.content.indexOf(VALMISTAUDU_ETULIITE) === 0;
-    teksti.textContent = (onValmistautumis ? '🎒 ' : '') + muotoileMuistutusAika(m.remind_at);
+    // Sinnikäs muistutus (2026-07-19): näyttää tärähdyssarjan etenemisen
+    // ("🔁 2/4") ajan sijaan kun sarja on jo alkanut, muuten kohdehetken.
+    const etuliite = onValmistautumis ? '🎒 ' : (m.persistent ? '🔁 ' + m.sent_count + '/' + m.frequency + ' · ' : '');
+    teksti.textContent = etuliite + muotoileMuistutusAika(m.remind_at);
     rivi.appendChild(teksti);
+
+    const napit = document.createElement('span');
+
+    // "✓ Hoidettu" — VAIN sinnikkäille (kertaluontoisella ei ole mitä
+    // kuitata, se joko odottaa tai on jo lähtenyt). Kuittaus pysäyttää
+    // tärähdyssarjan HETI: sent_at asetetaan tässä SAMALLA client-puolella
+    // (ei vain acked_at) jotta rivi katoaa listasta heti eikä vasta
+    // seuraavalla ~5 min cron-kierroksella (ks. api/muistutukset-laheta.js,
+    // joka muuten tarkistaisi/päättäisi sen vasta seuraavalla ajolla).
+    if (m.persistent) {
+      const hoidettu = document.createElement('button');
+      hoidettu.className = 'muistutus-hoidettu-btn';
+      hoidettu.textContent = '✓ Hoidettu';
+      hoidettu.addEventListener('click', async function() {
+        const nytIso = new Date().toISOString();
+        const { error: ackError } = await db.from('muistutukset').update({ acked_at: nytIso, sent_at: nytIso }).eq('id', m.id);
+        if (ilmoitaKirjoitusvirheesta(ackError, 'Muistutuksen kuittaus')) return;
+        await paivitaMuistutuksetKartta();
+        await paivitaMuistutusLista();
+        if (muistutusKohde && muistutusKohde.jalkeenPaivitys) muistutusKohde.jalkeenPaivitys();
+      });
+      napit.appendChild(hoidettu);
+    }
 
     const poisto = document.createElement('button');
     poisto.className = 'delete-btn';
@@ -5609,7 +5649,8 @@ async function paivitaMuistutusLista() {
       await paivitaMuistutusLista();
       if (muistutusKohde && muistutusKohde.jalkeenPaivitys) muistutusKohde.jalkeenPaivitys();
     });
-    rivi.appendChild(poisto);
+    napit.appendChild(poisto);
+    rivi.appendChild(napit);
 
     listaEl.appendChild(rivi);
   });
@@ -5617,13 +5658,26 @@ async function paivitaMuistutusLista() {
 
 async function lisaaMuistutus(remindAtDate) {
   if (!muistutusKohde) return;
-  const { data: paaMuistutus, error } = await db.from('muistutukset').insert({
+
+  // Sinnikäs muistutus (2026-07-19, ks. muistiinpanot.md "Sinnikäs
+  // muistutus") — VAIN päämuistutukselle, EI koskaan valmistautumis-
+  // tönäisylle (ks. alempana): remind_at toimii silloin KOHDEHETKENÄ, ei
+  // ensimmäisen tärähdyksen ajankohtana (ks. api/muistutukset-laheta.js).
+  const sinnikasCheck = document.getElementById('muistutus-sinnikas-check');
+  const paaMuistutusRivi = {
     user_id: currentUserId,
     source: muistutusKohde.source,
     source_ref: muistutusKohde.sourceRef,
     content: muistutusKohde.content,
     remind_at: remindAtDate.toISOString(),
-  }).select().single();
+  };
+  if (sinnikasCheck && sinnikasCheck.checked) {
+    paaMuistutusRivi.persistent = true;
+    paaMuistutusRivi.window_minutes = parseInt(document.getElementById('muistutus-sinnikas-ikkuna').value, 10) || 60;
+    paaMuistutusRivi.frequency = parseInt(document.getElementById('muistutus-sinnikas-tiheys').value, 10) || 4;
+  }
+
+  const { data: paaMuistutus, error } = await db.from('muistutukset').insert(paaMuistutusRivi).select().single();
   if (error) {
     console.error('Muistutuksen tallennus epäonnistui:', error);
     naytaIlmoitus('Muistutuksen tallennus epäonnistui');
@@ -5652,7 +5706,10 @@ async function lisaaMuistutus(remindAtDate) {
     valmistautumisOnnistui = !valmistautumisError;
   }
 
-  naytaIlmoitus(valmistautumisOnnistui ? 'Muistutus + valmistautumistönäisy asetettu' : 'Muistutus asetettu');
+  const sinnikasPaalla = sinnikasCheck && sinnikasCheck.checked;
+  naytaIlmoitus(valmistautumisOnnistui
+    ? 'Muistutus + valmistautumistönäisy asetettu'
+    : (sinnikasPaalla ? 'Sinnikäs muistutus asetettu' : 'Muistutus asetettu'));
   await paivitaMuistutuksetKartta();
   await paivitaMuistutusLista();
   if (muistutusKohde.jalkeenPaivitys) muistutusKohde.jalkeenPaivitys();

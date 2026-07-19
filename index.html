@@ -399,6 +399,30 @@
           <span>ennen</span>
         </label>
 
+        <!-- Sinnikäs muistutus / "tärähdyssarja" (2026-07-19, ks.
+             muistiinpanot.md "Sinnikäs muistutus") — valinnainen, sama koskee
+             kumpaakin välilehteä kuin valmistaudu-rivi. remind_at toimii
+             KOHDEHETKENÄ (ei ensimmäisen tärähdyksen aikana) kun tämä on
+             päällä — ks. api/muistutukset-laheta.js. -->
+        <label class="muistutus-sinnikas-rivi">
+          <input type="checkbox" id="muistutus-sinnikas-check">
+          <span>🔁 Sinnikäs</span>
+          <select id="muistutus-sinnikas-ikkuna" disabled>
+            <option value="30">30 min</option>
+            <option value="60" selected>1 h</option>
+            <option value="90">1,5 h</option>
+            <option value="120">2 h</option>
+          </select>
+          <span>ikkuna,</span>
+          <select id="muistutus-sinnikas-tiheys" disabled>
+            <option value="2">2×</option>
+            <option value="3">3×</option>
+            <option value="4" selected>4×</option>
+            <option value="6">6×</option>
+            <option value="8">8×</option>
+          </select>
+        </label>
+
         <div id="muistutus-pika-tila">
           <div class="muistutus-pikanapit" id="muistutus-pikanapit" style="display:none">
             <button class="dialog-btn dialog-btn-cancel" data-min="15">15 min ennen</button>

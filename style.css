@@ -1551,6 +1551,38 @@ h1 {
   border-bottom: none;
 }
 
+.muistutus-rivi > span:last-child {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* Sinnikäs muistutus (2026-07-19, ks. muistiinpanot.md "Sinnikäs muistutus")
+   — "✓ Hoidettu" -kuittausnappi mini-listan rivillä, pieni ja kevyt (rivi
+   itsessään on jo kompakti, ei tarvitse ison napin kokoluokkaa). Kuittaus
+   pysäyttää tärähdyssarjan HETI riippumatta jäljellä olevasta ikkunasta —
+   sama kolmiporras-henki kuin muualla: kuittaus on eksplisiittinen ihmisen
+   teko, ei koskaan automaattinen. */
+.muistutus-hoidettu-btn {
+  font-family: 'Courier New', Courier, monospace;
+  font-size: 12px;
+  letter-spacing: 0.04em;
+  color: var(--accent);
+  background: none;
+  border: 1px dashed var(--accent);
+  border-radius: 4px;
+  padding: 4px 8px;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  white-space: nowrap;
+}
+
+.muistutus-hoidettu-btn:hover,
+.muistutus-hoidettu-btn:active {
+  background: var(--accent);
+  color: var(--ground);
+}
+
 /* Aikavalitsin (2026-07-16, ks. muistiinpanot.md kohta 7): kaksi syöttötilaa
    samassa jaetussa komponentissa — PIKA (suhteellinen, olemassa ollut) ja
    KELLONAIKA (päivä + kellonaika, uusi). Sama .kalenteri-tila-btn-tyyli
@@ -1562,8 +1594,11 @@ h1 {
 }
 
 /* Valmistautumisvaihe (2026-07-18, ks. muistiinpanot.md) — kevyt rivi
-   päämuistutuksen välilehtien alla, koskee kumpaakin (Pika/Kellonaika). */
-.muistutus-valmistaudu-rivi {
+   päämuistutuksen välilehtien alla, koskee kumpaakin (Pika/Kellonaika).
+   Sinnikäs muistutus (2026-07-19, ks. muistiinpanot.md "Sinnikäs muistutus")
+   uudelleenkäyttää samat säännöt — sama visuaali, oma rivinsä. */
+.muistutus-valmistaudu-rivi,
+.muistutus-sinnikas-rivi {
   display: flex;
   align-items: center;
   gap: 6px;
@@ -1572,7 +1607,8 @@ h1 {
   margin-bottom: 4px;
 }
 
-.muistutus-valmistaudu-rivi select {
+.muistutus-valmistaudu-rivi select,
+.muistutus-sinnikas-rivi select {
   font-family: 'Courier New', Courier, monospace;
   font-size: 13px;
   color: var(--text);
@@ -1582,7 +1618,8 @@ h1 {
   padding: 4px;
 }
 
-.muistutus-valmistaudu-rivi select:disabled {
+.muistutus-valmistaudu-rivi select:disabled,
+.muistutus-sinnikas-rivi select:disabled {
   opacity: 0.4;
 }
 
