@@ -18,6 +18,8 @@ function piilotaKaikkiNakymat() {
   document.getElementById('hytti-kortti-view').style.display = 'none';
   document.getElementById('teema-view').style.display = 'none';
   document.getElementById('vahdittu-view').style.display = 'none';
+  document.getElementById('opinto-kurssi-view').style.display = 'none';
+  document.getElementById('opinto-kartta-view').style.display = 'none';
 }
 
 function showLoginView() {
@@ -629,6 +631,324 @@ document.getElementById('vahdittu-back-btn').addEventListener('click', function(
   currentVahdittu = null;
   showVarastoView();
   lataaVarasto();
+});
+
+// === OPINTOPOLKU VAIHE 1 (2026-07-21, ks. muistiinpanot.md "Opintopolku" —
+// KONSEPTIKIRJA.md 4.11 puuttuu vielä repon konseptikirjasta, tämä on
+// rakennettu suoraan Katrin chat-pyynnön verbatim-spesifikaatiosta) ===
+// Arvoperiaate: "Satama tukee oppimista — ei tee oppimista puolesta. Äly voi
+// järjestää MILLOIN/MITEN opiskellaan, ei ymmärtää sisältöä puolesta (Sung:
+// jäsentäminen ON oppiminen)." Tämä VAIHE 1 ei sisällä mitään älyä
+// ollenkaan — pelkkä käsin ylläpidettävä rakenne jonka päälle Vaihe 2:n
+// kolmen voiman moottori ja spaced repetition -kierto rakentuvat.
+//
+// Yksityinen — sama owner_id-RLS-periaate kuin hytti_kortit/hytti_rivit
+// (sql/016), EI Katri-kohtaista kovakoodausta koodissa, RLS hoitaa rajauksen.
+
+const OPINTO_VAIHE_NIMET = {
+  priming: 'Aloittamatta',
+  encoding: 'Opiskelussa',
+  retrieval: 'Kertauksessa',
+  reference: 'Hallussa',
+  yllapito: 'Ylläpidossa',
+};
+const OPINTO_VAIHE_JARJESTYS = ['priming', 'encoding', 'retrieval', 'reference', 'yllapito'];
+
+// Kokonaiskartan kolme väriryhmää (2c:n speksi: "hallussa/työn alla/edessä").
+function opintoVaiheRyhma(vaihe) {
+  if (vaihe === 'reference' || vaihe === 'yllapito') return 'hallussa';
+  if (vaihe === 'encoding' || vaihe === 'retrieval') return 'tyon-alla';
+  return 'edessa';
+}
+
+async function lataaOpintoKurssit() {
+  const { data, error } = await db.from('opinto_kurssit').select().order('sort_order');
+  if (error) {
+    console.error('Opintopolun kurssien haku epäonnistui:', error);
+    return;
+  }
+  const kurssit = data || [];
+  const listEl = document.getElementById('opinto-kurssi-lista');
+  listEl.innerHTML = '';
+  document.getElementById('opinto-tyhja').style.display = kurssit.length === 0 ? 'block' : 'none';
+
+  for (const kurssi of kurssit) {
+    const li = document.createElement('li');
+    li.addEventListener('click', function() { avaaOpintoKurssi(kurssi); });
+
+    const teksti = document.createElement('span');
+    teksti.textContent = kurssi.name;
+    li.appendChild(teksti);
+
+    const poisto = document.createElement('button');
+    poisto.className = 'delete-btn';
+    poisto.textContent = '×';
+    poisto.addEventListener('click', async function(e) {
+      e.stopPropagation();
+      const vahvistus = await naytaVahvistus('Poistetaanko ' + kurssi.name + '?', 'Kurssin kaikki aiheet ja deadlinet poistuvat mukana.', 'Poista kurssi');
+      if (!vahvistus) return;
+      const { error: poistoError } = await db.from('opinto_kurssit').delete().eq('id', kurssi.id);
+      if (ilmoitaKirjoitusvirheesta(poistoError, 'Kurssin poisto')) return;
+      lataaOpintoKurssit();
+    });
+    li.appendChild(poisto);
+
+    listEl.appendChild(li);
+  }
+}
+
+document.getElementById('opinto-uusi-kurssi-btn').addEventListener('click', async function() {
+  const input = document.getElementById('opinto-uusi-kurssi-input');
+  const nimi = input.value.trim();
+  if (nimi === '') { input.focus(); return; }
+  const { error } = await db.from('opinto_kurssit').insert({ name: nimi, owner_id: currentUserId });
+  if (ilmoitaKirjoitusvirheesta(error, 'Kurssin luonti')) return;
+  input.value = '';
+  lataaOpintoKurssit();
+});
+document.getElementById('opinto-uusi-kurssi-input').addEventListener('keydown', function(event) {
+  if (event.key === 'Enter') document.getElementById('opinto-uusi-kurssi-btn').click();
+});
+
+function showOpintoKurssiView() {
+  piilotaKaikkiNakymat();
+  document.getElementById('opinto-kurssi-view').style.display = 'block';
+}
+
+let currentOpintoKurssi = null;
+
+async function avaaOpintoKurssi(kurssi) {
+  currentOpintoKurssi = kurssi;
+  showOpintoKurssiView();
+  document.getElementById('opinto-kurssi-title').textContent = '✱ ' + kurssi.name + ' ✱';
+  document.getElementById('opinto-materiaali-teksti').value = kurssi.materiaali || '';
+  await lataaOpintoAiheet();
+  await lataaOpintoKurssinDeadlinet();
+}
+
+document.getElementById('opinto-kurssi-back-btn').addEventListener('click', function() {
+  currentOpintoKurssi = null;
+  showHyttiView();
+  lataaOpintoKurssit();
+});
+
+document.getElementById('opinto-kurssi-poista-btn').addEventListener('click', async function() {
+  if (!currentOpintoKurssi) return;
+  const vahvistus = await naytaVahvistus('Poistetaanko ' + currentOpintoKurssi.name + '?', 'Kurssin kaikki aiheet ja deadlinet poistuvat mukana.', 'Poista kurssi');
+  if (!vahvistus) return;
+  const { error } = await db.from('opinto_kurssit').delete().eq('id', currentOpintoKurssi.id);
+  if (ilmoitaKirjoitusvirheesta(error, 'Kurssin poisto')) return;
+  currentOpintoKurssi = null;
+  showHyttiView();
+  lataaOpintoKurssit();
+});
+
+document.getElementById('opinto-materiaali-tallenna-btn').addEventListener('click', async function() {
+  if (!currentOpintoKurssi) return;
+  const uusi = document.getElementById('opinto-materiaali-teksti').value.trim();
+  const { error } = await db.from('opinto_kurssit').update({ materiaali: uusi || null }).eq('id', currentOpintoKurssi.id);
+  if (ilmoitaKirjoitusvirheesta(error, 'Materiaalin tallennus')) return;
+  currentOpintoKurssi.materiaali = uusi || null;
+  naytaIlmoitus('Materiaali tallennettu');
+});
+
+async function lataaOpintoAiheet() {
+  if (!currentOpintoKurssi) return;
+  const { data, error } = await db.from('opinto_aiheet').select().eq('kurssi_id', currentOpintoKurssi.id).order('sort_order');
+  if (error) {
+    console.error('Aiheiden haku epäonnistui:', error);
+    return;
+  }
+  const aiheet = data || [];
+  const listEl = document.getElementById('opinto-aihe-lista');
+  listEl.innerHTML = '';
+  document.getElementById('opinto-aihe-tyhja').style.display = aiheet.length === 0 ? 'block' : 'none';
+
+  aiheet.forEach(function(aihe) {
+    const li = document.createElement('li');
+
+    const teksti = document.createElement('span');
+    teksti.textContent = aihe.name;
+    li.appendChild(teksti);
+
+    // VAIHE 1: käsin vaihdettava tila, EI automaattista etenemistä (moottori
+    // on Vaihe 2, ks. muistiinpanot.md "Opintopolku").
+    const vaiheSelect = document.createElement('select');
+    vaiheSelect.className = 'opinto-vaihe-select opinto-vaihe-' + aihe.vaihe;
+    OPINTO_VAIHE_JARJESTYS.forEach(function(v) {
+      const optio = document.createElement('option');
+      optio.value = v;
+      optio.textContent = OPINTO_VAIHE_NIMET[v];
+      if (v === aihe.vaihe) optio.selected = true;
+      vaiheSelect.appendChild(optio);
+    });
+    vaiheSelect.addEventListener('change', async function() {
+      const uusi = vaiheSelect.value;
+      const { error: vaiheError } = await db.from('opinto_aiheet').update({ vaihe: uusi }).eq('id', aihe.id);
+      if (ilmoitaKirjoitusvirheesta(vaiheError, 'Vaiheen päivitys')) return;
+      aihe.vaihe = uusi;
+      vaiheSelect.className = 'opinto-vaihe-select opinto-vaihe-' + uusi;
+    });
+    li.appendChild(vaiheSelect);
+
+    const poisto = document.createElement('button');
+    poisto.className = 'delete-btn';
+    poisto.textContent = '×';
+    poisto.addEventListener('click', async function() {
+      const { error: poistoError } = await db.from('opinto_aiheet').delete().eq('id', aihe.id);
+      if (ilmoitaKirjoitusvirheesta(poistoError, 'Aiheen poisto')) return;
+      lataaOpintoAiheet();
+    });
+    li.appendChild(poisto);
+
+    listEl.appendChild(li);
+  });
+}
+
+document.getElementById('opinto-uusi-aihe-btn').addEventListener('click', async function() {
+  if (!currentOpintoKurssi) return;
+  const input = document.getElementById('opinto-uusi-aihe-input');
+  const nimi = input.value.trim();
+  if (nimi === '') { input.focus(); return; }
+  const { error } = await db.from('opinto_aiheet').insert({ name: nimi, kurssi_id: currentOpintoKurssi.id });
+  if (ilmoitaKirjoitusvirheesta(error, 'Aiheen luonti')) return;
+  input.value = '';
+  lataaOpintoAiheet();
+});
+document.getElementById('opinto-uusi-aihe-input').addEventListener('keydown', function(event) {
+  if (event.key === 'Enter') document.getElementById('opinto-uusi-aihe-btn').click();
+});
+
+function muotoileOpintoPvm(pvmStr) {
+  const d = new Date(pvmStr + 'T00:00:00');
+  return d.getDate() + '.' + (d.getMonth() + 1) + '.' + d.getFullYear();
+}
+
+async function lataaOpintoKurssinDeadlinet() {
+  if (!currentOpintoKurssi) return;
+  const { data, error } = await db.from('opinto_deadlinet').select().eq('kurssi_id', currentOpintoKurssi.id).order('pvm');
+  if (error) {
+    console.error('Deadlinejen haku epäonnistui:', error);
+    return;
+  }
+  const listEl = document.getElementById('opinto-kurssi-deadline-lista');
+  listEl.innerHTML = '';
+  (data || []).forEach(function(dl) {
+    const li = document.createElement('li');
+    const teksti = document.createElement('span');
+    teksti.textContent = (dl.tyyppi === 'koe' ? '📝 Koe' : '📤 Palautus') + ' — ' + muotoileOpintoPvm(dl.pvm);
+    li.appendChild(teksti);
+    const poisto = document.createElement('button');
+    poisto.className = 'delete-btn';
+    poisto.textContent = '×';
+    poisto.addEventListener('click', async function() {
+      const { error: poistoError } = await db.from('opinto_deadlinet').delete().eq('id', dl.id);
+      if (ilmoitaKirjoitusvirheesta(poistoError, 'Deadlinen poisto')) return;
+      lataaOpintoKurssinDeadlinet();
+    });
+    li.appendChild(poisto);
+    listEl.appendChild(li);
+  });
+}
+
+document.getElementById('opinto-kurssi-deadline-lisaa-btn').addEventListener('click', async function() {
+  if (!currentOpintoKurssi) return;
+  const pvm = document.getElementById('opinto-kurssi-deadline-pvm').value;
+  const tyyppi = document.getElementById('opinto-kurssi-deadline-tyyppi').value;
+  if (!pvm) {
+    naytaIlmoitus('Valitse päivämäärä');
+    return;
+  }
+  const { error } = await db.from('opinto_deadlinet').insert({ kurssi_id: currentOpintoKurssi.id, pvm: pvm, tyyppi: tyyppi });
+  if (ilmoitaKirjoitusvirheesta(error, 'Deadlinen lisäys')) return;
+  document.getElementById('opinto-kurssi-deadline-pvm').value = '';
+  lataaOpintoKurssinDeadlinet();
+});
+
+// Kokonaiskartta ("näkymä 2", 2c) — LUETTAVA vilkaisu, EI ohjaava: ei
+// toimintonappeja, ei napautettavia rivejä. Väri = aiheiden vaiheiden
+// summa, deadline = lähin tuleva (kurssi- TAI aihetasolta).
+function showOpintoKarttaView() {
+  piilotaKaikkiNakymat();
+  document.getElementById('opinto-kartta-view').style.display = 'block';
+}
+
+async function lataaOpintoKartta() {
+  const { data: kurssit, error: kurssiError } = await db.from('opinto_kurssit').select().order('sort_order');
+  if (kurssiError) {
+    console.error('Kokonaiskartan kurssien haku epäonnistui:', kurssiError);
+    return;
+  }
+
+  const sisalto = document.getElementById('opinto-kartta-sisalto');
+  sisalto.innerHTML = '';
+  if (!kurssit || kurssit.length === 0) {
+    const tyhja = document.createElement('p');
+    tyhja.className = 'section-empty';
+    tyhja.textContent = 'Ei vielä kursseja.';
+    sisalto.appendChild(tyhja);
+    return;
+  }
+
+  for (const kurssi of kurssit) {
+    const [{ data: aiheet }, { data: kurssiDeadlinet }, { data: aiheDeadlinet }] = await Promise.all([
+      db.from('opinto_aiheet').select('vaihe').eq('kurssi_id', kurssi.id),
+      db.from('opinto_deadlinet').select('pvm').eq('kurssi_id', kurssi.id).gte('pvm', paivamaaraISO(new Date())).order('pvm').limit(1),
+      db.from('opinto_deadlinet').select('pvm, aihe_id, opinto_aiheet!inner(kurssi_id)').eq('opinto_aiheet.kurssi_id', kurssi.id).gte('pvm', paivamaaraISO(new Date())).order('pvm').limit(1),
+    ]);
+
+    const kortti = document.createElement('div');
+    kortti.className = 'opinto-kartta-kurssi';
+
+    const nimi = document.createElement('div');
+    nimi.className = 'opinto-kartta-kurssi-nimi';
+    nimi.textContent = kurssi.name;
+    kortti.appendChild(nimi);
+
+    const palkki = document.createElement('div');
+    palkki.className = 'opinto-kartta-palkki';
+    const maara = (aiheet || []).length;
+    if (maara === 0) {
+      const lohko = document.createElement('div');
+      lohko.className = 'opinto-kartta-lohko--edessa';
+      lohko.style.flex = '1';
+      palkki.appendChild(lohko);
+    } else {
+      ['hallussa', 'tyon-alla', 'edessa'].forEach(function(ryhma) {
+        const osuus = aiheet.filter(function(a) { return opintoVaiheRyhma(a.vaihe) === ryhma; }).length;
+        if (osuus === 0) return;
+        const lohko = document.createElement('div');
+        lohko.className = 'opinto-kartta-lohko--' + ryhma;
+        lohko.style.flex = String(osuus);
+        palkki.appendChild(lohko);
+      });
+    }
+    kortti.appendChild(palkki);
+
+    // Lähin tuleva deadline joko kurssi- tai aihetasolta — yksinkertainen
+    // Math.min kahdesta jo valmiiksi lajitellusta/rajatusta hakutuloksesta.
+    const lahimmat = []
+      .concat(kurssiDeadlinet || [])
+      .concat(aiheDeadlinet || [])
+      .sort(function(a, b) { return a.pvm < b.pvm ? -1 : 1; });
+    if (lahimmat.length > 0) {
+      const deadlineEl = document.createElement('div');
+      deadlineEl.className = 'opinto-kartta-deadline';
+      deadlineEl.textContent = '📅 Lähin: ' + muotoileOpintoPvm(lahimmat[0].pvm);
+      kortti.appendChild(deadlineEl);
+    }
+
+    sisalto.appendChild(kortti);
+  }
+}
+
+document.getElementById('opinto-kartta-linkki').addEventListener('click', function() {
+  showOpintoKarttaView();
+  lataaOpintoKartta();
+});
+document.getElementById('opinto-kartta-back-btn').addEventListener('click', function() {
+  showHyttiView();
+  lataaOpintoKurssit();
 });
 
 // === KALENTERI ===
@@ -2039,6 +2359,7 @@ async function lataaHyttiPaanakyma() {
   if (raahattavaRivi) return;
   paivitaHyttiTyoVapaaLabel();
   lataaHyttiTanaanKaista();
+  lataaOpintoKurssit();
 
   const { data: kortit, error: korttiError } = await db.from('hytti_kortit').select().eq('status', 'aktiivinen').order('sort_order');
   if (korttiError) {

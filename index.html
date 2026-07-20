@@ -246,6 +246,22 @@
     </div>
 
     <p class="section-link" id="hytti-arkisto-linkki" style="display:none">Arkisto</p>
+
+    <hr class="divider">
+
+    <!-- Opintopolku VAIHE 1 (2026-07-21, ks. muistiinpanot.md "Opintopolku" /
+         KONSEPTIKIRJA.md 4.11) — yksityinen opiskelumoduuli Hytin sisällä,
+         sama "vain omistaja näkee" -periaate kuin muukin Hytti. VAIHE 1:
+         perusta ilman kolmen voiman moottoria/spaced repetitionia (Vaihe 2). -->
+    <div class="section-title">📚 Opinnot <span class="opinto-kartta-linkki" id="opinto-kartta-linkki">🗺️ Kartta</span></div>
+    <ul class="list" id="opinto-kurssi-lista"></ul>
+    <p class="section-empty" id="opinto-tyhja" style="display:none">Ei vielä kursseja. Lisää ensimmäinen alta.</p>
+
+    <div class="add-item">
+      <span class="prefix">›</span>
+      <input type="text" id="opinto-uusi-kurssi-input" placeholder="uuden kurssin nimi...">
+      <button id="opinto-uusi-kurssi-btn">+</button>
+    </div>
   </div>
 
   <div class="container" id="hytti-kortti-view" style="display:none">
@@ -283,6 +299,58 @@
         <button class="dialog-btn dialog-btn-cancel" id="hytti-arkisto-sulje">Sulje</button>
       </div>
     </div>
+  </div>
+
+  <!-- Opintopolku VAIHE 1 — kurssin oma näkymä: aiheet + PACER-vaihe,
+       materiaali-liite (kevyt teksti/linkki), deadlinet. -->
+  <div class="container" id="opinto-kurssi-view" style="display:none">
+    <div class="list-header">
+      <button class="back-btn" id="opinto-kurssi-back-btn">‹</button>
+      <h1 id="opinto-kurssi-title">✱ KURSSI ✱</h1>
+      <button class="settings-btn" id="opinto-kurssi-poista-btn" title="Poista kurssi kokonaan">🗑</button>
+    </div>
+
+    <div class="section-title">📎 Materiaali</div>
+    <textarea id="opinto-materiaali-teksti" class="jatkorivi-teksti" rows="2" placeholder="Linkki tai muistiinpano kurssin materiaaliin..."></textarea>
+    <button class="dialog-btn dialog-btn-cancel" id="opinto-materiaali-tallenna-btn" style="margin-top:6px">Tallenna materiaali</button>
+
+    <hr class="divider">
+
+    <div class="section-title">📅 Deadlinet</div>
+    <ul class="list" id="opinto-kurssi-deadline-lista"></ul>
+    <div class="opinto-deadline-lisays">
+      <input type="date" id="opinto-kurssi-deadline-pvm">
+      <select id="opinto-kurssi-deadline-tyyppi">
+        <option value="koe">Koe</option>
+        <option value="palautus">Palautus</option>
+      </select>
+      <button class="dialog-btn dialog-btn-cancel" id="opinto-kurssi-deadline-lisaa-btn">Lisää</button>
+    </div>
+
+    <hr class="divider">
+
+    <div class="section-title">🧭 Aiheet</div>
+    <ul class="list" id="opinto-aihe-lista"></ul>
+    <p class="section-empty" id="opinto-aihe-tyhja" style="display:none">Ei vielä aiheita.</p>
+
+    <div class="add-item">
+      <span class="prefix">›</span>
+      <input type="text" id="opinto-uusi-aihe-input" placeholder="uuden aiheen nimi...">
+      <button id="opinto-uusi-aihe-btn">+</button>
+    </div>
+  </div>
+
+  <!-- Opintopolku VAIHE 1 — kokonaiskartta ("näkymä 2"): kaikki kurssit
+       palkkeina, väri = vaihe, deadline näkyvissä. LUETTAVA vilkaisu, EI
+       ohjaava (ei toimintonappeja tässä näkymässä). -->
+  <div class="container" id="opinto-kartta-view" style="display:none">
+    <div class="list-header">
+      <button class="back-btn" id="opinto-kartta-back-btn">‹</button>
+      <h1>✱ KOKONAISKARTTA ✱</h1>
+      <span></span>
+    </div>
+    <p class="section-empty">Missä menen — vilkaisu, ei tehtävälista.</p>
+    <div id="opinto-kartta-sisalto"></div>
   </div>
 
   <div class="container" id="asetukset-view" style="display:none">

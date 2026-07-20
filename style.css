@@ -2371,6 +2371,85 @@ h1 {
   color: var(--huomio);
 }
 
+/* Opintopolku VAIHE 1 (2026-07-21, ks. muistiinpanot.md "Opintopolku") */
+.opinto-kartta-linkki {
+  float: right;
+  color: var(--accent);
+  text-transform: none;
+  letter-spacing: normal;
+  cursor: pointer;
+  font-size: 13px;
+}
+
+.opinto-deadline-lisays {
+  display: flex;
+  gap: 6px;
+  margin: 10px 0;
+}
+
+.opinto-deadline-lisays input[type="date"],
+.opinto-deadline-lisays select {
+  font-family: 'Courier New', Courier, monospace;
+  font-size: 13px;
+  color: var(--text);
+  background: var(--ground);
+  border: 1px solid var(--border-dash);
+  border-radius: 4px;
+  padding: 6px;
+  flex: 1;
+  min-width: 0;
+}
+
+.opinto-vaihe-select {
+  font-family: 'Courier New', Courier, monospace;
+  font-size: 12px;
+  color: var(--text);
+  background: var(--ground);
+  border: 1px solid var(--border-dash);
+  border-radius: 4px;
+  padding: 4px;
+}
+
+/* PACER-vaihe-värit — pehmeät, ei kolmiportaisen merkkikielen (kulta/
+   meripihka/punainen) sävyjä sekaannuksen välttämiseksi (ks. "Kalenterin
+   merkkikieli" muistiinpanot.md:ssä — ne on VARATTU päällekkäisyysmerkille). */
+.opinto-vaihe-priming { color: var(--muted); }
+.opinto-vaihe-encoding { color: var(--accent-text); }
+.opinto-vaihe-retrieval { color: var(--accent-text); }
+.opinto-vaihe-reference { color: var(--muted); }
+.opinto-vaihe-yllapito { color: var(--muted); }
+
+.opinto-kartta-kurssi {
+  border: 1px solid var(--border-dash);
+  border-radius: 6px;
+  padding: 10px 12px;
+  margin-bottom: 10px;
+}
+
+.opinto-kartta-kurssi-nimi {
+  font-size: 15px;
+  color: var(--text);
+  margin-bottom: 6px;
+}
+
+.opinto-kartta-palkki {
+  display: flex;
+  height: 10px;
+  border-radius: 5px;
+  overflow: hidden;
+  background: var(--border);
+}
+
+.opinto-kartta-lohko--hallussa { background: var(--accent); }
+.opinto-kartta-lohko--tyon-alla { background: var(--huomio); }
+.opinto-kartta-lohko--edessa { background: var(--border-dash); }
+
+.opinto-kartta-deadline {
+  font-size: 12px;
+  color: var(--muted);
+  margin-top: 6px;
+}
+
 .hytti-tyyppi-selite {
   font-size: 11px;
   color: var(--muted);
