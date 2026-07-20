@@ -183,3 +183,145 @@ Todistettu 2026-07-14/15 illan diagnoosissa ("Ajastetut muistutukset eivät tule
 **Korjaus: ulkoinen cron-palvelu (cron-job.org) ensisijaiseksi laukaisijaksi, GitHub Actions jää varalaukaisijaksi (ei poisteta — ilmainen, ei haittaa, molemmat kutsuvat samoja idempotentteja endpointteja turvallisesti päällekkäinkin).** Katrin oma asennusaskel (vaatii ulkoisen tilin, ei tehtävissä koodista) — jo tehty ja vahvistettu (ks. muistiinpanot.md 2026-07-15).
 
 **Yleistettävä oppi:** jos rakennat JATKOSSA jotain aikakriittistä (esim. Viikkokatsaus, Horisontti-rytmioppija) tämän saman `muistutukset-cron.yml`-workflow'n varaan, MUISTA että sen toteuma-aikataulu on suuntaa-antava, ei taattu — 20h+ -välein tapahtuvalle työlle (kuten E3:n yöajo) tämä on lähes huomaamaton, mutta minuuttitason tarkkuutta vaativalle (muistutukset) se on merkittävä riski jota ei näy testauksessa ellei nimenomaan mittaa toteuma-aikaleimoja.
+
+---
+
+## Repon kokonaiskuva ja lukemisjärjestys (kirjattu 2026-07-20, Claude Coden ja Copilotin vaihdon kynnyksellä)
+
+Tämä osio on eri asia kuin kaikki yllä oleva: yllä on **kertyneitä sääntöjä ja oppeja** (luettava kokonaan, mutta ei tarvitse ymmärtää koko koodikantaa lukeakseen niitä). Tämä osio on **kartta koko repoon** — kirjoitettu siksi että Copilot ei näe koko repoa kerralla eikä sillä ole Claude Coden keskusteluhistoriaa. Lue tämä osio ENSIN jos tämä on ensimmäinen kerta tässä projektissa.
+
+### Projektin yleiskuva
+
+**Mikä Satama on:** perheen (Katri + Juha) yhteinen arjenhallintasovellus — jaetut listat, yhteinen kalenteri (peilattu iCloudista), push-muistutukset, henkilökohtainen "Laituri" (ajatusten talteenottopaikka jota pieni tekoälyavustaja lajittelee), henkilökohtainen "Hytti" (yksityinen työtila/opiskelukalenteri), ja kasvava äly-putki joka EHDOTTAA muttei koskaan kirjoita mitään ilman ihmisen hyväksyntää. Ks. README.md kokonaiskuvan tarina-versiolle ja KONSEPTIKIRJA.md OSA 1:n periaatteille (vilkaisuarvo, maksimiautomaatio/minimikustannus, kolmiporras, turvainvariantti — nämä periaatteet OHJAAVAT jokaista suunnittelupäätöstä tässä repossa, lue ne ennen kuin lisäät mitään uutta).
+
+**Teknologiapino ja miksi:**
+- **Vanilla HTML/CSS/JS** (`index.html` + `script.js` + `style.css`) — EI frameworkkia (ei Reactia/Vueta), EI bundleria, EI build-askelta. Yksi tiedosto per kerros, ladataan suoraan selaimeen `<script src="script.js">`:lla. Valinta on tietoinen: projekti alkoi kolme viikkoa sitten ilman aiempaa web-kehityskokemusta (ks. README.md "Matka: mistä lähdin") — vanilla-JS pitää koko pinon ymmärrettävänä ilman rakennusputken tai frameworkin opetteluakin.
+- **Supabase** — Postgres-tietokanta + autentikointi (Google OAuth) + Realtime (websocket-pohjainen live-synkka) + Row Level Security (RLS, "portsari" joka päättää rivikohtaisesti kuka näkee/kirjoittaa mitä). Yhteys avataan `script.js`:n alussa (`createClient(...)`), projektin URL ja julkinen **anon key** ovat suoraan koodissa (tämä on TARKOITUKSELLISTA — anon-avain on suunniteltu julkiseksi, RLS on se mikä oikeasti suojaa dataa, ei avaimen salaisuus).
+- **Vercel** — hostaa staattiset tiedostot JA `api/`-kansion serverless-funktiot (Node.js). **Ei `vercel.json`-tiedostoa** — projekti käyttää Vercelin zero-config-tunnistusta (staattinen juuri + `api/*.js` → automaattisesti serverless-funktioita). Ei build-komentoa (`package.json`:n `dependencies` ovat VAIN `api/`-funktioiden Node-riippuvuuksia — `tsdav`, `ical.js`, `web-push` — selainpuoli ei tarvitse `npm install`:ia ollenkaan).
+- **GitHub** — koodi + `.github/workflows/muistutukset-cron.yml` (varalaukaisijana ulkoiselle cron-job.org-palvelulle, ks. "GitHub Actions -ajastin" -osio yllä).
+
+**Deploy-osoite:** `https://kauppalista-nine.vercel.app` (ks. `.github/workflows/muistutukset-cron.yml`, jossa tämä osoite näkyy cron-kutsujen kohteena). **Miten deploy tapahtuu:** Vercel on kytketty suoraan GitHub-repoon — `git push` `main`-haaraan päivittää tuotannon automaattisesti, ei erillistä deploy-komentoa. PWA-puolella tämä tarkoittaa: aina kun `index.html`/`script.js`/`style.css` muuttuu, **`sw.js`:n `CACHE`-vakio pitää nostaa** (esim. `kauppalista-v86` → `v87`), muuten käyttäjän puhelin näyttää vanhaa cachettua versiota eikä uusi koodi tule voimaan itsestään (ks. `sw.js`, cache-first-strategia appitiedostoille).
+
+### Lukemisjärjestys
+
+Nopein reitti kokonaiskuvaan — lue tässä järjestyksessä:
+
+1. **README.md** — mikä Satama on ja miksi, ihmisen kielellä (5 min).
+2. **KONSEPTIKIRJA.md OSA 1–3** — periaatteet, käyttäjät, tiivis kartta jo rakennetuista kokonaisuuksista. Tämä on paras "mitä täällä ylipäätään on" -yleiskatsaus, tiiviimpi kuin muistiinpanot.md.
+3. **Tämä tiedosto (COPILOT.md) kokonaan** — talon säännöt joita jokainen uusi rivi koodia noudattaa (kirjoituspolkujen 4 tarkistusta, testirivikäytäntö, koodikielisääntö, äly-putken periaatteet).
+4. **`index.html`** — kaikki näkymät ("view") ovat SAMASSA tiedostossa, päällekkäin, `display:none`/`display:block`-vaihdolla näytettynä (ei reititintä, ei useaa HTML-sivua). Etsi `id="...-view"` -divit saadaksesi täyden näkymälistan: `login-view`, `home-view`, `app-view` (yksittäinen lista, esim. Kauppalista), `muistilaput-view`, `varasto-view`, `kalenteri-view`, `hytti-view`, `hytti-kortti-view`, `asetukset-view`, `laituri-view`. Lisäksi joukko `dialog-overlay`-luokan modaaleja (muistutuspaneeli, ristiriitakuittaus, hytin arkisto, listan asetukset, ym.) — nekin ovat aina DOM:issa, vain piilossa kunnes avataan.
+5. **`script.js`** (n. 6100 riviä) — EI moduulitiedostoja, kaikki yhdessä tiedostossa jaoteltuna `// === OTSIKKO ===` -bannerikommentein (`grep -n "^// ==="` löytää ne kaikki nopeasti). Lue järjestyksessä: tiedoston ALKU (Supabase-yhteys, näkymänvaihtofunktiot `showXView()`, ankkurointi/delegointi-logiikka) → `// === KALENTERI ===` → `// === PÄÄLLEKKÄISYYSMERKKI ===` → `// === KUUKAUSINÄKYMÄ ===` → `// === KALENTERIN KUITTAUSJONO ===` → `// === OMA HYTTI ===` → (välissä Laituri-logiikka ja ydin-kauppalistatoiminnot `poistaTuote()`/`paivitaNaytto()`/`deleteList()` — vanhinta koodia, edeltää bannerikäytäntöä, ei omaa otsikkoaan) → `// === HUOMIOPALLURAT ===` → `// === OFFLINE-JONO ===` → `// === RAAHAUS ===` → `// === MUISTUTUSPANEELIN NAPIT JA RULLAT ===` → `// === PUSH-ILMOITUKSET ===` → `// === MUISTUTUKSET ===` → `// === ASETUKSET: TILI + SOVELLUS ===` → `// === AUTH ===` (tiedoston loppu — kirjautumisen kuuntelija joka päättää mikä view näytetään).
+6. **`style.css`** (n. 2500 riviä) — yksi tiedosto, ei esikäsittelijää (ei Sass/Less). CSS custom properties (`:root { --ground; --text; --accent; ... }`) määrittelevät koko väripaletin, `@media (prefers-color-scheme: dark)` toistaa saman listan tumman teeman arvoilla — EI JS-pohjaista teemanvaihtoa, selain/käyttöjärjestelmä päättää.
+7. **`api/*.js`** — kahdeksan itsenäistä serverless-funktiota, ei jaettuja moduuleja (yksi tarkoituksellinen poikkeus, ks. `api/_lib/aly-classify.js` alla). Lue `api/aly.js` ensin (lyhyin, selkein esimerkki auth-kaavasta), sitten muut tarpeen mukaan (ks. "Moduulit yksitellen" alla per-endpoint kuvaukset).
+8. **`sql/*.sql`** (078 migraatiota tätä kirjoitettaessa) — ÄLÄ lue kaikkia läpi, ne ovat historiaa. Sen sijaan: (a) uusimmat 5-10 kertovat mitä on VIIMEKSI rakennettu, (b) `grep -l "create table X"` löytää minkä migraation joku taulu syntyi jos tarvitset sen tarkan skeeman. Taulun `tuotteet` (Kauppalistan rivit) loi jokin AIKAISEMPI, migraatiojärjestelmän ulkopuolinen käsinluonti — se ei löydy mistään `sql/*.sql`-tiedostosta, tarkista sen skeema suoraan Supabasen Table Editorista.
+9. **muistiinpanot.md** (n. 2900 riviä) — LUE VASTA TARVITTAESSA, ei kertalukuun. Tämä on projektin täysi historia, päätökset ja "Testauslista — kesken" -osio ("mitä pitää vielä tutkia/korjata"). Käytä sitä hakuteoksena (`grep` otsikon/aiheen mukaan), älä yritä lukea kokonaan — se on kirjoitettu kronologisena päiväkirjana, ei viitteenä.
+10. **KONSEPTIKIRJA.md OSA 4** — kun aloitat UUDEN, rakentamattoman ominaisuuden: jokainen konsepti tässä on täysi speksi (tarve, torjutut ratkaisut, rakennusjärjestys) valmiiksi mietittynä, ei tarvitse suunnitella tyhjästä.
+
+### Arkkitehtuuri
+
+**Ei reititintä, ei komponenttikehystä.** `index.html` sisältää KAIKKI näkymät kerralla DOM:issa; `piilotaKaikkiNakymat()` + `showXView()`-funktiot (script.js:n alussa) vaihtavat mikä on `display:block` vs `display:none`. Navigointi on siis puhdasta DOM-manipulaatiota, ei URL-tilaa (selaimen "takaisin"-nappi ei toimi sovelluksen sisäisenä navigointina — tietoinen, ei rikki).
+
+**Tila (state) elää kolmessa kerroksessa:**
+1. **Supabase-tietokanta on ainoa pysyvä totuus.** Ei omaa client-puolen tietovarastoa (ei Reduxia/Piniaa) — jokainen näkymä LATAA oman datansa suoraan Supabasesta avattaessa (`lataaLista()`, `lataaKalenteri()`, `lataaAnkkurit()`, `lataaHyttiRivit()` jne.), muokkaa DOM:ia suoraan tuloksen perusteella.
+2. **Muutamat pienet, kertaluvun globaalit muuttujat** (esim. `currentList`, `currentUserId`, `kalenteriTila`, `muistutusKohde`, `muistuksetKartta`) pitävät kirjaa "missä ollaan nyt" -tilasta yhden näkymän sisällä — EI kertaluontoista sovellustilaa (esim. `currentUserId` asetetaan kirjautumisen yhteydessä ja pysyy koko istunnon).
+3. **Realtime-kanavat** (`db.channel(...)`) pitävät auki olevan näkymän tuoreena ilman käsinpäivitystä — jokainen kanava kuuntelee TIETTYÄ taulua/tapahtumaa ja kutsuu vastaavaa `lataaX()`-funktiota kun jotain muuttuu (ks. `script.js`:n loppupuoli, `realtimeChannel`/`laituriRealtimeChannel`/`kalenteriPalluraChannel`). Vaatii Replication-julkaisun päälle kyseiselle taululle Supabasen puolella (ks. `sql/034_realtime_huomiopallurat.sql` mallina uudelle taululle).
+
+**Supabase-yhteys:** `script.js`:n aivan ensimmäiset rivit (`createClient(SUPABASE_URL, ANON_KEY)`) — `db`-muuttuja on globaali, jokainen näkymäfunktio kutsuu `db.from('taulu').select/insert/update/delete(...)`. `api/`-funktiot EIVÄT käytä tätä samaa client-kirjastoa — ne tekevät raakoja `fetch()`-kutsuja Supabasen REST-rajapintaan (`/rest/v1/...`) `SUPABASE_SERVICE_KEY`:llä (service_role, ohittaa RLS:n), koska ne ajavat palvelimella ilman käyttäjän omaa selainistuntoa.
+
+**Autentikointi:** Google OAuth Supabase Authin kautta (`db.auth.signInWithOAuth({provider:'google'})`, ks. `// === AUTH ===` -osio `script.js`:n lopussa). Kirjautumisen jälkeen `db.auth.getSession()` antaa käyttäjän JWT:n, jota selainpuoli käyttää automaattisesti jokaisessa `db.from(...)`-kutsussa (supabase-js hoitaa tämän itse) — RLS-policyt (`sql/003_row_level_security.sql` ja myöhemmät korjaukset/laajennukset) päättävät rivitasolla mitä käyttäjä näkee/muokkaa `auth.uid()`:n perusteella. `api/`-funktiot jotka VAATIVAT kirjautuneen käyttäjän identiteetin (esim. `api/aly.js`, `api/push-test.js`) validoivat kutsujan lähettämän `access_token`:in `/auth/v1/user`-endpointilla (ks. "Äly-putki"-osion "Auth-kaava" yllä) — ne EIVÄT luota client-puolen väitteeseen kuka käyttäjä on.
+
+**Kaksi käyttäjää, ei rooleja:** koko sovellus on rakennettu kahdelle nimetylle käyttäjälle (Katri + Juha) — ei yleiskäyttöistä moniperhe-/monikäyttäjätukea, ei käyttäjähallintaa. `henkiloNimi()`/`henkiloAllatiivi()`-funktiot (script.js) ja `HENKILO_ALLATIIVI`-taulukko kääntävät `user_id`:n ihmisluettavaksi nimeksi taivutettuna.
+
+### Moduulit yksitellen
+
+**Listat (Kauppalista / Muistilaput / Varasto)**
+- Mitä tekee: jaettuja tai henkilökohtaisia tarkistuslistoja (`lists`-taulun rivi = yksi lista, `tuotteet`-taulun rivi = yksi listan tuote/rivi). Kauppalista on kotinäkymän oma kiinteä pikakuvake, Muistilaput/Varasto ovat käyttäjän itse luomia listoja kahdessa eri "kategoriassa" (aktiivinen vs. "nukkuva" varasto, ks. KONSEPTIKIRJA.md periaate 7).
+- Tiedostot: `index.html` (`app-view`, `muistilaput-view`, `varasto-view`), `script.js` (`lataaLista()`, `paivitaNaytto()`, `poistaTuote()`, `deleteList()`, raahaus-osio raahausjärjestykselle).
+- Taulut: `tuotteet` (id, list_id, nimi, tehty, sort_order, is_header), `lists` (id, name, kategoria/varasto-lippu, jaettu-lippu), `list_members`.
+- Tunnettu keskeneräisyys: listan kokonaispoisto ei siivoa sen riveihin liitettyjä `muistutukset`-rivejä (jäisi orpoja, harvinainen reunatapaus, ei ratkaistu — ks. muistiinpanot.md "Muistutukset"-osio).
+
+**Kalenteri**
+- Mitä tekee: perheen yhteinen ja henkilökohtainen kalenterinäkymä (päivä/viikko/kuukausi), peilattu iCloudista/ICS-syötteistä yksisuuntaisesti ("yksi totuus, kaksi ikkunaa" -arkkitehtuuri). Toisen lisäämät tapahtumat odottavat kuittausta (ei estä näkymistä, vain merkitsee "uusi"). Ristiriitapaketti tunnistaa päällekkäisyydet kolmiportaisella vakavuudella ja tarjoaa "Ehdota keskustelua"-toiminnon riidan sijaan.
+- Tiedostot: `index.html` (`kalenteri-view` + `kalenteri-kuittaus-overlay` + `ristiriita-overlay`), `script.js` (`// === KALENTERI ===`, `// === PÄÄLLEKKÄISYYSMERKKI ===`, `// === KUUKAUSINÄKYMÄ ===`, `// === KALENTERIN KUITTAUSJONO ===`), `api/caldav-sync.js` (varsinainen synkka), `api/ics.js` (kalenterisilta-vientinappi).
+- Taulut: `kalenteri_tapahtumat`, `kalenteri_kuittaukset`, `kalenteri_syotteet` (syötteiden asetukset, uusi syöte lisätään TÄNNE Table Editorista, ei koodiin), `kalenteri_tekijat`, `kalenteri_ristiriita_kuittaukset`. `kalenteri_odottavat` on VANHENTUNUT (vanha hyväksyntäjono-arkkitehtuuri, taulu on yhä olemassa mutta käytöstä poistunut — älä kirjoita siihen).
+- Tunnettu keskeneräisyys: kuukausinäkymän vaihto hidas (~3s, syy: verkkohaku ilman välimuistia, hyväksytty toistaiseksi) · värimaailma jakaa mielipiteitä (Copilot-hionta) · monipäiväisen tapahtuman pikanapit laskevat ajan alkuperäisestä alkupäivästä eivätkä näytettävästä (harvinainen reunatapaus).
+
+**Muistutukset**
+- Mitä tekee: henkilökohtainen push-muistutus listan riville/kalenteritapahtumalle/ankkurille — neljä lajia: kertaluontoinen, valmistaudu (toinen aikaisempi tönäisy), sinnikäs ("tärähdyssarja" — tiheä pushisarja ennen kohdehetkeä, kuittaus tappaa sarjan), toistuva (yksi ikuinen sääntö, itsenäisesti etenevä, ei kuittausta). Ks. muistiinpanot.md "Muistutukset"/"Valmistautumisvaihe"/"Sinnikäs muistutus"/"Toistuva muistutus" -osiot täydelle tekniselle kuvaukselle jokaisesta.
+- Tiedostot: `index.html` (`muistutus-overlay`), `script.js` (`// === MUISTUTUSPANEELIN NAPIT JA RULLAT ===`, `// === MUISTUTUKSET ===`), `api/muistutukset-laheta.js` (cron-lähetys, kaikkien neljän lajin atominen claim-logiikka).
+- Taulut: `muistutukset` (yksi taulu kaikille neljälle lajille, kasvavalla sarakejoukolla — `persistent`/`window_minutes`/`frequency`/`sent_count`/`acked_at` sinnikkäälle, `recurring`/`recurrence_type`/`weekdays`/`interval_n`/`interval_unit`/`time_of_day`/`ends_at` toistuvalle, `parent_id` valmistaudulle).
+- Tunnettu keskeneräisyys: "kuittaa suoraan push-ilmoituksesta" (natiivi action-nappi) ei ole rakennettu (vaatisi Service Workerin oman autentikoinnin) · toistuva+sinnikäs-yhdistelmä ei ole tuettu (UI piilottaa toisen kun toinen on päällä) · EI mitään neljästä lajista ole testattu oikealla ~5 min cron-ajolla/oikealla laitteella pidemmän ajan yli, vain Node-simulaatioilla.
+
+**Laituri**
+- Mitä tekee: nopea ajatusten/murujen talteenottopaikka ("heitä tänne ennen kuin unohtuu") — hakutoiminto, arkisto (kokoontaitettava, ei poisto), ja äly-lajittelu joka ehdottaa (EI koskaan päätä itse) mihin muru kuuluisi: ankkuriehdokas ("hetki"/"ikkuna"), kauppatavara-ehdotus, tai delegointi toiselle henkilölle laukaisusanalla ("Juhalle: ...").
+- Tiedostot: `index.html` (`laituri-view`), `script.js` (Laituri-osio ydintiedoston keskivaiheilla — `pyydaLaituriEhdotus()`, `piirraLaituriEhdotusKortti()`, `piirraKauppaEhdotusKortti()`, `piirraHetkiSiltaKortti()`, `ehdotaSisaltoToiselle()`, `tunnistaEhdotusLaukaisu()`), `api/laituri-add.js` (Siri-pikakomentoreitti + välitön äly-luokittelu), `api/aly-nightly.js` (yöajo, sama luokittelu erässä), `api/_lib/aly-classify.js` (JAETTU prompti/normalisointi näiden kahden API-reitin välillä — repon AINOA jaettu moduuli, ks. sen oma yläkommentti miksi juuri tämä on poikkeus).
+- Taulut: `laituri`, `laituri_nahty`, `aly_log`, `aly_log_seen`, `aly_evaluated`.
+- Tunnettu keskeneräisyys: `api/laituri-add.js`:n `henkilo`-parametrin todennus on tietoisesti auki (ei salaisuutta/tokenia — päätös perusteltu tiedoston omassa yläkommentissa) · KONSEPTIKIRJA.md 4.10 ("Laiturin luode + arkisto") kerrokset 1-2 (pehmeä oletusikkuna ajattomille tehtäville, viikoittainen "luode"-katselmus) EIVÄT ole vielä rakennettu, vain kerros 3 (arkisto) on.
+
+**Ankkurit**
+- Mitä tekee: kotinäkymän "päivän kärjet" — henkilökohtaiset, jokaisella on "koti" (ei kelluvia). Äly voi ehdottaa ankkuriehdokkaita Laiturin muruista (ks. yllä); ehdokas voidaan hyväksyä omaksi, siirtää (⏭) tai hylätä. Toiselle voi ehdottaa ankkuria valmiin toiminnon kautta (ei enää erillistä "kenelle"-kohdevalintaa etusivulla, poistettu 2026-07-19 design-kritiikin jälkeen).
+- Tiedostot: `index.html` (`home-view`:n `ankkurit-list`/`anchor-candidates-list`), `script.js` (`vaihdaAnkkurointiYleinen()`, `paivitaAnkkuroidutAvaimet()`, koodin alkuosassa).
+- Taulut: `ankkurit` (source: `'manuaalinen'`/`'aly'`/`'ehdotus'`, `is_candidate`, `event_date`/`event_time`, `visible_from`).
+
+**Oma Hytti**
+- Mitä tekee: jokaisen OMA yksityinen työtila (RLS-suojattu molempiin suuntiin, todistettu auditoinnissa) — kortit (jatkuva/päättyvä), tehtävät jotka kokoontuvat kortilta ylös, 7 päivän kalenteri-ikkuna, ICS-syötteet opiskelukalentereille (Lukkarikone/Itslearning).
+- Tiedostot: `index.html` (`hytti-view`, `hytti-kortti-view`), `script.js` (`// === OMA HYTTI ===`).
+- Taulut: `hytti_kortit`, `hytti_rivit`, `hytti_omistajat`, jaettu käyttö `kalenteri_syotteet`-taulusta (`scope='hytti'`).
+
+**Asetukset**
+- Mitä tekee: kokoelma HARVOIN kosketettavia asetuksia — tili/uloskirjautuminen, push-lupa+testi, vinkit (dataohjattu), sovellusversio+päivitys, kalenterin manuaalisynkka, äly-testi, Kuormavahti-raja, "Mitä äly on tehnyt" -loki.
+- Tiedostot: `index.html` (`asetukset-view`), `script.js` (`// === ASETUKSET: TILI + SOVELLUS ===`).
+- Taulut: `asetukset` (yleinen avain-arvo-taulu, käytetään myös moduulien välisenä "kytkeytynä tilana", esim. `aly_yoajo`, `aly_yoajo_last_run`, `hetki_ennakkopaivat`, `kuormaraja`), `ohjeet` (Vinkit-osion sisältö), `push_tilaukset`.
+
+**Äly-putki**
+- Ks. tämän tiedoston OMA "Äly-putki"-osio yllä täydelle kuvaukselle — sitä ei toisteta tässä. Lyhyesti: `api/aly.js` on geneerinen `{prompt}→{text}`-endpoint jonka päälle jokainen älyominaisuus (Laituri-lajittelu, tuleva Siri-tulkinta) rakentuu joko uudella promptilla samaan endpointiin tai kokonaan uudella endpointilla.
+
+### Konventiot ja tyyli
+
+- **Koodikieli:** uusi koodi englanniksi (nimet + kommentit), olemassa oleva suomenkielinen koodi jätetään koskemattomaksi ellei sitä muutenkin kirjoiteta uusiksi — ks. tämän tiedoston OMA "Koodikieli"-osio yllä täydelle säännölle. Käyttäjälle näkyvä teksti on AINA suomeksi, poikkeuksetta.
+- **Ei build-askelta, ei linteriä, ei muotoilijaa (Prettier/ESLint) määriteltynä** — koodityyli on epävirallinen mutta johdonmukainen: 2 välilyönnin sisennys, puolipisteet, `function`-avainsana (ei nuolifunktioita valtaosassa vanhempaa koodia, uudempi koodi käyttää molempia sekaisin), yksinkertaiset `if`-vartiolauseet mieluummin kuin syvä sisennys.
+- **Funktionimeämiskaava:** `lataaX()` (hakee datan + piirtää), `piirraX()` (pelkkä DOM-rakennus datasta), `avaaXPaneeli()`/`suljeXPaneeli()` (modaalien avaus/sulku), `paivitaX()` (olemassa olevan näkymän virkistys ilman uutta hakua tarvittaessa).
+- **Kommentointitapa:** kommentti selittää MIKSI, ei MITÄ — erityisesti bugikorjaukset kirjoitetaan muotoon `// BUGIKORJAUS (päivämäärä, "lyhyt nimi"): mikä meni rikki, miksi, miten korjattu, ks. muistiinpanot.md`. Isot rakenteelliset kommentit (tiedoston/osion alussa) selittävät arkkitehtuurin, ei rivikohtaista logiikkaa.
+- **Virheenkäsittely on PAKOLLINEN kaava, ei tyylikysymys** — ks. tämän tiedoston "Uusi kirjoituspolku → nämä 4 asiaa aina" -osio yllä. Tätä EI saa ohittaa uudessa koodissa.
+- **CSS-rakenne:** yksi `style.css`, CSS custom properties (`--ground`, `--text`, `--accent`, `--accent-text`, `--muted`, `--border`, `--border-dash`, `--huomio`, `--vaara`, `--vaara-ground`) määrittelevät koko väripaletin `:root`:issa + `@media (prefers-color-scheme: dark)` -kopio. Luokkanimet ovat suomenkielisiä ja ominaisuuskohtaisia (esim. `.muistutus-sinnikas-rivi`, `.hytti-tyyppi-btn`, `.kalenteri-tila-btn` — jälkimmäistä UUDELLEENKÄYTETÄÄN välilehti-/tyyppivalitsimena monessa eri moduulissa, ei omaa luokkaa jokaiselle). Kontrastisuhteet (WCAG AA, ≥4.5:1, tavoiteltu ~6:1 "luettava ulkona auringossa" -vaatimuksesta) on tarkistettu erikseen `--muted`/`--accent-text`/`--huomio`-väreille, ÄLÄ hämärrä niitä ilman kontrastintarkistusta.
+- **ADHD-/arkiystävälliset suunnitteluperiaatteet** (KONSEPTIKIRJA.md OSA 1, kannattaa lukea kokonaan ennen UI-muutoksia): **vilkaisuarvo** (tärkein asia näkyy yhdellä silmäyksellä, ei kaivamista); **maksimiautomaatio, minimikustannus** (äly vain siihen mihin logiikka ei taivu, ei koskaan silmukassa/joka avauksella); **kolmiporras** (äly ehdottaa → ihminen kuittaa → ei koskaan suoraa kirjoitusta ilman hyväksyntää); **turvainvariantti** (mikään kirjoitettu ei koskaan katoa hiljaa — poisto on aina käyttäjän oma, eksplisiittinen teko); **vahvistus seuraa todellisuutta** (UI ei koskaan väitä jotain tehdyksi mitä ei ole tehty — tämän rikkomisesta on maksettu viisi kertaa, ks. "Uusi kirjoituspolku" -osio yllä); **arki-minälle, ei ideaaliminälle** (suunnittele sille joka avaa jääkaapin väsyneenä tiistai-iltana, ei sille joka jaksaisi täydellisen järjestelmän); **Satama ei ränkytä** (taustapäivitykset/sisäinen bookkeeping eivät vaadi käyttäjän huomiota, vain käyttäjää oikeasti koskevat asiat nousevat esiin).
+
+### Ympäristö ja salaisuudet
+
+Kaikki alla ovat Vercelin projektikohtaisia ympäristömuuttujia (Vercel-dashboard → Settings → Environment Variables) — **ÄLÄ KOSKAAN kirjoita niiden ARVOJA mihinkään repon tiedostoon**, vain nimet ja käyttötarkoitus:
+
+| Muuttuja | Käyttötarkoitus | Käyttävät tiedostot |
+|---|---|---|
+| `SUPABASE_SERVICE_KEY` | service_role-avain, ohittaa RLS:n — palvelinpuolen kirjoitukset JA kutsujan JWT:n validointi | kaikki `api/*.js` paitsi `api/ics.js` |
+| `ANTHROPIC_API_KEY` | Claude API -kutsut | `api/aly.js`, `api/aly-nightly.js`, `api/laituri-add.js` |
+| `ALY_MALLI` | valinnainen, mallin vaihto ilman koodimuutosta (oletus koodissa) | `api/aly.js`, `api/aly-nightly.js`, `api/laituri-add.js` |
+| `VAPID_PUBLIC_KEY` / `VAPID_PRIVATE_KEY` / `VAPID_SUBJECT` | web-push-allekirjoitus | `api/push-test.js`, `api/muistutukset-laheta.js` |
+| `MUISTUTUKSET_CRON_SECRET` | jaettu salaisuus cron-endpointtien suojaukseen (URL-parametrina) — SAMA arvo myös GitHub-reposecrettinä ja cron-job.orgin kutsu-URL:issa | `api/muistutukset-laheta.js`, `api/caldav-sync.js`, `api/aly-nightly.js` |
+| `ICLOUD_USERNAME` / `ICLOUD_APP_PASSWORD` | Katrin iCloud CalDAV-tunnus (sovelluskohtainen salasana, EI oikea iCloud-salasana) | `api/caldav-sync.js` |
+| `ICLOUD_USERNAME_JUHA` / `ICLOUD_APP_PASSWORD_JUHA` | sama, Juhan tili | `api/caldav-sync.js` |
+| `ITSLEARNING_ICS_KATRI` / `LUKKARIKONE_ICS_KATRI` | opiskelukalentereiden .ics-linkit (token URL:ssa, siksi ympäristömuuttujina eikä `kalenteri_syotteet`-taulun rivinä) | `api/caldav-sync.js` |
+
+Lisäksi: **cron-job.org** (ulkoinen ilmaispalvelu, ei Vercel-muuttuja) on ENSISIJAINEN laukaisija kolmelle cron-endpointille, GitHub Actions on varalaukaisija — molempien tilaa ja lokeja pääsee tarkistamaan omilta dashboardeiltaan jos ajastettu työ vaikuttaa lakanneen toimimasta (ks. "GitHub Actions -ajastin" -osio yllä).
+
+**Miten projekti ajetaan lokaalisti:** koska ei ole build-askelta, staattiset tiedostot (`index.html`/`script.js`/`style.css`) toimivat sellaisenaan miltä tahansa staattiselta palvelimelta (esim. `python3 -m http.server` tai `npx serve`) — mutta Supabase-kirjautuminen (Google OAuth) vaatii että käytetty osoite on lisätty Supabasen Auth-asetusten "Redirect URLs" -listaan, muuten kirjautuminen ohjautuu väärään paikkaan (ks. muistiinpanot.md, tunnettu sudenkuoppa: `localhost:3000`-osoite ei toiminut ilman tätä). `api/`-serverless-funktioiden ajamiseen lokaalisti käytä `vercel dev` (lukee `.env`-tiedoston tai kysyy Vercel-projektin ympäristömuuttujat) — pelkkä staattinen palvelin EI aja `api/*.js`-tiedostoja.
+
+### Seuraavat askeleet / keskeneräiset asiat
+
+**Aikataulu (kirjattu 2026-07-08, Katrin oma priorisointi):** 21.–22.7.2026 rauhoitetaan KOKONAAN uusilta ominaisuuksilta — vain koko testauslistan läpikäynti molemmilla tileillä (Katri + Juha) + turvasiivous (Anthropic Console -API-avainten tarkistus). **23.7.2026 kehityskone palautuu ja Copilot ottaa jatkokehityksen** — tämä COPILOT.md-tiedosto on kirjoitettu juuri tätä siirtymää varten.
+
+**Työn alla Claude Coden viimeisillä päivillä (19.–20.7.2026):**
+- Neljäs ja viimeinen muistutuslaji, **Toistuva muistutus**, valmistui juuri (ks. muistiinpanot.md "Toistuva muistutus" -osio + KONSEPTIKIRJA.md 4.8) — kaikki neljä muistutuslajia (kertaluontoinen/valmistaudu/sinnikäs/toistuva) ovat nyt rakennettu, mutta EI YHTÄÄN niistä ole testattu oikealla cron-ajolla/oikealla laitteella pidemmän ajan yli — tämä on ISOIN yksittäinen aukko testauslistalla ennen 23.7.
+- Neljä auditointia (idempotenssi/toisto, riippuvuudet/rajat, aikakäsittely, XSS/renderöinti) on tehty ja korjattu — konsistenssi-auditointi (KONSEPTIKIRJA.md mainitsee tämän "tehdään viimeisenä ennen luovutusta") on VIELÄ TEKEMÄTTÄ 21.-22.7. rauhoitetun jakson aikana.
+
+**Suunniteltu mutta EI VIELÄ toteutettu (täydet speksit KONSEPTIKIRJA.md OSA 4:ssä, rakennusjärjestys per konsepti on jo mietitty valmiiksi):**
+- 4.1 Ruoka-moduuli (Juhan moduuli, konsepti ~95 % valmis)
+- 4.2 Päivän askel (Juhan oma toiminnanohjaus)
+- 4.3 Tiivistä sovitut / purkusanelu
+- 4.4 Kalenterin kerrosarkkitehtuurin jatkot
+- 4.5 Siirtymäkerros
+- 4.6 Herätyspäivä + Horisontti + Kalenterisilta (kalenterisilta on osittain jo rakennettu, ks. muistiinpanot.md)
+- 4.7 Yksi luukko — Laituri Sirin sisääntulona (osittain jo rakennettu, äly-lajittelu erä 1 valmis)
+- 4.9 Wilma-poiminta
+- 4.10 Laiturin luode + arkisto (kerros 3, arkisto, on jo rakennettu — kerrokset 1-2 puuttuvat)
+
+**HUOMIO — spesifikaatio joka EI VIELÄ ole kirjattu KONSEPTIKIRJA.md:hen tai muistiinpanot.md:hen:** Katri antoi 2026-07-20 Claude Codelle laajan rakennuspyynnön KONSEPTIKIRJA.md 4.10:n jatkoksi — kolme osaa: (A) **Murun säie** (jatkoriveillä varustettu muru, "kesken jäänyt keskustelu" -muisti, herätyspäivä olemassa olevalla `visible_from`-koneistolla), (B) **Vahdittu lepo Varastossa** (uusi sivutyyppi jolla on aikaraja — jos rivi on yhä kuittaamatta X ajan kuluttua, nousee ankkuriehdokkaaksi), (C) **Keskusteluteemat Varastoon** (jaettu LUETTAVA-teemasivu jolle voi siirtää muruja säikeineen). Pyyntö tuli jonoon EKSPLISIITTISESTI vasta Toistuvan muistutuksen jälkeen, eikä sitä ollut ehditty kirjata KONSEPTIKIRJA.md:hen ennen tämän COPILOT.md-lisäyksen kirjoitushetkeä — **jos tätä työtä ei ole vielä aloitettu kun luet tätä, tarkista ensin muistiinpanot.md:n tuorein Muutosloki-merkintä onko spesifikaatio siirretty sinne, ja jos ei, kysy Katrilta täyttä kuvausta ennen rakentamista** (spesifikaatio on tällä hetkellä olemassa vain Claude Coden keskusteluhistoriassa, ei missään tiedostossa).
