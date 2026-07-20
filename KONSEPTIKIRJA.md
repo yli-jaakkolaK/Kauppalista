@@ -291,7 +291,7 @@ Koulun Wilma-viestit ovat perheen suurin yksittäinen "asioita hukkuu" -lähde. 
 
 **TASO 1 (murun säie + herätys) RAKENNETTU 2026-07-20/21** — täysi tekninen kuvaus muistiinpanot.md:n "Murun säie" -osiossa, ei toisteta tässä. Lyhyesti: jatkorivit murulle (⋯ → "🧵 Jatka säiettä"), valinnainen herätyspäivä olemassa olevalla `visible_from`-koneistolla, äly lukee säikeen viimeisintä riviä tilana. `sql/079`+`080`, `laituri_jatkorivit`-taulu.
 
-**TASO 2 — EI VIELÄ RAKENNETTU, täysi speksi Katrin omin sanoin (kirjattu sanatarkasti ettei mitään katoa):**
+**TASO 2 RAKENNETTU 2026-07-21** (yön yli -erä, kaikki 2a-2e + kohta 1:n luote-peruste) — täysi tekninen kuvaus muistiinpanot.md:n "Laiturin luote + Keskusteluteema + Vahdittu lepo" -osiossa, ei toisteta tässä. EI TESTATTU oikealla ajalla/cronilla/kahdella tilillä (ks. muistiinpanot.md "☀️ HERÄTESSÄSI LUE TÄMÄ ENSIN"). Alkuperäinen speksi säilytetty alla sellaisenaan historiallisena viitteenä siitä mitä pyydettiin:
 
 Arvoperiaate joka koskee KAIKKEA alla olevaa: *"Satama tukee vanhempien muistia — ei rakenna profiilia lapsesta."* Ei koskaan luonnearvio-/diagnoosikenttiä millekään teemalle/säikeelle.
 
