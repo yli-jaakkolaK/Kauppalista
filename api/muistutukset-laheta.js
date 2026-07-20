@@ -7,24 +7,129 @@
 // välein — tarkkuus ±5 min on hyväksytty reunaehto (ks. muistiinpanot.md
 // "Muistutukset"-osio).
 //
-// Kaksi muistutuslajia (2026-07-19, ks. muistiinpanot.md "Sinnikäs muistutus"):
-// (1) kertaluontoinen (persistent=false, oletus): sama kuin ennen — lähtee
-//     KERRAN kun remind_at <= nyt, sent_at merkitään heti.
+// Neljä muistutuslajia (ks. muistiinpanot.md "Sinnikäs muistutus" ja
+// "Toistuva muistutus"):
+// (1) kertaluontoinen (oletus): lähtee KERRAN kun remind_at <= nyt, sent_at
+//     merkitään heti.
 // (2) sinnikäs/"tärähdyssarja" (persistent=true): remind_at on KOHDEHETKI,
-//     ei ensimmäisen lähetyksen aika — tärähdykset lähtevät
-//     window_minutes/frequency-minuutin välein alkaen (remind_at -
-//     window_minutes) asti (remind_at - askel). sent_at pysyy NULLINA koko
-//     sarjan ajan (rivi näkyy yhä aktiivisena muistutuspaneelissa),
-//     sent_count laskee lähetetyt tärähdykset. Sarja PÄÄTTYY (sent_at
-//     asetetaan) kun KUKA TAHANSA näistä toteutuu: käyttäjä kuittasi
-//     (acked_at), kaikki tärähdykset lähetetty, TAI kohdehetki (remind_at)
-//     on ohitettu — viimeinen takaa ettei sarja koskaan hakkaa ikuisesti.
+//     tärähdykset lähtevät window_minutes/frequency-minuutin välein ennen
+//     sitä. sent_at pysyy NULLINA koko sarjan ajan, sent_count laskee
+//     lähetetyt. Kuittaus (acked_at) TAI kohdehetken ohitus TAI kaikki
+//     tärähdykset lähetetty päättää sarjan.
+// (3) toistuva (recurring=true): YKSI rivi edustaa loputonta SÄÄNTÖÄ, ei
+//     yhtä kertaa. remind_at on SEURAAVAN laukaisun ajankohta — kun se
+//     erääntyy, muistutus lähtee JA remind_at päivitetään ATOMISESTI
+//     seuraavaan lasketun säännön mukaan (recurrence_type: 'weekday'
+//     [weekdays int[] ISO 1=ma..7=su + time_of_day] tai 'interval'
+//     [interval_n × interval_unit + time_of_day]). sent_at pysyy NULLINA
+//     IKUISESTI niin kauan kuin sääntö on aktiivinen — TÄRKEÄ ERO
+//     sinnikkääseen: kuittaus (jos sellainen joskus rakennetaan) koskisi
+//     VAIN yhtä kertaa, ei koskaan pysäytä sääntöä — tässä erässä ei ole
+//     edes erillistä kuittaus-UI:ta, koska rivi etenee seuraavaan kertaan
+//     AINA automaattisesti heti lähetyksen jälkeen riippumatta mistään
+//     käyttäjän teosta (ks. testitapaus "kuittaamaton kerta ei estä
+//     seuraavaa"). Sääntö päättyy VAIN poistamalla rivi (×) tai `ends_at`
+//     -päivän umpeutuessa. DST-turvallinen: kaikki päivä/viikko/kuukausi/
+//     vuosi-laskenta tehdään Europe/Helsinki-seinäkellonajan komponenteilla
+//     (ei UTC-millisekunteina), ks. helsinkiWallClockToUtc()/isoDate()-oppi
+//     5b83ed9:stä — "joka päivä klo 8" pysyy klo 8:ssa DST-siirtymän ylikin.
+//     Yhteispeli valmistautumisvaiheen (parent_id) kanssa: kun toistuva
+//     rivi etenee, sen mahdollisen valmistautumis-lapsen remind_at siirtyy
+//     SAMALLA suhteellisella etäisyydellä ja sent_at nollataan — "jokainen
+//     kerta saa esitönäisyn". Yhteispeli SINNIKKÄÄN kanssa EI ole tuettu
+//     tässä erässä (tietoinen rajaus, ks. muistiinpanot.md) — UI estää
+//     molempien valinnan yhtä aikaa.
 //
 // Vaatii Vercelin ympäristömuuttujat:
 //   SUPABASE_SERVICE_KEY, VAPID_PUBLIC_KEY/VAPID_PRIVATE_KEY/VAPID_SUBJECT
 //   (samat kuin api/push-test.js:ssä) + MUISTUTUKSET_CRON_SECRET
 
 const webpush = require('web-push');
+
+// --- Aikavyöhykeapurit toistuvien muistutusten laskentaan (2026-07-19,
+// ks. muistiinpanot.md "Toistuva muistutus") — Vercel ajaa funktiot UTC:ssa,
+// joten kaikki "seuraava kerta" -laskenta pitää tehdä Helsingin
+// seinäkellonajan komponenteilla, ei raa'alla UTC-millisekuntiaritmetiikalla
+// (muuten "joka päivä klo 8" siirtyisi DST-siirtymän yli, sama bugiluokka
+// kuin isoDate()-korjauksessa 5b83ed9). ---
+
+// UTC-hetki -> Helsingin seinäkellonajan komponentit.
+function helsinkiParts(date) {
+  const osat = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'Europe/Helsinki', hour12: false,
+    year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit',
+  }).formatToParts(date).reduce(function(acc, o) { acc[o.type] = o.value; return acc; }, {});
+  return {
+    year: parseInt(osat.year, 10),
+    month: parseInt(osat.month, 10),
+    day: parseInt(osat.day, 10),
+    hour: osat.hour === '24' ? 0 : parseInt(osat.hour, 10),
+    minute: parseInt(osat.minute, 10),
+  };
+}
+
+// Helsingin seinäkellonajan komponentit -> todellinen UTC-hetki. Kahden
+// kierroksen temppu: rakenna ALUSTAVA arvaus (komponentit sellaisenaan
+// UTC:na), katso Intl:llä mitä kellonaikaa se arvaus OIKEASTI näyttäisi
+// Helsingissä, ja korjaa erotuksella — riittää yksi kierros koska Helsingin
+// poikkeama UTC:sta on aina täysiä tunteja (+2/+3), ei koskaan puolikkaita.
+function helsinkiWallClockToUtc(year, month, day, hour, minute) {
+  const arvaus = new Date(Date.UTC(year, month - 1, day, hour, minute, 0));
+  const osat = helsinkiParts(arvaus);
+  const arvausUtcNa = Date.UTC(osat.year, osat.month - 1, osat.day, osat.hour, osat.minute, 0);
+  const erotus = arvaus.getTime() - arvausUtcNa;
+  return new Date(arvaus.getTime() + erotus);
+}
+
+// ISO-viikonpäivä (1=maanantai .. 7=sunnuntai) annetulle Y/M/D-kolmikolle.
+function isoViikonpaiva(year, month, day) {
+  const jsPaiva = new Date(Date.UTC(year, month - 1, day)).getUTCDay(); // 0=su..6=la
+  return jsPaiva === 0 ? 7 : jsPaiva;
+}
+
+// Laskee toistuvan säännön SEURAAVAN laukaisuhetken (todellinen UTC-hetki)
+// annetun edellisen laukaisuhetken jälkeen. Palauttaa null jos sääntö on
+// rakenteellisesti virheellinen (ei koskaan pitäisi tapahtua UI:n kautta
+// luoduille riveille, mutta cron ei saa kaatua siihen jos näin käy).
+function laskeSeuraavaToisto(rule, edellinenHetki) {
+  if (rule.recurrence_type === 'weekday') {
+    if (!Array.isArray(rule.weekdays) || rule.weekdays.length === 0 || !rule.time_of_day) return null;
+    const aikaOsat = rule.time_of_day.split(':').map(function(s) { return parseInt(s, 10); });
+    const edellinen = helsinkiParts(edellinenHetki);
+    for (let lisays = 1; lisays <= 7; lisays++) {
+      const ehdokasUtcNa = new Date(Date.UTC(edellinen.year, edellinen.month - 1, edellinen.day + lisays));
+      const ehdokasViikonpaiva = isoViikonpaiva(ehdokasUtcNa.getUTCFullYear(), ehdokasUtcNa.getUTCMonth() + 1, ehdokasUtcNa.getUTCDate());
+      if (rule.weekdays.indexOf(ehdokasViikonpaiva) !== -1) {
+        return helsinkiWallClockToUtc(ehdokasUtcNa.getUTCFullYear(), ehdokasUtcNa.getUTCMonth() + 1, ehdokasUtcNa.getUTCDate(), aikaOsat[0], aikaOsat[1]);
+      }
+    }
+    return null;
+  }
+
+  if (rule.recurrence_type === 'interval') {
+    const n = rule.interval_n;
+    if (!n || n <= 0) return null;
+    if (rule.interval_unit === 'hour') {
+      return new Date(edellinenHetki.getTime() + n * 3600000);
+    }
+    if (!rule.time_of_day) return null;
+    const aikaOsat = rule.time_of_day.split(':').map(function(s) { return parseInt(s, 10); });
+    const edellinen = helsinkiParts(edellinenHetki);
+    let y = edellinen.year, m = edellinen.month, d = edellinen.day;
+    if (rule.interval_unit === 'day') d += n;
+    else if (rule.interval_unit === 'week') d += n * 7;
+    else if (rule.interval_unit === 'month') m += n;
+    else if (rule.interval_unit === 'year') y += n;
+    else return null;
+    // Date.UTC normalisoi ylivuodon (esim. päivä 35 -> seuraava kuukausi)
+    // automaattisesti — luetaan normalisoidut komponentit takaisin ennen
+    // Helsinki-muunnosta.
+    const normalisoitu = new Date(Date.UTC(y, m - 1, d));
+    return helsinkiWallClockToUtc(normalisoitu.getUTCFullYear(), normalisoitu.getUTCMonth() + 1, normalisoitu.getUTCDate(), aikaOsat[0], aikaOsat[1]);
+  }
+
+  return null;
+}
 
 const SUPABASE_URL = 'https://uctmxxeewoeydabuepye.supabase.co';
 const SUPABASE_KEY = process.env.SUPABASE_SERVICE_KEY;
@@ -152,11 +257,112 @@ module.exports = async function handler(req, res) {
     }
   }
 
+  // Palauttaa toistuvan muistutuksen remind_at:n takaisin edelliseen arvoon
+  // — käytetään kun tämän kerran claim otettiin mutta lähetys sittenkin
+  // epäonnistui kokonaan, jotta seuraava ajo yrittää SAMAA kertaa uudelleen
+  // sen sijaan että hyppäisi jo seuraavaan laskettuun ajankohtaan.
+  async function palautaRemindAt(id, vanhaArvo) {
+    const res = await supabaseFetch('muistutukset?id=eq.' + id, {
+      method: 'PATCH',
+      headers: { Prefer: 'return=minimal' },
+      body: JSON.stringify({ remind_at: vanhaArvo }),
+    });
+    if (!res.ok) {
+      console.error('[muistutukset-laheta] id=' + id + ': remind_at-palautus epäonnistui epäonnistuneen toistokerran jälkeen.');
+    }
+  }
+
+  // Päättää toistuvan säännön kokonaan (sent_at) — kutsutaan kun ends_at on
+  // ohitettu tai sääntö on rakenteellisesti virheellinen. Sama
+  // compare-and-swap-periaate kuin muuallakin: odotettu remind_at-arvo
+  // suodattimessa varmistaa ettei kaksi rinnakkaista ajoa päätä samaa
+  // riviä kahdesti eikä ohita toisen jo tekemää edistystä.
+  async function paataToistuva(id, odotettuRemindAt) {
+    const res = await supabaseFetch('muistutukset?id=eq.' + id + '&remind_at=eq.' + encodeURIComponent(odotettuRemindAt), {
+      method: 'PATCH',
+      headers: { Prefer: 'return=minimal' },
+      body: JSON.stringify({ sent_at: new Date().toISOString() }),
+    });
+    if (!res.ok) {
+      console.error('[muistutukset-laheta] id=' + id + ': toistuvan säännön päättäminen epäonnistui:', res.status);
+    }
+  }
+
   let lahetetty = 0;
   let jatetaanYrittamaan = 0;
   let tarkistettu = 0;
 
   for (const muistutus of kaikki) {
+    if (muistutus.recurring) {
+      const remindAtMs = new Date(muistutus.remind_at).getTime();
+      if (remindAtMs > nytMs) continue; // ei vielä due
+
+      // "Loppuu"-tarkistus ENNEN lähetystä — jos tämä erääntynyt kerta on
+      // jo eräpäivän jälkeen, sääntö päätetään kokonaan eikä lähetetä
+      // tätäkään enää.
+      if (muistutus.ends_at && remindAtMs > new Date(muistutus.ends_at).getTime()) {
+        await paataToistuva(muistutus.id, muistutus.remind_at);
+        continue;
+      }
+
+      tarkistettu++;
+
+      const uusiRemindAt = laskeSeuraavaToisto(muistutus, new Date(muistutus.remind_at));
+      if (!uusiRemindAt) {
+        console.error('[muistutukset-laheta] id=' + muistutus.id + ': seuraavan toistokerran laskenta epäonnistui (virheellinen sääntö?) — sääntö päätetään.');
+        await paataToistuva(muistutus.id, muistutus.remind_at);
+        continue;
+      }
+
+      // Atominen claim: compare-and-swap remind_at:lla itsellään (versioitu
+      // kenttä) — sama periaate kuin sinnikkään sent_count-CAS, vain eri
+      // sarake, koska toistuvalla ei ole erillistä per-kerta-laskuria (yksi
+      // rivi edustaa koko loputonta sääntöä, ei yhtä kertaa).
+      const claimRes = await supabaseFetch('muistutukset?id=eq.' + muistutus.id + '&remind_at=eq.' + encodeURIComponent(muistutus.remind_at), {
+        method: 'PATCH',
+        headers: { Prefer: 'return=representation' },
+        body: JSON.stringify({ remind_at: uusiRemindAt.toISOString() }),
+      });
+      const claimatut = claimRes.ok ? await claimRes.json() : [];
+      if (!Array.isArray(claimatut) || claimatut.length === 0) continue; // toinen ajo ehti jo
+
+      try {
+        const { joku, eiRetryttavaa } = await sendPushToOwner(muistutus, '🔁 ' + muistutus.content);
+        if (!joku && !eiRetryttavaa) {
+          jatetaanYrittamaan++;
+          await palautaRemindAt(muistutus.id, muistutus.remind_at);
+          console.error('[muistutukset-laheta] id=' + muistutus.id + ': toistuva kerta EI lähtenyt yhteenkään tilaukseen — jätetään uudelleenyritettäväksi (remind_at palautettu).');
+          continue;
+        }
+        if (joku) lahetetty++;
+
+        // Valmistautumisvaihe + toistuva -yhteispeli (ks. muistiinpanot.md
+        // "Toistuva muistutus"): jos tällä rivillä on valmistautumis-lapsi
+        // (parent_id), sen remind_at siirretään SAMALLA suhteellisella
+        // etäisyydellä uuteen kohdehetkeen ja sent_at nollataan — "jokainen
+        // kerta saa esitönäisyn". Etäisyys (prep-minuutit) JOHDETAAN
+        // olemassa olevasta erotuksesta, ei tallenneta erikseen.
+        const lapsetRes = await supabaseFetch('muistutukset?select=*&parent_id=eq.' + muistutus.id);
+        const lapset = (await lapsetRes.json()) || [];
+        for (const lapsi of lapset) {
+          const etaisyysMs = remindAtMs - new Date(lapsi.remind_at).getTime();
+          const uusiLapsenHetki = new Date(uusiRemindAt.getTime() - etaisyysMs);
+          const lapsiRes = await supabaseFetch('muistutukset?id=eq.' + lapsi.id, {
+            method: 'PATCH',
+            headers: { Prefer: 'return=minimal' },
+            body: JSON.stringify({ remind_at: uusiLapsenHetki.toISOString(), sent_at: null }),
+          });
+          if (!lapsiRes.ok) {
+            console.error('[muistutukset-laheta] id=' + lapsi.id + ': toistuvan valmistautumis-lapsen siirto epäonnistui.');
+          }
+        }
+      } catch (e) {
+        console.error('[muistutukset-laheta] id=' + muistutus.id + ': odottamaton virhe toistuvan kerran käsittelyssä, palautetaan remind_at:', e.message);
+        await palautaRemindAt(muistutus.id, muistutus.remind_at);
+      }
+      continue;
+    }
+
     if (!muistutus.persistent) {
       // Kertaluontoinen — TÄYSIN ENNALLAAN (regressio: 2026-07-19 lisäys ei
       // saa muuttaa tätä polkua millään tavalla, ks. testitapaus 3).

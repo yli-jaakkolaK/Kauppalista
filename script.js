@@ -5138,6 +5138,17 @@ document.getElementById('kuormaraja-input').addEventListener('change', async fun
   taytaRulla('muistutus-paivaa', 14, 0);
   taytaRulla('muistutus-tuntia', 23, 0);
   taytaRulla('muistutus-minuuttia', 59, 15);
+
+  // Toistuva muistutus (2026-07-19) — "Joka N" -rulla alkaa 1:stä (taytaRulla
+  // alkaa aina 0:sta, "joka 0." ei ole mielekäs), siksi oma pieni silmukka.
+  const toistuvaN = document.getElementById('muistutus-toistuva-n');
+  for (let i = 1; i <= 30; i++) {
+    const optio = document.createElement('option');
+    optio.value = i;
+    optio.textContent = i;
+    if (i === 3) optio.selected = true;
+    toistuvaN.appendChild(optio);
+  }
 })();
 
 document.getElementById('muistutus-lisaa-btn').addEventListener('click', function() {
@@ -5185,6 +5196,42 @@ document.getElementById('muistutus-valmistaudu-check').addEventListener('change'
 document.getElementById('muistutus-sinnikas-check').addEventListener('change', function(e) {
   document.getElementById('muistutus-sinnikas-ikkuna').disabled = !e.target.checked;
   document.getElementById('muistutus-sinnikas-tiheys').disabled = !e.target.checked;
+});
+
+// Toistuva muistutus (2026-07-19, ks. muistiinpanot.md "Toistuva muistutus")
+// — täppä vaihtaa koko lomakkeen muodon: #muistutus-normaali-osiot (Pika/
+// Kellonaika-välilehdet + Sinnikäs-rivi) piiloon, oma lomake tilalle. Koska
+// Sinnikäs-täppä asuu normaali-osioiden SISÄLLÄ, sen piilottaminen riittää
+// estämään toistuva+sinnikäs-yhdistelmän (tietoinen rajaus tässä erässä) —
+// ei tarvita erillistä poissulkevaa disable-logiikkaa.
+document.getElementById('muistutus-toistuva-check').addEventListener('change', function(e) {
+  const toistuva = e.target.checked;
+  document.getElementById('muistutus-normaali-osiot').style.display = toistuva ? 'none' : 'block';
+  document.getElementById('muistutus-toistuva-lomake').style.display = toistuva ? 'block' : 'none';
+});
+
+document.querySelectorAll('.muistutus-toistuva-tyyppi-btn').forEach(function(btn) {
+  btn.addEventListener('click', function() {
+    document.querySelectorAll('.muistutus-toistuva-tyyppi-btn').forEach(function(b) { b.classList.toggle('active', b === btn); });
+    document.getElementById('muistutus-toistuva-viikonpaivat').style.display = btn.dataset.tyyppi === 'weekday' ? 'block' : 'none';
+    document.getElementById('muistutus-toistuva-intervalli').style.display = btn.dataset.tyyppi === 'interval' ? 'block' : 'none';
+  });
+});
+
+document.querySelectorAll('.muistutus-viikonpaiva-btn').forEach(function(btn) {
+  btn.addEventListener('click', function() {
+    btn.classList.toggle('active');
+  });
+});
+
+// Tunti-intervallilla ei ole erillistä kellonaikaa (spec: "tunti-intervallilla
+// ei erillistä kellonaikaa") — se on puhdas kesto, ei kalenterihetki.
+document.getElementById('muistutus-toistuva-yksikko').addEventListener('change', function(e) {
+  document.getElementById('muistutus-toistuva-intervalli-aika-rivi').style.display = e.target.value === 'hour' ? 'none' : 'flex';
+});
+
+document.getElementById('muistutus-toistuva-loppuu-check').addEventListener('change', function(e) {
+  document.getElementById('muistutus-toistuva-loppuu-pvm').disabled = !e.target.checked;
 });
 
 // Pikanapit säilyttävät jo asetetun kellonajan (jos käyttäjä on jo pyörittänyt
@@ -5567,6 +5614,25 @@ async function avaaMuistutusPaneeli(source, sourceRef, content, eventDate, event
   document.getElementById('muistutus-sinnikas-ikkuna').disabled = true;
   document.getElementById('muistutus-sinnikas-tiheys').disabled = true;
 
+  // Toistuva muistutus (2026-07-19): sama "EI oletuksena päällä" -periaate,
+  // palautuu kokonaan alkutilaansa joka avauksella (viikonpäivä-tyyppi,
+  // ei valittuja päiviä, klo 08:00, joka 3. päivä, ei loppumispäivää).
+  document.getElementById('muistutus-toistuva-check').checked = false;
+  document.getElementById('muistutus-normaali-osiot').style.display = 'block';
+  document.getElementById('muistutus-toistuva-lomake').style.display = 'none';
+  document.querySelectorAll('.muistutus-viikonpaiva-btn').forEach(function(b) { b.classList.remove('active'); });
+  document.querySelectorAll('.muistutus-toistuva-tyyppi-btn').forEach(function(b) { b.classList.toggle('active', b.dataset.tyyppi === 'weekday'); });
+  document.getElementById('muistutus-toistuva-viikonpaivat').style.display = 'block';
+  document.getElementById('muistutus-toistuva-intervalli').style.display = 'none';
+  document.getElementById('muistutus-toistuva-viikko-aika').value = '08:00';
+  document.getElementById('muistutus-toistuva-intervalli-aika').value = '08:00';
+  document.getElementById('muistutus-toistuva-intervalli-aika-rivi').style.display = 'flex';
+  document.getElementById('muistutus-toistuva-n').value = '3';
+  document.getElementById('muistutus-toistuva-yksikko').value = 'day';
+  document.getElementById('muistutus-toistuva-loppuu-check').checked = false;
+  document.getElementById('muistutus-toistuva-loppuu-pvm').disabled = true;
+  document.getElementById('muistutus-toistuva-loppuu-pvm').value = '';
+
   await paivitaMuistutusLista();
   document.getElementById('muistutus-overlay').style.display = 'flex';
 }
@@ -5582,6 +5648,26 @@ function suljeMuistutusPaneeli() {
 // sisältö+aika) — sama merkkijono kirjoitetaan INSERTissä (lisaaMuistutus)
 // ja luetaan täällä NÄYTTÖÄ varten, pidä nämä synkassa jos joskus muuttuu.
 const VALMISTAUDU_ETULIITE = '🎒 Valmistaudu: ';
+
+// Toistuva muistutus (2026-07-19, ks. muistiinpanot.md "Toistuva muistutus")
+// — mini-listan kuvausteksti säännölle ("ti+to klo 08:00" / "joka 3. päivä
+// klo 18:00"), sama kuvausmuoto käytetään vain näyttöön, ei tallenteta.
+const VIIKONPAIVA_LYHENNE = { 1: 'ma', 2: 'ti', 3: 'ke', 4: 'to', 5: 'pe', 6: 'la', 7: 'su' };
+const TOISTUVA_YKSIKKO_NIMI = { hour: 'tunnin', day: 'päivän', week: 'viikon', month: 'kuukauden', year: 'vuoden' };
+
+function muotoileToistuvaKuvaus(m) {
+  if (m.recurrence_type === 'weekday') {
+    const paivat = (m.weekdays || []).slice().sort(function(a, b) { return a - b; })
+      .map(function(pv) { return VIIKONPAIVA_LYHENNE[pv]; }).join('+');
+    return paivat + ' klo ' + m.time_of_day;
+  }
+  if (m.recurrence_type === 'interval') {
+    const yksikko = TOISTUVA_YKSIKKO_NIMI[m.interval_unit] || m.interval_unit;
+    const aika = m.interval_unit === 'hour' ? '' : (' klo ' + m.time_of_day);
+    return 'joka ' + m.interval_n + '. ' + yksikko + aika;
+  }
+  return 'toistuva';
+}
 
 async function paivitaMuistutusLista() {
   if (!muistutusKohde) return;
@@ -5609,11 +5695,17 @@ async function paivitaMuistutusLista() {
     rivi.className = 'muistutus-rivi';
 
     const teksti = document.createElement('span');
-    const onValmistautumis = m.content.indexOf(VALMISTAUDU_ETULIITE) === 0;
-    // Sinnikäs muistutus (2026-07-19): näyttää tärähdyssarjan etenemisen
-    // ("🔁 2/4") ajan sijaan kun sarja on jo alkanut, muuten kohdehetken.
-    const etuliite = onValmistautumis ? '🎒 ' : (m.persistent ? '🔁 ' + m.sent_count + '/' + m.frequency + ' · ' : '');
-    teksti.textContent = etuliite + muotoileMuistutusAika(m.remind_at);
+    if (m.recurring) {
+      // Toistuva muistutus (2026-07-19): EI kuittaushetkeä näytettävänä
+      // (kuittausta ei ole, rivi elää loputtomiin) — kuvaus + seuraava kerta.
+      teksti.textContent = '🔁 ' + muotoileToistuvaKuvaus(m) + ' · seuraava: ' + muotoileMuistutusAika(m.remind_at);
+    } else {
+      const onValmistautumis = m.content.indexOf(VALMISTAUDU_ETULIITE) === 0;
+      // Sinnikäs muistutus (2026-07-19): näyttää tärähdyssarjan etenemisen
+      // ("🔁 2/4") ajan sijaan kun sarja on jo alkanut, muuten kohdehetken.
+      const etuliite = onValmistautumis ? '🎒 ' : (m.persistent ? '🔁 ' + m.sent_count + '/' + m.frequency + ' · ' : '');
+      teksti.textContent = etuliite + muotoileMuistutusAika(m.remind_at);
+    }
     rivi.appendChild(teksti);
 
     const napit = document.createElement('span');
@@ -5710,6 +5802,127 @@ async function lisaaMuistutus(remindAtDate) {
   naytaIlmoitus(valmistautumisOnnistui
     ? 'Muistutus + valmistautumistönäisy asetettu'
     : (sinnikasPaalla ? 'Sinnikäs muistutus asetettu' : 'Muistutus asetettu'));
+  await paivitaMuistutuksetKartta();
+  await paivitaMuistutusLista();
+  if (muistutusKohde.jalkeenPaivitys) muistutusKohde.jalkeenPaivitys();
+}
+
+// Toistuva muistutus (2026-07-19, ks. muistiinpanot.md "Toistuva muistutus")
+// — ENSIMMÄISEN kerran lasketaan tässä client-puolella tavallisella
+// paikallisella Date-aritmetiikalla (EI wall-clock-to-UTC-temppua, joka on
+// vain palvelinpuolen api/muistutukset-laheta.js:ssä tarpeen koska Vercel
+// ajaa UTC:ssa — selain pyörii jo käyttäjän omassa Helsinki-ajassa, ks.
+// aiempi aikakäsittely-auditti). Kaikki SEURAAVAT kerrat laskee cron.
+function ensimmainenViikonpaivaHetki(valitutPaivat, aikaStr) {
+  const aikaOsat = aikaStr.split(':').map(function(s) { return parseInt(s, 10); });
+  const nyt = new Date();
+  for (let lisays = 0; lisays <= 7; lisays++) {
+    const ehdokas = new Date(nyt.getFullYear(), nyt.getMonth(), nyt.getDate() + lisays, aikaOsat[0], aikaOsat[1], 0, 0);
+    const isoPaiva = ehdokas.getDay() === 0 ? 7 : ehdokas.getDay();
+    if (valitutPaivat.indexOf(isoPaiva) !== -1 && ehdokas.getTime() > nyt.getTime()) {
+      return ehdokas;
+    }
+  }
+  return new Date(nyt.getTime() + 7 * 86400000);
+}
+
+function ensimmainenIntervalliHetki(n, yksikko, aikaStr) {
+  const nyt = new Date();
+  if (yksikko === 'hour') {
+    return new Date(nyt.getTime() + n * 3600000);
+  }
+  const aikaOsat = aikaStr.split(':').map(function(s) { return parseInt(s, 10); });
+  const tanaan = new Date(nyt.getFullYear(), nyt.getMonth(), nyt.getDate(), aikaOsat[0], aikaOsat[1], 0, 0);
+  if (tanaan.getTime() > nyt.getTime()) return tanaan;
+  const seuraava = new Date(tanaan);
+  if (yksikko === 'day') seuraava.setDate(seuraava.getDate() + n);
+  else if (yksikko === 'week') seuraava.setDate(seuraava.getDate() + n * 7);
+  else if (yksikko === 'month') seuraava.setMonth(seuraava.getMonth() + n);
+  else if (yksikko === 'year') seuraava.setFullYear(seuraava.getFullYear() + n);
+  return seuraava;
+}
+
+document.getElementById('muistutus-toistuva-aseta-btn').addEventListener('click', function() {
+  lisaaToistuvaMuistutus();
+});
+
+async function lisaaToistuvaMuistutus() {
+  if (!muistutusKohde) return;
+
+  const tyyppi = document.querySelector('.muistutus-toistuva-tyyppi-btn.active').dataset.tyyppi;
+  const rivi = {
+    user_id: currentUserId,
+    source: muistutusKohde.source,
+    source_ref: muistutusKohde.sourceRef,
+    content: muistutusKohde.content,
+    recurring: true,
+    recurrence_type: tyyppi,
+  };
+  let ensimmainenHetki;
+
+  if (tyyppi === 'weekday') {
+    const valitutPaivat = Array.from(document.querySelectorAll('.muistutus-viikonpaiva-btn.active'))
+      .map(function(b) { return parseInt(b.dataset.pv, 10); });
+    if (valitutPaivat.length === 0) {
+      naytaIlmoitus('Valitse ainakin yksi viikonpäivä');
+      return;
+    }
+    const aika = document.getElementById('muistutus-toistuva-viikko-aika').value || '08:00';
+    rivi.weekdays = valitutPaivat;
+    rivi.time_of_day = aika;
+    ensimmainenHetki = ensimmainenViikonpaivaHetki(valitutPaivat, aika);
+  } else {
+    const n = parseInt(document.getElementById('muistutus-toistuva-n').value, 10) || 1;
+    const yksikko = document.getElementById('muistutus-toistuva-yksikko').value;
+    rivi.interval_n = n;
+    rivi.interval_unit = yksikko;
+    if (yksikko !== 'hour') {
+      rivi.time_of_day = document.getElementById('muistutus-toistuva-intervalli-aika').value || '08:00';
+    }
+    ensimmainenHetki = ensimmainenIntervalliHetki(n, yksikko, rivi.time_of_day);
+  }
+
+  const loppuuCheck = document.getElementById('muistutus-toistuva-loppuu-check');
+  if (loppuuCheck.checked) {
+    const pvm = document.getElementById('muistutus-toistuva-loppuu-pvm').value;
+    if (!pvm) {
+      naytaIlmoitus('Valitse loppumispäivä tai poista "Loppuu"-täppä');
+      return;
+    }
+    rivi.ends_at = new Date(pvm + 'T23:59:59').toISOString();
+  }
+
+  rivi.remind_at = ensimmainenHetki.toISOString();
+
+  const { data: paaMuistutus, error } = await db.from('muistutukset').insert(rivi).select().single();
+  if (error) {
+    console.error('Toistuvan muistutuksen tallennus epäonnistui:', error);
+    naytaIlmoitus('Toistuvan muistutuksen tallennus epäonnistui');
+    return;
+  }
+
+  // Toistuva + Valmistaudu (sallittu yhdistelmä, ks. muistiinpanot.md) —
+  // jokainen kerta saa oman esitönäisyn, ks. api/muistutukset-laheta.js
+  // jossa cron laskee lapsen etäisyyden UUDELLEEN joka kerta parentin
+  // edetessä (etäisyys päätellään, ei talleteta erikseen).
+  const valmistauduCheck = document.getElementById('muistutus-valmistaudu-check');
+  let valmistautumisOnnistui = null;
+  if (valmistauduCheck && valmistauduCheck.checked) {
+    const minuutit = parseInt(document.getElementById('muistutus-valmistaudu-min').value, 10) || 30;
+    const valmistautumisHetki = new Date(ensimmainenHetki.getTime() - minuutit * 60000);
+    const { error: valmistautumisError } = await db.from('muistutukset').insert({
+      user_id: currentUserId,
+      source: muistutusKohde.source,
+      source_ref: muistutusKohde.sourceRef,
+      content: VALMISTAUDU_ETULIITE + muistutusKohde.content,
+      remind_at: valmistautumisHetki.toISOString(),
+      parent_id: paaMuistutus.id,
+    });
+    if (valmistautumisError) console.error('Valmistautumis-tönäisyn tallennus epäonnistui (toistuva):', valmistautumisError);
+    valmistautumisOnnistui = !valmistautumisError;
+  }
+
+  naytaIlmoitus(valmistautumisOnnistui ? 'Toistuva muistutus + valmistautumistönäisy asetettu' : 'Toistuva muistutus asetettu');
   await paivitaMuistutuksetKartta();
   await paivitaMuistutusLista();
   if (muistutusKohde.jalkeenPaivitys) muistutusKohde.jalkeenPaivitys();

@@ -1703,6 +1703,106 @@ h1 {
   width: 100%;
 }
 
+/* Toistuva muistutus (2026-07-19, ks. muistiinpanot.md "Toistuva muistutus")
+   — pääkytkin joka vaihtaa koko lomakkeen muodon, siksi hieman painavampi
+   kuin valmistaudu/sinnikäs-rivit (ei vain valinnainen lisäys vaan koko
+   syöttötavan valinta). */
+.muistutus-toistuva-check-rivi {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 14px;
+  font-weight: bold;
+  color: var(--text);
+  margin: 4px 0 10px;
+}
+
+#muistutus-toistuva-lomake {
+  margin-top: 4px;
+}
+
+.muistutus-viikonpaiva-valinta {
+  display: flex;
+  gap: 4px;
+  margin: 10px 0;
+}
+
+.muistutus-viikonpaiva-btn {
+  flex: 1;
+  font-family: 'Courier New', Courier, monospace;
+  font-size: 12px;
+  background: none;
+  border: 1px dashed var(--border-dash);
+  color: var(--muted);
+  padding: 8px 2px;
+  cursor: pointer;
+  appearance: none;
+  -webkit-appearance: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.muistutus-viikonpaiva-btn.active {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.muistutus-toistuva-aika-rivi {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 10px 0;
+}
+
+.muistutus-toistuva-aika-rivi select,
+.muistutus-toistuva-aika-rivi input[type="time"] {
+  font-family: 'Courier New', Courier, monospace;
+  font-size: 15px;
+  color: var(--text);
+  background: var(--ground);
+  border: 1px solid var(--border-dash);
+  border-radius: 4px;
+  padding: 8px 4px;
+}
+
+.muistutus-toistuva-aika-rivi select#muistutus-toistuva-n {
+  width: 60px;
+}
+
+.muistutus-toistuva-aika-rivi input[type="time"] {
+  flex: 1;
+  min-width: 0;
+}
+
+.muistutus-toistuva-loppu-rivi {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--muted);
+  margin: 10px 0;
+}
+
+.muistutus-toistuva-loppu-rivi input[type="date"] {
+  font-family: 'Courier New', Courier, monospace;
+  font-size: 13px;
+  color: var(--text);
+  background: var(--ground);
+  border: 1px solid var(--border-dash);
+  border-radius: 4px;
+  padding: 4px;
+  flex: 1;
+  min-width: 0;
+}
+
+.muistutus-toistuva-loppu-rivi input[type="date"]:disabled {
+  opacity: 0.4;
+}
+
+#muistutus-toistuva-aseta-btn {
+  width: 100%;
+  margin-top: 4px;
+}
+
 .edit-btn {
   min-width: 52px;
   min-height: 52px;
