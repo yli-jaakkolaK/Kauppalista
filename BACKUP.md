@@ -96,3 +96,11 @@ Jos haluat jommankumman näistä, pyydä erikseen.
 - Varmuuskopiotiedostot EIVÄT mene gittiin (`.gitignore` estää tämän jo) — ne sisältävät oikeaa perheen dataa, ei kuulu versionhallintaan.
 - `SUPABASE_DB_URL` on arkaluontoinen — käytä sitä vain hetkellisesti komentoriviltä, älä tallenna sitä pysyvästi mihinkään tiedostoon.
 - Supabase saattaa myös itse ottaa automaattisia varmuuskopioita riippuen tilaustasosta (Pro-tason projekteilla on usein point-in-time-recovery) — tarkista Project Settings → Database jos haluat tietää onko tämä käytössä. Tämä käsin ajettava kopio on siitä riippumaton lisäturva, ei korvaa sitä eikä ole sen korvaama.
+
+---
+
+## Varmuuskopiohistoria
+
+Loki jokaisesta käsin ajetusta `varmuuskopio.sh`-ajosta: päivämäärä, mitä kopio kattoi, minne tallentui. Uusi rivi jokaisen ajon jälkeen — vanhoja ei muokata.
+
+- **2026-07-20 klo 14:35 — ensimmäinen käsin ajettu varmuuskopio.** Koko Supabase-tietokanta `pg_dump`-muodossa (kaikki 65 taulua sellaisenaan, mukaan lukien Toistuva-muistutus-featuren tuore skeema `sql/077`/`sql/078`:sta — `muistutukset`-taulun `recurring`/`recurrence_type`/`weekdays`/`interval_n`/`interval_unit`/`time_of_day`/`ends_at`-sarakkeet vahvistettu mukana). Tallennuspaikka: iCloud Drive, `~/Library/Mobile Documents/com~apple~CloudDocs/Satama-varmuuskopiot/satama_varmuuskopio_2026-07-20_14-35-13.sql` (472 KB, synkkautuu pilveen automaattisesti). Ensimmäinen kerta kun tämä ohje otettiin oikeasti käyttöön — `pg_dump`/`libpq` asennettiin samalla kertaa tälle koneelle (ks. "Kertaluontoinen asennus" yllä).
