@@ -12,6 +12,14 @@
 // tables/columns (laituri, ankkurit, asetukset, muru content) are
 // referenced as-is.
 //
+// "Murun säie" (2026-07-20/21, ks. muistiinpanot.md "Murun säie") — a note
+// with follow-up thread lines (laituri_jatkorivit, sql/079) is classified
+// using its LATEST thread line as the effective content/written_on instead
+// of the original muru (ks. effectiveContent()/effectiveWrittenAt() below)
+// — "äly lukee säikeen viimeisintä riviä tilana". The original laituri.content
+// itself is NEVER touched by this, only the read-side interpretation used
+// for eligibility/prompt-building.
+//
 // "Hetki vs. ikkuna" (ks. muistiinpanot.md, added 2026-07-16 after the
 // first real night): every hetki/ikkuna match is classified as a single
 // MOMENT ("hetki" — surfaced once, never again once its candidate expires
@@ -321,11 +329,34 @@ module.exports = async function handler(req, res) {
   (await evaluatedRes.json() || []).forEach(function(r) { evaluatedContentById[r.laituri_id] = r.content; });
   const suggestedIds = new Set((await suggestedRes.json() || []).map(function(r) { return Number(r.source_ref); }));
 
+  // Murun säie (2026-07-20/21, ks. muistiinpanot.md "Murun säie"): "äly lukee
+  // säikeen VIIMEISINTÄ riviä tilana" — jos murulla on jatkorivejä, kaikki
+  // luokitteluun/kelpoisuuteen liittyvä käyttää VIIMEISIMMÄN jatkorivin
+  // tekstiä+kirjoitushetkeä alkuperäisen murun sijaan. Alkuperäinen
+  // laituri.content EI muutu missään — turvainvariantti (ei koskaan muokata
+  // olemassa olevaa riviä), tämä on vain LUKUpuolen tulkinta kelpoisuudesta
+  // ja promptin sisällöstä.
+  const latestJatkoByNoteId = {};
+  if (notes.length > 0) {
+    const jatkoRes = await supabaseFetch('laituri_jatkorivit?select=muru_id,teksti,created_at&muru_id=in.(' + notes.map(function(n) { return n.id; }).join(',') + ')&order=created_at.asc');
+    (await jatkoRes.json() || []).forEach(function(jr) {
+      latestJatkoByNoteId[jr.muru_id] = jr; // asc-järjestyksen ansiosta viimeisin voittaa
+    });
+  }
+  function effectiveContent(note) {
+    const jr = latestJatkoByNoteId[note.id];
+    return jr ? jr.teksti : note.content;
+  }
+  function effectiveWrittenAt(note) {
+    const jr = latestJatkoByNoteId[note.id];
+    return jr ? jr.created_at : note.created_at;
+  }
+
   function isEligible(note) {
     if (suggestedIds.has(note.id)) return false;
     const evaluatedContent = evaluatedContentById[note.id];
     if (evaluatedContent === undefined) return true;
-    return evaluatedContent !== note.content;
+    return evaluatedContent !== effectiveContent(note);
   }
 
   const eligibleByAge = notes.filter(isEligible);
@@ -380,7 +411,14 @@ module.exports = async function handler(req, res) {
   for (const userId of Object.keys(byUser)) {
     const userNotes = byUser[userId];
     usersChecked++;
-    const result = await callClaude(buildClassifyPrompt(userNotes), userId);
+    // Murun säie: prompti saa jokaiselle murulle sen EFEKTIIVISEN sisällön
+    // (viimeisin jatkorivi jos sellainen on) ja SEN kirjoitushetken — id säilyy
+    // alkuperäisen laituri-rivin id:nä, joten matches[].id-täsmäys (rawMatch,
+    // ks. alla) toimii muuttumattomana.
+    const promptNotes = userNotes.map(function(n) {
+      return { id: n.id, content: effectiveContent(n), created_at: effectiveWrittenAt(n) };
+    });
+    const result = await callClaude(buildClassifyPrompt(promptNotes), userId);
 
     // BUGIKORJAUS (2026-07-15, ks. muistiinpanot.md "Yöajo ei tee mitään"):
     // ennen tätä, jos äly-kutsu epäonnistui (Anthropic-virhe TAI vastaus ei
@@ -435,7 +473,7 @@ module.exports = async function handler(req, res) {
           console.error('[aly-nightly] Kauppaehdotuksen kirjaus epäonnistui murulle ' + note.id + ':', kauppaRes.status, await kauppaRes.text());
           continue;
         }
-        await markEvaluated(note.id, note.content);
+        await markEvaluated(note.id, effectiveContent(note));
         kauppaSuggested++;
         continue;
       }
@@ -454,7 +492,7 @@ module.exports = async function handler(req, res) {
       // "hetkeä" — "ikkuna" saa yhä olla mennyt kokonaan ohi vasta deadlinen
       // jälkeen, sama logiikka kuin osan 1 deadlineHasPassed()-tarkistuksessa.
       if (category === 'hetki' && resolvedDate && resolvedDate < isoDate(new Date())) {
-        await markEvaluated(note.id, note.content);
+        await markEvaluated(note.id, effectiveContent(note));
         console.log('[aly-nightly] Hetki "' + match.content + '" (id ' + note.id + ') oli jo mennyt ohi arviointihetkellä (' + resolvedDate + ') — ei ehdokasta, merkitty käsitellyksi.');
         continue;
       }
@@ -550,7 +588,7 @@ module.exports = async function handler(req, res) {
     // only then do we know the outcome was "no" rather than "not yet".
     const noMatch = userNotes.filter(function(n) { return !matchedIds.has(n.id); });
     for (const note of noMatch) {
-      await markEvaluated(note.id, note.content);
+      await markEvaluated(note.id, effectiveContent(note));
     }
   }
 

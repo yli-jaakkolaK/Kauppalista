@@ -3196,6 +3196,24 @@ async function lataaLaituri(hakusana) {
     console.error('Laiturin haku epäonnistui:', error);
   }
 
+  // Murun säie (2026-07-20/21, ks. muistiinpanot.md "Murun säie") — yksi
+  // erällinen haku KAIKKIEN näytettävien murujen jatkoriveille (ei N+1-
+  // kyselyä per rivi). Ryhmitellään muru_id:n mukaan, aikajärjestykseen
+  // (order asc) jo kannassa, joten piirtokohdassa ei tarvitse lajitella uudelleen.
+  const jatkorivitKartta = {};
+  if (data && data.length > 0) {
+    const { data: jatkorivit, error: jatkoriviError } = await db.from('laituri_jatkorivit').select()
+      .in('muru_id', data.map(function(r) { return r.id; })).order('created_at', { ascending: true });
+    if (jatkoriviError) {
+      console.error('Säikeiden jatkorivien haku epäonnistui:', jatkoriviError);
+    } else {
+      (jatkorivit || []).forEach(function(jr) {
+        if (!jatkorivitKartta[jr.muru_id]) jatkorivitKartta[jr.muru_id] = [];
+        jatkorivitKartta[jr.muru_id].push(jr);
+      });
+    }
+  }
+
   const listEl = document.getElementById('laituri-list');
   listEl.innerHTML = '';
 
@@ -3357,6 +3375,13 @@ async function lataaLaituri(hakusana) {
         });
       }
     }
+    // Murun säie (2026-07-20/21, ks. muistiinpanot.md "Murun säie") — toimii
+    // riippumatta sijoitettu-tilasta (keskustelu voi jatkua vaikka muru olisi
+    // jo sijoitettu jonnekin), siksi TÄSSÄ eikä yllä olevan sijoittamaton-ehdon sisällä.
+    menuKohdat.push({
+      label: '🧵 Jatka säiettä',
+      onClick: function() { avaaJatkoriviDialog(rivi); },
+    });
     // Sama laituri.status-tilakenttä kuin OSA A:n "siirretty Kauppalistalle" —
     // "arkistoitu" vain kolmas arvo, ei erillinen mekanismi.
     menuKohdat.push({
@@ -3379,18 +3404,130 @@ async function lataaLaituri(hakusana) {
       siivoaMuistutuksetKumottavasti('laituri', rivi.id);
       const { error: ankkuriError } = await db.from('ankkurit').delete().eq('source', 'laituri').eq('source_ref', String(rivi.id));
       if (ankkuriError) console.error('Ankkurin siivous murun poiston yhteydessä epäonnistui:', ankkuriError);
+      // Murun säie (2026-07-20/21): itse jatkorivit siivoutuvat automaattisesti
+      // FK-cascadella (sql/079), mutta mahdollinen herätysehdokas ankkurit-
+      // taulussa on ERILLINEN rivi (oma source='jatkorivi') eikä siivoudu
+      // cascadella — siivotaan tässä samalla periaatteella kuin yllä.
+      const { error: jatkoAnkkuriError } = await db.from('ankkurit').delete().eq('source', 'jatkorivi').eq('source_ref', String(rivi.id));
+      if (jatkoAnkkuriError) console.error('Säikeen herätysehdokkaan siivous murun poiston yhteydessä epäonnistui:', jatkoAnkkuriError);
       lataaLaituri(document.getElementById('laituri-search').value.trim());
       paivitaLaituriBadge();
     });
     li.appendChild(poistoNappi);
 
     listEl.appendChild(li);
+    piirraJatkorivit(rivi, li, jatkorivitKartta[rivi.id] || []);
     piirraKauppaEhdotusKortti(rivi, li);
     piirraHetkiSiltaKortti(rivi, li);
   });
 
   paivitaLaituriArkisto();
 }
+
+// Murun säie (2026-07-20/21, ks. muistiinpanot.md "Murun säie" / KONSEPTIKIRJA.md
+// 4.10 jatko) — piirtää jatkorivit murun rivin (li) JÄLKEEN omina <li>-
+// sisaruksinaan, sama insertAdjacentElement('afterend', ...) -kaava kuin
+// piirraHetkiSiltaKortti/piirraKauppaEhdotusKortti. Kutsuttava ENNEN niitä
+// (ks. lataaLaituri()) jotta jatkorivit päätyvät VISUAALISESTI ehdotuskorttien
+// ALLE — jokainen 'afterend'-lisäys samaan ankkuriin nousee edellisen ohi.
+function piirraJatkorivit(rivi, li, jatkorivit) {
+  let edellinen = li;
+  jatkorivit.forEach(function(jr) {
+    const rivEl = document.createElement('li');
+    rivEl.className = 'laituri-jatkorivi-rivi';
+
+    const teksti = document.createElement('span');
+    teksti.className = 'jatkorivi-rivi-teksti';
+    teksti.textContent = '↳ ' + jr.teksti;
+    rivEl.appendChild(teksti);
+
+    const aika = document.createElement('span');
+    aika.className = 'jatkorivi-aika';
+    const d = new Date(jr.created_at);
+    let aikaTeksti = d.getDate() + '.' + (d.getMonth() + 1) + '.';
+    if (jr.heratys_pvm) {
+      const hd = new Date(jr.heratys_pvm + 'T00:00:00');
+      aikaTeksti += ' · 🔔 ' + hd.getDate() + '.' + (hd.getMonth() + 1) + '.';
+    }
+    aika.textContent = aikaTeksti;
+    rivEl.appendChild(aika);
+
+    edellinen.insertAdjacentElement('afterend', rivEl);
+    edellinen = rivEl;
+  });
+}
+
+// Dialogin nykyinen kohdemuru — asetetaan avattaessa, tyhjennetään suljettaessa.
+let jatkoriviKohdeMuru = null;
+
+function avaaJatkoriviDialog(rivi) {
+  jatkoriviKohdeMuru = rivi;
+  document.getElementById('jatkorivi-teksti').value = '';
+  document.getElementById('jatkorivi-heratys-check').checked = false;
+  document.getElementById('jatkorivi-heratys-pvm').disabled = true;
+  document.getElementById('jatkorivi-heratys-pvm').value = '';
+  document.getElementById('jatkorivi-overlay').style.display = 'flex';
+  document.getElementById('jatkorivi-teksti').focus();
+}
+
+function suljeJatkoriviDialog() {
+  document.getElementById('jatkorivi-overlay').style.display = 'none';
+  jatkoriviKohdeMuru = null;
+}
+
+document.getElementById('jatkorivi-peruuta').addEventListener('click', suljeJatkoriviDialog);
+document.getElementById('jatkorivi-overlay').addEventListener('click', function(e) {
+  if (e.target === document.getElementById('jatkorivi-overlay')) suljeJatkoriviDialog();
+});
+document.getElementById('jatkorivi-heratys-check').addEventListener('change', function(e) {
+  document.getElementById('jatkorivi-heratys-pvm').disabled = !e.target.checked;
+});
+
+document.getElementById('jatkorivi-tallenna').addEventListener('click', async function() {
+  if (!jatkoriviKohdeMuru) return;
+  const rivi = jatkoriviKohdeMuru;
+
+  const teksti = document.getElementById('jatkorivi-teksti').value.trim();
+  if (!teksti) {
+    naytaIlmoitus('Kirjoita jotain ensin');
+    return;
+  }
+  const heratysCheck = document.getElementById('jatkorivi-heratys-check');
+  const heratysPvm = document.getElementById('jatkorivi-heratys-pvm').value;
+  if (heratysCheck.checked && !heratysPvm) {
+    naytaIlmoitus('Valitse herätyspäivä tai poista "Muistuta"-täppä');
+    return;
+  }
+
+  const { error } = await db.from('laituri_jatkorivit').insert({
+    muru_id: rivi.id,
+    teksti: teksti,
+    heratys_pvm: heratysCheck.checked ? heratysPvm : null,
+  });
+  if (ilmoitaKirjoitusvirheesta(error, 'Säikeen jatkorivin tallennus')) return;
+
+  // Herätys (ks. yläkommentti tiedoston tässä osiossa) — EI uutta
+  // ajastusmekanismia, sama visible_from-koneisto kuin ⏭-siirrolla ja
+  // "hetki"-ehdokkaan viivästetyllä näkyvyydellä (ks. laskeHetkiNakyvyys(),
+  // api/_lib/aly-classify.js) — sama UTC-puolinaisuus tarkoituksella, ei
+  // uusi bugi vaan sama johdonmukaisuus kuin siellä.
+  if (heratysCheck.checked) {
+    const visibleFrom = new Date(heratysPvm + 'T00:00:00.000Z').toISOString();
+    const { error: ankkuriError } = await db.from('ankkurit').insert({
+      content: rivi.content + ' — oletteko palanneet?',
+      source: 'jatkorivi',
+      source_ref: String(rivi.id),
+      user_id: currentUserId,
+      is_candidate: true,
+      visible_from: visibleFrom,
+    });
+    if (ankkuriError) console.error('Murun säikeen herätysehdokkaan luonti epäonnistui:', ankkuriError);
+  }
+
+  suljeJatkoriviDialog();
+  naytaIlmoitus(heratysCheck.checked ? 'Jatkorivi + herätys asetettu' : 'Jatkorivi tallennettu');
+  lataaLaituri(document.getElementById('laituri-search').value.trim());
+});
 
 // Kalenterisilta aikaistettu (2026-07-20, Katrin tarkennus, ks. muistiinpanot.md
 // "Kalenterisilta aikaistettu") — äly kirjoittaa TÄMÄN suoraan murun omalle

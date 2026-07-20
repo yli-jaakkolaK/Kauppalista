@@ -1170,6 +1170,10 @@ h1 {
    oman rivityssäännön (ks. alempana) — "Varastossa lista nukkuu" -periaatteen
    mukaisesti pohja on luettava KOKONAAN eikä rivikorkeuden tarvitse pysyä
    kiinteänä, koska riviä ei "eletä".
+   MURUN SÄIE (2026-07-20/21): `.laituri-jatkorivi-rivi` lisätty samaan
+   poissulkulistaan samasta syystä (jatkorivin teksti pitää saada rivittyä,
+   ei katketa ellipsiksellä) — oma rivityssääntönsä `.laituri-jatkorivi-rivi
+   .jatkorivi-rivi-teksti`-kohdassa (ks. tiedoston loppupuoli).
    BUGIKORJAUS (2026-07-17, ks. "Rivien UI-remontti" jatko-osio
    muistiinpanot.md:ssä): tässä oli VIRHEELLINEN väite ("Laituri EI tarvinnut
    tätä") joka osoittautui vääräksi — Laituri KÄYTTÄÄ samaa `.list`-luokkaa
@@ -1195,7 +1199,7 @@ h1 {
    (ks. script.js:n lataaAnkkurit()) rajattu pois tästä säännöstä ja saa oman
    enintään 4-rivisen line-clamp-säännön alla — välimuoto Varaston (ei koskaan
    ellipsis) ja elävien listojen (aina yksirivinen) välillä. */
-.list li:not(.varasto-rivi):not(.laituri-ehdotus-rivi):not(.anchor-candidate-row):not(.ankkuri-rivi):not(.elava-rivi) span:not(.kalenteri-aika):not(.kalenteri-vari):not(.kalenteri-uusi-merkki):not(.hytti-tanaan-aika):not(.hytti-tehtava-erapaiva):not(.hytti-rivi-erapaiva):not(.history-time):not(.muistutus-aika):not(.laituri-text):not(.laituri-meta) {
+.list li:not(.varasto-rivi):not(.laituri-ehdotus-rivi):not(.anchor-candidate-row):not(.ankkuri-rivi):not(.elava-rivi):not(.laituri-jatkorivi-rivi) span:not(.kalenteri-aika):not(.kalenteri-vari):not(.kalenteri-uusi-merkki):not(.hytti-tanaan-aika):not(.hytti-tehtava-erapaiva):not(.hytti-rivi-erapaiva):not(.history-time):not(.muistutus-aika):not(.laituri-text):not(.laituri-meta) {
   flex: 1;
   min-width: 0;
   overflow: hidden;
@@ -1991,6 +1995,79 @@ h1 {
   color: var(--muted);
   text-align: center;
   margin-bottom: 4px;
+}
+
+/* Murun säie (2026-07-20/21) — ainoa textarea sovelluksessa toistaiseksi,
+   sama syöttökenttien värimaailma kuin muualla (esim. #muistutus-hetki-input). */
+.jatkorivi-teksti {
+  width: 100%;
+  font-family: 'Courier New', Courier, monospace;
+  font-size: 14px;
+  color: var(--text);
+  background: var(--ground);
+  border: 1px solid var(--border-dash);
+  border-radius: 4px;
+  padding: 8px;
+  resize: vertical;
+  margin-top: 4px;
+}
+
+.jatkorivi-heratys-rivi {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--muted);
+  margin-top: 12px;
+}
+
+.jatkorivi-heratys-rivi input[type="date"] {
+  font-family: 'Courier New', Courier, monospace;
+  font-size: 13px;
+  color: var(--text);
+  background: var(--ground);
+  border: 1px solid var(--border-dash);
+  border-radius: 4px;
+  padding: 4px;
+  flex: 1;
+  min-width: 0;
+}
+
+.jatkorivi-heratys-rivi input[type="date"]:disabled {
+  opacity: 0.4;
+}
+
+/* Säikeen jatkorivit murun alla (2026-07-20/21) — omat <li>-sisarukset
+   murun rivin jälkeen (sama insertAdjacentElement('afterend', ...) -kaava
+   kuin piirraHetkiSiltaKortti/piirraKauppaEhdotusKortti), sisennetty ja
+   hillitympi kuin itse muru — tuki-informaatio, ei toiminnallinen rivi. */
+.list li.laituri-jatkorivi-rivi {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  padding: 2px 0 2px 18px;
+  margin: -1px 0 0;
+  border-left: 2px solid var(--border-dash);
+  font-size: 13px;
+  color: var(--muted);
+}
+
+/* min-width:0 on flex-perusarvo "auto" estäisi tekstiä kutistumasta
+   kapeampaa saraketta varten (sama flexbox-ansa kuin .laituri-content,
+   ks. sen kommentti) — teksti katkeaisi näkymättömiin sen sijaan että
+   rivittyisi kahdelle riville. */
+.laituri-jatkorivi-rivi .jatkorivi-rivi-teksti {
+  flex: 1;
+  min-width: 0;
+  word-break: break-word;
+}
+
+.jatkorivi-aika {
+  font-size: 11px;
+  color: var(--muted);
+  opacity: 0.7;
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 
 .dialog-buttons {

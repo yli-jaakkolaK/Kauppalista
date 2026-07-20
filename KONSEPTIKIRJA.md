@@ -287,6 +287,30 @@ Koulun Wilma-viestit ovat perheen suurin yksittäinen "asioita hukkuu" -lähde. 
 
 ---
 
+### 4.10b MURUN SÄIE + JATKO-OSAT (Katrin priorisoitu rakennuspyyntö 2026-07-20/21, jatkaa 4.10:tä)
+
+**TASO 1 (murun säie + herätys) RAKENNETTU 2026-07-20/21** — täysi tekninen kuvaus muistiinpanot.md:n "Murun säie" -osiossa, ei toisteta tässä. Lyhyesti: jatkorivit murulle (⋯ → "🧵 Jatka säiettä"), valinnainen herätyspäivä olemassa olevalla `visible_from`-koneistolla, äly lukee säikeen viimeisintä riviä tilana. `sql/079`+`080`, `laituri_jatkorivit`-taulu.
+
+**TASO 2 — EI VIELÄ RAKENNETTU, täysi speksi Katrin omin sanoin (kirjattu sanatarkasti ettei mitään katoa):**
+
+Arvoperiaate joka koskee KAIKKEA alla olevaa: *"Satama tukee vanhempien muistia — ei rakenna profiilia lapsesta."* Ei koskaan luonnearvio-/diagnoosikenttiä millekään teemalle/säikeelle.
+
+**2a. Keskusteluteema Varastossa:** LUETTAVA-tyyppinen sivu jolle voi SIIRTÄÄ murun säikeineen (poistuu Laiturista siirrettynä, turvainvariantti — ei koskaan häviä, vain siirtyy). Teema = muruja allekkain aikajärjestyksessä, EI editoitava dokumentti. Rivin voi nostaa takaisin aktiiviseksi (Varasto on lepopaikka, ei hautausmaa, ks. periaate 7). Jaettu (molemmat näkevät ja kartuttavat). **Poikkeus turvainvariantista:** teeman voi sulkea JA POISTAA kokonaan tietoisesti — AINOA paikka jossa poisto on oikein huolimatta muualla vallitsevasta "mikään ei koskaan katoa" -periaatteesta, koska lapsen yksityisyys > arkisto.
+
+**2b. Sovittu linja:** teemalla kiinnitetty ydin-kenttä ERI historian LISÄKSI — "viimeisin yhteinen päätös" (esim. "ruutuaika 1h arkisin, sovittu 12.7.") näkyvissä teeman yläreunassa kiinteänä, ei historian seassa. Syy: kasvatustilanne tulee päälle yllättäen, linjan pitää löytyä VILKAISULLA ilman "kysyn isältä" -murtumaa keskellä tilannetta. Päivittyessä vanha linja valuu historiaan (ei häviä, vain ei ole enää ylhäällä).
+
+**2c. Luoteen laajennus (TAE, ei vain mahdollisuus):** laajenna olemassa oleva/suunniteltu Laiturin luode (4.10:n Kerros 2, viikoittainen tarjottu katselmus) kattamaan MYÖS avoimet teemat/säikeet samassa kierroksessa. Tämä tulee JOKA TAPAUKSESSA riippumatta kuormasta — erotuksena 2d:hen joka on vain opportunistinen bonus.
+
+**2d. Kevyen päivän ehdotus (opportunistinen bonus, EI korvaa 2c:tä):** kytke Kuormavahdin kevyt-päivä-tunnistukseen — kun huominen/tänään on kevyt, äly voi ehdottaa YHDEN auki olevan teeman/säikeen nostoa ankkuriehdokkaaksi ("torstai näyttää rauhalliselta — se lapsen x-asia?"). Ei koskaan raskaana päivänä, max yksi kerrallaan, aina ehdokas (kolmiporras).
+
+**2d-2. Painava-vihje, EI tähti (täsmennys, tärkeä pitää mielessä koko 2d:n/2c:n rakennuksen ajan):** ÄLÄ rakenna erillistä "tärkeä-tähti" -merkintää millekään asialle — se loisi tähditettyjen kasan jota koko appi vastustaa (staattinen tähti odottaa ihmisen aloitetta ja unohtuu, sama oppi kuin poistettu Itselle/Juhalle-kohdevalinta ankkureista 2026-07-19: tärkeys on suhde HETKEEN, ei pysyvä leima). SEN SIJAAN säikeellä/teemalla/vahditulla rivillä on kaksitasoinen PRIORITEETTIVIHJE nostomekanismille ITSELLEEN (ei ihmiselle näkyvä muistilippu): "tavallinen" vs. "painava" — painava nousee herkemmin (ensimmäisenä kevyenä päivänä 2d:ssä, luoteen katselmuksessa 2c:n kärjessä). Vihje ohjaa JÄRJESTELMÄN omaa aloitetta koska/missä järjestyksessä nostaa, ei ole ihmisen muistiapu sinänsä.
+
+**2e. Vahdittu lepo Varastossa (oma pieni mekanisminsa, matalin prioriteetti TASO 2:ssa):** uusi sivutyyppi Varastoon jolla rivi nousee ankkuriehdokkaaksi jos kuittaamatta X päivän jälkeen ("anna arjen yrittää ensin ennen kuin järjestelmä puuttuu") — sama `visible_from`-pohja kuin muuallakin, käyttäjän itse asettama pehmeä ikkuna per rivi.
+
+**Rakennusjärjestys (Katrin oma, jos/kun jatketaan):** 2a ensin (perusta jolle 2b/2c/2d rakentuvat), 2b samassa erässä jos mahtuu (pieni, sama taulu), 2c on TAE joten se pitää rakentaa ennen kuin ominaisuus on "valmis" siinä mielessä että Katri sen speksasi, 2d on erillinen bonus joka voi jäädä myöhemmäksi ilman että 2c:n lupaus rikkoutuu, 2e on oma erillinen matalan prioriteetin mekanisminsa eikä riipu muista.
+
+---
+
 ## OSA 5: MITEN TÄTÄ KEHITETÄÄN COPILOTIN KANSSA
 
 ### Katrin työskentelytapa (todistetusti toimiva)

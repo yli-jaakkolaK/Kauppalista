@@ -552,6 +552,25 @@
     </div>
   </div>
 
+  <!-- Murun säie (2026-07-20/21, ks. muistiinpanot.md "Murun säie") — vapaa
+       jatkorivi murun alle + valinnainen herätyspäivä. Sama dialog-overlay-
+       kaava kuin muualla, ei omaa erikoisrakennetta. -->
+  <div class="dialog-overlay" id="jatkorivi-overlay" style="display:none">
+    <div class="dialog-box">
+      <p class="dialog-title">Jatka säiettä</p>
+      <textarea id="jatkorivi-teksti" class="jatkorivi-teksti" rows="3" placeholder="Mihin jäätiin..."></textarea>
+      <label class="jatkorivi-heratys-rivi">
+        <input type="checkbox" id="jatkorivi-heratys-check">
+        <span>Muistuta</span>
+        <input type="date" id="jatkorivi-heratys-pvm" disabled>
+      </label>
+      <div class="dialog-buttons">
+        <button class="dialog-btn dialog-btn-cancel" id="jatkorivi-peruuta">Peruuta</button>
+        <button class="dialog-btn" id="jatkorivi-tallenna">Tallenna</button>
+      </div>
+    </div>
+  </div>
+
   <script>
     if ('serviceWorker' in navigator) {
       navigator.serviceWorker.register('/sw.js');
