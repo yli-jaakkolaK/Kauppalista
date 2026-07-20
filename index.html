@@ -74,11 +74,83 @@
 
     <hr class="divider">
 
+    <!-- TASO 2 (2026-07-21, ks. KONSEPTIKIRJA.md 4.10b): kolme sivutyyppiä
+         samalla lists-taululla, ei kolmea eri lomaketta — vain napautettu
+         tyyppi vaikuttaa insertin list_type/visibility-kenttiin (script.js). -->
+    <div class="varasto-tyyppi-valinta">
+      <button class="kalenteri-tila-btn varasto-tyyppi-btn active" data-tyyppi="normal">📋 Lista</button>
+      <button class="kalenteri-tila-btn varasto-tyyppi-btn" data-tyyppi="teema">🧵 Teema</button>
+      <button class="kalenteri-tila-btn varasto-tyyppi-btn" data-tyyppi="vahdittu">⏳ Vahdittu</button>
+    </div>
+
     <div class="add-item">
       <span class="prefix">›</span>
       <input type="text" id="new-varasto-input" placeholder="uusi lista...">
       <button id="new-varasto-btn">+</button>
     </div>
+  </div>
+
+  <!-- Keskusteluteema (2026-07-21, ks. KONSEPTIKIRJA.md 4.10b / muistiinpanot.md
+       "Keskusteluteema Varastossa") — jaettu, LUETTAVA näkymä murun säikeille
+       jotka on siirretty tänne Laiturista. EI editointia yksittäisille
+       riveille, vain kokonaispoisto (⋯-tyylinen × yläpalkissa, sama
+       deleteList()-reitti kuin muillakin listoilla). -->
+  <div class="container" id="teema-view" style="display:none">
+    <div class="list-header">
+      <button class="back-btn" id="teema-back-btn">‹</button>
+      <h1 id="teema-title">✱ TEEMA ✱</h1>
+      <button class="settings-btn" id="teema-poista-btn" title="Poista teema kokonaan">🗑</button>
+    </div>
+
+    <div class="teema-sovittu-linja-laatikko">
+      <div class="teema-sovittu-linja-otsikko">📌 Sovittu linja</div>
+      <div class="teema-sovittu-linja-teksti" id="teema-sovittu-linja-teksti">Ei vielä sovittua linjaa</div>
+      <div class="teema-sovittu-linja-pvm" id="teema-sovittu-linja-pvm"></div>
+      <input type="text" id="teema-sovittu-linja-input" style="display:none" placeholder="Mitä sovittiin...">
+      <div class="dialog-buttons" id="teema-sovittu-linja-napit">
+        <button class="dialog-btn dialog-btn-cancel" id="teema-sovittu-linja-muokkaa-btn">Päivitä</button>
+      </div>
+    </div>
+
+    <div class="varasto-tyyppi-valinta teema-priority-valinta">
+      <span class="teema-priority-label">Nostoherkkyys</span>
+      <button class="kalenteri-tila-btn teema-priority-btn" data-priority="tavallinen">Tavallinen</button>
+      <button class="kalenteri-tila-btn teema-priority-btn" data-priority="painava">🔥 Painava</button>
+    </div>
+
+    <hr class="divider">
+
+    <ul class="list" id="teema-list"></ul>
+    <p class="section-empty" id="teema-tyhja" style="display:none">Ei vielä muruja tässä teemassa. Siirrä Laiturista ⋯-valikon kautta.</p>
+  </div>
+
+  <!-- Vahdittu lepo (2026-07-21, ks. KONSEPTIKIRJA.md 4.10b / muistiinpanot.md
+       "Vahdittu lepo Varastossa") — muuten tavallinen tuotteet-lista, mutta
+       kuittaamaton rivi nousee ankkuriehdokkaaksi X päivän jälkeen
+       (api/muistutukset-laheta.js). Sama tuotteet-rakenne/UI kuin muillakin
+       listoilla, vain oma raja-asetus. -->
+  <div class="container" id="vahdittu-view" style="display:none">
+    <div class="list-header">
+      <button class="back-btn" id="vahdittu-back-btn">‹</button>
+      <h1 id="vahdittu-title">✱ VAHDITTU ✱</h1>
+      <span></span>
+    </div>
+    <p class="section-empty">Anna arjen yrittää ensin — jos rivi on yhä kuittaamatta alla asetetun ajan jälkeen, se nousee ankkuriehdokkaaksi etusivulle.</p>
+
+    <div class="settings-row">
+      <span>Nouse ehdokkaaksi kuittaamattomana (pv)</span>
+      <input type="number" class="settings-numero-input" id="vahdittu-raja-input" min="1" step="1">
+    </div>
+
+    <hr class="divider">
+
+    <div class="add-item">
+      <span class="prefix">›</span>
+      <input type="text" id="vahdittu-input" placeholder="lisää vahdittava asia...">
+      <button id="vahdittu-add-btn">+</button>
+    </div>
+
+    <ul class="list" id="vahdittu-list"></ul>
   </div>
 
   <div class="container" id="kalenteri-view" style="display:none">
@@ -290,6 +362,12 @@
     </div>
 
     <p class="laituri-tila-teksti" id="laituri-sijoittamatta"></p>
+
+    <!-- Laiturin luote (2026-07-21, ks. KONSEPTIKIRJA.md 4.10 Kerros 2 /
+         4.10b, muistiinpanot.md "Laiturin luote") — TARJOTTU, ei pakollinen,
+         näkyy vain kun vanhoja/pysähtyneitä muruja tai avoimia teemoja on
+         kertynyt. Ei koskaan avaudu itsestään. -->
+    <p class="section-link" id="luote-linkki" style="display:none"></p>
 
     <hr class="divider">
 
@@ -567,6 +645,35 @@
       <div class="dialog-buttons">
         <button class="dialog-btn dialog-btn-cancel" id="jatkorivi-peruuta">Peruuta</button>
         <button class="dialog-btn" id="jatkorivi-tallenna">Tallenna</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Laiturin luote (2026-07-21, ks. KONSEPTIKIRJA.md 4.10 Kerros 2 / 4.10b,
+       muistiinpanot.md "Laiturin luote") — yksi kerrallaan -katselmus,
+       kolme pyyhkäisyä murulle, kevyempi kahden napin "avaa/anna olla"
+       avoimelle teemalle (2c). Tarjottu, ei pakollinen, ei pörise. -->
+  <div class="dialog-overlay" id="luote-overlay" style="display:none">
+    <div class="dialog-box">
+      <p class="dialog-title">🌊 Luote</p>
+      <p class="dialog-body" id="luote-laskuri"></p>
+      <p class="dialog-body" id="luote-sisalto" style="white-space:pre-line"></p>
+
+      <div class="dialog-buttons" id="luote-murun-napit">
+        <button class="dialog-btn dialog-btn-cancel" id="luote-anna-olla">Anna olla</button>
+        <button class="dialog-btn dialog-btn-cancel" id="luote-arkistoi">🗄 Arkistoi</button>
+      </div>
+      <div class="dialog-buttons" id="luote-murun-napit-2">
+        <button class="dialog-btn" id="luote-ankkuriin">⚓ Ankkuriin</button>
+      </div>
+
+      <div class="dialog-buttons" id="luote-teema-napit" style="display:none">
+        <button class="dialog-btn dialog-btn-cancel" id="luote-teema-ohita">Anna olla</button>
+        <button class="dialog-btn" id="luote-teema-avaa">Avaa teema</button>
+      </div>
+
+      <div class="dialog-buttons">
+        <button class="dialog-btn dialog-btn-cancel" id="luote-sulje">Sulje</button>
       </div>
     </div>
   </div>

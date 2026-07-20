@@ -40,6 +40,17 @@
 //     tässä erässä (tietoinen rajaus, ks. muistiinpanot.md) — UI estää
 //     molempien valinnan yhtä aikaa.
 //
+// TASO 2 (2026-07-21, ks. muistiinpanot.md "Vahdittu lepo Varastossa" /
+// "Keskusteluteema Varastossa", KONSEPTIKIRJA.md 4.10b) — tämä tiedosto
+// hoitaa myös kaksi TÄYSIN ERILLISTÄ, MUISTUTUKSIIN LIITTYMÄTÖNTÄ
+// deterministista tarkistusta (ei älykutsua, puhdasta laskentaa), koska ne
+// tarvitsevat saman ~5 min cron-kadenssin eikä ole syytä rekisteröidä uutta
+// cron-job.org-työtä pelkän ajoituksen jakamiseksi: (a) Vahdittu lepo —
+// kuittaamaton vahdittu-listan rivi nousee ankkuriehdokkaaksi X päivän
+// jälkeen ("anna arjen yrittää ensin"), (b) Kevyen päivän ehdotus — jos
+// huominen on kalenterin mukaan tapahtumaton, ehdottaa YHDEN painavan/vanhan
+// avoimen teeman nostoa. Ks. tarkistaVahdittuLepo()/tarkistaKevyenPaivanEhdotus().
+//
 // Vaatii Vercelin ympäristömuuttujat:
 //   SUPABASE_SERVICE_KEY, VAPID_PUBLIC_KEY/VAPID_PRIVATE_KEY/VAPID_SUBJECT
 //   (samat kuin api/push-test.js:ssä) + MUISTUTUKSET_CRON_SECRET
@@ -177,6 +188,125 @@ async function sendPushToOwner(muistutus, bodyText) {
   return { joku: joku, eiRetryttavaa: !Array.isArray(tilaukset) || tilaukset.length === 0 };
 }
 
+// Vahdittu lepo (2026-07-21, TASO 2e, ks. muistiinpanot.md "Vahdittu lepo
+// Varastossa" / KONSEPTIKIRJA.md 4.10b) — PUHDAS LASKENTA, ei älykutsua
+// ("maksimiautomaatio, minimikustannus": jos asia voidaan ilmaista säännöksi,
+// ei älyä). Jaettu-tyyppinen lista, joten EI tiedetä kenelle yksittäinen rivi
+// "kuuluu" — ankkuriehdokas luodaan JOKAISELLE push-tilauksen omaavalle
+// käyttäjälle (samat kaksi henkilöä koko sovelluksessa), sama "jaettu =
+// molemmat näkevät" -periaate kuin muuallakin. Idempotenssi: source='vahdittu'
+// + source_ref=<tuoterivin id> uniikki löydös estää saman rivin nostamisen
+// uudelleen riippumatta siitä onko edellinen ehdokas yhä pending/hyväksytty/
+// hylätty — sama malli kuin muillakin ankkuriehdotusreiteillä.
+async function tarkistaVahdittuLepo() {
+  let nostettu = 0;
+  const listatRes = await supabaseFetch('lists?select=id,name,vahdittu_raja_paivia&list_type=eq.vahdittu');
+  const listat = await listatRes.json();
+  if (!Array.isArray(listat) || listat.length === 0) return nostettu;
+
+  const kayttajatRes = await supabaseFetch('push_tilaukset?select=user_id');
+  const kayttajaRivit = await kayttajatRes.json();
+  const userIds = Array.from(new Set((Array.isArray(kayttajaRivit) ? kayttajaRivit : []).map(function(r) { return r.user_id; })));
+  if (userIds.length === 0) return nostettu;
+
+  for (const lista of listat) {
+    const rajaPaivia = lista.vahdittu_raja_paivia || 14;
+    const rajaHetkiIso = new Date(Date.now() - rajaPaivia * 86400000).toISOString();
+    const rivitRes = await supabaseFetch('tuotteet?select=id,nimi&list_id=eq.' + lista.id + '&tehty=eq.false&created_at=lt.' + encodeURIComponent(rajaHetkiIso));
+    const rivit = await rivitRes.json();
+    if (!Array.isArray(rivit)) continue;
+
+    for (const rivi of rivit) {
+      const olemassaRes = await supabaseFetch('ankkurit?select=id&source=eq.vahdittu&source_ref=eq.' + rivi.id);
+      const olemassa = await olemassaRes.json();
+      if (Array.isArray(olemassa) && olemassa.length > 0) continue;
+
+      for (const userId of userIds) {
+        const luontiRes = await supabaseFetch('ankkurit', {
+          method: 'POST',
+          headers: { Prefer: 'return=minimal' },
+          body: JSON.stringify({
+            content: rivi.nimi + ' (' + lista.name + ') — ei hoitunut itsestään, ankkuriin?',
+            source: 'vahdittu',
+            source_ref: String(rivi.id),
+            user_id: userId,
+            is_candidate: true,
+          }),
+        });
+        if (!luontiRes.ok) {
+          console.error('[muistutukset-laheta] Vahdittu-ehdokkaan luonti epäonnistui rivi=' + rivi.id + ' user=' + userId + ':', luontiRes.status, await luontiRes.text());
+          continue;
+        }
+        nostettu++;
+      }
+    }
+  }
+  return nostettu;
+}
+
+// Kevyen päivän ehdotus (2026-07-21, TASO 2d + 2d-2, ks. muistiinpanot.md
+// "Keskusteluteema Varastossa" / KONSEPTIKIRJA.md 4.10b) — MYÖS puhdas
+// laskenta, ei älykutsua ("kevyt päivä" on pelkkä tapahtumalaskuri, ei vaadi
+// tulkintaa). "Max yksi kerrallaan" (spec): jos JOKIN kevyt_paiva-ehdokas on
+// yhä pending millä tahansa käyttäjällä, ei ehdoteta uutta. Poimintajärjestys
+// painava-vihjeen mukaan (2d-2, "vihje ohjaa järjestelmän aloitetta, ei
+// ihmisen muistia") — painava-tyyppiset teemat ensin, sitten vanhin.
+async function tarkistaKevyenPaivanEhdotus() {
+  const pendingRes = await supabaseFetch('ankkurit?select=id&source=eq.kevyt_paiva&is_candidate=eq.true&done=eq.false');
+  const pending = await pendingRes.json();
+  if (Array.isArray(pending) && pending.length > 0) return { ehdotettu: false, syy: 'jo_pending' };
+
+  const huominen = new Date(Date.now() + 86400000);
+  const huomisenPvm = isoDate(huominen);
+  const menotRes = await supabaseFetch('kalenteri_tapahtumat?select=id&event_date=eq.' + huomisenPvm + '&event_time=not.is.null');
+  const menot = await menotRes.json();
+  const kevyt = Array.isArray(menot) && menot.length === 0;
+  if (!kevyt) return { ehdotettu: false, syy: 'ei_kevyt' };
+
+  const teemaRes = await supabaseFetch('lists?select=id,name,priority&list_type=eq.teema&order=priority.desc,id.asc&limit=1');
+  const teemat = await teemaRes.json();
+  if (!Array.isArray(teemat) || teemat.length === 0) return { ehdotettu: false, syy: 'ei_teemoja' };
+  const teema = teemat[0];
+
+  const kayttajatRes = await supabaseFetch('push_tilaukset?select=user_id');
+  const kayttajaRivit = await kayttajatRes.json();
+  const userIds = Array.from(new Set((Array.isArray(kayttajaRivit) ? kayttajaRivit : []).map(function(r) { return r.user_id; })));
+
+  let ehdotettu = 0;
+  for (const userId of userIds) {
+    const luontiRes = await supabaseFetch('ankkurit', {
+      method: 'POST',
+      headers: { Prefer: 'return=minimal' },
+      body: JSON.stringify({
+        content: 'Huominen näyttää rauhalliselta — ' + teema.name + '?',
+        source: 'kevyt_paiva',
+        source_ref: String(teema.id),
+        user_id: userId,
+        is_candidate: true,
+      }),
+    });
+    if (!luontiRes.ok) {
+      console.error('[muistutukset-laheta] Kevyen päivän ehdotuksen luonti epäonnistui teema=' + teema.id + ' user=' + userId + ':', luontiRes.status, await luontiRes.text());
+      continue;
+    }
+    ehdotettu++;
+  }
+  return { ehdotettu: ehdotettu > 0, syy: 'ehdotettu', teema: teema.name };
+}
+
+// Sama Helsinki-kalenteripäivä-laskenta kuin api/_lib/aly-classify.js:n
+// isoDate()-funktiolla (5b83ed9-oppi: EI UTC-slicellä) — kopioitu tähän
+// erikseen koska tämä tiedosto ei jaa moduuleja _lib:n kanssa (eri syy: siellä
+// jako on OK koska molemmat kutsujat ovat äly-lajittelun sisällä, tässä ei ole
+// vastaavaa perustetta lisätä riippuvuutta).
+function isoDate(d) {
+  const osat = new Intl.DateTimeFormat('fi-FI', {
+    timeZone: 'Europe/Helsinki',
+    year: 'numeric', month: '2-digit', day: '2-digit',
+  }).formatToParts(d).reduce(function(acc, o) { acc[o.type] = o.value; return acc; }, {});
+  return osat.year + '-' + osat.month + '-' + osat.day;
+}
+
 module.exports = async function handler(req, res) {
   if (!SUPABASE_KEY) {
     return res.status(500).json({ error: 'SUPABASE_SERVICE_KEY puuttuu Vercelin ympäristömuuttujista' });
@@ -190,6 +320,24 @@ module.exports = async function handler(req, res) {
   }
 
   webpush.setVapidDetails(process.env.VAPID_SUBJECT, process.env.VAPID_PUBLIC_KEY, process.env.VAPID_PRIVATE_KEY);
+
+  // TASO 2e + 2d (2026-07-21) — kaksi UUTTA riippumatonta, deterministista
+  // tarkistusta jotka jakavat TÄMÄN endpointin valmiin 5 min -cron-kadenssin
+  // (ei uutta cron-job.org-rekisteröintiä, ei uutta GitHub Actions -askelta).
+  // Molemmat KÄÄRITTY try/catchiin — bugi kummassakaan EI SAA kaataa alla
+  // olevaa, jo tuotannossa todistettua muistutuslogiikkaa.
+  let vahdittuNostettu = 0;
+  let kevytPaivaTulos = null;
+  try {
+    vahdittuNostettu = await tarkistaVahdittuLepo();
+  } catch (e) {
+    console.error('[muistutukset-laheta] Vahditun levon tarkistus heitti poikkeuksen:', e.message);
+  }
+  try {
+    kevytPaivaTulos = await tarkistaKevyenPaivanEhdotus();
+  } catch (e) {
+    console.error('[muistutukset-laheta] Kevyen päivän ehdotuksen tarkistus heitti poikkeuksen:', e.message);
+  }
 
   // BUGIKORJAUS/LAAJENNUS (2026-07-19, "Sinnikäs muistutus", ks.
   // muistiinpanot.md): haetaan KAIKKI päättämättömät rivit (sent_at IS
@@ -210,7 +358,7 @@ module.exports = async function handler(req, res) {
   console.log('[muistutukset-laheta] ' + nyt.toISOString() + ': ' + (Array.isArray(kaikki) ? kaikki.length : 0) + ' päättämätöntä riviä tarkistettavana.');
 
   if (!Array.isArray(kaikki) || kaikki.length === 0) {
-    return res.status(200).json({ success: true, lahetetty: 0, tarkistettu: 0 });
+    return res.status(200).json({ success: true, lahetetty: 0, tarkistettu: 0, vahdittu_nostettu: vahdittuNostettu, kevyt_paiva: kevytPaivaTulos });
   }
 
   // Palauttaa muistutuksen sent_at:n takaisin nulliksi — käytetään kun claim
@@ -463,5 +611,5 @@ module.exports = async function handler(req, res) {
     }
   }
 
-  return res.status(200).json({ success: true, lahetetty: lahetetty, tarkistettu: tarkistettu, uudelleenyritetaan: jatetaanYrittamaan });
+  return res.status(200).json({ success: true, lahetetty: lahetetty, tarkistettu: tarkistettu, uudelleenyritetaan: jatetaanYrittamaan, vahdittu_nostettu: vahdittuNostettu, kevyt_paiva: kevytPaivaTulos });
 };

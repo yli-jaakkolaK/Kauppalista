@@ -2303,6 +2303,74 @@ h1 {
   margin: 20px 0 6px;
 }
 
+.varasto-tyyppi-valinta {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 10px;
+}
+
+/* Keskusteluteema (2026-07-21, ks. muistiinpanot.md "Keskusteluteema
+   Varastossa") — "sovittu linja" pysyy kiinteänä kortin YLÄREUNASSA
+   erillään historiasta (2b), samantyylinen huomiolaatikko kuin Hytin
+   "seuraava askel" (.hytti-seuraava-askel-laatikko), oma kultainen reunus. */
+.teema-sovittu-linja-laatikko {
+  border: 1px solid var(--accent);
+  border-radius: 6px;
+  padding: 10px 12px;
+  margin: 12px 0 16px;
+}
+
+.teema-sovittu-linja-otsikko {
+  font-size: 12px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-bottom: 4px;
+}
+
+.teema-sovittu-linja-teksti {
+  font-size: 15px;
+  color: var(--text);
+  word-break: break-word;
+}
+
+.teema-sovittu-linja-pvm {
+  font-size: 12px;
+  color: var(--muted);
+  margin-top: 2px;
+}
+
+#teema-sovittu-linja-input {
+  width: 100%;
+  font-family: 'Courier New', Courier, monospace;
+  font-size: 14px;
+  color: var(--text);
+  background: var(--ground);
+  border: 1px solid var(--border-dash);
+  border-radius: 4px;
+  padding: 6px;
+  margin-top: 6px;
+}
+
+#teema-sovittu-linja-napit {
+  margin-top: 8px;
+}
+
+.teema-priority-valinta {
+  align-items: center;
+}
+
+.teema-priority-label {
+  font-size: 13px;
+  color: var(--muted);
+  margin-right: 4px;
+}
+
+.teema-priority-btn.active {
+  border-color: var(--huomio);
+  color: var(--huomio);
+}
+
 .hytti-tyyppi-selite {
   font-size: 11px;
   color: var(--muted);

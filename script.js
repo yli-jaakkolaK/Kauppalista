@@ -16,6 +16,8 @@ function piilotaKaikkiNakymat() {
   document.getElementById('asetukset-view').style.display = 'none';
   document.getElementById('hytti-view').style.display = 'none';
   document.getElementById('hytti-kortti-view').style.display = 'none';
+  document.getElementById('teema-view').style.display = 'none';
+  document.getElementById('vahdittu-view').style.display = 'none';
 }
 
 function showLoginView() {
@@ -316,13 +318,17 @@ async function lataaListatNakymaan(containerId, kategoria) {
     const item = document.createElement('li');
     item.dataset.tuoteId = lista.id;
     alustaRaahaus(item, lista, { container: containerEl, cache: data, taulu: 'lists', jalkeenPaivitys: paivitaNakyma });
+    // TASO 2 (2026-07-21) — teema/vahdittu-tyyppiset rivit avaavat OMAN
+    // näkymänsä tavallisen tuotteet-listan (app-view) sijaan.
     item.addEventListener('click', function() {
+      if (lista.list_type === 'teema') { avaaTeemaView(lista); return; }
+      if (lista.list_type === 'vahdittu') { avaaVahdittuView(lista); return; }
       listanAvausLahde = kategoria;
       avaaLista(lista);
     });
 
     const teksti = document.createElement('span');
-    teksti.textContent = lista.name;
+    teksti.textContent = (lista.list_type === 'teema' ? '🧵 ' : lista.list_type === 'vahdittu' ? '⏳ ' : '') + lista.name;
     item.appendChild(teksti);
 
     if (lista.name !== 'Kauppalista') {
@@ -356,6 +362,274 @@ async function lataaMuistilaput() {
 async function lataaVarasto() {
   return lataaListatNakymaan('varasto-list', 'varasto');
 }
+
+// === KESKUSTELUTEEMA (2026-07-21, ks. KONSEPTIKIRJA.md 4.10b / muistiinpanot.md
+// "Keskusteluteema Varastossa") ===
+// Arvoperiaate koko tälle osiolle ja Vahditulle levolle alla (Katrin oma
+// sanamuoto, TASO 1:ssä jo kirjattu, koskee tätäkin): "Satama tukee
+// vanhempien muistia — ei rakenna profiilia lapsesta." Ei koskaan
+// luonnearvio-/diagnoosikenttiä millekään teemalle.
+function showTeemaView() {
+  piilotaKaikkiNakymat();
+  document.getElementById('teema-view').style.display = 'block';
+}
+
+let currentTeema = null;
+
+async function avaaTeemaView(lista) {
+  currentTeema = lista;
+  showTeemaView();
+  document.getElementById('teema-title').textContent = '✱ ' + lista.name + ' ✱';
+  paivitaSovittuLinjaNaytto();
+  paivitaTeemaPriorityNapit();
+  await lataaTeemaSisalto();
+}
+
+function paivitaSovittuLinjaNaytto() {
+  const teksti = document.getElementById('teema-sovittu-linja-teksti');
+  const pvm = document.getElementById('teema-sovittu-linja-pvm');
+  if (currentTeema.sovittu_linja) {
+    teksti.textContent = currentTeema.sovittu_linja;
+    const d = new Date(currentTeema.sovittu_linja_pvm + 'T00:00:00');
+    pvm.textContent = 'sovittu ' + d.getDate() + '.' + (d.getMonth() + 1) + '.' + d.getFullYear();
+  } else {
+    teksti.textContent = 'Ei vielä sovittua linjaa';
+    pvm.textContent = '';
+  }
+}
+
+function paivitaTeemaPriorityNapit() {
+  document.querySelectorAll('.teema-priority-btn').forEach(function(b) {
+    b.classList.toggle('active', b.dataset.priority === currentTeema.priority);
+  });
+}
+
+document.querySelectorAll('.teema-priority-btn').forEach(function(btn) {
+  btn.addEventListener('click', async function() {
+    if (!currentTeema) return;
+    const uusi = btn.dataset.priority;
+    const { error } = await db.from('lists').update({ priority: uusi }).eq('id', currentTeema.id);
+    if (ilmoitaKirjoitusvirheesta(error, 'Nostoherkkyyden päivitys')) return;
+    currentTeema.priority = uusi;
+    paivitaTeemaPriorityNapit();
+  });
+});
+
+// "Sovittu linja" (2b) — päivittyessä VANHA arvo ei häviä, se kirjoitetaan
+// uudeksi laituri-riviksi samaan teemaan ("vanha valuu historiaan") ENNEN
+// ylikirjoitusta — sama laituri+teema_id-mekanismi kuin murutkin, ei
+// erillistä historiataulua tarvita.
+document.getElementById('teema-sovittu-linja-muokkaa-btn').addEventListener('click', function() {
+  const input = document.getElementById('teema-sovittu-linja-input');
+  const napit = document.getElementById('teema-sovittu-linja-napit');
+  input.value = currentTeema.sovittu_linja || '';
+  input.style.display = 'block';
+  napit.style.display = 'none';
+  document.getElementById('teema-sovittu-linja-teksti').style.display = 'none';
+  input.focus();
+
+  async function tallenna() {
+    const uusi = input.value.trim();
+    input.removeEventListener('blur', tallenna);
+    input.style.display = 'none';
+    napit.style.display = 'flex';
+    document.getElementById('teema-sovittu-linja-teksti').style.display = 'block';
+    if (!uusi || uusi === currentTeema.sovittu_linja) return;
+
+    if (currentTeema.sovittu_linja) {
+      const { error: historiaError } = await db.from('laituri').insert({
+        content: 'Sovittu (aiempi linja): ' + currentTeema.sovittu_linja,
+        teema_id: currentTeema.id,
+        status: 'uusi',
+      });
+      if (historiaError) console.error('Vanhan sovitun linjan historiakirjaus epäonnistui:', historiaError);
+    }
+
+    const tanaan = paivamaaraISO(new Date());
+    const { error } = await db.from('lists').update({ sovittu_linja: uusi, sovittu_linja_pvm: tanaan }).eq('id', currentTeema.id);
+    if (ilmoitaKirjoitusvirheesta(error, 'Sovitun linjan päivitys')) return;
+    currentTeema.sovittu_linja = uusi;
+    currentTeema.sovittu_linja_pvm = tanaan;
+    paivitaSovittuLinjaNaytto();
+    await lataaTeemaSisalto();
+  }
+
+  input.addEventListener('blur', tallenna);
+  input.addEventListener('keydown', function(e) {
+    if (e.key === 'Enter') input.blur();
+    if (e.key === 'Escape') { input.value = ''; input.blur(); }
+  });
+});
+
+async function lataaTeemaSisalto() {
+  if (!currentTeema) return;
+  const { data, error } = await db.from('laituri').select().eq('teema_id', currentTeema.id).order('created_at', { ascending: true });
+  if (error) {
+    console.error('Teeman sisällön haku epäonnistui:', error);
+    return;
+  }
+  const murut = data || [];
+
+  const jatkorivitKartta = {};
+  if (murut.length > 0) {
+    const { data: jatkorivit, error: jatkoriviError } = await db.from('laituri_jatkorivit').select()
+      .in('muru_id', murut.map(function(r) { return r.id; })).order('created_at', { ascending: true });
+    if (jatkoriviError) {
+      console.error('Teeman jatkorivien haku epäonnistui:', jatkoriviError);
+    } else {
+      (jatkorivit || []).forEach(function(jr) {
+        if (!jatkorivitKartta[jr.muru_id]) jatkorivitKartta[jr.muru_id] = [];
+        jatkorivitKartta[jr.muru_id].push(jr);
+      });
+    }
+  }
+
+  const listEl = document.getElementById('teema-list');
+  listEl.innerHTML = '';
+  document.getElementById('teema-tyhja').style.display = murut.length === 0 ? 'block' : 'none';
+
+  murut.forEach(function(muru) {
+    const li = document.createElement('li');
+    li.className = 'laituri-row';
+
+    const sisalto = document.createElement('div');
+    sisalto.className = 'laituri-content';
+    const teksti = document.createElement('span');
+    teksti.className = 'laituri-text';
+    teksti.textContent = muru.content;
+    sisalto.appendChild(teksti);
+    const meta = document.createElement('span');
+    meta.className = 'laituri-meta';
+    const d = new Date(muru.created_at);
+    meta.textContent = d.getDate() + '.' + (d.getMonth() + 1) + '.' + d.getFullYear();
+    sisalto.appendChild(meta);
+    li.appendChild(sisalto);
+
+    // EI editointia, EI poistoa yksittäiselle riville — VAIN "nosta
+    // aktiiviseksi" (turvainvariantti: teeman sisältö on lukittu paitsi
+    // kokonaispoistolla, ks. teema-poista-btn).
+    const nostaNappi = document.createElement('button');
+    nostaNappi.className = 'restore-btn';
+    nostaNappi.textContent = '↩';
+    nostaNappi.title = 'Nosta takaisin aktiiviseksi Laituriin';
+    nostaNappi.addEventListener('click', async function() {
+      const { error: nostoError } = await db.from('laituri').update({ teema_id: null }).eq('id', muru.id);
+      if (ilmoitaKirjoitusvirheesta(nostoError, 'Nosto aktiiviseksi')) return;
+      naytaIlmoitus('Nostettu takaisin Laituriin');
+      lataaTeemaSisalto();
+    });
+    li.appendChild(nostaNappi);
+
+    listEl.appendChild(li);
+    piirraJatkorivit(muru, li, jatkorivitKartta[muru.id] || []);
+  });
+}
+
+document.getElementById('teema-back-btn').addEventListener('click', function() {
+  currentTeema = null;
+  showVarastoView();
+  lataaVarasto();
+});
+
+document.getElementById('teema-poista-btn').addEventListener('click', async function() {
+  if (!currentTeema) return;
+  await deleteList(currentTeema, function() {
+    currentTeema = null;
+    showVarastoView();
+    lataaVarasto();
+  });
+});
+
+// === VAHDITTU LEPO (2026-07-21, ks. KONSEPTIKIRJA.md 4.10b / muistiinpanot.md
+// "Vahdittu lepo Varastossa") ===
+// "Anna arjen yrittää ensin" — muuten tavallinen tuotteet-lista (samat
+// rivit/täppäys kuin Muistilaput/Varasto), mutta kuittaamaton rivi nousee
+// ankkuriehdokkaaksi X päivän jälkeen (ks. api/muistutukset-laheta.js:n
+// uusi tarkistus). Tämä näkymä on VAIN sisällönhallinta + raja-asetus —
+// itse nosto tapahtuu palvelimella cronissa, ei täällä.
+function showVahdittuView() {
+  piilotaKaikkiNakymat();
+  document.getElementById('vahdittu-view').style.display = 'block';
+}
+
+let currentVahdittu = null;
+
+async function avaaVahdittuView(lista) {
+  currentVahdittu = lista;
+  showVahdittuView();
+  document.getElementById('vahdittu-title').textContent = '✱ ' + lista.name + ' ✱';
+  document.getElementById('vahdittu-raja-input').value = lista.vahdittu_raja_paivia;
+  await lataaVahdittuSisalto();
+}
+
+async function lataaVahdittuSisalto() {
+  if (!currentVahdittu) return;
+  const { data, error } = await db.from('tuotteet').select().eq('list_id', currentVahdittu.id).order('sort_order');
+  if (error) {
+    console.error('Vahditun listan haku epäonnistui:', error);
+    return;
+  }
+  const listEl = document.getElementById('vahdittu-list');
+  listEl.innerHTML = '';
+  (data || []).forEach(function(tuote) {
+    const li = document.createElement('li');
+
+    const check = document.createElement('button');
+    check.className = 'check-btn';
+    check.textContent = tuote.tehty ? '✓' : '○';
+    check.addEventListener('click', async function() {
+      const { error: checkError } = await db.from('tuotteet').update({ tehty: !tuote.tehty }).eq('id', tuote.id);
+      if (ilmoitaKirjoitusvirheesta(checkError, 'Rivin kuittaus')) return;
+      lataaVahdittuSisalto();
+    });
+    li.appendChild(check);
+
+    const teksti = document.createElement('span');
+    teksti.textContent = tuote.nimi;
+    li.appendChild(teksti);
+
+    const poisto = document.createElement('button');
+    poisto.className = 'delete-btn';
+    poisto.textContent = '×';
+    poisto.addEventListener('click', async function() {
+      const { error: poistoError } = await db.from('tuotteet').delete().eq('id', tuote.id);
+      if (ilmoitaKirjoitusvirheesta(poistoError, 'Rivin poisto')) return;
+      lataaVahdittuSisalto();
+    });
+    li.appendChild(poisto);
+
+    listEl.appendChild(li);
+  });
+}
+
+document.getElementById('vahdittu-add-btn').addEventListener('click', async function() {
+  if (!currentVahdittu) return;
+  const input = document.getElementById('vahdittu-input');
+  const nimi = input.value.trim();
+  if (nimi === '') { input.focus(); return; }
+  const { error } = await db.from('tuotteet').insert({ nimi: nimi, tehty: false, list_id: currentVahdittu.id });
+  if (ilmoitaKirjoitusvirheesta(error, 'Rivin lisäys')) return;
+  input.value = '';
+  lataaVahdittuSisalto();
+});
+
+document.getElementById('vahdittu-input').addEventListener('keydown', function(event) {
+  if (event.key === 'Enter') document.getElementById('vahdittu-add-btn').click();
+});
+
+document.getElementById('vahdittu-raja-input').addEventListener('change', async function(e) {
+  if (!currentVahdittu) return;
+  const uusi = parseInt(e.target.value, 10) || 14;
+  const { error } = await db.from('lists').update({ vahdittu_raja_paivia: uusi }).eq('id', currentVahdittu.id);
+  if (ilmoitaKirjoitusvirheesta(error, 'Rajan päivitys')) return;
+  currentVahdittu.vahdittu_raja_paivia = uusi;
+});
+
+document.getElementById('vahdittu-back-btn').addEventListener('click', function() {
+  currentVahdittu = null;
+  showVarastoView();
+  lataaVarasto();
+});
 
 // === KALENTERI ===
 let kalenteriTila = 'paiva';
@@ -3187,7 +3461,12 @@ async function lataaLaituri(hakusana) {
   // Arkistoidut murut (ks. "Murun arkistointi", muistiinpanot.md) eivät kuulu
   // aktiiviseen näkymään — samaa "murua ei koskaan poisteta" -periaatetta
   // kuin muuallakin, ne vain suodatetaan pois täältä, ei tuhota.
-  let kysely = db.from('laituri').select().neq('status', 'arkistoitu').order('created_at', { ascending: false });
+  // Keskusteluteema (2026-07-21, ks. muistiinpanot.md "Keskusteluteema
+  // Varastossa" / KONSEPTIKIRJA.md 4.10b): teemaan siirretty muru (teema_id
+  // asetettu) POISTUU aktiivisesta Laiturin näkymästä KOKONAAN — eri käytös
+  // kuin status='sijoitettu' (joka jää näkyviin himmennettynä), koska muru
+  // vaihtoi kotinsa pysyvästi teemaan eikä ole enää osa Laiturin virtaa.
+  let kysely = db.from('laituri').select().neq('status', 'arkistoitu').is('teema_id', null).order('created_at', { ascending: false });
   if (hakusana) {
     kysely = kysely.ilike('content', '%' + hakusana + '%');
   }
@@ -3382,6 +3661,14 @@ async function lataaLaituri(hakusana) {
       label: '🧵 Jatka säiettä',
       onClick: function() { avaaJatkoriviDialog(rivi); },
     });
+    // Keskusteluteema (2026-07-21) — siirtää murun (JA sen jatkorivit,
+    // ei erillistä kopiointia) teemaan. Sama "poistuu Laiturista siirrettynä"
+    // -periaate kuin muillakin sijoitusreiteillä, turvainvariantti säilyy
+    // (ei poistoa, vain uudelleenluokittelu teema_id:llä).
+    menuKohdat.push({
+      label: '🧵➜ Siirrä teemaan',
+      onClick: function() { avaaTeemaValikko(rivi, li); },
+    });
     // Sama laituri.status-tilakenttä kuin OSA A:n "siirretty Kauppalistalle" —
     // "arkistoitu" vain kolmas arvo, ei erillinen mekanismi.
     menuKohdat.push({
@@ -3422,6 +3709,7 @@ async function lataaLaituri(hakusana) {
   });
 
   paivitaLaituriArkisto();
+  paivitaLuoteLinkki();
 }
 
 // Murun säie (2026-07-20/21, ks. muistiinpanot.md "Murun säie" / KONSEPTIKIRJA.md
@@ -3746,6 +4034,36 @@ async function avaaSijoitaValikko(rivi, li) {
   openRowMenu(li, items);
 }
 
+// Keskusteluteema (2026-07-21, ks. muistiinpanot.md "Keskusteluteema
+// Varastossa") — sama openRowMenu-kaava kuin sijoituksella. Siirto on
+// PELKKÄ teema_id-asetus (ei sisällön kopiointia mihinkään), joten
+// jatkorivit (sql/079) seuraavat automaattisesti mukana (viittaavat
+// muru_id:hen, joka ei muutu).
+async function avaaTeemaValikko(rivi, li) {
+  const { data: teemat, error } = await db.from('lists').select('id, name').eq('list_type', 'teema').order('name');
+  if (error) {
+    console.error('Teemojen haku epäonnistui:', error);
+    naytaIlmoitus('Teemojen haku epäonnistui');
+    return;
+  }
+  if (!teemat || teemat.length === 0) {
+    naytaIlmoitus('Ei yhtään teemaa vielä — luo ensin uusi teema Varastosta');
+    return;
+  }
+  const items = teemat.map(function(teema) {
+    return {
+      label: '🧵 ' + teema.name,
+      onClick: async function() {
+        const { error: siirtoError } = await db.from('laituri').update({ teema_id: teema.id }).eq('id', rivi.id);
+        if (ilmoitaKirjoitusvirheesta(siirtoError, 'Siirto teemaan')) return;
+        naytaIlmoitus('Siirretty teemaan: ' + teema.name);
+        lataaLaituri(document.getElementById('laituri-search').value.trim());
+      },
+    };
+  });
+  openRowMenu(li, items);
+}
+
 // Merkitsee murun sijoitetuksi VASTA kun muistutus on VARMISTETUSTI
 // tallentunut (kutsutaan avaaMuistutusPaneelin jalkeenPaivitys-callbackina,
 // joka laukeaa vain onnistuneen tallennuksen jälkeen — ks. lisaaMuistutus).
@@ -3835,6 +4153,171 @@ async function paivitaLaituriArkisto() {
 document.getElementById('laituri-arkisto-toggle').addEventListener('click', function() {
   const lista = document.getElementById('laituri-arkisto-lista');
   lista.style.display = lista.style.display === 'none' ? 'block' : 'none';
+});
+
+// === LAITURIN LUOTE (2026-07-21, ks. KONSEPTIKIRJA.md 4.10 Kerros 2 / 4.10b,
+// muistiinpanot.md "Laiturin luote") ===
+// Viikoittainen TARJOTTU katselmus vanhoille/pysähtyneille muruille — EI
+// pakollinen, EI pörise, käyttäjä avaa itse "🌊 Luote (N)" -linkistä joka
+// näkyy VAIN kun jotain on kertynyt. Kolme pyyhkäisyä murulle (ankkuriin/
+// anna olla/arkistoi), kevyempi "avaa/anna olla" avoimelle teemalle (2c:n
+// "taattu perälauta" — sama kierros kattaa myös teemat, ei erillistä omaa
+// katselmusta niille).
+//
+// "Pysähtynyt" = tehokas viimeisin aktiviteetti (VIIMEISIN jatkorivi jos
+// sellainen on, muuten murun oma created_at — sama periaate kuin äly-yöajon
+// effectiveContent()/effectiveWrittenAt()-logiikassa api/aly-nightly.js:ssä,
+// vain client-puolella tässä) on vanhempi kuin `luote_raja_paivia`-asetus
+// (oletus 14 pv, dataohjattu — sama "ei koodia" -periaate kuin muillakin
+// Sataman kynnysarvoilla).
+//
+// Painava-vihje (2d-2, "vihje ohjaa JÄRJESTELMÄN aloitetta") nostaa
+// priority='painava'-teemat jonon KÄRKEEN riippumatta iästä — muuten
+// vanhin ensin.
+let luoteJono = [];
+let luoteIndeksi = 0;
+
+async function laskeLuoteJono() {
+  const rajaPaivia = haeAsetusNumero('luote_raja_paivia', 14);
+  const rajaHetkiMs = Date.now() - rajaPaivia * 86400000;
+
+  const { data: murut, error: muruError } = await db.from('laituri').select().neq('status', 'arkistoitu').is('teema_id', null);
+  if (muruError) {
+    console.error('Luoteen murujen haku epäonnistui:', muruError);
+    return [];
+  }
+
+  const viimeisinJatkoKartta = {};
+  if (murut && murut.length > 0) {
+    const { data: jatkorivit } = await db.from('laituri_jatkorivit').select()
+      .in('muru_id', murut.map(function(m) { return m.id; })).order('created_at', { ascending: true });
+    (jatkorivit || []).forEach(function(jr) { viimeisinJatkoKartta[jr.muru_id] = jr; }); // asc → viimeisin voittaa
+  }
+
+  const jono = [];
+  (murut || []).forEach(function(muru) {
+    const jr = viimeisinJatkoKartta[muru.id];
+    const viimeisin = new Date(jr ? jr.created_at : muru.created_at).getTime();
+    if (viimeisin < rajaHetkiMs) jono.push({ tyyppi: 'muru', data: muru, viimeisin: viimeisin });
+  });
+
+  // 2c: avoimet teemat samaan kierrokseen — "taattu perälauta".
+  const { data: teemat, error: teemaError } = await db.from('lists').select().eq('list_type', 'teema');
+  if (!teemaError && teemat && teemat.length > 0) {
+    for (const teema of teemat) {
+      const { data: teemanMurut } = await db.from('laituri').select('id, created_at').eq('teema_id', teema.id);
+      if (!teemanMurut || teemanMurut.length === 0) continue; // tyhjä teema — ei mitään katsottavaa
+      let viimeisin = Math.max.apply(null, teemanMurut.map(function(m) { return new Date(m.created_at).getTime(); }));
+      const { data: teemanJatkorivit } = await db.from('laituri_jatkorivit').select('created_at')
+        .in('muru_id', teemanMurut.map(function(m) { return m.id; }));
+      (teemanJatkorivit || []).forEach(function(jr) { viimeisin = Math.max(viimeisin, new Date(jr.created_at).getTime()); });
+      if (viimeisin < rajaHetkiMs) jono.push({ tyyppi: 'teema', data: teema, viimeisin: viimeisin });
+    }
+  }
+
+  jono.sort(function(a, b) {
+    const aPainava = (a.tyyppi === 'teema' && a.data.priority === 'painava') ? 0 : 1;
+    const bPainava = (b.tyyppi === 'teema' && b.data.priority === 'painava') ? 0 : 1;
+    if (aPainava !== bPainava) return aPainava - bPainava;
+    return a.viimeisin - b.viimeisin;
+  });
+  return jono;
+}
+
+async function paivitaLuoteLinkki() {
+  luoteJono = await laskeLuoteJono();
+  const linkki = document.getElementById('luote-linkki');
+  if (luoteJono.length > 0) {
+    linkki.style.display = 'block';
+    linkki.textContent = '🌊 Luote (' + luoteJono.length + ')';
+  } else {
+    linkki.style.display = 'none';
+  }
+}
+
+function naytaLuoteKohde() {
+  const laskuri = document.getElementById('luote-laskuri');
+  const sisalto = document.getElementById('luote-sisalto');
+  const murunNapit = document.getElementById('luote-murun-napit');
+  const murunNapit2 = document.getElementById('luote-murun-napit-2');
+  const teemaNapit = document.getElementById('luote-teema-napit');
+
+  if (luoteIndeksi >= luoteJono.length) {
+    laskuri.textContent = '';
+    sisalto.textContent = 'Ei enää mitään katsottavaa tällä kierroksella. 🌊';
+    murunNapit.style.display = 'none';
+    murunNapit2.style.display = 'none';
+    teemaNapit.style.display = 'none';
+    return;
+  }
+
+  const kohde = luoteJono[luoteIndeksi];
+  laskuri.textContent = (luoteIndeksi + 1) + ' / ' + luoteJono.length;
+  const paivia = Math.round((Date.now() - kohde.viimeisin) / 86400000);
+
+  if (kohde.tyyppi === 'muru') {
+    sisalto.textContent = kohde.data.content + '\n\n(' + paivia + ' päivää hiljaisuutta)';
+    murunNapit.style.display = 'flex';
+    murunNapit2.style.display = 'flex';
+    teemaNapit.style.display = 'none';
+  } else {
+    sisalto.textContent = '🧵 ' + kohde.data.name + (kohde.data.sovittu_linja ? '\n📌 ' + kohde.data.sovittu_linja : '') + '\n\n(' + paivia + ' päivää hiljaisuutta)';
+    murunNapit.style.display = 'none';
+    murunNapit2.style.display = 'none';
+    teemaNapit.style.display = 'flex';
+  }
+}
+
+function luoteSeuraava() {
+  luoteIndeksi++;
+  naytaLuoteKohde();
+}
+
+function suljeLuote() {
+  document.getElementById('luote-overlay').style.display = 'none';
+  lataaLaituri(document.getElementById('laituri-search').value.trim());
+  paivitaLuoteLinkki();
+}
+
+document.getElementById('luote-linkki').addEventListener('click', function() {
+  luoteIndeksi = 0;
+  document.getElementById('luote-overlay').style.display = 'flex';
+  naytaLuoteKohde();
+});
+document.getElementById('luote-sulje').addEventListener('click', suljeLuote);
+document.getElementById('luote-overlay').addEventListener('click', function(e) {
+  if (e.target === document.getElementById('luote-overlay')) suljeLuote();
+});
+document.getElementById('luote-anna-olla').addEventListener('click', luoteSeuraava);
+document.getElementById('luote-teema-ohita').addEventListener('click', luoteSeuraava);
+
+document.getElementById('luote-arkistoi').addEventListener('click', async function() {
+  const kohde = luoteJono[luoteIndeksi];
+  if (!kohde || kohde.tyyppi !== 'muru') return;
+  const { error } = await db.from('laituri').update({ status: 'arkistoitu' }).eq('id', kohde.data.id);
+  ilmoitaKirjoitusvirheesta(error, 'Murun arkistointi');
+  luoteSeuraava();
+});
+
+document.getElementById('luote-ankkuriin').addEventListener('click', async function() {
+  const kohde = luoteJono[luoteIndeksi];
+  if (!kohde || kohde.tyyppi !== 'muru') return;
+  if (ankkuroidutAvaimet.has('laituri:' + kohde.data.id)) {
+    naytaIlmoitus('Jo ankkurissa');
+    luoteSeuraava();
+    return;
+  }
+  const { error } = await db.from('ankkurit').insert({ content: kohde.data.content, source: 'laituri', source_ref: String(kohde.data.id), user_id: currentUserId });
+  if (ilmoitaKirjoitusvirheesta(error, 'Ankkurointi')) return;
+  await paivitaAnkkuroidutAvaimet();
+  luoteSeuraava();
+});
+
+document.getElementById('luote-teema-avaa').addEventListener('click', function() {
+  const kohde = luoteJono[luoteIndeksi];
+  if (!kohde || kohde.tyyppi !== 'teema') return;
+  document.getElementById('luote-overlay').style.display = 'none';
+  avaaTeemaView(kohde.data);
 });
 
 // Siivoaa rivin (li) jälkeen mahdollisesti jo olevan ehdotuskortin pois
@@ -4080,8 +4563,20 @@ function naytaVahvistus(otsikko, teksti, poistaTeksti) {
 // said why. Fixed on the policy side in sql/039, but this code must never
 // swallow an error silently again regardless of what causes it in future).
 async function deleteList(list, refreshView) {
-  const { count } = await db.from('tuotteet').select('id', { count: 'exact', head: true }).eq('list_id', list.id);
-  const message = count > 0 ? 'Listalla on ' + count + ' asiaa — nekin poistuvat.' : null;
+  // Keskusteluteema (2026-07-21, ks. muistiinpanot.md "Keskusteluteema
+  // Varastossa") — teemalla ei ole tuotteet-rivejä ollenkaan (sisältö on
+  // laituri-rivejä teema_id:n kautta), joten vahvistuksen pitää laskea
+  // OIKEA taulu jotta käyttäjä näkee mitä on oikeasti katoamassa ennen
+  // tietoista poistopäätöstä ("vahvistus seuraa todellisuutta").
+  let count;
+  if (list.list_type === 'teema') {
+    ({ count } = await db.from('laituri').select('id', { count: 'exact', head: true }).eq('teema_id', list.id));
+  } else {
+    ({ count } = await db.from('tuotteet').select('id', { count: 'exact', head: true }).eq('list_id', list.id));
+  }
+  const message = count > 0
+    ? (list.list_type === 'teema' ? 'Teemassa on ' + count + ' murua säikeineen — nekin poistuvat PYSYVÄSTI, ei arkistoon.' : 'Listalla on ' + count + ' asiaa — nekin poistuvat.')
+    : null;
   const confirmed = await naytaVahvistus('Poistetaanko ' + list.name + '?', message, 'Poista lista');
   if (!confirmed) return;
 
@@ -5199,12 +5694,33 @@ document.getElementById('varasto-back-btn').addEventListener('click', function()
   lataaKotinakyma();
 });
 
+// TASO 2 (2026-07-21, ks. KONSEPTIKIRJA.md 4.10b) — kolme Varasto-sivutyyppiä
+// samalla luontilomakkeella, vain napautettu tyyppi vaikuttaa insertiin.
+let uusiVarastoTyyppi = 'normal';
+document.querySelectorAll('.varasto-tyyppi-btn').forEach(function(btn) {
+  btn.addEventListener('click', function() {
+    uusiVarastoTyyppi = btn.dataset.tyyppi;
+    document.querySelectorAll('.varasto-tyyppi-btn').forEach(function(b) { b.classList.toggle('active', b === btn); });
+    const input = document.getElementById('new-varasto-input');
+    input.placeholder = uusiVarastoTyyppi === 'teema' ? 'uuden teeman nimi...'
+      : uusiVarastoTyyppi === 'vahdittu' ? 'uuden vahditun asian nimi...'
+      : 'uusi lista...';
+  });
+});
+
 document.getElementById('new-varasto-btn').addEventListener('click', async function() {
   const varastoInput = document.getElementById('new-varasto-input');
   const nimi = varastoInput.value.trim();
   if (nimi === '') { varastoInput.focus(); return; }
 
-  const { data, error } = await db.from('lists').insert({ name: nimi, type: 'checklist', owner_id: currentUserId, category: 'varasto' }).select().single();
+  const rivi = { name: nimi, type: 'checklist', owner_id: currentUserId, category: 'varasto', list_type: uusiVarastoTyyppi };
+  // Teema/Vahdittu ovat AINA jaettuja (KONSEPTIKIRJA.md 4.10b: "jaettu,
+  // molemmat näkevät/kartuttavat") — ei odoteta erillistä jako-tekoa kuten
+  // normaaleilla listoilla, koska koko ominaisuuden tarkoitus on kahden
+  // vanhemman yhteinen muisti/seuranta.
+  if (uusiVarastoTyyppi !== 'normal') rivi.visibility = 'shared';
+
+  const { data, error } = await db.from('lists').insert(rivi).select().single();
   if (ilmoitaKirjoitusvirheesta(error, 'Listan luonti')) return;
   logEvent('created', 'list', data.id, nimi, data.id);
   varastoInput.value = '';
