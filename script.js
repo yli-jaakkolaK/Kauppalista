@@ -951,6 +951,301 @@ document.getElementById('opinto-kartta-back-btn').addEventListener('click', func
   lataaOpintoKurssit();
 });
 
+// === OPINTOPOLKU VAIHE 2: KOLMEN VOIMAN MOOTTORI (2026-07-21, ks.
+// muistiinpanot.md "Opintopolku VAIHE 2" — KONSEPTIKIRJA.md 4.11 puuttuu
+// vielä repon konseptikirjasta, sama huomio kuin VAIHE 1:ssä) ===
+// Arvoperiaate ennallaan: "Satama tukee oppimista — ei tee oppimista
+// puolesta. Äly voi järjestää MILLOIN/MITEN opiskellaan, ei ymmärtää
+// sisältöä puolesta." Moottori on PUHDASTA LASKENTAA, ei yhtään älykutsua.
+//
+// Rakennettu VAIHE 1:n TODELLISEN toteutuksen päälle (ei suunnitellun
+// konseptin, jota ei ollut olemassa) — erityisesti opinto_aiheet.vaihe
+// (5 arvoa: priming/encoding/retrieval/reference/yllapito) ja
+// opintoVaiheRyhma()-jaottelu (hallussa=reference+yllapito, työn alla=
+// encoding+retrieval, edessä=priming) ovat VAIHE 1:n omia päätöksiä joita
+// tämä moottori kunnioittaa muuttamatta.
+//
+// TULKINTAPÄÄTÖS (ei yksiselitteisesti spesifioitu, kirjattu näkyväksi):
+// 'reference' on VAIN käsin asetettava, moottorin EI KOSKAAN automaattisesti
+// asettama tai ehdottama tila — se edustaa "tiedän tämän, en aktiivisesti
+// harjoittele" -tyyppistä sisältöä (esim. kertaustaulukko jota vain
+// tarvittaessa katsotaan). Moottorin oma automaattinen kierto kulkee
+// priming→encoding→retrieval(SR-kierto)→yllapito, EI KOSKAAN reference-tilan
+// kautta — reference on käyttäjän oma sivuraide, moottori ohittaa sen
+// kokonaan kandidaattijoukosta.
+
+const OPINTO_SR_VALIT_PV = [1, 3, 7, 21]; // kevenevä kertaustahti (spec: "1pv→3pv→7pv→21pv...")
+const OPINTO_YLLAPITO_VALI_PV = 60; // ylläpitovaiheen kiinteä jatkokertaustahti SR-kierron jälkeen
+
+const OPINTO_VAIHE_OHJE = {
+  priming: 'Silmäile aihe kokonaan läpi ilman että pysähdyt yksityiskohtiin. Kysy itseltäsi: mistä tässä on kyse, mitkä ovat pääkohdat? Keskity VAIN kokonaiskuvan hahmottamiseen — et vielä opettele mitään ulkoa.',
+  encoding: 'Rakenna käsitekartta tai luettelo siitä miten aiheen osat liittyvät toisiinsa ja aiemmin opittuun. Keskity YHTEYKSIIN, ei yksityiskohtien ulkoa opetteluun.',
+  retrieval: 'Sulje kirja/muistiinpanot kokonaan. Selitä aihe ääneen tai kirjoita omin sanoin ilman apuja. Tarkista vasta jälkeenpäin mitä jäi puuttumaan tai epäselväksi.',
+  reference: 'Tämä aihe on merkitty hallussa olevaksi viitetiedoksi — ei aktiivista kertausta, palaa tähän vain tarvittaessa.',
+  yllapito: 'Nopea kertaus: käy aihe läpi omin sanoin muutamassa minuutissa, tarkista ettei mikään ole päässyt unohtumaan kokonaan.',
+};
+
+function opintoTanaanPvm() {
+  return paivamaaraISO(new Date());
+}
+
+// KUORMA rajoittaa: sama Kuormavahdin "kellonaikameno"-määritelmä ja
+// paivan_menoraja-asetus kuin muualla sovelluksessa (ks. laskeMenoja(),
+// haeAsetusNumero('paivan_menoraja', 5)) — ei uutta kynnysarvoa keksitty.
+async function opintoPaivanKuorma() {
+  const tanaan = opintoTanaanPvm();
+  const { count } = await db.from('kalenteri_tapahtumat').select('id', { count: 'exact', head: true })
+    .eq('event_date', tanaan).not('event_time', 'is', null);
+  const raja = haeAsetusNumero('paivan_menoraja', 5);
+  const maara = count || 0;
+  if (maara === 0) return 'kevyt';
+  if (maara >= raja) return 'raskas';
+  return 'keski';
+}
+
+// PACER jäsentää: aihe on ylipäätään kandidaatti VAIN jos sen nykyinen vaihe
+// sallii toiminnan juuri nyt. priming/encoding ovat AINA valmiita (ei SR-
+// ajastusta, ensikertaista työtä). retrieval/yllapito vaativat että
+// sr_next_review on jo koittanut (ei ehdoteta kertausta ennen aikaansa).
+// reference EI OLE KOSKAAN kandidaatti (ks. tulkintapäätös yllä).
+function opintoOnkoRipe(aihe, tanaan) {
+  if (aihe.vaihe === 'priming' || aihe.vaihe === 'encoding') return true;
+  if (aihe.vaihe === 'retrieval' || aihe.vaihe === 'yllapito') {
+    return !aihe.sr_next_review || aihe.sr_next_review <= tanaan;
+  }
+  return false;
+}
+
+// DEADLINE vetää: lähin tuleva deadline (kurssi- TAI aihetasolta, kumpi
+// tahansa lähempänä) kasvattaa painoarvoa käänteisesti päivien määrään —
+// mitä lähempänä, sitä suurempi pisteet. Ei deadlinea → pieni tasapaino
+// (silti kelpaa, interleaving muiden kurssien kanssa ei tyrehdy).
+function opintoDeadlinePaino(aihe, kurssienDeadlinet, aiheidenDeadlinet, tanaan) {
+  const omat = (aiheidenDeadlinet[aihe.id] || []).map(function(d) { return d.pvm; });
+  const kurssin = (kurssienDeadlinet[aihe.kurssi_id] || []).map(function(d) { return d.pvm; });
+  const kaikki = omat.concat(kurssin).filter(function(pvm) { return pvm >= tanaan; }).sort();
+  if (kaikki.length === 0) return 1;
+  const paivia = Math.round((new Date(kaikki[0] + 'T00:00:00') - new Date(tanaan + 'T00:00:00')) / 86400000);
+  return 1000 / (paivia + 1);
+}
+
+// KUORMA rajoittaa (osa 2): raskaana päivänä VAIN kevyt kertaus (retrieval/
+// yllapito) kelpaa ollenkaan — uusi encoding/priming suodatetaan kokonaan
+// pois (iso negatiivinen pistemäärä, suodatetaan alempana). Kevyenä päivänä
+// uusi työ saa pienen bonuksen ("kevyt päivä → raskaampi encoding sallitaan").
+function opintoKuormaBonus(vaihe, kuormaTaso) {
+  const kevytTyo = vaihe === 'retrieval' || vaihe === 'yllapito';
+  if (kuormaTaso === 'raskas') return kevytTyo ? 50 : -1000;
+  if (kuormaTaso === 'kevyt') return kevytTyo ? 0 : 20;
+  return 0;
+}
+
+// Kolmen voiman moottori — palauttaa 1-2 aihe-oliota tälle päivälle.
+// Interleaving: suositaan eri kursseilta poimintaa (ei kahta askelta
+// samalta kurssilta jos toinenkin kurssi tarjoaa kelpaavan kandidaatin).
+async function laskeOpintoPaivanAskeleet() {
+  const tanaan = opintoTanaanPvm();
+
+  const { data: aiheet, error: aiheError } = await db.from('opinto_aiheet')
+    .select('*, opinto_kurssit!inner(owner_id, name)').eq('opinto_kurssit.owner_id', currentUserId);
+  if (aiheError) {
+    console.error('Moottorin aiheiden haku epäonnistui:', aiheError);
+    return [];
+  }
+  if (!aiheet || aiheet.length === 0) return [];
+
+  const kurssiIdt = Array.from(new Set(aiheet.map(function(a) { return a.kurssi_id; })));
+  const aiheIdt = aiheet.map(function(a) { return a.id; });
+
+  const [{ data: kurssiDl }, { data: aiheDl }] = await Promise.all([
+    db.from('opinto_deadlinet').select('kurssi_id, pvm').in('kurssi_id', kurssiIdt),
+    db.from('opinto_deadlinet').select('aihe_id, pvm').in('aihe_id', aiheIdt),
+  ]);
+  const kurssienDeadlinet = {};
+  (kurssiDl || []).forEach(function(d) { if (!d.kurssi_id) return; (kurssienDeadlinet[d.kurssi_id] = kurssienDeadlinet[d.kurssi_id] || []).push(d); });
+  const aiheidenDeadlinet = {};
+  (aiheDl || []).forEach(function(d) { if (!d.aihe_id) return; (aiheidenDeadlinet[d.aihe_id] = aiheidenDeadlinet[d.aihe_id] || []).push(d); });
+
+  const kuormaTaso = await opintoPaivanKuorma();
+  const maxAskelia = kuormaTaso === 'raskas' ? 1 : 2;
+
+  const ehdokkaat = aiheet
+    .filter(function(a) { return opintoOnkoRipe(a, tanaan); })
+    .map(function(a) {
+      return { aihe: a, pisteet: opintoDeadlinePaino(a, kurssienDeadlinet, aiheidenDeadlinet, tanaan) + opintoKuormaBonus(a.vaihe, kuormaTaso) };
+    })
+    .filter(function(e) { return e.pisteet > -500; })
+    .sort(function(a, b) { return b.pisteet - a.pisteet; });
+
+  const valitut = [];
+  const kaytetytKurssit = new Set();
+  for (const e of ehdokkaat) {
+    if (valitut.length >= maxAskelia) break;
+    const onkoMuitaKursseja = ehdokkaat.some(function(muu) { return !kaytetytKurssit.has(muu.aihe.kurssi_id); });
+    if (valitut.length > 0 && kaytetytKurssit.has(e.aihe.kurssi_id) && onkoMuitaKursseja) continue;
+    valitut.push(e.aihe);
+    kaytetytKurssit.add(e.aihe.kurssi_id);
+  }
+  // Interleaving-suosinta voi jättää paikkoja täyttämättä (esim. vain
+  // yhdellä kurssilla ripe-kandidaatteja) — täytetään loput ilman rajoitusta.
+  if (valitut.length < maxAskelia) {
+    for (const e of ehdokkaat) {
+      if (valitut.length >= maxAskelia) break;
+      if (valitut.indexOf(e.aihe) === -1) valitut.push(e.aihe);
+    }
+  }
+  return valitut;
+}
+
+// Idempotenssi (testivaatimus: "sama päivä ladattuna kahdesti ei tuplaa
+// ehdotuksia"): lasketaan VAIN jos tälle päivälle ei jo ole tallennettuja
+// askelia — muuten luetaan aiemmin tallennettu tulos sellaisenaan. Sama
+// "laske kerran, tallenna, lue sen jälkeen" -periaate kuin muillakin
+// idempotenteilla kertalaskuilla tässä projektissa.
+async function lataaOpintoPaivanAskeleet() {
+  if (!currentUserId) return;
+  const tanaan = opintoTanaanPvm();
+  const { data: olemassa, error: olemassaError } = await db.from('opinto_paivan_askeleet')
+    .select('*, opinto_aiheet(*, opinto_kurssit(name))').eq('owner_id', currentUserId).eq('pvm', tanaan);
+  if (olemassaError) {
+    console.error('Päivän askelten haku epäonnistui:', olemassaError);
+    return;
+  }
+
+  let askeleet = olemassa || [];
+  if (askeleet.length === 0) {
+    const valitutAiheet = await laskeOpintoPaivanAskeleet();
+    if (valitutAiheet.length > 0) {
+      const { error: insertError } = await db.from('opinto_paivan_askeleet').insert(
+        valitutAiheet.map(function(a) { return { owner_id: currentUserId, aihe_id: a.id, pvm: tanaan }; })
+      );
+      // Uniikkirajoite (owner_id, aihe_id, pvm) voi hylätä insertin jos toinen
+      // välilehti/lataus ehti jo kirjoittaa saman päivän rivit juuri äsken —
+      // ei virhe, seuraava haku alla lukee joka tapauksessa sen mikä kannassa
+      // oikeasti on (kumpi tahansa ehti ensin).
+      if (insertError) console.error('Päivän askelten tallennus epäonnistui (voi olla harmiton kilpa-ajo):', insertError);
+      const { data: uudet } = await db.from('opinto_paivan_askeleet')
+        .select('*, opinto_aiheet(*, opinto_kurssit(name))').eq('owner_id', currentUserId).eq('pvm', tanaan);
+      askeleet = uudet || [];
+    }
+  }
+  piirraOpintoTanaanOsio(askeleet);
+}
+
+function naytaOpintoOhje(vaihe) {
+  naytaVahvistus('🎯 ' + OPINTO_VAIHE_NIMET[vaihe], OPINTO_VAIHE_OHJE[vaihe], 'Selvä');
+}
+
+function piirraOpintoTanaanOsio(askeleet) {
+  const osio = document.getElementById('opinto-tanaan-osio');
+  const lista = document.getElementById('opinto-tanaan-lista');
+  lista.innerHTML = '';
+
+  if (!askeleet || askeleet.length === 0) {
+    osio.style.display = 'none';
+    return;
+  }
+  osio.style.display = 'block';
+
+  askeleet.forEach(function(askel) {
+    const aihe = askel.opinto_aiheet;
+    if (!aihe) return; // aihe ehditty poistaa askeleen tallennuksen jälkeen
+    const kortti = document.createElement('li');
+    kortti.className = 'opinto-tanaan-kortti';
+
+    const otsikko = document.createElement('div');
+    otsikko.className = 'opinto-tanaan-otsikko';
+    otsikko.textContent = aihe.name + (aihe.opinto_kurssit ? ' · ' + aihe.opinto_kurssit.name : '');
+    kortti.appendChild(otsikko);
+
+    const vaiheTeksti = document.createElement('div');
+    vaiheTeksti.className = 'opinto-tanaan-vaihe';
+    vaiheTeksti.textContent = OPINTO_VAIHE_NIMET[aihe.vaihe];
+    kortti.appendChild(vaiheTeksti);
+
+    if (askel.tila === 'tarjolla') {
+      const napit = document.createElement('div');
+      napit.className = 'opinto-tanaan-napit';
+
+      const ohjeNappi = document.createElement('button');
+      ohjeNappi.className = 'dialog-btn dialog-btn-cancel';
+      ohjeNappi.textContent = 'Näytä ohje';
+      ohjeNappi.addEventListener('click', function() { naytaOpintoOhje(aihe.vaihe); });
+      napit.appendChild(ohjeNappi);
+
+      const ohitaNappi = document.createElement('button');
+      ohitaNappi.className = 'dialog-btn dialog-btn-cancel';
+      ohitaNappi.textContent = 'En ehtinyt';
+      ohitaNappi.addEventListener('click', function() { merkitseOpintoAskel(askel, 'ohitettu'); });
+      napit.appendChild(ohitaNappi);
+
+      const tehtyNappi = document.createElement('button');
+      tehtyNappi.className = 'dialog-btn';
+      tehtyNappi.textContent = '✓ Tehty';
+      tehtyNappi.addEventListener('click', function() { merkitseOpintoAskel(askel, 'tehty'); });
+      napit.appendChild(tehtyNappi);
+
+      kortti.appendChild(napit);
+    } else {
+      const tila = document.createElement('div');
+      tila.className = 'opinto-tanaan-tila';
+      tila.textContent = askel.tila === 'tehty' ? '✓ Tehty tänään' : 'Ohitettu tänään — ei kertymää, tarjolla taas kun ajankohtainen.';
+      kortti.appendChild(tila);
+    }
+
+    lista.appendChild(kortti);
+  });
+}
+
+// "En ehtinyt" -kuittaus EI kosketa aiheen vaihe-/SR-tilaa mitenkään — sama
+// "ei rangaistusta, ei kertymää" -periaate kuin Toistuvan muistutuksen
+// kuittaamattomalla kerralla. Askel jää vain tälle päivälle 'ohitettu'-
+// tilaan historiaan, seuraava päivän moottoriajo laskee tuoreen ehdokasjoukon
+// riippumatta tästä.
+async function merkitseOpintoAskel(askel, tila) {
+  const { error } = await db.from('opinto_paivan_askeleet').update({ tila: tila }).eq('id', askel.id);
+  if (ilmoitaKirjoitusvirheesta(error, 'Askeleen kuittaus')) return;
+
+  if (tila === 'tehty') {
+    await etenetaOpintoAihe(askel.opinto_aiheet);
+  }
+  lataaOpintoPaivanAskeleet();
+}
+
+// "Tehty" etenee PACERia JA ajastaa spaced repetitionin — moottorin
+// kirjoittava puolisko. priming→encoding (ei SR:ää vielä). encoding→
+// retrieval JA ensimmäinen SR-kertaushetki. retrieval: joko seuraava
+// kevenevä väli TAI (viimeisen välin jälkeen) siirtyminen yllapito-tilaan
+// ("aihe ei koskaan valmistu, siirtyy ylläpito-tilaan"). yllapito: pysyy
+// yllapito-tilassa, jatkaa kiinteällä kertaustahdilla ikuisesti.
+async function etenetaOpintoAihe(aihe) {
+  if (!aihe) return;
+  let paivitys = null;
+
+  if (aihe.vaihe === 'priming') {
+    paivitys = { vaihe: 'encoding' };
+  } else if (aihe.vaihe === 'encoding') {
+    const ensiKertaus = new Date(Date.now() + OPINTO_SR_VALIT_PV[0] * 86400000);
+    paivitys = { vaihe: 'retrieval', sr_interval_index: 0, sr_next_review: paivamaaraISO(ensiKertaus) };
+  } else if (aihe.vaihe === 'retrieval') {
+    const seuraavaIndeksi = aihe.sr_interval_index + 1;
+    if (seuraavaIndeksi < OPINTO_SR_VALIT_PV.length) {
+      const seuraava = new Date(Date.now() + OPINTO_SR_VALIT_PV[seuraavaIndeksi] * 86400000);
+      paivitys = { sr_interval_index: seuraavaIndeksi, sr_next_review: paivamaaraISO(seuraava) };
+    } else {
+      const seuraava = new Date(Date.now() + OPINTO_YLLAPITO_VALI_PV * 86400000);
+      paivitys = { vaihe: 'yllapito', sr_interval_index: seuraavaIndeksi, sr_next_review: paivamaaraISO(seuraava) };
+    }
+  } else if (aihe.vaihe === 'yllapito') {
+    const seuraava = new Date(Date.now() + OPINTO_YLLAPITO_VALI_PV * 86400000);
+    paivitys = { sr_next_review: paivamaaraISO(seuraava) };
+  }
+
+  if (!paivitys) return;
+  const { error } = await db.from('opinto_aiheet').update(paivitys).eq('id', aihe.id);
+  if (error) console.error('Aiheen PACER/SR-eteneminen epäonnistui:', error);
+}
+
 // === KALENTERI ===
 let kalenteriTila = 'paiva';
 let kalenteriPvm = new Date();
@@ -2360,6 +2655,7 @@ async function lataaHyttiPaanakyma() {
   paivitaHyttiTyoVapaaLabel();
   lataaHyttiTanaanKaista();
   lataaOpintoKurssit();
+  lataaOpintoPaivanAskeleet();
 
   const { data: kortit, error: korttiError } = await db.from('hytti_kortit').select().eq('status', 'aktiivinen').order('sort_order');
   if (korttiError) {
