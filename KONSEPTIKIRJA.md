@@ -366,7 +366,7 @@ Arvoperiaate joka koskee KAIKKEA alla olevaa: *"Satama tukee vanhempien muistia 
 
 **Alkuperäinen speksi säilytetty alla sellaisenaan historiallisena viitteenä siitä mitä pyydettiin (kirjoitettu ENNEN rakentamista, ei siis suunnitelma joka toteutui sellaisenaan — ks. yllä mitä oikeasti syntyi).** HUOM numerointi: tämän speksin sisäinen "VAIHE 1/2/3" ja "TASO 1/2/3" viittaavat materiaalianalyysin ja moottorin kunnianhimon TASOIHIN (spekulatiivinen rakennussuositus), EIVÄT samaa tarkoita kuin yllä mainitut TODELLISET rakennusvaiheet "VAIHE 1" (perusta, rakennettu) ja "VAIHE 2" (kolmen voiman moottori, rakennettu) — kaksi eri numerointijärjestelmää samassa dokumentissa, ei pidä sekoittaa.
 
-### 4.11 OPINTOPOLKU — kuormatietoinen opiskelusuunnitelma omaan tyyliin (Katrin moduuli, konseptoitu 19.7., iso — vaiheistettu)
+**ALKUPERÄINEN SPEKSI: "OPINTOPOLKU — kuormatietoinen opiskelusuunnitelma omaan tyyliin" (Katrin moduuli, konseptoitu 19.7., iso — vaiheistettu)**
 
 **Ydintarve (Katrin kiteytys):** "kun minulla on se harvinainen opiskeluikkuna, tiedän heti MITÄ ja MITEN teen — ei arpomista, ei jumia." Ongelma on sama kuin koko Sataman ydin sovellettuna opiskeluun: ADHD-arjessa arvokas opiskelutunti menee siihen että PÄÄTÄT mitä tehdä, ja päätöskuorma syö energian ennen aloitusta. Ratkaisu: päätös tehty ennalta → istuessa vain tekeminen. TÄRKEÄ RAJAUS: EI raskasta materiaalin tekoälyanalyysia (ei "niele luentovideo ja ymmärrä puolestani") — Katri karsi sen tietoisesti. Materiaali on VIITE ja pilkottava, ei nieltävä.
 

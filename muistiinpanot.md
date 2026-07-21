@@ -11,6 +11,49 @@ Projekti on myös **Satama-sovelluksen vaihe 1** — myöhemmin kasvaa isommaksi
 
 ---
 
+## 🔍 KONSISTENSSI-AUDITOINTI 2026-07-21 — LUE TÄMÄ ENSIN (viimeinen auditointi ennen 23.7. luovutusta)
+
+Katri pyysi viimeisen, kattavan konsistenssiauditoinnin ennen Copilot-siirtymää: koodin keskeneräisyyksien inventointi, dokumentaation lupausten vertailu koodiin (erityisesti juuri rakennettu Opintopolku ja TASO 2 -erä), käänteinen tarkistus (koodissa jotain jota mikään dokumentti ei kuvaa), COPILOT.md:n tekninen tarkkuus, ja KONSEPTIKIRJA.md:n juuri tehdyn yhdistämisen ristiriidattomuus. Viisi rinnakkaista tutkimusagenttia kävivät koko koodikannan (script.js 7377 riviä, kaikki api/*.js, kaikki sql/001–086) ja kaikki kolme dokumenttia läpi.
+
+**1. KONSEPTIKIRJA.md-yhdistämisen tarkistus:** löytyi yksi todellinen rakennevirhe — kaksi `### 4.11`-otsikkoa peräkkäin (rakennettu-yhteenveto + alkuperäinen speksi molemmat omana "4.11"-otsikkonaan). Korjattu: alkuperäinen speksi on nyt lihavoitu alaotsikko ("ALKUPERÄINEN SPEKSI: ...") saman 4.11-osion sisällä, ei enää oma numeroitu osionsa. Muu sisältö (4.7 sanelun tiivistys/Oivallukset, 4.8 vuosi-intervalli, 4.9 Jakoluukku, 4.10:n täysi speksi + 4.10b:n rakennettu-yhteenveto) tarkistettu — ei muita duplikaatteja tai ristiriitoja.
+
+**2. KRIITTISIN LÖYDÖS — `sql/081` ei olisi voinut ajaa onnistuneesti:** `laituri.teema_id` oli tyypitetty `bigint` mutta viittaa `lists(id)`, joka on `uuid` — Postgres ei salli implisiittistä bigint↔uuid-castia, joten koko migraatio (yksi `begin…commit`-lohko) olisi kaatunut ja rullautunut kokonaan takaisin ensimmäisellä ajokerralla. **Koska "sql/083–086 on ajettu" -viestisi ei maininnut 081/082:ta, se ei todennäköisesti ollut vielä ajettu — eli koko TASO 2 (Keskusteluteema, Vahdittu lepo, Sovittu linja, Laiturin luoteen teema-laajennus) ei ole tällä hetkellä olemassa kannassa lainkaan.** Korjattu koodissa (`teema_id uuid`) suoraan tiedostoon paikoilleen, koska migraatiota ei ollut vielä ajettu (ei siis uutta numeroa — ei ristiriidassa "aina numeroitu migraatio" -säännön kanssa, koska tämä ei muuta jo ajettua kantaa). **SINUN PITÄÄ AJAA `sql/081` UUDELLEEN (korjattuna) ja sitten `sql/082` ennen kuin mikään TASO 2 -ominaisuus toimii.**
+
+**3. Muut korjatut, triviaalit ja varmat koodibugit** (ei suunnittelupäätöksiä vaativia, siksi korjattu suoraan koodiin tämän auditoinnin sääntöjen mukaisesti):
+   - `api/muistutukset-laheta.js` (kevyen päivän ehdotus): `order=priority.desc` lajitteli tekstiarvot ('painava'/'tavallinen') aakkosjärjestyksessä väärin päin ('t' > 'p' → tavallinen tulisi ensin, vaikka painava piti nousta ensin) — vastoin 2d-2:n dokumentoitua tarkoitusta ja script.js:n omaa oikeaa erikoiskäsittelyä (`laskeLuoteJono()`). Korjattu `priority.asc`:ksi.
+   - `script.js` (Sovittu linja -tallennus): jos vanhan linjan historiakirjaus epäonnistui, koodi vain logitti virheen mutta JATKOI silti uuden linjan ylikirjoittamiseen — vanha päätös olisi voinut kadota hiljaa, vastoin turvainvarianttia. Korjattu: käyttää nyt `ilmoitaKirjoitusvirheesta()`+`return`, sama malli kuin kaikkialla muualla.
+   - `script.js` (`luote-arkistoi`-käsittelijä): jätti kirjoitusvirheen paluuarvon huomiotta ja eteni silti seuraavaan luotekohteeseen (sisarkäsittelijä `luote-ankkuriin` teki tämän oikein) — muru olisi voinut jäädä arkistoimatta ilman että kukaan huomaa. Korjattu vastaamaan sisarkäsittelijää.
+   - `script.js` (`vahdittu-raja-input`): `parseInt(...) || 14` tulkitsi arvon `0` falsyksi ja korvasi sen oletuksella 14 — mutta testauskäytäntö (ks. TASO 2 -testirivit) nimenomaan vaatii rajan asettamista 0:aan välitöntä testausta varten. Korjattu `Number.isNaN`-tarkistukseksi, 0 on nyt kelvollinen arvo.
+
+**4. COPILOT.md — useita vanhentuneita väitteitä korjattu:**
+   - "HUOMIO"-osio (rivi 327 vanhassa versiossa) väitti Murun säie/Vahdittu lepo/Keskusteluteema-speksin olevan kirjaamatta minnekään ja neuvoi kysymään Katrilta ennen rakentamista — todellisuudessa kaikki kolme oli jo rakennettu SAMANA ILTANA (KONSEPTIKIRJA.md 4.10b). Korvattu ajantasaisella tilalla + viittauksella `sql/081`-bugiin.
+   - Kaksi kohtaa väitti KONSEPTIKIRJA.md 4.10:n kerrosten 1-2 olevan rakentamatta ("vain kerros 3, arkisto, on") — todellisuudessa nyt rakennettu. Päivitetty.
+   - Koko Opintopolku-moduuli (4.11) puuttui COPILOT.md:n moduulikartasta kokonaan — lisätty oma "Opintopolku"-osio tauluineen/tiedostoineen/tunnettuine keskeneräisyyksineen.
+   - `index.html`:n näkymälista, `script.js`:n rivimäärä (n. 6100 → n. 7400) ja bannerikommenttien todellinen järjestys (uudet osiot eivät olleet listan lopussa vaan keskellä), sql-migraatioiden lukumäärä (078 → 86, ja tehty "kasvaa jatkuvasti" -huomautuksella ettei tarvitse päivittää joka kerta), style.css/muistiinpanot.md-rivimäärät — kaikki päivitetty vastaamaan nykytilaa.
+   - "Aikataulu"-kohta päivitetty: 21.-22.7. oli tarkoitus rauhoittaa uusilta ominaisuuksilta, mutta Katrin omasta eksplisiittisestä pyynnöstä TASO 2 ja koko Opintopolku silti rakennettiin 20.-21.7. — kirjattu faktana, ei kritiikkinä, koska pyyntö oli tietoinen ja eksplisiittinen.
+   - "Suunniteltu mutta ei vielä toteutettu" -lista: 4.10 ja 4.11 poistettu listalta (nyt rakennettu), 4.9 päivitetty vastaamaan uutta Jakoluukku-laajuutta, 4.7:ään lisätty huomautus että sanelun tiivistys/Oivallukset ovat vielä pelkkää speksiä.
+   - COPILOT.md:n muu sisältö (äly-putken periaatteet, kirjoituspolkujen 4 tarkistusta, ympäristömuuttujat, GitHub Actions -osio, sw.js-versiokäytäntö) tarkistettiin ja todettiin edelleen paikkansapitäväksi — ei muutoksia.
+
+**5. Opintopolku (Vaihe 1+2) — koodi vastaa dokumentaatiota, ei poikkeamia:** kaikki KONSEPTIKIRJA.md 4.11:n väitteet (owner_id-RLS hytti_kortit-mallilla, PACER-tila, kolmen voiman moottori ilman älykutsua, idempotentti tallennus `unique(owner_id, aihe_id, pvm)`, "tehty" etenee PACERia + ajastaa SR:n, `reference`-vaihe TIETOISESTI moottorin ulkopuolella, ei aikaikkuna/vuorokaudenaika-profiilia) vahvistettiin koodista rivi riviltä. Yksi pieni huomio: 4/4 Node-logiikkatestin väitetty ajo (muistiinpanot.md) ei ole toistettavissa suoraan reposta, koska testitiedostoa ei ole koskaan committoitu — ei ristiriita, mutta jos joskus haluat regressiotestata moottorin logiikkaa, testi pitää kirjoittaa uudelleen.
+
+**6. TASO 2 (Keskusteluteema/Vahdittu lepo/Sovittu linja/Luote) — RLS ja kirjoituspolut kunnossa `sql/081`-korjauksen jälkeen:** RLS-policyt (jaettu muokkaus/poisto teema/vahdittu-riveille) ovat oikein ja idempotentteja, kaikki muut kuin kohdassa 3 mainitut kirjoituspolut noudattavat "vahvistus seuraa todellisuutta" -sääntöä oikein.
+
+**7. Tunnetut, EI-korjatut aukot — kirjattu, vaativat suunnittelupäätöksen (ei korjattu koodiin tämän auditoinnin sääntöjen mukaisesti, koska eivät ole triviaaleja):**
+   - **Vahdittu lepo / Kevyen päivän ehdotus -ehdokkaan hylkääminen ei pysy hylättynä:** yleinen ehdokkaan hylkäysnappi (×) vain poistaa `ankkurit`-rivin — koska näillä kahdella lähteellä ei ole `aly_log`-tyylistä pysyvää "käsitelty"-kirjanpitoa, seuraava ~5 min cron-kierros löytää saman ylikuittaamattoman tuoterivin/teeman ja luo identtisen ehdokkaan uudelleen. Vaatii oman pysyvän hylkäystaulukon/-sarakkeen kuten `aly_log`:lla on — suunnittelupäätös, ei triviaali fiksi.
+   - **Sama kaksi funktiota tekevät ei-atomisen "tarkista sitten kirjoita" -tarkistuksen** ilman uniikki-rajoitetta `ankkurit(source, source_ref)`:lle — projektin oma opittu läksy (OSA 6, kohta 7) sanoo cron-job.org + GitHub Actions voivat aidosti ajaa päällekkäin, joten kaksi samanaikaista ajoa voi molemmat läpäistä tarkistuksen ja luoda duplikaattiehdokkaan. Sama korjaustyyli kuin `claimNightlyRun`/`paataPersistentti` puuttuu näiltä kahdelta uudelta funktiolta.
+   - `luote_raja_paivia`-asetuksella ei ole siemenriviä missään migraatiossa eikä Asetukset-UI:ta — toimii vain hardcoded-oletuksella (14) ellei joku muuta Table Editorista suoraan (ristiriidassa "ei irtokomentoja"-hengen kanssa, mutta ei tuota virheitä).
+   - `showHistory()`-funktio (`script.js`) on kuollutta koodia, ei kutsuta mistään — turvallinen poistaa, ei poistettu tässä (ei bugi, vain siivousta).
+   - `list_members`-taulu on yhä käyttämätön — tarkistettu: tämä on TIETOISESTI dokumentoitu tuleva ominaisuus (sql/003:n oma kommentti), ei unohdettu jäänne.
+
+**8. Käänteinen tarkistus (koodikäytös jota mikään dokumentti ei kuvaa):** löytyi vain kohdassa 7 jo mainitut kaksi asiaa (hylkäyksen pysymättömyys + race-suoja puuttuu) — kaikki muu merkittävä koodikäytös (Kuormavahdin rajat, caldav-syncin ikkuna/toistokatto, Ristiriitapaketin vakavuusluokat, RLS:n "kirjautunut = koko perhe" -luottamusmalli, ym.) osoittautui jo dokumentoiduksi jossain kolmesta tiedostosta.
+
+**MITÄ SINUN PITÄÄ TEHDÄ NYT:**
+1. Aja `sql/081_varasto_teemat_ja_vahdittu.sql` (korjattu) ja `sql/082_testipaiva_taso2_rivit.sql`, tässä järjestyksessä, Supabasen SQL Editorissa — TASO 2 ei toimi ennen tätä.
+2. Käy sql/082:n testirivit läpi puhelimella kuten aiemminkin.
+3. Kohdan 7 kaksi ensimmäistä aukkoa (hylkäyksen pysyvyys, race-suoja) kannattaa harkita korjattavaksi Copilot-aikana ennen kuin TASO 2 on täydessä tuotantokäytössä pitkään — molemmat ovat "toimii yleensä mutta ei aina luotettavasti" -luokkaa, ei akuutteja.
+
+---
+
 ## ☀️ HERÄTESSÄSI LUE TÄMÄ ENSIN — yön yli -erän yhteenveto (2026-07-21)
 
 Sait luvan rakentaa koko KONSEPTIKIRJA.md 4.10b:n TASO 2:n yhdessä pitkässä erässä ilman lupakyselyjä välissä. Tässä numeroituna mikä valmistui, mikä jäi kesken/testaamatta, ja mitä sinun pitää testata/ajaa.

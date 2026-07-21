@@ -444,7 +444,10 @@ document.getElementById('teema-sovittu-linja-muokkaa-btn').addEventListener('cli
         teema_id: currentTeema.id,
         status: 'uusi',
       });
-      if (historiaError) console.error('Vanhan sovitun linjan historiakirjaus epäonnistui:', historiaError);
+      // Vanha linja ei saa hävitä (turvainvariantti): jos historiakirjaus
+      // epäonnistuu, EI ylikirjoiteta sovittu_linja-kenttää (korjattu
+      // konsistenssi-auditoinnissa 2026-07-21 — aiemmin jatkoi silti).
+      if (ilmoitaKirjoitusvirheesta(historiaError, 'Vanhan sovitun linjan historiakirjaus')) return;
     }
 
     const tanaan = paivamaaraISO(new Date());
@@ -621,7 +624,11 @@ document.getElementById('vahdittu-input').addEventListener('keydown', function(e
 
 document.getElementById('vahdittu-raja-input').addEventListener('change', async function(e) {
   if (!currentVahdittu) return;
-  const uusi = parseInt(e.target.value, 10) || 14;
+  // HUOM (korjattu konsistenssi-auditoinnissa 2026-07-21): "|| 14" tulkitsi
+  // syötteen 0 falsyksi ja korvasi sen oletuksella — 0 pv pitää kuitenkin
+  // olla kelvollinen arvo (testauskäytäntö vaatii sen välitöntä nostoa varten).
+  const parsed = parseInt(e.target.value, 10);
+  const uusi = Number.isNaN(parsed) || parsed < 0 ? 14 : parsed;
   const { error } = await db.from('lists').update({ vahdittu_raja_paivia: uusi }).eq('id', currentVahdittu.id);
   if (ilmoitaKirjoitusvirheesta(error, 'Rajan päivitys')) return;
   currentVahdittu.vahdittu_raja_paivia = uusi;
@@ -4912,7 +4919,7 @@ document.getElementById('luote-arkistoi').addEventListener('click', async functi
   const kohde = luoteJono[luoteIndeksi];
   if (!kohde || kohde.tyyppi !== 'muru') return;
   const { error } = await db.from('laituri').update({ status: 'arkistoitu' }).eq('id', kohde.data.id);
-  ilmoitaKirjoitusvirheesta(error, 'Murun arkistointi');
+  if (ilmoitaKirjoitusvirheesta(error, 'Murun arkistointi')) return;
   luoteSeuraava();
 });
 

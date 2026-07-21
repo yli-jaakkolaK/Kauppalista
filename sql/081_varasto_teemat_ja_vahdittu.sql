@@ -58,7 +58,7 @@ alter table lists add column if not exists priority text not null default 'taval
   check (priority in ('tavallinen', 'painava'));
 alter table lists add column if not exists vahdittu_raja_paivia int not null default 14;
 
-alter table laituri add column if not exists teema_id bigint references lists(id) on delete cascade;
+alter table laituri add column if not exists teema_id uuid references lists(id) on delete cascade;
 
 -- Idempotentti (drop+create policy, sama malli kuin sql/063/sql/072).
 drop policy if exists "lists_update_shared_teema" on lists;

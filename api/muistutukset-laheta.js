@@ -263,7 +263,11 @@ async function tarkistaKevyenPaivanEhdotus() {
   const kevyt = Array.isArray(menot) && menot.length === 0;
   if (!kevyt) return { ehdotettu: false, syy: 'ei_kevyt' };
 
-  const teemaRes = await supabaseFetch('lists?select=id,name,priority&list_type=eq.teema&order=priority.desc,id.asc&limit=1');
+  // HUOM (korjattu konsistenssi-auditoinnissa 2026-07-21): priority on tekstiä
+  // ('tavallinen'/'painava'), joten priority.desc lajittelisi aakkosjärjestyksessä
+  // väärin päin ('t' > 'p' → tavallinen ensin). asc antaa painava ensin, samoin
+  // kuin script.js:n laskeLuoteJono() -erikoiskäsittely (ei aakkosjärjestys).
+  const teemaRes = await supabaseFetch('lists?select=id,name,priority&list_type=eq.teema&order=priority.asc,id.asc&limit=1');
   const teemat = await teemaRes.json();
   if (!Array.isArray(teemat) || teemat.length === 0) return { ehdotettu: false, syy: 'ei_teemoja' };
   const teema = teemat[0];
