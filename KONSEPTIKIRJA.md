@@ -311,6 +311,20 @@ Arvoperiaate joka koskee KAIKKEA alla olevaa: *"Satama tukee vanhempien muistia 
 
 ---
 
+### 4.11 OPINTOPOLKU — RAKENNETTU 2026-07-21 (VAIHE 1 + VAIHE 2, kirjattu retroaktiivisesti)
+
+**⚠️ Tämä osio EI ollut olemassa kun Vaihe 1:tä ja Vaihe 2:ta pyydettiin rakennettavaksi** — molemmat rakennettiin suoraan Katrin chat-pyyntöjen verbatim-tekstistä (ks. molempien oma huomio muistiinpanot.md:ssä). Kirjattu tähän VASTA JÄLKIKÄTEEN, "elävä dokumentti" -periaatteen mukaisesti ("kun konsepti rakentuu, siirrä sen speksi tänne rakennettujen joukkoon") — ei siis alkuperäinen suunnitelma, vaan tiivistys siitä mitä oikeasti syntyi. Täysi tekninen kuvaus: muistiinpanot.md:n "Opintopolku VAIHE 1" ja "Opintopolku VAIHE 2: kolmen voiman moottori" -osiot.
+
+**Mikä:** yksityinen opiskelumoduuli Hytin sisällä (sama owner_id-RLS kuin muu Hytti). Kurssi → aiheet (PACER-vaihetila: priming/encoding/retrieval/reference/yllapito) → deadlinet (koe/palautus, kurssi- tai aihetasolla) → kevyt materiaali-tekstikenttä. Kolmen voiman moottori (puhdas laskenta, ei älyä) punnitsee deadlinea+PACERia+Kuormavahtia ja tarjoaa 1-2 päivän askelta arjen ohjaavassa ikkunassa Hytin yläosassa, idempotentisti tallennettuna. "Tehty" etenee PACERia ja ajastaa spaced repetitionin (1/3/7/21pv → pysyvä 60pv ylläpitosykli). Kokonaiskartta-näkymä (luettava, ei ohjaava) näyttää kaikki kurssit väripalkkeina.
+
+**Tulkintapäätös kirjattu (ei yksiselitteisesti spesifioitu alkuperäisessä pyynnössä):** `reference`-vaihe on moottorin ULKOPUOLELLA — vain käsin asetettava, ei koskaan osa automaattista PACER-kiertoa.
+
+**EI rakennettu, tietoinen rajaus:** "aikaikkuna/vuorokaudenaika"-metodiprofiili (vain Sung-vaiheiden ohjetekstit rakennettu). Ei mitään älykutsua ollenkaan (arvoperiaatteen mukaisesti).
+
+**EI TESTATTU oikealla käytöllä:** moottorin todellinen tarjonta usealla oikealla kurssilla/deadlinella — puhdas logiikka on Node-testattu, mutta Katrin oma huomio pyynnössä oli täsmälleen oikea: "moottorin tarjonta on vaikea todentaa ilman todellista dataa". Tämä on ensimmäinen asia mitä kannattaa seurata oikeassa käytössä.
+
+---
+
 ## OSA 5: MITEN TÄTÄ KEHITETÄÄN COPILOTIN KANSSA
 
 ### Katrin työskentelytapa (todistetusti toimiva)
