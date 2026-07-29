@@ -186,6 +186,81 @@ Todistettu 2026-07-14/15 illan diagnoosissa ("Ajastetut muistutukset eivät tule
 
 ---
 
+## Project Memory and Documentation Workflow
+
+### Documentation Roles
+
+Use the existing documentation structure as follows:
+
+- README.md = project overview, goals, user value and onboarding.
+- KONSEPTIKIRJA.md = source of truth for product vision, architecture principles, design decisions and long-term direction.
+- COPILOT.md = source of truth for development workflow, coding conventions and agent behavior.
+- muistiinpanot.md = project working memory containing recent work, decisions, known issues, lessons learned and next steps.
+- BACKUP.md = backup and recovery procedures.
+
+Do not create alternative documentation files that duplicate these responsibilities unless explicitly requested.
+
+### Before Starting Work
+
+Before making changes:
+
+1. Read muistiinpanot.md to understand:
+   - recent work
+   - current state
+   - open issues
+   - planned next steps
+
+2. If additional context is needed, read KONSEPTIKIRJA.md.
+
+3. Follow all rules and conventions defined in COPILOT.md.
+
+Do not generate project summaries unless explicitly requested.
+
+### During Development
+
+- Follow the architecture and design direction defined in KONSEPTIKIRJA.md.
+- Prefer extending existing solutions over introducing new patterns or frameworks.
+- Avoid unnecessary refactoring.
+- Keep implementations simple and maintainable.
+- Preserve existing functionality unless the task specifically requires changes.
+
+### After Completing Work
+
+Before creating a commit:
+
+Update muistiinpanot.md with:
+
+- completed work
+- important decisions
+- architectural changes
+- discovered bugs or risks
+- lessons learned
+- unresolved issues
+- recommended next steps
+
+Keep entries concise, practical and chronological.
+
+Do not duplicate information already documented in KONSEPTIKIRJA.md or COPILOT.md.
+
+### Commits
+
+Documentation updates should be included in the same commit as the related code changes whenever practical.
+
+Commit checklist:
+
+1. Update muistiinpanot.md with completed work, important decisions, next steps and risks.
+2. If the change affects data, migrations, user-visible behavior or architecture, review BACKUP.md and add a backup reminder in muistiinpanot.md when relevant.
+3. Keep documentation concise and practical; do not duplicate information already documented in KONSEPTIKIRJA.md or COPILOT.md.
+4. Before finishing, confirm that the current work state is understandable from the latest notes.
+
+When work is complete:
+
+- provide a short summary of what was done
+- identify any remaining issues
+- suggest logical next tasks
+
+---
+
 ## Repon kokonaiskuva ja lukemisjärjestys (kirjattu 2026-07-20, Claude Coden ja Copilotin vaihdon kynnyksellä)
 
 Tämä osio on eri asia kuin kaikki yllä oleva: yllä on **kertyneitä sääntöjä ja oppeja** (luettava kokonaan, mutta ei tarvitse ymmärtää koko koodikantaa lukeakseen niitä). Tämä osio on **kartta koko repoon** — kirjoitettu siksi että Copilot ei näe koko repoa kerralla eikä sillä ole Claude Coden keskusteluhistoriaa. Lue tämä osio ENSIN jos tämä on ensimmäinen kerta tässä projektissa.

@@ -1,5 +1,14 @@
 # Kauppalista / Satama — projektimuistiinpanot
 
+## Pika-template / nykyisen työn muisti
+
+- Tavoite:
+- Viimeisimmät muutokset:
+- Päätökset:
+- Seuraavat askeleet:
+- Riskit / huomiot:
+- Varmuuskopio / palautus: tarvitaan? viimeisin tarkistus:
+
 ## Mistä on kyse
 
 Katrin opetusprojekti: jaettu kauppalista hänen ja miehensä välillä. Toimii PWA:na iPhonessa.
@@ -8,6 +17,19 @@ Projekti on myös **Satama-sovelluksen vaihe 1** — myöhemmin kasvaa isommaksi
 **Julkaistu:** https://kauppalista-nine.vercel.app
 **Repo:** https://github.com/yli-jaakkolaK/Kauppalista (main-haara → auto-deploy Verceliin)
 **Supabase projekti:** https://uctmxxeewoeydabuepye.supabase.co
+
+---
+
+## Laituri-threadin nykyinen suunnanote (2026-07-29)
+
+Laituriin on tarkoitus rakentaa kevyt "säie"-tyyppinen käyttäjäkokemus, jossa:
+- ensimmäinen note jää Laiturin pääasiassa olevaksi pääviestiksi;
+- siihen liittyvät jatkoviestit näytetään sen alla kompaktina kommenttina;
+- Laiturissa näkyy vain viimeiset kaksi jatkoviestiä, jotta näkymä pysyy selkeänä;
+- jos keskustelu kasvaa pidemmäksi, järjestelmä kysyy minne se siirretään, jotta Laituri pysyy kevyenä ja itseohjautuvana;
+- kaikki toteutus pyritään pitämään yksinkertaisena eikä liian "prosessinomaisena".
+
+Tämä on tarkoituksella suunniteltu kevyeksi ja arjen käyttöön sopivaksi: ei ylimääräistä rakennetta, vaan selkeä ja nopea vuorovaikutus.
 
 ---
 
