@@ -4079,18 +4079,12 @@ async function paivitaLaituriSijoittamattaTeksti() {
   teksti.textContent = count ? count + ' sijoittamatta' : 'kaikki sijoitettu';
 }
 
-// Hakee ja piirtää Laiturin rivit, valinnaisesti hakusanalla suodatettuna
+// Hakee ja piirtää Laiturin rivit, valinnaisesti hakusanalla suodatettuna.
+// Jokainen muru pysyy omana kokonaisuutena ja sen alle voidaan jatkaa
+// säiettä. Näytössä näkyy vain kaksi uusinta jatkoriviä.
 async function lataaLaituri(hakusana) {
   paivitaLaituriSijoittamattaTeksti();
-  // Arkistoidut murut (ks. "Murun arkistointi", muistiinpanot.md) eivät kuulu
-  // aktiiviseen näkymään — samaa "murua ei koskaan poisteta" -periaatetta
-  // kuin muuallakin, ne vain suodatetaan pois täältä, ei tuhota.
-  // Keskusteluteema (2026-07-21, ks. muistiinpanot.md "Keskusteluteema
-  // Varastossa" / KONSEPTIKIRJA.md 4.10b): teemaan siirretty muru (teema_id
-  // asetettu) POISTUU aktiivisesta Laiturin näkymästä KOKONAAN — eri käytös
-  // kuin status='sijoitettu' (joka jää näkyviin himmennettynä), koska muru
-  // vaihtoi kotinsa pysyvästi teemaan eikä ole enää osa Laiturin virtaa.
-  let kysely = db.from('laituri').select().neq('status', 'arkistoitu').is('teema_id', null).order('created_at', { ascending: false });
+  let kysely = db.from('laituri').select('id, content, created_at, user_id, status, placed_where, teema_id').neq('status', 'arkistoitu').is('teema_id', null).order('created_at', { ascending: false });
   if (hakusana) {
     kysely = kysely.ilike('content', '%' + hakusana + '%');
   }
@@ -4343,8 +4337,11 @@ async function lataaLaituri(hakusana) {
 // (ks. lataaLaituri()) jotta jatkorivit päätyvät VISUAALISESTI ehdotuskorttien
 // ALLE — jokainen 'afterend'-lisäys samaan ankkuriin nousee edellisen ohi.
 function piirraJatkorivit(rivi, li, jatkorivit) {
+  if (!jatkorivit || jatkorivit.length === 0) return;
+
+  const nakyvat = jatkorivit.slice(-2);
   let edellinen = li;
-  jatkorivit.forEach(function(jr) {
+  nakyvat.forEach(function(jr) {
     const rivEl = document.createElement('li');
     rivEl.className = 'laituri-jatkorivi-rivi';
 
@@ -4367,6 +4364,13 @@ function piirraJatkorivit(rivi, li, jatkorivit) {
     edellinen.insertAdjacentElement('afterend', rivEl);
     edellinen = rivEl;
   });
+
+  if (jatkorivit.length > 2) {
+    const lisatieto = document.createElement('li');
+    lisatieto.className = 'laituri-jatkorivi-rivi';
+    lisatieto.textContent = '… ' + (jatkorivit.length - 2) + ' vanhempaa kommenttia piilotettu';
+    edellinen.insertAdjacentElement('afterend', lisatieto);
+  }
 }
 
 // Dialogin nykyinen kohdemuru — asetetaan avattaessa, tyhjennetään suljettaessa.
@@ -6249,6 +6253,8 @@ document.getElementById('laituri-add-btn').addEventListener('click', async funct
     return;
   }
 
+  const teemaSelect = document.getElementById('laituri-teema-select');
+  const teemaId = teemaSelect && teemaSelect.value ? teemaSelect.value : null;
   const { error } = await db.from('laituri').insert({ user_id: currentUserId, content: teksti });
   // "Ei koskaan kadota ajatusta" -periaate koskee myös epäonnistunutta
   // kirjoitusta: kenttää/luonnosta EI tyhjennetä jos kirjoitus ei onnistunut,
