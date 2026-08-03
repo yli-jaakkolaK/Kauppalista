@@ -60,6 +60,17 @@ Tämä tiedosto on eri asia kuin **muistiinpanot.md** (projektin historia, pää
 
 ---
 
+## Vahvistusdialogi vs. kumottava toast — kumpaa käyttää (talon sääntö, kirjattu 2026-08-04 Parisuhdeaika-ehdotuksen rakentamisen yhteydessä)
+
+Sovelluksessa on KAKSI erillistä mekanismia tuhoavalle/peruuttamattomalle toiminnolle, eikä valinta niiden välillä ole ollut aiemmin kirjattuna sääntönä — vain hajanaisia esimerkkejä eri puolilla koodia. Nyt eksplisiittinen:
+
+1. **`naytaVahvistus()`** (blokkaava "Oletko varma?" -dialogi, odottaa napautusta ennen kuin mitään tapahtuu) — käytä kun toiminto on JOKO (a) **jaettu/vaikuttaa toiseen käyttäjään** (esim. Parisuhdeaika-ehdotuksen hylkäys perii myös kumppanin ehdotuksen) TAI (b) **aidosti peruuttamaton sen jälkeen kun se on tapahtunut** (esim. molemminpuolisen hyväksynnän sulkeutuminen — ei mitään "kumoa"-nappia enää mistään sen jälkeen). Esimerkkejä: murun poisto, teeman poisto, Parisuhdeaika-ehdotuksen hyväksyntä/hylkäys.
+2. **`naytaKumottavaIlmoitus()`** (5s kumottava toast, varsinainen toiminto suoritetaan VASTA ajastimen jälkeen) — käytä kun toiminto on **puhtaasti oma/henkilökohtainen JA helposti perua** ilman että kukaan muu on siitä riippuvainen välissä (esim. ankkurin poisto, ✨-ehdokkaan hylkäys). Sopii tilanteisiin joissa nopeus/kitkattomuus painaa enemmän kuin varmuus, koska virhe on halpa korjata.
+
+**Kysy tämä ENNEN kuin lisäät jommankumman:** *"Vaikuttaako tämä vain minuun, ja voinko itse perua sen helposti jälkikäteen? Jos ei jompaankumpaan, käytä `naytaVahvistus()`:ia, ei toastia."*
+
+---
+
 ## Äly-putki (`api/aly.js`, rakennettu 2026-07-11, todistettu + ensimmäinen oikea ominaisuus 2026-07-12)
 
 ### Mikä tämä on
@@ -156,6 +167,8 @@ async function haeKayttajaId(userToken) {
 ```
 Sama malli kuin `api/push-test.js`:ssä — validoi kutsujan Supabase-istunnon `access_token` `/auth/v1/user`-endpointilla ennen kuin tehdään mitään maksullista. **Ilman tätä JOKAINEN uusi äly-endpoint on avoin kenelle tahansa netissä, joka polttaisi Anthropic-saldoa.** Ei poikkeuksia — jos joskus tarvitaan endpoint joka EI vaadi Satama-kirjautumista (esim. Siri Shortcut suoraan puhelimelta ilman selainistuntoa, kuten `api/add.js` käyttää `service_role`-avainta Siriä varten), se on eri, tietoinen päätös joka pitää perustella erikseen — ei oletus.
 
+**Sama auth-kaava toimii myös EI-älyominaisuuksille jotka tarvitsevat pääsyn TOISEN käyttäjän riviin** (kirjattu 2026-08-04, Parisuhdeaika-ehdotuksen molemminpuolisen hyväksynnän rakentamisen yhteydessä, ks. `api/parisuhdeaika-hyvaksy.js`/`api/parisuhdeaika-hylkaa.js`, muistiinpanot.md "Parisuhdeaika-ehdotus"). Tämä on ERI syy tarvita `service_role` kuin cron/Siri-tapaus (ks. "GitHub Actions -ajastin" -osio alla) — ei "ei selainistuntoa lainkaan", vaan "on kirjautunut selainistunto, mutta rivi jonka pitää lukea/kirjoittaa kuuluu TOISELLE käyttäjälle". Useimmilla tauluilla (`ankkurit`, `hytti_kortit`/`hytti_rivit`) RLS rajaa select/update/delete tarkasti `user_id = auth.uid()`:iin (ks. sql/029, sql/016) — tämä on TARKOITUKSELLISTA yksityisyyssuojaa, ei koodivika, joten client ei KOSKAAN pääse toisen rivin luo suoraan `db.from(...)`-kutsulla riippumatta siitä miten hyvältä syyltä tuntuu. **Kun uusi ominaisuus tarvitsee koordinoida kahden käyttäjän rivejä keskenään** (esim. "kumpikin hyväksyy saman asian"): (1) validoi kutsujan oma JWT `haeKayttajaId()`-kaavalla, (2) tarkista että kutsuja OMISTAA pyydetyn rivin ennen mitään muuta (älä luota pelkkään id:hen — kutsuja voisi antaa kenen tahansa rivin id:n), (3) käytä `SUPABASE_SERVICE_KEY`+`supabaseFetch()`-kaavaa (ks. `api/muistutukset-laheta.js`) VAIN sen jälkeen, ja VAIN siihen mihin kutsuja on jo (1)+(2):n perusteella oikeutettu — ei koskaan avaa laajempaa pääsyä kuin juuri tämä yksi toiminto vaatii.
+
 ### Kustannusnäkökulma
 
 - `max_tokens`: aina oletus + kova yläraja (`api/aly.js`: oletus 500, katto 2000) — kutsuja EI voi pyytää rajatonta vastausta.
@@ -193,6 +206,18 @@ Todistettu 2026-07-14/15 illan diagnoosissa ("Ajastetut muistutukset eivät tule
 **Korjaus: ulkoinen cron-palvelu (cron-job.org) ensisijaiseksi laukaisijaksi, GitHub Actions jää varalaukaisijaksi (ei poisteta — ilmainen, ei haittaa, molemmat kutsuvat samoja idempotentteja endpointteja turvallisesti päällekkäinkin).** Katrin oma asennusaskel (vaatii ulkoisen tilin, ei tehtävissä koodista) — jo tehty ja vahvistettu (ks. muistiinpanot.md 2026-07-15).
 
 **Yleistettävä oppi:** jos rakennat JATKOSSA jotain aikakriittistä (esim. Viikkokatsaus, Horisontti-rytmioppija) tämän saman `muistutukset-cron.yml`-workflow'n varaan, MUISTA että sen toteuma-aikataulu on suuntaa-antava, ei taattu — 20h+ -välein tapahtuvalle työlle (kuten E3:n yöajo) tämä on lähes huomaamaton, mutta minuuttitason tarkkuutta vaativalle (muistutukset) se on merkittävä riski jota ei näy testauksessa ellei nimenomaan mittaa toteuma-aikaleimoja.
+
+---
+
+## PWA-tiedostosillat (.ics ym.): AINA aito `<a href>`, EI KOSKAAN JS-navigointia (talon sääntö, kirjattu 2026-08-04 kolmen heinäkuisen korjauskierroksen jälkeen)
+
+Kun sovellus tarjoilee jotain iOS:n omalle natiivikäsittelylle (Kalenterisilta/`api/ics.js`, ja MIKÄ TAHANSA vastaava tuleva "vie puhelimen omaan sovellukseen" -silta, esim. `.vcf`-kontakti), asennettu PWA (standalone-tila) EI toimi samoin kuin selainvälilehti — kolme korjauskierrosta 2026-07-21 (ks. muistiinpanot.md "Kalenterisilta") todistivat tämän kalliisti:
+
+1. `data:text/calendar`-URI avasi vain tyhjän valkoisen sivun.
+2. `window.location.href` NIELEE navigoinnin ei-HTML-vastaukseen standalone-tilasta — nappi näytti aktiivityylin muttei siirtynyt mihinkään.
+3. `window.open(url, '_blank')` AVASI uuden ikkunan mutta se jäi TYHJÄKSI — tunnettu iOS-PWA-oikku.
+
+**Ainoa toimiva reitti todettiin olevan AITO `<a href="...">`-linkkielementti ilman `target`-attribuuttia ja ilman click-käsittelijää**, jonka selain/PWA käsittelee natiivina linkkinä — sama malli kuin selaimessa jo toimi alusta asti. **Kun rakennat JATKOSSA minkä tahansa "avaa puhelimen oma X-sovellus valmiiksi täytettynä" -sillan:** käytä suoraan `kalenterisiltaUrl()`-tyylistä mallia (palvelin palauttaa oikean `Content-Type`-vastauksen, client renderöi aidon `<a>`-elementin) — ÄLÄ yritä ohjelmallista navigointia (`location.href`, `window.open`, `router.push` tms.) ei-HTML-vastaukseen, vaikka se toimisikin selaimessa testattuna. Testaa AINA asennetulla PWA:lla, ei pelkällä Safari-välilehdellä — selain ja PWA käyttäytyvät tässä eri tavalla.
 
 ---
 
