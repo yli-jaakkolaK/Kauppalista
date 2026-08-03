@@ -2,12 +2,15 @@
 
 ## Pika-template / nykyisen työn muisti
 
-- Tavoite:
-- Viimeisimmät muutokset:
-- Päätökset:
-- Seuraavat askeleet:
-- Riskit / huomiot:
-- Varmuuskopio / palautus: tarvitaan? viimeisin tarkistus:
+- Tavoite: (tyhjä — täytä kun seuraava työ alkaa)
+- Viimeisimmät muutokset: 2026-08-04 illalla, ks. Muutosloki — Laiturin koti-mekanismi + piilotustäppä (commit f17514e), Parisuhdeaika-ehdotus + molemminpuolinen hyväksyntä (commit 00fb8d4), dokumentaatioaukkojen korjaus (commit df2d850). Kaikki committoitu JA pushattu, `git status` puhdas, ei paikallisia eroja origin/mainiin nähden.
+- Päätökset: —
+- Seuraavat askeleet (huomiselle, Katrin oma muistutus 2026-08-04 illalla):
+  1. **Jatka Node.js-asennusta.** Tämän session aikana node ei ollut käytettävissä kummassakaan shell-ympäristössä (Bash/PowerShell) vaikka asennus oli käynnissä — kaikki koodimuutokset jouduttiin varmistamaan käsin (brace/paren-tasapainon vertailu HEAD-versioon) `node --check`:in sijaan. Kun Node on asennettu, aja se ainakin kertaalleen `script.js`:n ja kaikkien `api/*.js`-tiedostojen läpi tämän session muutosten jälkivarmistukseksi.
+  2. **"Cron ajot takaisin ylös"** — Katrin oma muistutus, ei tarkennettu tässä keskustelussa MITÄ täsmälleen piti korjata (tarkista cron-job.orgin dashboard ensin, ks. myös COPILOT.md "GitHub Actions -ajastin" -osio mahdollisesta 60 päivän automaattisammutuksesta). Tarkista myös ETTÄ uusien migraatioiden (087–091) jälkeiset uudet cron-tarkistukset (`checkCoupleTimeProposal`, koti-mekanismin ei vaadi omaa cronia) todella ajautuvat ilman virheitä ensimmäisellä oikealla ajolla.
+  3. **Aja migraatiot 087–091 Supabasen SQL Editorissa** (ei vielä ajettu) — ilman niitä Laiturin koti-mekanismi, piilotustäppä JA Parisuhdeaika-ehdotus eivät toimi ollenkaan tuotannossa. Järjestys: 087 → 088 (lue ensin SELECT-tarkistus) → 089 → 090 → 091.
+- Riskit / huomiot: mikään tämän session koodimuutoksista ei ole vielä nähnyt oikeaa Supabase-dataa/cron-ajoa — kaikki koodikatselmoitu käsin, ei ajettu (ks. yllä, migraatiot puuttuu vielä).
+- Varmuuskopio / palautus: ei tehty tässä sessiossa erikseen — harkitse jos migraatiot 087–091 ajetaan huomenna ja ne muuttavat paljon dataa (ks. BACKUP.md).
 
 ## Mistä on kyse
 
