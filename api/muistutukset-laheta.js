@@ -244,23 +244,35 @@ async function tarkistaVahdittuLepo() {
   return nostettu;
 }
 
+// "Calm day" detection (2026-07-21, originally built for Kevyen päivän
+// ehdotus) — TOMORROW counts as calm if it has zero timed calendar events.
+// Pure calculation, no AI call. REUSED as-is for the Couple Time proposal's
+// trigger (2026-08-04, Katri's explicit requirement — "don't build a
+// parallel detector for the same thing"): both proposal types wait for the
+// SAME signal, but keep their own separate "max one pending" state
+// (source='kevyt_paiva' vs. source='parisuhdeaika'), so one's pending state
+// never blocks the other.
+async function isTomorrowCalm() {
+  const tomorrow = new Date(Date.now() + 86400000);
+  const tomorrowDate = isoDate(tomorrow);
+  const eventsRes = await supabaseFetch('kalenteri_tapahtumat?select=id&event_date=eq.' + tomorrowDate + '&event_time=not.is.null');
+  const events = await eventsRes.json();
+  return Array.isArray(events) && events.length === 0;
+}
+
 // Kevyen päivän ehdotus (2026-07-21, TASO 2d + 2d-2, ks. muistiinpanot.md
 // "Keskusteluteema Varastossa" / KONSEPTIKIRJA.md 4.10b) — MYÖS puhdas
-// laskenta, ei älykutsua ("kevyt päivä" on pelkkä tapahtumalaskuri, ei vaadi
-// tulkintaa). "Max yksi kerrallaan" (spec): jos JOKIN kevyt_paiva-ehdokas on
-// yhä pending millä tahansa käyttäjällä, ei ehdoteta uutta. Poimintajärjestys
-// painava-vihjeen mukaan (2d-2, "vihje ohjaa järjestelmän aloitetta, ei
-// ihmisen muistia") — painava-tyyppiset teemat ensin, sitten vanhin.
+// laskenta, ei älykutsua. "Max yksi kerrallaan" (spec): jos JOKIN
+// kevyt_paiva-ehdokas on yhä pending millä tahansa käyttäjällä, ei ehdoteta
+// uutta. Poimintajärjestys painava-vihjeen mukaan (2d-2, "vihje ohjaa
+// järjestelmän aloitetta, ei ihmisen muistia") — painava-tyyppiset teemat
+// ensin, sitten vanhin.
 async function tarkistaKevyenPaivanEhdotus() {
   const pendingRes = await supabaseFetch('ankkurit?select=id&source=eq.kevyt_paiva&is_candidate=eq.true&done=eq.false');
   const pending = await pendingRes.json();
   if (Array.isArray(pending) && pending.length > 0) return { ehdotettu: false, syy: 'jo_pending' };
 
-  const huominen = new Date(Date.now() + 86400000);
-  const huomisenPvm = isoDate(huominen);
-  const menotRes = await supabaseFetch('kalenteri_tapahtumat?select=id&event_date=eq.' + huomisenPvm + '&event_time=not.is.null');
-  const menot = await menotRes.json();
-  const kevyt = Array.isArray(menot) && menot.length === 0;
+  const kevyt = await isTomorrowCalm();
   if (!kevyt) return { ehdotettu: false, syy: 'ei_kevyt' };
 
   // HUOM (korjattu konsistenssi-auditoinnissa 2026-07-21): priority on tekstiä
@@ -298,6 +310,102 @@ async function tarkistaKevyenPaivanEhdotus() {
   return { ehdotettu: ehdotettu > 0, syy: 'ehdotettu', teema: teema.name };
 }
 
+// Same asetukset read as script.js's haeAsetusNumero() — duplicated here
+// for the same reason as isoDate() below (no shared modules between the
+// api/ functions and the browser side).
+async function getServerSettingNumber(key, fallback) {
+  const res = await supabaseFetch('asetukset?select=value&key=eq.' + key);
+  const rows = await res.json();
+  const value = Array.isArray(rows) && rows[0] ? parseInt(rows[0].value, 10) : NaN;
+  return isNaN(value) ? fallback : value;
+}
+
+// Couple time proposal ("Parisuhdeaika-ehdotus", 2026-08-04, Katri's
+// request) — pure calculation, no AI call. The trigger is EXACTLY the same
+// "is tomorrow calm" check as Kevyen päivän ehdotus (isTomorrowCalm() above)
+// — no parallel detector, per Katri's explicit requirement. Once triggered,
+// scans from tomorrow through the next 10 days for the FIRST day that is
+// NOT in a Kuormavahti load spike (same paivan_menoraja threshold + event
+// count as the client-side Kuormavahti, ks. laskeMenoja()) AND has 19:30-
+// 20:30 free (same overlap check as the client's onkoAjallisestiPaallekkainen()).
+// "Max one at a time" is its OWN state (source='parisuhdeaika'), separate
+// from kevyt_paiva's — one's pending state never blocks the other.
+//
+// Mutual acceptance (ks. muistiinpanot.md "Parisuhdeaika-ehdotus"): this
+// function only CREATES the proposal (one ankkuri row per user, same
+// parisuhde_ryhma uuid on both) — the accept/reject logic lives in
+// api/parisuhdeaika-hyvaksy.js and api/parisuhdeaika-hylkaa.js, because
+// those require the LOGGED-IN user's own action (principle 8: Satama never
+// writes to the calendar in the background without a human's own export step).
+async function checkCoupleTimeProposal() {
+  const calm = await isTomorrowCalm();
+  if (!calm) return { proposed: false, reason: 'not_calm' };
+
+  const pendingRes = await supabaseFetch('ankkurit?select=id&source=eq.parisuhdeaika&is_candidate=eq.true&done=eq.false');
+  const pending = await pendingRes.json();
+  if (Array.isArray(pending) && pending.length > 0) return { proposed: false, reason: 'already_pending' };
+
+  const usersRes = await supabaseFetch('push_tilaukset?select=user_id');
+  const userRows = await usersRes.json();
+  const userIds = Array.from(new Set((Array.isArray(userRows) ? userRows : []).map(function(r) { return r.user_id; })));
+  if (userIds.length < 2) return { proposed: false, reason: 'missing_a_user' };
+
+  const loadThreshold = await getServerSettingNumber('paivan_menoraja', 5);
+  const SLOT_START = '19:30:00';
+  const SLOT_END = '20:30:00'; // same 1h duration api/ics.js always assumes
+
+  for (let i = 1; i <= 10; i++) {
+    const day = new Date(Date.now() + i * 86400000);
+    const dateStr = isoDate(day);
+    const eventsRes = await supabaseFetch('kalenteri_tapahtumat?select=event_time,event_end_time&event_date=eq.' + dateStr);
+    const events = await eventsRes.json();
+    if (!Array.isArray(events)) continue;
+
+    const timedEvents = events.filter(function(e) { return e.event_time; });
+    if (timedEvents.length >= loadThreshold) continue; // load spike — skip this day
+
+    const overlaps = timedEvents.some(function(e) {
+      const end = e.event_end_time || e.event_time;
+      return e.event_time < SLOT_END && SLOT_START < end;
+    });
+    if (overlaps) continue; // proposed window already taken — skip this day
+
+    const groupId = require('crypto').randomUUID();
+    let created = 0;
+    for (const userId of userIds) {
+      const createRes = await supabaseFetch('ankkurit', {
+        method: 'POST',
+        headers: { Prefer: 'return=minimal' },
+        body: JSON.stringify({
+          content: 'Parisuhdeaikaa ' + dateStr + ' klo ' + SLOT_START.slice(0, 5) + '?',
+          source: 'parisuhdeaika',
+          user_id: userId,
+          is_candidate: true,
+          event_date: dateStr,
+          event_time: SLOT_START,
+          parisuhde_ryhma: groupId,
+        }),
+      });
+      if (!createRes.ok) {
+        console.error('[muistutukset-laheta] Couple time proposal creation failed user=' + userId + ':', createRes.status, await createRes.text());
+        continue;
+      }
+      created++;
+    }
+    // Kirjoituspolkujen rule 3/4: if only one row was created, the proposal
+    // is one-sided and doesn't match the spec ("both phones at the same
+    // time") — clean up the half-succeeded attempt instead of leaving the
+    // other person without one and never knowing.
+    if (created !== userIds.length) {
+      const cleanupRes = await supabaseFetch('ankkurit?parisuhde_ryhma=eq.' + groupId, { method: 'DELETE' });
+      if (!cleanupRes.ok) console.error('[muistutukset-laheta] Couple time proposal cleanup failed group=' + groupId);
+      return { proposed: false, reason: 'partial_write_failure' };
+    }
+    return { proposed: true, date: dateStr };
+  }
+  return { proposed: false, reason: 'no_suitable_day' };
+}
+
 // Sama Helsinki-kalenteripäivä-laskenta kuin api/_lib/aly-classify.js:n
 // isoDate()-funktiolla (5b83ed9-oppi: EI UTC-slicellä) — kopioitu tähän
 // erikseen koska tämä tiedosto ei jaa moduuleja _lib:n kanssa (eri syy: siellä
@@ -332,6 +440,7 @@ module.exports = async function handler(req, res) {
   // olevaa, jo tuotannossa todistettua muistutuslogiikkaa.
   let vahdittuNostettu = 0;
   let kevytPaivaTulos = null;
+  let coupleTimeResult = null;
   try {
     vahdittuNostettu = await tarkistaVahdittuLepo();
   } catch (e) {
@@ -341,6 +450,11 @@ module.exports = async function handler(req, res) {
     kevytPaivaTulos = await tarkistaKevyenPaivanEhdotus();
   } catch (e) {
     console.error('[muistutukset-laheta] Kevyen päivän ehdotuksen tarkistus heitti poikkeuksen:', e.message);
+  }
+  try {
+    coupleTimeResult = await checkCoupleTimeProposal();
+  } catch (e) {
+    console.error('[muistutukset-laheta] Couple time proposal check threw an exception:', e.message);
   }
 
   // BUGIKORJAUS/LAAJENNUS (2026-07-19, "Sinnikäs muistutus", ks.
@@ -362,7 +476,7 @@ module.exports = async function handler(req, res) {
   console.log('[muistutukset-laheta] ' + nyt.toISOString() + ': ' + (Array.isArray(kaikki) ? kaikki.length : 0) + ' päättämätöntä riviä tarkistettavana.');
 
   if (!Array.isArray(kaikki) || kaikki.length === 0) {
-    return res.status(200).json({ success: true, lahetetty: 0, tarkistettu: 0, vahdittu_nostettu: vahdittuNostettu, kevyt_paiva: kevytPaivaTulos });
+    return res.status(200).json({ success: true, lahetetty: 0, tarkistettu: 0, vahdittu_nostettu: vahdittuNostettu, kevyt_paiva: kevytPaivaTulos, couple_time: coupleTimeResult });
   }
 
   // Palauttaa muistutuksen sent_at:n takaisin nulliksi — käytetään kun claim
@@ -615,5 +729,5 @@ module.exports = async function handler(req, res) {
     }
   }
 
-  return res.status(200).json({ success: true, lahetetty: lahetetty, tarkistettu: tarkistettu, uudelleenyritetaan: jatetaanYrittamaan, vahdittu_nostettu: vahdittuNostettu, kevyt_paiva: kevytPaivaTulos });
+  return res.status(200).json({ success: true, lahetetty: lahetetty, tarkistettu: tarkistettu, uudelleenyritetaan: jatetaanYrittamaan, vahdittu_nostettu: vahdittuNostettu, kevyt_paiva: kevytPaivaTulos, couple_time: coupleTimeResult });
 };

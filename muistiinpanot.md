@@ -20,6 +20,29 @@ Projekti on myös **Satama-sovelluksen vaihe 1** — myöhemmin kasvaa isommaksi
 
 ---
 
+## Parisuhdeaika-ehdotus (2026-08-04, rakennettu)
+
+**Katrin pyyntö:** sama malli kuin "sisarusriidoissa" (Katrin oma nimitys) + molempien hyväksyntä. Koodikannassa ei ole mitään "sisarusriidat"-nimistä ominaisuutta — tarkistettu ristiin koko koodikanta ja dokumentaatio ennen rakentamista. Ainoa toiminto joka täsmää KIRJAIMELLISESTI Katrin kuvaukseen ("kuormavahti tunnistaa rauhallisen päivän, ja vasta silloin nostetaan ehdotus — ei jatkuvaa muistuttelua") on **Kevyen päivän ehdotus** (TASO 2d, 2026-07-21, ks. `tarkistaKevyenPaivanEhdotus()` api/muistutukset-laheta.js:ssä) — deterministinen tarkistus joka luo ankkuriehdokkaan kun huomisella ei ole yhtään kellonaikaan sidottua kalenteritapahtumaa. Tulkinta perusteltu Katrille erikseen ennen rakentamista.
+
+**Mistä malli on kopioitu — kaksi lähdettä, Katrin oma pyyntö:**
+1. **"Rauhallinen päivä" -tunnistus** = Kevyen päivän ehdotuksen olemassa oleva laukaisin. UUDELLEENKÄYTETTY SUORAAN, ei rinnakkaista tunnistinta: `tarkistaKevyenPaivanEhdotus()`:n sisäinen "huomenna ei tapahtumia" -tarkistus refaktoroitu omaksi `isTomorrowCalm()`-funktioksi (api/muistutukset-laheta.js), jota MOLEMMAT ehdotuslajit kutsuvat — Kevyen päivän ehdotus muuttumattomana (sama käytös kuin ennen), Parisuhdeaika-ehdotus uutena kutsujana. Kummallakin on OMA erillinen "max yksi kerrallaan" -tila (`source='kevyt_paiva'` vs. `source='parisuhdeaika'`) — toisen pending-tila ei estä toista.
+2. **Kalenteriin vienti** = sama Kalenterisilta-mekanismi kuin muistutuksilla/Laiturin "hetki"-sillalla (`kalenterisiltaUrl()`, `api/ics.js`, aito `<a href>`-linkki — EI JS-navigointia, ks. Kalenterisilta-korjaushistoria heinäkuulta miksi tämä on pakollinen PWA:ssa). Ei uutta kalenteri-integraatiota rakennettu.
+
+**Ehdotuksen luonti (cron, `checkCoupleTimeProposal()` api/muistutukset-laheta.js:ssä, sama 5 min -kadenssi kuin muutkin deterministiset tarkistukset):** kun huominen on rauhallinen JA parisuhdeaika-tyyppinen ehdotus ei ole jo pending, skannataan huomisesta 10 päivää eteenpäin ENSIMMÄINEN päivä jolla (a) kellonaikamenoja on alle Kuormavahdin `paivan_menoraja`-rajan JA (b) klo 19:30-20:30 on vapaa (sama päällekkäisyyslaskenta kuin script.js:n `onkoAjallisestiPaallekkainen()`, palvelinpuolelle kopioituna samasta syystä kuin `isoDate()` jo on kopioitu tähän tiedostoon). Luo YHDEN ankkuri-rivin per push-tilauksen omaava käyttäjä, samalla jaetulla `parisuhde_ryhma`-uuidilla — jos vain toinen rivi onnistuu kirjoittumaan, molemmat siivotaan pois (kirjoituspolkujen sääntö 3/4: ei koskaan yksipuolista ehdotusta jäämään roikkumaan).
+
+**UUSI OSA — molemminpuolinen hyväksyntä (ei ollut mallissa mistä kopioitiin, Katrin oma lisäpyyntö):**
+- Ankkurit-taulun RLS (sql/029) rajaa jokaisen rivin VAIN omistajalleen (select/update/delete) — käyttäjä ei voi lukea/kirjoittaa kumppaninsa riviä suoraan selaimesta. Tämä teki puhtaan client-side-ratkaisun mahdottomaksi: molemminpuolisen tilan tarkistus/sulkeminen VAATII service_role-palvelinreitin, sama auth-kaava kuin `api/aly.js`:ssä (validoi kutsujan oman JWT:n ensin, käyttää service_rolea vain siihen mihin kutsuja on jo oikeutettu).
+- `sql/090`: kaksi uutta saraketta `ankkurit`-tauluun: `parisuhde_ryhma` (uuid, sama molemmilla saman ehdotuksen riveillä) ja `parisuhde_hyvaksytty` (boolean, kunkin käyttäjän oma hyväksyntä).
+- `api/parisuhdeaika-hyvaksy.js`: merkitsee kutsujan oman rivin hyväksytyksi, tarkistaa kumppanin rivin. Jos kumppani EI ole vielä hyväksynyt → palauttaa `{mutual:false}`, käyttäjä näkee "odotetaan kumppania" -tilan. Jos kumppani ON jo hyväksynyt → tämä on VIIMEISENÄ hyväksyvä: molemmat rivit suljetaan (`is_candidate=false, done=true`) SAMASSA pyynnössä, ja vastaus sisältää kalenteritiedot joilla asiakas rakentaa `kalenterisiltaUrl()`-linkin. **HUOM:** linkkiä ei koskaan avata ohjelmallisesti (`window.location.href`) — vain aito `<a href>`-elementti, koska heinäkuun Kalenterisilta-korjaushistoria todisti että JS-navigointi ei toimi asennetusta iOS-PWA:sta.
+- `api/parisuhdeaika-hylkaa.js`: AKTIIVINEN hylkäys poistaa MOLEMMAT rivit (`parisuhde_ryhma`-osumalla). Passiivinen huomiotta jättäminen ei koskaan laukaise tätä reittiä — vain eksplisiittinen napin painallus. Uusi ehdotus syntyy vasta seuraavan kerran kun `isTomorrowCalm()` laukeaa uudelleen (ei erillistä jäähdytysajastinta — "max yksi kerrallaan" -pending-tarkistus riittää, koska hylätty ehdotus ei enää ole pending sen jälkeen kun rivit on poistettu).
+- **Vahvistusdialogi (Katrin lisäpyyntö kesken rakennuksen):** sekä Hyväksy että Hylkää/Peru avaavat ensin `naytaVahvistus()`-vahvistusdialogin (sama komponentti kuin esim. murun poistolla) ennen palvelinkutsua — perusteltu sillä että molemminpuolisen hyväksynnän sulkeutuminen ei ole enää peruttavissa mistään sen jälkeen kun se on tapahtunut.
+- **Periaate 8 ("Yksi totuus, kaksi ikkunaa"):** kumpikaan uusi endpoint EI KOSKAAN kirjoita kalenteritapahtumaa mihinkään — ne vain kertovat tilan ja tarjoavat linkin, sama malli kuin muistutuksilla. Vienti tapahtuu aina ihmisen omalla `<a href>`-napautuksella.
+- **Periaate 9 ("Se vain on siinä"):** ei kuittaus-/muistutuslogiikkaa toteumasta sen jälkeen kun ehdotus on käsitelty (hyväksytty tai hylätty) — appi ei myöhemmin kysy "varasitteko ajan?" eikä laske kuinka moni ehdotus toteutui.
+
+**Testirivit:** `sql/091` (OSA AG), ajettava `sql/090`:n jälkeen. **EI TESTATTU LAINKAAN oikealla cron-ajolla/kahdella laitteella** — koodikatselmoitu käsin (node ei ollut saatavilla `node --check`-ajoon tässä ympäristössä, paren/brace-tasapaino tarkistettu Pythonilla vertaamalla HEAD-version deltaan).
+
+---
+
 ## Laituri-threadin nykyinen suunnanote (2026-08-03, rakennettu — täsmennys 29.7. suunnitelmaan)
 
 Laiturissa on kevyt "säie"-tyyppinen käyttäjäkokemus, ja sen logiikka on rajattu nimenomaan saman murun sisäiseen ketjuun:

@@ -3542,6 +3542,69 @@ async function loadAnchorCandidates() {
     const napitRivi = document.createElement('div');
     napitRivi.className = 'anchor-candidate-napit';
 
+    // Couple time proposal (2026-08-04, Katri's request, ks.
+    // muistiinpanot.md "Parisuhdeaika-ehdotus") — mutual acceptance means
+    // this row's own accept action does NOT resolve it locally like a
+    // normal candidate; it must go through the server (RLS blocks reading/
+    // writing the partner's row from here) which reports back whether both
+    // sides have now said yes.
+    if (candidate.source === 'parisuhdeaika') {
+      const text = document.createElement('span');
+      const d = new Date(candidate.event_date + 'T00:00:00');
+      const dateText = d.getDate() + '.' + (d.getMonth() + 1) + '.';
+      const timeText = candidate.event_time.slice(0, 5);
+      text.textContent = candidate.parisuhde_hyvaksytty
+        ? '💞 Parisuhdeaikaa ' + dateText + ' klo ' + timeText + ' — odotetaan kumppanin hyväksyntää'
+        : '💞 Parisuhdeaikaa ' + dateText + ' klo ' + timeText + '?';
+      sisaltoRivi.appendChild(text);
+      li.appendChild(sisaltoRivi);
+
+      if (!candidate.parisuhde_hyvaksytty) {
+        const acceptButton = document.createElement('button');
+        acceptButton.textContent = '💞 Hyväksy';
+        acceptButton.className = 'dialog-btn';
+        acceptButton.addEventListener('click', async function() {
+          // Confirmation gate (2026-08-04, Katri's request): once BOTH
+          // people accept, the proposal closes and there is no "peru"
+          // option left anywhere — an accidental tap here would be
+          // unrecoverable, so a genuine confirm dialog guards it, not just
+          // a dismissable toast.
+          const confirmed = await naytaVahvistus(
+            'Hyväksytäänkö parisuhdeaika ' + dateText + ' klo ' + timeText + '?',
+            'Kun kumppanisikin hyväksyy, ehdotus sulkeutuu eikä sitä voi enää perua täältä.',
+            'Hyväksy'
+          );
+          if (!confirmed) return;
+          acceptButton.disabled = true;
+          acceptCoupleTimeProposal(candidate);
+        });
+        napitRivi.appendChild(acceptButton);
+      }
+
+      const rejectButton = document.createElement('button');
+      rejectButton.textContent = candidate.parisuhde_hyvaksytty ? '× Peru' : '× Ei sovi';
+      rejectButton.className = 'delete-btn';
+      rejectButton.addEventListener('click', async function() {
+        // Same confirmation gate as accept — rejecting cancels the proposal
+        // for BOTH people, not just this device, so it needs the stronger
+        // "are you sure" dialog rather than the lighter undo-toast used for
+        // purely personal candidate dismissals elsewhere in this list.
+        const confirmed = await naytaVahvistus(
+          candidate.parisuhde_hyvaksytty ? 'Perutaanko oma hyväksyntäsi?' : 'Hylätäänkö parisuhdeaika-ehdotus?',
+          'Ehdotus perutaan myös kumppanilta. Uusi ehdotus tulee vasta seuraavan kerran kun rauhallinen päivä tunnistetaan uudelleen.',
+          candidate.parisuhde_hyvaksytty ? 'Peru' : 'Hylkää'
+        );
+        if (!confirmed) return;
+        rejectButton.disabled = true;
+        rejectCoupleTimeProposal(candidate);
+      });
+      napitRivi.appendChild(rejectButton);
+
+      li.appendChild(napitRivi);
+      listEl.appendChild(li);
+      return;
+    }
+
     // Keskusteluehdotuksen erityissääntö (2026-07-17, Katrin linjaus, ks.
     // muistiinpanot.md "💬-ehdotuksen elinkaari"): ristiriidasta lähetetty
     // ehdotus (ristiriita_pvm+ristiriita_avain asetettu) on ERI LAJI kuin
@@ -3729,6 +3792,107 @@ async function loadAnchorCandidates() {
 
     listEl.appendChild(li);
   });
+}
+
+// Couple time proposal — accept (2026-08-04, ks. muistiinpanot.md
+// "Parisuhdeaika-ehdotus"). Calls the server (api/parisuhdeaika-hyvaksy.js)
+// because RLS blocks reading/writing the partner's own row from here — the
+// server is the only place that can tell whether both sides have said yes.
+async function acceptCoupleTimeProposal(candidate) {
+  const { data: sessionData } = await db.auth.getSession();
+  const token = sessionData.session ? sessionData.session.access_token : null;
+  let result = null;
+  try {
+    const response = await fetch('/api/parisuhdeaika-hyvaksy', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
+      body: JSON.stringify({ ankkuri_id: candidate.id }),
+    });
+    result = await response.json();
+    if (!response.ok) throw new Error(result.error || 'Hyväksyntä epäonnistui');
+  } catch (e) {
+    console.error('Parisuhdeajan hyväksyntä epäonnistui:', e.message);
+    naytaIlmoitus('Hyväksyntä epäonnistui — yritä uudelleen');
+    loadAnchorCandidates();
+    return;
+  }
+  if (result.mutual) {
+    naytaIlmoitus('Molemmat hyväksyivät!');
+    showCoupleTimeCalendarCard(result.calendar);
+  } else {
+    naytaIlmoitus('Hyväksytty — odotetaan kumppanin hyväksyntää');
+  }
+  loadAnchorCandidates();
+}
+
+// Couple time proposal — reject. An ACTIVE reject cancels the proposal for
+// BOTH people (server deletes both rows by their shared parisuhde_ryhma) —
+// the next proposal only appears the next time the calm-day trigger fires
+// naturally, never right away. The caller already ran a confirm dialog (ks.
+// above) before this is invoked, so this executes directly — no separate
+// undo toast, same "confirm once, then commit" pattern as murun poisto.
+async function rejectCoupleTimeProposal(candidate) {
+  const { data: sessionData } = await db.auth.getSession();
+  const token = sessionData.session ? sessionData.session.access_token : null;
+  try {
+    const response = await fetch('/api/parisuhdeaika-hylkaa', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
+      body: JSON.stringify({ ankkuri_id: candidate.id }),
+    });
+    const result = await response.json();
+    if (!response.ok) throw new Error(result.error || 'Hylkäys epäonnistui');
+    naytaIlmoitus('Parisuhdeaika-ehdotus hylätty');
+  } catch (e) {
+    console.error('Parisuhdeaika-ehdotuksen hylkäys epäonnistui:', e.message);
+    naytaIlmoitus('Hylkäys epäonnistui — yritä uudelleen');
+  }
+  loadAnchorCandidates();
+}
+
+// Shows the "both accepted" confirmation with the real Kalenterisilta link
+// (kalenterisiltaUrl(), same mechanism as reminders' calendar bridge) — the
+// underlying ankkuri row is already resolved server-side at this point (ks.
+// api/parisuhdeaika-hyvaksy.js), so it will disappear from the normal
+// candidate list on the next reload; this card is the only remaining place
+// the person can tap the link, so it stays until manually dismissed.
+function showCoupleTimeCalendarCard(calendar) {
+  const existing = document.getElementById('couple-time-calendar-card');
+  if (existing) existing.remove();
+
+  const card = document.createElement('li');
+  card.id = 'couple-time-calendar-card';
+  card.className = 'anchor-candidate-row';
+
+  const content = document.createElement('div');
+  content.className = 'anchor-candidate-content';
+  const text = document.createElement('span');
+  text.textContent = '🎉 Molemmat hyväksyivät parisuhdeajan — vie se kalenteriin';
+  content.appendChild(text);
+  card.appendChild(content);
+
+  const buttons = document.createElement('div');
+  buttons.className = 'anchor-candidate-napit';
+
+  const link = document.createElement('a');
+  link.textContent = '➕ Lisää kalenteriin';
+  link.className = 'dialog-btn dialog-btn-cancel';
+  link.title = 'Avaa valmiiksi täytettynä puhelimen omaan Kalenteriin';
+  link.href = kalenterisiltaUrl(calendar);
+  buttons.appendChild(link);
+
+  const okButton = document.createElement('button');
+  okButton.textContent = '✓ Selvä';
+  okButton.className = 'delete-btn';
+  okButton.addEventListener('click', function() { card.remove(); });
+  buttons.appendChild(okButton);
+
+  card.appendChild(buttons);
+
+  const list = document.getElementById('anchor-candidates-list');
+  list.insertBefore(card, list.firstChild);
+  const title = document.getElementById('anchor-candidates-title');
+  if (title) title.style.display = 'block';
 }
 
 // Hakee etusivun osiot (Laituri, Ankkurit, ym.) ja piirtää ne geneerisesti —
