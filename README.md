@@ -5,6 +5,33 @@
 
 ---
 
+## Dokumentaatio ja ympäristö
+
+- README.md = yleiskuvaus, tavoitteet, käyttötarve ja pääasiallinen onboarding-dokumentti.
+- KONSEPTIKIRJA.md = suunnitteluperiaatteet, arkkitehtuuri ja pitkän aikavälin suunta.
+- muistiinpanot.md = nykyinen työn muisti, tunnetut ongelmat, päätökset ja testauslista.
+- COPILOT.md = tekniset käytännöt, koodauskonventiot ja agentin ohjeet.
+- BACKUP.md = varmuuskopiointi ja palautusohjeet.
+
+### Lukemisjärjestys
+1. README.md
+2. KONSEPTIKIRJA.md, osat 1–3
+3. COPILOT.md
+4. muistiinpanot.md vain tarvittaessa
+
+### Ympäristömuuttujat
+
+| Muuttuja | Käyttötarkoitus |
+|---|---|
+| SUPABASE_SERVICE_KEY | palvelinpuolen kirjoitukset ja käyttäjän JWT:n validointi |
+| ANTHROPIC_API_KEY | Claude API -kutsut |
+| ALY_MALLI | valinnainen malli- ja kustannusvalinta ilman koodimuutosta |
+| VAPID_PUBLIC_KEY / VAPID_PRIVATE_KEY / VAPID_SUBJECT | web-push-allekirjoitus |
+| MUISTUTUKSET_CRON_SECRET | cron-endpointtien suojaus ja GitHub/cron-job.org-kutsut |
+| ICLOUD_USERNAME / ICLOUD_APP_PASSWORD | CalDAV-synkkaus |
+| ICLOUD_USERNAME_JUHA / ICLOUD_APP_PASSWORD_JUHA | Juhan CalDAV-synkkaus |
+| ITSLEARNING_ICS_KATRI / LUKKARIKONE_ICS_KATRI | opiskelukalenterien .ics-syötteet |
+
 ## Mikä Satama on
 
 Satama on sovellus, jonka rakensin perheelleni. Se auttaa pitämään arjen langat käsissä, kun elämässä on paljon liikkuvia osia ja kaksi aikuista, joiden tulee olla samalla kartalla kalenterin ja noh elämän kanssa ylipäätään.

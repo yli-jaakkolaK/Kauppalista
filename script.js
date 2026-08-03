@@ -295,6 +295,10 @@ function paivitaNakyvyysIkoni() {
 // Lataa etusivun: navigointiruudukko, Ankkurit ja päivämäärä.
 // Listat (nyk. "Muistilaput") EIVÄT enää ole suoraan etusivulla, ks. lataaMuistilaput()
 async function lataaKotinakyma() {
+  // Tuore asetuskartta ennen ankkurien piirtoa (ks. ankkurit_nayta_maara,
+  // lataaAnkkurit alla) — muuten oletusarvo (3) näkyisi kunnes käyttäjä
+  // ehtii käydä Kalenterissa/Asetuksissa samassa istunnossa.
+  paivitaAsetukset();
   lataaOsiot();
   lataaAnkkurit();
   loadAnchorCandidates();
@@ -318,6 +322,13 @@ async function lataaListatNakymaan(containerId, kategoria) {
 
   (data || []).forEach(function(lista) {
     const item = document.createElement('li');
+    // BUGIKORJAUS (2026-08-03, Katrin löydös): ilman rivin omaa luokkaa
+    // listan nimi kaatuu geneeriseen `.list li span`-sääntöön (nowrap +
+    // ellipsis) eikä näy kokonaan pysty- eikä vaakasuunnassa millään pitkällä
+    // nimellä. 'varasto-rivi' antaa jo olemassa olevan rivitys-CSS:n
+    // (white-space:normal, word-break:break-word) — sama luokka toimii
+    // Muistilapuille ja Varastolle identtisesti, ei tarvitse uutta sääntöä.
+    item.className = 'varasto-rivi';
     item.dataset.tuoteId = lista.id;
     alustaRaahaus(item, lista, { container: containerEl, cache: data, taulu: 'lists', jalkeenPaivitys: paivitaNakyma });
     // TASO 2 (2026-07-21) — teema/vahdittu-tyyppiset rivit avaavat OMAN
@@ -3239,7 +3250,11 @@ async function lataaAnkkurit() {
 
   cachedAnkkurit = data || [];
   await paivitaMuistutuksetKartta();
-  const nayta = ankkuritKaikkiNakyvissa ? cachedAnkkurit : cachedAnkkurit.slice(0, 3);
+  // Näkyvien ankkureiden määrä on nyt asetus (Asetukset → ⚓ Ankkurit,
+  // ankkurit-nayta-maara-input), oletus 3 kuten ennen — 0 on sallittu
+  // (kaikki piiloon, "laajenna" tarvitaan aina).
+  const raja = haeAsetusNumero('ankkurit_nayta_maara', 3);
+  const nayta = ankkuritKaikkiNakyvissa ? cachedAnkkurit : cachedAnkkurit.slice(0, raja);
   const piilossa = cachedAnkkurit.length - nayta.length;
 
   const listEl = document.getElementById('ankkurit-list');
@@ -3394,8 +3409,8 @@ async function lataaAnkkurit() {
 
   const laajennusLinkki = document.getElementById('ankkurit-laajenna');
   if (ankkuritKaikkiNakyvissa) {
-    laajennusLinkki.style.display = cachedAnkkurit.length > 3 ? 'block' : 'none';
-    laajennusLinkki.textContent = 'näytä vain 3 tärkeintä';
+    laajennusLinkki.style.display = cachedAnkkurit.length > raja ? 'block' : 'none';
+    laajennusLinkki.textContent = raja > 0 ? ('näytä vain ' + raja + ' tärkeintä') : 'piilota kaikki';
   } else if (piilossa > 0) {
     laajennusLinkki.style.display = 'block';
     laajennusLinkki.textContent = '+ ' + piilossa + ' muuta odottaa — näytä kaikki';
@@ -3797,6 +3812,8 @@ function avaaOsio(osio) {
     markAiLogSeen();
     paivitaAsetukset().then(function() {
       document.getElementById('kuormaraja-input').value = haeAsetusNumero('paivan_menoraja', 5);
+      document.getElementById('ankkurit-nayta-maara-input').value = haeAsetusNumero('ankkurit_nayta_maara', 3);
+      paivitaLaiturinPiilotusAsetukset();
     });
   } else if (osio.route === 'hytti') {
     showHyttiView();
@@ -4081,10 +4098,11 @@ async function paivitaLaituriSijoittamattaTeksti() {
 
 // Hakee ja piirtää Laiturin rivit, valinnaisesti hakusanalla suodatettuna.
 // Jokainen muru pysyy omana kokonaisuutena ja sen alle voidaan jatkaa
-// säiettä. Näytössä näkyy vain kaksi uusinta jatkoriviä.
+// säiettä. Ketjun kotiin-valuminen (2026-08-03, ks. KONSEPTIKIRJA.md 7b) —
+// vain ketjun UUSIN segmentti näkyy täällä, ks. piirraLaituriRivi.
 async function lataaLaituri(hakusana) {
   paivitaLaituriSijoittamattaTeksti();
-  let kysely = db.from('laituri').select('id, content, created_at, user_id, status, placed_where, teema_id').neq('status', 'arkistoitu').is('teema_id', null).order('created_at', { ascending: false });
+  let kysely = db.from('laituri').select('id, content, created_at, user_id, status, placed_where, teema_id, koti_tyyppi, koti_kohde_id, koti_kohde_nimi, koti_segmentti_valunut, piilota_laiturista').neq('status', 'arkistoitu').is('teema_id', null).eq('piilota_laiturista', false).order('created_at', { ascending: false });
   if (hakusana) {
     kysely = kysely.ilike('content', '%' + hakusana + '%');
   }
@@ -4119,12 +4137,33 @@ async function lataaLaituri(hakusana) {
     li.className = 'laituri-row' + (rivi.status === 'sijoitettu' ? ' sijoitettu' : '');
     li.dataset.tuoteId = rivi.id;
 
+    // Ketjun kotiin-valuminen (2026-08-03, ks. KONSEPTIKIRJA.md 7b): kun
+    // murulla on koti, vain ketjun UUSIN valumaton segmentti (muru itse tai
+    // viimeisin jatkorivi) toimii tämän rivin otsikkona — vanhemmat segmentit
+    // ovat jo valuneet kotiin eivätkä siksi enää näy täällä ollenkaan.
+    // Ilman kotia näytetään koko (korkeintaan 3 säikeen) ketju sellaisenaan.
+    const kaikkiJatkorivit = jatkorivitKartta[rivi.id] || [];
+    let otsikkoTeksti = rivi.content;
+    let otsikkoAika = rivi.created_at;
+    let nakyvatJatkorivit = kaikkiJatkorivit;
+    let otsikkoOnMuru = true;
+    if (rivi.koti_tyyppi) {
+      const valumattomat = kaikkiJatkorivit.filter(function(jr) { return !jr.valunut_kotiin; });
+      if (valumattomat.length > 0) {
+        const uusin = valumattomat[valumattomat.length - 1];
+        otsikkoTeksti = uusin.teksti;
+        otsikkoAika = uusin.created_at;
+        otsikkoOnMuru = false;
+      }
+      nakyvatJatkorivit = valumattomat;
+    }
+
     const sisalto = document.createElement('div');
     sisalto.className = 'laituri-content';
 
     const teksti = document.createElement('span');
     teksti.className = 'laituri-text';
-    teksti.textContent = rivi.content;
+    teksti.textContent = otsikkoTeksti;
     sisalto.appendChild(teksti);
 
     // BUGIKORJAUS ("Laiturin ⚓-tilan näkyvyys"): sijoittamaton ja jo-
@@ -4147,44 +4186,50 @@ async function lataaLaituri(hakusana) {
     // totuus" tälle nimenomaiselle suunnalle — päinvastoin kuin ankkurin
     // oman muokkauksen kohdalla, ks. Bugi 10, joka tietoisesti EI vaikuta
     // takaisin lähteeseen).
-    teksti.title = 'Napauta korjataksesi (esim. epäselväksi jäänyt muru)';
-    teksti.addEventListener('click', function() {
-      const inputti = document.createElement('input');
-      inputti.type = 'text';
-      inputti.value = rivi.content;
-      inputti.className = 'edit-input';
-      teksti.replaceWith(inputti);
-      inputti.focus();
-      inputti.select();
+    // Korjausmuokkaus koskee VAIN murun omaa tekstiä — jatkorivit eivät ole
+    // koskaan muokattavissa (ks. sql/079), joten kun otsikko näyttää valuneen
+    // ketjun uusinta jatkoriviä, napautus ei avaa muokkausta ollenkaan.
+    if (otsikkoOnMuru) {
+      teksti.title = 'Napauta korjataksesi (esim. epäselväksi jäänyt muru)';
+      teksti.addEventListener('click', function() {
+        const inputti = document.createElement('input');
+        inputti.type = 'text';
+        inputti.value = rivi.content;
+        inputti.className = 'edit-input';
+        teksti.replaceWith(inputti);
+        inputti.focus();
+        inputti.select();
 
-      async function tallenna() {
-        const uusi = inputti.value.trim();
-        if (uusi && uusi !== rivi.content) {
-          const { error } = await db.from('laituri').update({ content: uusi }).eq('id', rivi.id);
-          if (!ilmoitaKirjoitusvirheesta(error, 'Murun muokkaus') && onAnkkuroitu) {
-            const { error: peiliError } = await db.from('ankkurit').update({ content: uusi }).eq('source', 'laituri').eq('source_ref', String(rivi.id));
-            if (peiliError) console.error('Ankkurin peilipäivitys epäonnistui:', peiliError);
+        async function tallenna() {
+          const uusi = inputti.value.trim();
+          if (uusi && uusi !== rivi.content) {
+            const { error } = await db.from('laituri').update({ content: uusi }).eq('id', rivi.id);
+            if (!ilmoitaKirjoitusvirheesta(error, 'Murun muokkaus') && onAnkkuroitu) {
+              const { error: peiliError } = await db.from('ankkurit').update({ content: uusi }).eq('source', 'laituri').eq('source_ref', String(rivi.id));
+              if (peiliError) console.error('Ankkurin peilipäivitys epäonnistui:', peiliError);
+            }
           }
+          lataaLaituri(document.getElementById('laituri-search').value.trim());
         }
-        lataaLaituri(document.getElementById('laituri-search').value.trim());
-      }
 
-      inputti.addEventListener('blur', tallenna);
-      inputti.addEventListener('keydown', function(e) {
-        if (e.key === 'Enter') inputti.blur();
-        if (e.key === 'Escape') { inputti.value = rivi.content; inputti.blur(); }
+        inputti.addEventListener('blur', tallenna);
+        inputti.addEventListener('keydown', function(e) {
+          if (e.key === 'Enter') inputti.blur();
+          if (e.key === 'Escape') { inputti.value = rivi.content; inputti.blur(); }
+        });
       });
-    });
+    }
 
     const meta = document.createElement('span');
     meta.className = 'laituri-meta';
     const kuka = rivi.user_id === currentUserId ? 'sinä' : 'kumppani';
-    const d = new Date(rivi.created_at);
+    const d = new Date(otsikkoAika);
     const aika = d.getDate().toString().padStart(2, '0') + '.' + (d.getMonth() + 1).toString().padStart(2, '0') + '. ' +
                  d.getHours().toString().padStart(2, '0') + ':' + d.getMinutes().toString().padStart(2, '0');
     meta.textContent = kuka + ' · ' + aika +
       (rivi.status === 'sijoitettu' ? ' · → ' + rivi.placed_where : '') +
-      (onAnkkuroitu ? ' · ⚓ ankkurissa' : '');
+      (onAnkkuroitu ? ' · ⚓ ankkurissa' : '') +
+      (rivi.koti_tyyppi ? ' · 🏠 koti: ' + rivi.koti_kohde_nimi : '');
     sisalto.appendChild(meta);
 
     li.appendChild(sisalto);
@@ -4197,6 +4242,14 @@ async function lataaLaituri(hakusana) {
     // yleisintä/nopeinta tointa (⚓/→) jäävät aina näkyviin, harvemmin
     // tarvitut (✨ kysy ehdotus, 💬 ehdota toiselle) siirretty ⋯-valikkoon
     // 🗄 Arkistoi:n rinnalle.
+    // BUGIKORJAUS (2026-08-03, Katrin huomio): napit rivissä yhtenä pitkänä
+    // jonona kaventivat tekstisaraketta ikävästi kapealla näytöllä — sama
+    // oire kuin Ankkureissa. Napit koottu omaan 2×2-ruudukkoon (ks.
+    // .laituri-rivi-toiminnot, style.css) yhden pitkän rivin sijaan.
+    const toiminnot = document.createElement('div');
+    toiminnot.className = 'laituri-rivi-toiminnot';
+    li.appendChild(toiminnot);
+
     if (rivi.status !== 'sijoitettu') {
       // Suora ⚓-oikotie (2026-07-17, ks. "Kalenteri-sijoitus ei kirjoita
       // mitään" -bugikorjaus): nostaa murun sellaisenaan tälle päivälle
@@ -4213,7 +4266,7 @@ async function lataaLaituri(hakusana) {
           lataaLaituri(document.getElementById('laituri-search').value.trim());
         });
       });
-      li.appendChild(ankkuriNappi);
+      toiminnot.appendChild(ankkuriNappi);
 
       const sijoitaNappi = document.createElement('button');
       sijoitaNappi.className = 'place-btn';
@@ -4222,7 +4275,7 @@ async function lataaLaituri(hakusana) {
       sijoitaNappi.addEventListener('click', function() {
         avaaSijoitaValikko(rivi, li);
       });
-      li.appendChild(sijoitaNappi);
+      toiminnot.appendChild(sijoitaNappi);
     } else {
       // "↺ palauta sijoittamattomaksi" (2026-07-17, ks. "Kalenteri-sijoitus
       // ei kirjoita mitään" -bugikorjaus) — sijoitettu-merkintä voi olla
@@ -4236,7 +4289,7 @@ async function lataaLaituri(hakusana) {
       palautaNappi.addEventListener('click', function() {
         palautaLaituriSijoittamattomaksi(rivi);
       });
-      li.appendChild(palautaNappi);
+      toiminnot.appendChild(palautaNappi);
     }
 
     // ⋯-valikko: harvemmin tarvitut toiminnot (ks. UI-BUGI-kommentti yllä).
@@ -4279,13 +4332,21 @@ async function lataaLaituri(hakusana) {
       label: '🧵 Jatka säiettä',
       onClick: function() { avaaJatkoriviDialog(rivi); },
     });
-    // Keskusteluteema (2026-07-21) — siirtää murun (JA sen jatkorivit,
-    // ei erillistä kopiointia) teemaan. Sama "poistuu Laiturista siirrettynä"
-    // -periaate kuin muillakin sijoitusreiteillä, turvainvariantti säilyy
-    // (ei poistoa, vain uudelleenluokittelu teema_id:llä).
+    // Koti (2026-08-03, ks. KONSEPTIKIRJA.md 7b — korvaa vanhan "Siirrä
+    // teemaan" -toiminnon): asettaa vain OSOITTIMEN, ei siirrä mitään heti.
+    // Kotia EI koskaan pakoteta paitsi 3 säikeen kovassa rajassa (ks.
+    // jatkorivi-tallenna-käsittelijä) — tietoinen poikkeus "ei koskaan
+    // pakota" -periaatteesta, perusteltu KONSEPTIKIRJA.md:ssä.
     menuKohdat.push({
-      label: '🧵➜ Siirrä teemaan',
-      onClick: function() { avaaTeemaValikko(rivi, li); },
+      label: rivi.koti_tyyppi ? '🏠 Vaihda kotia (' + rivi.koti_kohde_nimi + ')' : '🏠 Aseta koti',
+      onClick: function() { avaaKotiValikko(rivi, li); },
+    });
+    // 7c: "ei tarvitse näkyä Laiturissa" — ERI mekanismi kuin arkistointi,
+    // ei tulkita käsitellyksi, vain pois aktiivisesta näkymästä. Turvainvariantti:
+    // rivi ei poistu, vain suodattuu (ks. lataaLaituri: eq('piilota_laiturista', false)).
+    menuKohdat.push({
+      label: '🙈 Ei tarvitse näkyä Laiturissa',
+      onClick: function() { piilotaLaiturinRivi(rivi); },
     });
     // Sama laituri.status-tilakenttä kuin OSA A:n "siirretty Kauppalistalle" —
     // "arkistoitu" vain kolmas arvo, ei erillinen mekanismi.
@@ -4293,7 +4354,7 @@ async function lataaLaituri(hakusana) {
       label: '🗄 Arkistoi',
       onClick: function() { arkistoiLaituriRivi(rivi); },
     });
-    li.appendChild(createOverflowButton(li, menuKohdat));
+    toiminnot.appendChild(createOverflowButton(li, menuKohdat));
 
     const poistoNappi = document.createElement('button');
     poistoNappi.className = 'delete-btn';
@@ -4318,15 +4379,16 @@ async function lataaLaituri(hakusana) {
       lataaLaituri(document.getElementById('laituri-search').value.trim());
       paivitaLaituriBadge();
     });
-    li.appendChild(poistoNappi);
+    toiminnot.appendChild(poistoNappi);
 
     listEl.appendChild(li);
-    piirraJatkorivit(rivi, li, jatkorivitKartta[rivi.id] || []);
+    piirraJatkorivit(rivi, li, nakyvatJatkorivit);
     piirraKauppaEhdotusKortti(rivi, li);
     piirraHetkiSiltaKortti(rivi, li);
   });
 
   paivitaLaituriArkisto();
+  paivitaLaituriPiilotetut();
   paivitaLuoteLinkki();
 }
 
@@ -4336,12 +4398,16 @@ async function lataaLaituri(hakusana) {
 // piirraHetkiSiltaKortti/piirraKauppaEhdotusKortti. Kutsuttava ENNEN niitä
 // (ks. lataaLaituri()) jotta jatkorivit päätyvät VISUAALISESTI ehdotuskorttien
 // ALLE — jokainen 'afterend'-lisäys samaan ankkuriin nousee edellisen ohi.
+// BUGIKORJAUS (2026-08-03, ks. KONSEPTIKIRJA.md 7b): ei enää sisäistä
+// slice(-2)-katkaisua — kutsuja päättää mitkä jatkorivit näytetään.
+// Laiturissa kutsuja välittää vain ketjun valumattoman "uusimman osan"
+// (koti-mekanismi rajoittaa sen jo pieneksi), Teema-/koti-näkymä välittää
+// AINA koko historian sellaisenaan (se ON arkisto).
 function piirraJatkorivit(rivi, li, jatkorivit) {
   if (!jatkorivit || jatkorivit.length === 0) return;
 
-  const nakyvat = jatkorivit.slice(-2);
   let edellinen = li;
-  nakyvat.forEach(function(jr) {
+  jatkorivit.forEach(function(jr) {
     const rivEl = document.createElement('li');
     rivEl.className = 'laituri-jatkorivi-rivi';
 
@@ -4364,13 +4430,6 @@ function piirraJatkorivit(rivi, li, jatkorivit) {
     edellinen.insertAdjacentElement('afterend', rivEl);
     edellinen = rivEl;
   });
-
-  if (jatkorivit.length > 2) {
-    const lisatieto = document.createElement('li');
-    lisatieto.className = 'laituri-jatkorivi-rivi';
-    lisatieto.textContent = '… ' + (jatkorivit.length - 2) + ' vanhempaa kommenttia piilotettu';
-    edellinen.insertAdjacentElement('afterend', lisatieto);
-  }
 }
 
 // Dialogin nykyinen kohdemuru — asetetaan avattaessa, tyhjennetään suljettaessa.
@@ -4415,12 +4474,40 @@ document.getElementById('jatkorivi-tallenna').addEventListener('click', async fu
     return;
   }
 
+  // Kova raja (2026-08-03, ks. KONSEPTIKIRJA.md 7b): 3 säiettä ilman kotia
+  // pysäyttää jatkamisen — tietoinen poikkeus "ei koskaan pakota"
+  // -periaatteesta. Turvainvariantti: TARKISTUS ENNEN kirjoitusta, kirjoitettu
+  // teksti pysyy kentässä koskemattomana jos torjutaan (ei häviä, käyttäjä
+  // voi asettaa kodin ja yrittää tallennusta uudelleen).
+  let nykyinenMaara = 0;
+  if (!rivi.koti_tyyppi) {
+    const { count, error: laskuError } = await db.from('laituri_jatkorivit')
+      .select('id', { count: 'exact', head: true }).eq('muru_id', rivi.id);
+    if (laskuError) {
+      console.error('Jatkorivien laskenta epäonnistui:', laskuError);
+    } else {
+      nykyinenMaara = count || 0;
+    }
+    if (nykyinenMaara >= 3) {
+      naytaIlmoitus('Ketju on jo 3 säiettä pitkä ilman kotia — valitse ensin koti (⋯ "🏠 Aseta koti") ennen kuin jatkat. Kirjoittamasi teksti säilyy tässä.');
+      return;
+    }
+  }
+
   const { error } = await db.from('laituri_jatkorivit').insert({
     muru_id: rivi.id,
     teksti: teksti,
     heratys_pvm: heratysCheck.checked ? heratysPvm : null,
   });
   if (ilmoitaKirjoitusvirheesta(error, 'Säikeen jatkorivin tallennus')) return;
+
+  // Ketjun kotiin-valuminen: jos koti on jo asetettu, edellinen uusin
+  // segmentti valuu nyt kotiin (tämä uusi jatkorivi on ketjun uusi kärki).
+  // Ilman kotia vain PEHMEÄ ehdotus 1. säikeen kohdalla — ei ränkytetä
+  // enää toisella tai kolmannella ("Satama ei ränkytä" -periaate).
+  if (rivi.koti_tyyppi) {
+    await valutaVanhatSegmentitKotiin(rivi);
+  }
 
   // Herätys (ks. yläkommentti tiedoston tässä osiossa) — EI uutta
   // ajastusmekanismia, sama visible_from-koneisto kuin ⏭-siirrolla ja
@@ -4441,7 +4528,8 @@ document.getElementById('jatkorivi-tallenna').addEventListener('click', async fu
   }
 
   suljeJatkoriviDialog();
-  naytaIlmoitus(heratysCheck.checked ? 'Jatkorivi + herätys asetettu' : 'Jatkorivi tallennettu');
+  const kotiVihje = !rivi.koti_tyyppi && nykyinenMaara === 0 ? ' — harkitse kodin valintaa tälle ketjulle (⋯ "🏠 Aseta koti")' : '';
+  naytaIlmoitus((heratysCheck.checked ? 'Jatkorivi + herätys asetettu' : 'Jatkorivi tallennettu') + kotiVihje);
   lataaLaituri(document.getElementById('laituri-search').value.trim());
 });
 
@@ -4593,14 +4681,23 @@ async function hylkaaKauppaEhdotus(rivi) {
 
 // Kaikki konkreettiset sijoituskohteet dynaamisesti: listat (RLS rajaa jo
 // omiin/jaettuihin) + Hytin AKTIIVISET kortit (arkistoituihin ei sijoiteta).
+// BUGIKORJAUS (2026-08-03, löydetty koti-mekanismin rakentamisen yhteydessä):
+// 'teema'-tyyppinen lista EI säilytä tuotteet-rivejä (ks. sql/081) —
+// suoritaSijoitus() kirjoittaisi sinne NÄKYMÄTTÖMÄN rivin (kirjoitus
+// onnistuisi, muttei näkyisi koskaan missään, sama "success:true joka
+// valehteli" -perhe kuin muistiinpanot.md:n "Kirjoituspolkujen auditointi").
+// Suodatettu pois — koti-mekanismilla (haeKotiKohteet) on teemalle OMA,
+// oikea kirjoitusreittinsä (laituri+teema_id).
 async function haeSijoitusKohteet() {
   const [{ data: listat, error: listatError }, { data: kortit, error: kortitError }] = await Promise.all([
-    db.from('lists').select('id, name, category').in('category', ['muistilaput', 'varasto']),
+    db.from('lists').select('id, name, category, list_type').in('category', ['muistilaput', 'varasto']),
     db.from('hytti_kortit').select('id, name').eq('status', 'aktiivinen'),
   ]);
   if (listatError) console.error('Listojen haku sijoitusta varten epäonnistui:', listatError);
   if (kortitError) console.error('Hytin korttien haku sijoitusta varten epäonnistui:', kortitError);
-  const listaKohteet = (listat || []).map(function(l) { return { tyyppi: 'lista', id: l.id, nimi: l.name, category: l.category }; });
+  const listaKohteet = (listat || [])
+    .filter(function(l) { return l.list_type !== 'teema'; })
+    .map(function(l) { return { tyyppi: 'lista', id: l.id, nimi: l.name, category: l.category }; });
   const hyttiKohteet = (kortit || []).map(function(k) { return { tyyppi: 'hytti', id: k.id, nimi: k.name }; });
   return listaKohteet.concat(hyttiKohteet);
 }
@@ -4662,34 +4759,248 @@ async function avaaSijoitaValikko(rivi, li) {
   openRowMenu(li, items);
 }
 
-// Keskusteluteema (2026-07-21, ks. muistiinpanot.md "Keskusteluteema
-// Varastossa") — sama openRowMenu-kaava kuin sijoituksella. Siirto on
-// PELKKÄ teema_id-asetus (ei sisällön kopiointia mihinkään), joten
-// jatkorivit (sql/079) seuraavat automaattisesti mukana (viittaavat
-// muru_id:hen, joka ei muutu).
-async function avaaTeemaValikko(rivi, li) {
-  const { data: teemat, error } = await db.from('lists').select('id, name').eq('list_type', 'teema').order('name');
-  if (error) {
-    console.error('Teemojen haku epäonnistui:', error);
-    naytaIlmoitus('Teemojen haku epäonnistui');
+// === LAITURIN KETJUN KOTI (2026-08-03, ks. KONSEPTIKIRJA.md 7b) ===
+// Korvaa vanhan "Siirrä teemaan" -toiminnon (avaaTeemaValikko). Vanha
+// mekanismi siirsi teema_id:llä KOKO ketjun kerralla pois Laiturista — liian
+// raju, ei vastaa speksiä "Laiturissa näkyy aina vain ketjun uusin osa".
+// Uusi malli: koti on KEVYT OSOITIN (koti_tyyppi/koti_kohde_id/koti_kohde_nimi,
+// ks. sql/087), ei välitön siirto. Vanhat, jo teema_id:llä siirretyt murut
+// (ennen 2026-08-03) pysyvät koskemattomina — ei takautuvaa muutosta.
+
+// Samat konkreettiset kohteet kuin käsisijoituksella (haeSijoitusKohteet),
+// mutta 'teema' MUKANA — sijoituskohteista se on tarkoituksella suodatettu
+// pois (teema-tyyppinen lista ei säilytä tuotteet-rivejä, ks. sql/081),
+// koti-mekanismi kirjoittaa sinne oman, eri reittinsä kautta (ks. alla).
+async function haeKotiKohteet() {
+  const [{ data: listat, error: listatError }, { data: kortit, error: kortitError }] = await Promise.all([
+    db.from('lists').select('id, name, list_type').in('category', ['muistilaput', 'varasto']),
+    db.from('hytti_kortit').select('id, name').eq('status', 'aktiivinen'),
+  ]);
+  if (listatError) console.error('Listojen haku kotivalintaa varten epäonnistui:', listatError);
+  if (kortitError) console.error('Hytin korttien haku kotivalintaa varten epäonnistui:', kortitError);
+  const listaKohteet = (listat || []).map(function(l) {
+    const tyyppi = l.list_type === 'teema' ? 'teema' : l.list_type === 'vahdittu' ? 'vahdittu' : 'lista';
+    return { tyyppi: tyyppi, id: l.id, nimi: l.name };
+  });
+  const hyttiKohteet = (kortit || []).map(function(k) { return { tyyppi: 'hytti', id: k.id, nimi: k.name }; });
+  return listaKohteet.concat(hyttiKohteet);
+}
+
+async function avaaKotiValikko(rivi, li) {
+  // Tuore asetuskartta ennen kohdekohtaisen piilotusoletuksen tarkistusta —
+  // asetuksetKartta ladataan muuten vain Asetukset-näkymän avatessa, joka ei
+  // takaa tuoreutta jos Laituria käytetään käymättä siellä samassa istunnossa.
+  await paivitaAsetukset();
+  const kohteet = await haeKotiKohteet();
+  if (kohteet.length === 0) {
+    naytaIlmoitus('Ei yhtään kohdetta löytynyt');
     return;
   }
-  if (!teemat || teemat.length === 0) {
-    naytaIlmoitus('Ei yhtään teemaa vielä — luo ensin uusi teema Varastosta');
-    return;
-  }
-  const items = teemat.map(function(teema) {
+  const ikoni = { teema: '🧵 ', vahdittu: '⏳ ', hytti: '🚪 ', lista: '' };
+  const items = kohteet.map(function(kohde) {
     return {
-      label: '🧵 ' + teema.name,
-      onClick: async function() {
-        const { error: siirtoError } = await db.from('laituri').update({ teema_id: teema.id }).eq('id', rivi.id);
-        if (ilmoitaKirjoitusvirheesta(siirtoError, 'Siirto teemaan')) return;
-        naytaIlmoitus('Siirretty teemaan: ' + teema.name);
-        lataaLaituri(document.getElementById('laituri-search').value.trim());
-      },
+      label: ikoni[kohde.tyyppi] + kohde.nimi,
+      onClick: function() { asetaLaiturinKoti(rivi, kohde); },
     };
   });
   openRowMenu(li, items);
+}
+
+// 7c-jatko: kohdekohtainen oletus (Asetukset → 🛟 Laituri) — jos valittu
+// koti on käyttäjän merkitsemä "ei koskaan Laiturissa" -kohde, piilotus
+// asetetaan SAMALLA kirjoituksella kuin koti (yksi kirjoitus, ei kahta
+// peräkkäistä — kirjoituspolkujen sääntö 3).
+function kohdeOnOletuksenaPiilotettu(tyyppi, id) {
+  const lista = haeAsetusJSON('laituri_piilota_oletus_kohteet', []);
+  return (lista || []).some(function(k) { return k.tyyppi === tyyppi && String(k.id) === String(id); });
+}
+
+async function asetaLaiturinKoti(rivi, kohde) {
+  const piilotaOletuksena = kohdeOnOletuksenaPiilotettu(kohde.tyyppi, kohde.id);
+  const { error } = await db.from('laituri').update({
+    koti_tyyppi: kohde.tyyppi,
+    koti_kohde_id: String(kohde.id),
+    koti_kohde_nimi: kohde.nimi,
+    piilota_laiturista: piilotaOletuksena,
+  }).eq('id', rivi.id);
+  if (ilmoitaKirjoitusvirheesta(error, 'Kodin asetus')) return;
+  naytaIlmoitus('Koti asetettu: ' + kohde.nimi + (piilotaOletuksena ? ' (piilotettu Laiturista)' : ''));
+  rivi.koti_tyyppi = kohde.tyyppi;
+  rivi.koti_kohde_id = String(kohde.id);
+  rivi.koti_kohde_nimi = kohde.nimi;
+  rivi.piilota_laiturista = piilotaOletuksena;
+  // Jos ketjussa on jo useampi segmentti ennen kodin valintaa, kaikki paitsi
+  // uusin valuu heti — sama reitti kuin uuden jatkorivin saapuessa.
+  await valutaVanhatSegmentitKotiin(rivi);
+  lataaLaituri(document.getElementById('laituri-search').value.trim());
+}
+
+// Kirjoittaa YHDEN valuvan segmentin sisällön kotiin KOHTEEN OMALLA
+// olemassa olevalla kirjoitusreitillä — sama kaava kuin "Sovittu linja:
+// vanha arvo valuu historiaan" (ks. dokumentoitu yllä KESKUSTELUTEEMA-osiossa)
+// ja suoritaSijoitus(). Alkuperäinen muru/jatkorivi EI KOSKAAN poistu tai
+// muutu tässä — tämä on aina KOPIO, turvainvariantti säilyy.
+async function kirjoitaSegmenttiKotiin(rivi, teksti) {
+  if (rivi.koti_tyyppi === 'teema') {
+    return db.from('laituri').insert({ content: teksti, teema_id: rivi.koti_kohde_id, status: 'uusi' });
+  }
+  if (rivi.koti_tyyppi === 'hytti') {
+    return db.from('hytti_rivit').insert({ content: teksti, kortti_id: Number(rivi.koti_kohde_id) });
+  }
+  // 'lista' ja 'vahdittu' kirjoittavat molemmat samaan tuotteet-tauluun —
+  // täppäysoikeus/-näkymä eroaa vain sen mukaan minkä list_type kohde on.
+  return db.from('tuotteet').insert({ nimi: teksti, tehty: false, list_id: rivi.koti_kohde_id });
+}
+
+// Ketjun segmenttijono = muru (segmentti 0) + jatkorivit aikajärjestyksessä.
+// Kun murulla on koti, VAIN jonon UUSIN elementti saa jäädä Laituriin — kaikki
+// sitä VANHEMMAT, vielä valumattomat segmentit kirjoitetaan kotiin ja
+// merkitään valuneiksi VASTA onnistuneen kirjoituksen jälkeen (kirjoituspolkujen
+// sääntö 3: ei koskaan jatketa kuin kirjoitus olisi onnistunut). Aikajärjestys
+// säilytetään: pysähdytään ENSIMMÄISEEN epäonnistumiseen sen sijaan että
+// ohitettaisiin se ja valutettaisiin uudempi segmentti sen ohi (muuten "uusin
+// valumaton" -päättely Laiturin näytössä menisi väärään segmenttiin).
+async function valutaVanhatSegmentitKotiin(rivi) {
+  if (!rivi.koti_tyyppi) return;
+  const { data: jatkorivit, error } = await db.from('laituri_jatkorivit').select()
+    .eq('muru_id', rivi.id).order('created_at', { ascending: true });
+  if (error) {
+    console.error('Valumista varten jatkorivien haku epäonnistui:', error);
+    return;
+  }
+  const kaikki = jatkorivit || [];
+
+  const vanhemmat = [];
+  if (!rivi.koti_segmentti_valunut && kaikki.length > 0) {
+    vanhemmat.push({ tyyppi: 'muru', teksti: rivi.content });
+  }
+  kaikki.forEach(function(jr, i) {
+    const onUusin = i === kaikki.length - 1;
+    if (!jr.valunut_kotiin && !onUusin) {
+      vanhemmat.push({ tyyppi: 'jatkorivi', id: jr.id, teksti: jr.teksti });
+    }
+  });
+
+  for (const segmentti of vanhemmat) {
+    const { error: kirjoitusError } = await kirjoitaSegmenttiKotiin(rivi, segmentti.teksti);
+    if (kirjoitusError) {
+      console.error('Segmentin valuminen kotiin epäonnistui:', kirjoitusError);
+      naytaIlmoitus('Osa ketjusta ei valunut kotiin vielä — yritetään uudelleen seuraavan jatkorivin yhteydessä');
+      break;
+    }
+    if (segmentti.tyyppi === 'muru') {
+      const { error: merkintaError } = await db.from('laituri').update({ koti_segmentti_valunut: true }).eq('id', rivi.id);
+      if (merkintaError) { console.error('Murun valumismerkintä epäonnistui:', merkintaError); break; }
+      rivi.koti_segmentti_valunut = true;
+    } else {
+      const { error: merkintaError } = await db.from('laituri_jatkorivit').update({ valunut_kotiin: true }).eq('id', segmentti.id);
+      if (merkintaError) { console.error('Jatkorivin valumismerkintä epäonnistui:', merkintaError); break; }
+    }
+  }
+}
+
+// 7c: kertaluontoinen "ei tarvitse näkyä Laiturissa" -täppä. Turvainvariantti:
+// rivi ei poistu eikä arkistoidu, vain suodattuu Laiturin AKTIIVISESTA
+// näkymästä (ks. lataaLaituri: eq('piilota_laiturista', false)) — palautus
+// mahdollinen "🙈 Piilotetut" -osiosta samalla mallilla kuin arkisto.
+async function piilotaLaiturinRivi(rivi) {
+  const { error } = await db.from('laituri').update({ piilota_laiturista: true }).eq('id', rivi.id);
+  if (ilmoitaKirjoitusvirheesta(error, 'Piilotus')) return;
+  naytaIlmoitus('Piilotettu Laiturin näkymästä');
+  lataaLaituri(document.getElementById('laituri-search').value.trim());
+}
+
+async function palautaLaiturinRivi(rivi) {
+  const { error } = await db.from('laituri').update({ piilota_laiturista: false }).eq('id', rivi.id);
+  if (ilmoitaKirjoitusvirheesta(error, 'Piilotuksen palautus')) return;
+  naytaIlmoitus('Näytetään taas Laiturissa');
+  lataaLaituri(document.getElementById('laituri-search').value.trim());
+  paivitaLaituriPiilotetut();
+}
+
+// Kokoontaitettava "🙈 Piilotetut" -osio Laiturin oman listan alle — sama
+// UI-malli kuin "🗄 Arkisto" (paivitaLaituriArkisto), OMA mekanisminsa
+// (ei tulkita käsitellyksi, ks. sql/087-kommentti).
+async function paivitaLaituriPiilotetut() {
+  const osio = document.getElementById('laituri-piilotetut-osio');
+  const lista = document.getElementById('laituri-piilotetut-lista');
+  const oliAuki = lista.style.display !== 'none';
+
+  const { data, error } = await db.from('laituri').select().eq('piilota_laiturista', true).neq('status', 'arkistoitu').order('created_at', { ascending: false });
+  if (error) {
+    console.error('Piilotettujen haku epäonnistui:', error);
+    return;
+  }
+  const rivit = data || [];
+
+  osio.style.display = rivit.length > 0 ? 'block' : 'none';
+  document.getElementById('laituri-piilotetut-toggle').textContent = '🙈 Piilotetut (' + rivit.length + ')';
+
+  lista.innerHTML = '';
+  rivit.forEach(function(rivi) {
+    const li = document.createElement('li');
+    li.className = 'laituri-arkisto-rivi';
+    const teksti = document.createElement('span');
+    teksti.textContent = rivi.content;
+    li.appendChild(teksti);
+    const palautaNappi = document.createElement('button');
+    palautaNappi.className = 'restore-btn';
+    palautaNappi.textContent = '↺';
+    palautaNappi.title = 'Näytä taas Laiturissa';
+    palautaNappi.addEventListener('click', function() {
+      palautaLaiturinRivi(rivi);
+    });
+    li.appendChild(palautaNappi);
+    lista.appendChild(li);
+  });
+  lista.style.display = oliAuki ? 'block' : 'none';
+}
+
+document.getElementById('laituri-piilotetut-toggle').addEventListener('click', function() {
+  const lista = document.getElementById('laituri-piilotetut-lista');
+  lista.style.display = lista.style.display === 'none' ? 'block' : 'none';
+});
+
+// 7c-jatko: kohdekohtainen "ei koskaan Laiturissa" -oletus (Asetukset →
+// 🛟 Laituri). Sama haeKotiKohteet() kuin Laiturin oma koti-valikko — yksi
+// yhteinen kohdelista, ei kahta eri totuutta siitä mitä kohteita on olemassa.
+async function paivitaLaiturinPiilotusAsetukset() {
+  const kohteet = await haeKotiKohteet();
+  const valitut = haeAsetusJSON('laituri_piilota_oletus_kohteet', []) || [];
+  const valitutAvaimet = new Set(valitut.map(function(k) { return k.tyyppi + ':' + k.id; }));
+
+  const ikoni = { teema: '🧵 ', vahdittu: '⏳ ', hytti: '🚪 ', lista: '' };
+  const listaEl = document.getElementById('laituri-piilotus-lista');
+  listaEl.innerHTML = '';
+  kohteet.forEach(function(kohde) {
+    const avain = kohde.tyyppi + ':' + kohde.id;
+    const rivi = document.createElement('label');
+    rivi.className = 'laituri-piilotus-rivi';
+
+    const check = document.createElement('input');
+    check.type = 'checkbox';
+    check.checked = valitutAvaimet.has(avain);
+    check.addEventListener('change', function() {
+      tallennaLaiturinPiilotusAsetus(kohde, check.checked);
+    });
+    rivi.appendChild(check);
+
+    const teksti = document.createElement('span');
+    teksti.textContent = ikoni[kohde.tyyppi] + kohde.nimi;
+    rivi.appendChild(teksti);
+
+    listaEl.appendChild(rivi);
+  });
+}
+
+async function tallennaLaiturinPiilotusAsetus(kohde, paalla) {
+  const nykyinen = haeAsetusJSON('laituri_piilota_oletus_kohteet', []) || [];
+  const avain = kohde.tyyppi + ':' + kohde.id;
+  const ilmanTata = nykyinen.filter(function(k) { return (k.tyyppi + ':' + k.id) !== avain; });
+  const uusi = paalla ? ilmanTata.concat([{ tyyppi: kohde.tyyppi, id: kohde.id }]) : ilmanTata;
+  const { error } = await db.from('asetukset').upsert({ key: 'laituri_piilota_oletus_kohteet', value: JSON.stringify(uusi) }, { onConflict: 'key' });
+  if (ilmoitaKirjoitusvirheesta(error, 'Piilotusasetuksen tallennus')) return;
+  asetuksetKartta['laituri_piilota_oletus_kohteet'] = JSON.stringify(uusi);
 }
 
 // Merkitsee murun sijoitetuksi VASTA kun muistutus on VARMISTETUSTI
@@ -6398,6 +6709,25 @@ document.getElementById('kuormaraja-input').addEventListener('change', async fun
   }
   asetuksetKartta.paivan_menoraja = String(uusiRaja);
   naytaIlmoitus('Kuormaraja tallennettu: ' + uusiRaja);
+});
+
+// Näkyvien ankkureiden oletusmäärä (2026-08-03, Katrin pyyntö) — sama
+// asetus-kaava kuin kuormarajalla, 0 sallittu (min="0" HTML:ssä toistaiseksi
+// ainoa paikka missä alaraja poikkeaa kuormarajan >=1:stä).
+document.getElementById('ankkurit-nayta-maara-input').addEventListener('change', async function(e) {
+  const uusiMaara = parseInt(e.target.value, 10);
+  if (isNaN(uusiMaara) || uusiMaara < 0) {
+    e.target.value = haeAsetusNumero('ankkurit_nayta_maara', 3);
+    return;
+  }
+  const { error } = await db.from('asetukset').upsert({ key: 'ankkurit_nayta_maara', value: String(uusiMaara) }, { onConflict: 'key' });
+  if (error) {
+    console.error('Ankkurien näyttömäärän tallennus epäonnistui:', error);
+    return;
+  }
+  asetuksetKartta.ankkurit_nayta_maara = String(uusiMaara);
+  naytaIlmoitus('Ankkureita näytetään oletuksena: ' + uusiMaara);
+  lataaAnkkurit();
 });
 
 // === MUISTUTUSPANEELIN NAPIT JA RULLAT ===

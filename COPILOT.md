@@ -6,6 +6,16 @@ Tämä tiedosto on eri asia kuin **muistiinpanot.md** (projektin historia, pää
 
 ---
 
+## Työskentelysäännöt agentille (lisätty 2026-08-03)
+
+1. **Jokaisen työn alussa** lue ensin KONSEPTIKIRJA.md, muistiinpanot.md ja COPILOT.md. Näiden pitää olla aina työskentelyn lähtökohta, jotta seuraat projektin nykyistä suuntaa eikä vain yksittäistä pientä tehtävää.
+2. **Kun jokin tehtävä on valmis**, tee automaattisesti commit ja push ilman erillistä kysymystä, jos työ on sellaisessa tilassa että se voidaan turvallisesti tallentaa. Käytä selkeää ja kuvaavaa commit-viestiä.
+3. **Backup tulee tehdä säännöllisesti**. Tee järkevä varmuuskopiointi ainakin silloin, kun on tehty paljon muutoksia, kun tehdään merkittävä arkkitehtuurimuutos tai ainakin kerran viikossa jos työtä on jatkettu pitkään. Muista kirjata tästä relevantti huomio muistiinpanot.md:hen ja tarvittaessa BACKUP.md:hen.
+4. **Kun kerrot mitä olet tehnyt**, päivitä samalla myös KONSEPTIKIRJA.md, muistiinpanot.md ja COPILOT.md tarvittaessa niin, että seuraava työntekijä tai agentti näkee mistä jatketaan. Älä jätä työtilannetta epäselväksi.
+5. **Älä aloita uutta suurta muutosta ilman kontekstin lukemista.** Jos olet epävarma, lue ensin dokumentaatiota ja tarkista nykyinen tila ennen kuin edetään.
+
+---
+
 ## Koodikieli: uusi koodi englanniksi (talon sääntö, kirjattu 2026-07-13)
 
 **Tästä eteenpäin uusi koodi kirjoitetaan englanniksi** — funktioiden ja muuttujien nimet SEKÄ koodikommentit. Kolme rajausta:
@@ -186,78 +196,17 @@ Todistettu 2026-07-14/15 illan diagnoosissa ("Ajastetut muistutukset eivät tule
 
 ---
 
-## Project Memory and Documentation Workflow
+## Dokumentaation roolit
 
-### Documentation Roles
+Tämän repositorion dokumentaatio on jaettu seuraavasti:
 
-Use the existing documentation structure as follows:
+- README.md = yleiskuvaus, tavoitteet, käyttötarve ja onboarding.
+- KONSEPTIKIRJA.md = suunnitteluperiaatteet, arkkitehtuuri ja pitkän aikavälin suunta.
+- COPILOT.md = tekniset käytännöt, koodauskonventiot ja agentin ohjeet.
+- muistiinpanot.md = työmuisti, tunnetut ongelmat, päätökset ja testauslista.
+- BACKUP.md = varmuuskopiointi- ja palautusohjeet.
 
-- README.md = project overview, goals, user value and onboarding.
-- KONSEPTIKIRJA.md = source of truth for product vision, architecture principles, design decisions and long-term direction.
-- COPILOT.md = source of truth for development workflow, coding conventions and agent behavior.
-- muistiinpanot.md = project working memory containing recent work, decisions, known issues, lessons learned and next steps.
-- BACKUP.md = backup and recovery procedures.
-
-Do not create alternative documentation files that duplicate these responsibilities unless explicitly requested.
-
-### Before Starting Work
-
-Before making changes:
-
-1. Read muistiinpanot.md to understand:
-   - recent work
-   - current state
-   - open issues
-   - planned next steps
-
-2. If additional context is needed, read KONSEPTIKIRJA.md.
-
-3. Follow all rules and conventions defined in COPILOT.md.
-
-Do not generate project summaries unless explicitly requested.
-
-### During Development
-
-- Follow the architecture and design direction defined in KONSEPTIKIRJA.md.
-- Prefer extending existing solutions over introducing new patterns or frameworks.
-- Avoid unnecessary refactoring.
-- Keep implementations simple and maintainable.
-- Preserve existing functionality unless the task specifically requires changes.
-
-### After Completing Work
-
-Before creating a commit:
-
-Update muistiinpanot.md with:
-
-- completed work
-- important decisions
-- architectural changes
-- discovered bugs or risks
-- lessons learned
-- unresolved issues
-- recommended next steps
-
-Keep entries concise, practical and chronological.
-
-Do not duplicate information already documented in KONSEPTIKIRJA.md or COPILOT.md.
-
-### Commits
-
-Documentation updates should be included in the same commit as the related code changes whenever practical.
-
-Commit checklist:
-
-1. Update muistiinpanot.md with completed work, important decisions, next steps and risks.
-2. If the change affects data, migrations, user-visible behavior or architecture, review BACKUP.md and add a backup reminder in muistiinpanot.md when relevant.
-3. Keep documentation concise and practical; do not duplicate information already documented in KONSEPTIKIRJA.md or COPILOT.md.
-4. Before finishing, confirm that the current work state is understandable from the latest notes.
-
-When work is complete:
-
-- provide a short summary of what was done
-- identify any remaining issues
-- suggest logical next tasks
+Älä luo uusia dokumenttitiedostoja, jotka peilaavat samaa vastuualuetta, ellei sitä erikseen pyydetä.
 
 ---
 

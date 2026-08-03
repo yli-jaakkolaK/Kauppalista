@@ -414,6 +414,23 @@
       <input type="number" class="settings-numero-input" id="kuormaraja-input" min="1" step="1">
     </div>
 
+    <div class="section-title">⚓ Ankkurit</div>
+    <div class="settings-row">
+      <span>Näytä etusivulla enintään N ankkuria oletuksena (0 = piilota kaikki, "näytä kaikki" toimii silti)</span>
+      <input type="number" class="settings-numero-input" id="ankkurit-nayta-maara-input" min="0" step="1">
+    </div>
+
+    <hr class="divider">
+
+    <!-- 7c (2026-08-03, ks. KONSEPTIKIRJA.md): kohdekohtainen oletus "ei
+         tarvitse näkyä Laiturissa" -täpälle. Kun tälle listalle/kortille
+         asetetaan koti, piilotus tapahtuu automaattisesti (ks. script.js
+         asetaLaiturinKoti/kohdeOnOletuksenaPiilotettu). Kertaluontoinen
+         piilotus tehdään sen sijaan Laiturin rivin omasta ⋯-valikosta. -->
+    <div class="section-title">🛟 Laituri</div>
+    <p class="section-empty" id="laituri-piilotus-selite">Kohteet joiden koti asetetaan aina piiloon Laiturista</p>
+    <div class="laituri-piilotus-lista" id="laituri-piilotus-lista"></div>
+
     <hr class="divider">
 
     <div class="section-title">✨ Mitä äly on tehnyt</div>
@@ -454,6 +471,14 @@
     <div class="laituri-arkisto-osio" id="laituri-arkisto-osio" style="display:none">
       <button class="laituri-arkisto-toggle" id="laituri-arkisto-toggle">🗄 Arkisto (0)</button>
       <ul class="list" id="laituri-arkisto-lista" style="display:none"></ul>
+    </div>
+
+    <!-- 7c (2026-08-03, ks. KONSEPTIKIRJA.md): "ei tarvitse näkyä Laiturissa"
+         -täpän piilottamat rivit, sama kokoontaitettava malli kuin Arkisto
+         yllä — EI tulkita käsitellyksi, vain pois aktiivisesta näkymästä. -->
+    <div class="laituri-arkisto-osio" id="laituri-piilotetut-osio" style="display:none">
+      <button class="laituri-arkisto-toggle" id="laituri-piilotetut-toggle">🙈 Piilotetut (0)</button>
+      <ul class="list" id="laituri-piilotetut-lista" style="display:none"></ul>
     </div>
   </div>
 

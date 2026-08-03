@@ -532,6 +532,26 @@ h1 {
   color: var(--text);
 }
 
+/* 7c-jatko (2026-08-03): kohdekohtainen "ei koskaan Laiturissa" -oletuslista
+   (Asetukset → 🛟 Laituri, ks. script.js paivitaLaiturinPiilotusAsetukset). */
+.laituri-piilotus-lista {
+  margin-top: 8px;
+}
+
+.laituri-piilotus-rivi {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 0;
+  border-bottom: 1px dashed var(--border-dash);
+  font-size: 14px;
+  color: var(--text);
+}
+
+.laituri-piilotus-rivi:last-child {
+  border-bottom: none;
+}
+
 /* E3-keskiportaan "Mitä äly on tehnyt" -loki (Asetukset). */
 .aly-log-list {
   margin-top: 12px;
@@ -1536,6 +1556,19 @@ h1 {
 .overflow-btn:hover,
 .overflow-btn:active {
   opacity: 1;
+}
+
+/* BUGIKORJAUS (2026-08-03, Katrin huomio Laiturista/Ankkureista): korkeintaan
+   neljä rivitointaa yhtenä pitkänä vaakajonona kaventaa tekstisaraketta
+   kapealla näytöllä ja rikkoo tekstin rivityksen ikävästi. 2×2-ruudukko pitää
+   toimintojen viemän kokonaisleveyden noin kahden napin levyisenä riippumatta
+   siitä onko niitä 3 vai 4. Laiturissa käytössä nyt (ks. script.js
+   lataaLaituri) — sama malli sopisi Ankkureihin myöhemmin samalla periaatteella.*/
+.laituri-rivi-toiminnot {
+  display: grid;
+  grid-template-columns: repeat(2, auto);
+  gap: 0 2px;
+  flex-shrink: 0;
 }
 
 .row-menu {
