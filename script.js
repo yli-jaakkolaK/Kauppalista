@@ -1563,9 +1563,22 @@ document.querySelectorAll('.opinto-ikkuna-btn').forEach(function(btn) {
     const ikkunaMin = Number(btn.dataset.min);
     const alkuperainen = btn.textContent;
     btn.textContent = '...';
-    const ehdokas = await etsiIkkunaanSopivaAskel(ikkunaMin);
-    btn.textContent = alkuperainen;
-    piirraOpintoIkkunaTulos(ehdokas, ikkunaMin);
+    // BUGIKORJAUS (2026-08-06, Katrin löytö "15 min jäi jumittamaan ruudulle"):
+    // jos etsiIkkunaanSopivaAskel() heittää poikkeuksen (verkko/DB-virhe),
+    // btn.textContent ei koskaan palautunut — nappi jäi pysyvästi "..."-
+    // tilaan eikä toinen napautus (esim. 30 min) enää tehnyt mitään koska
+    // sama koodipolku olisi kaatunut uudestaan. try/finally takaa että nappi
+    // palautuu AINA, virhe myös näkyy käyttäjälle sen sijaan että katoaisi
+    // hiljaa konsoliin.
+    try {
+      const ehdokas = await etsiIkkunaanSopivaAskel(ikkunaMin);
+      piirraOpintoIkkunaTulos(ehdokas, ikkunaMin);
+    } catch (e) {
+      console.error('Aikaikkunan haku epäonnistui:', e);
+      naytaIlmoitus('Ehdotuksen haku epäonnistui — yritä uudelleen');
+    } finally {
+      btn.textContent = alkuperainen;
+    }
   });
 });
 
@@ -1722,14 +1735,28 @@ async function merkitseOpintoAskel(askel, tila) {
   const { error } = await db.from('opinto_paivan_askeleet').update({ tila: tila }).eq('id', askel.id);
   if (ilmoitaKirjoitusvirheesta(error, 'Askeleen kuittaus')) return;
 
-  if (tila === 'tehty') {
-    if (askel.opinto_aiheet) await etenetaOpintoKohde(askel.opinto_aiheet, 'opinto_aiheet');
-    else if (askel.taitosolmut) await etenetaOpintoKohde(askel.taitosolmut, 'taitosolmut');
+  // BUGIKORJAUS (2026-08-06, ks. samasta syystä korjattu Aikaikkuna-nappi):
+  // tila-päivitys YLLÄ on jo onnistunut tässä vaiheessa riippumatta mitä
+  // alla tapahtuu — mutta jos etenetaOpintoKohde/tayttaOpintoPaivanAskeleet
+  // heittäisi poikkeuksen, lataaOpintoPaivanAskeleet() (näkymän päivitys)
+  // EI koskaan suoritu, ja ruutu jäisi näyttämään vanhaa tilaa vaikka
+  // tietokannassa oikea tila on jo tallessa — näyttää käyttäjälle siltä
+  // että kuittaus "ei mennyt läpi" vaikka meni. try/finally takaa että
+  // näkymä päivittyy AINA kun tila-kirjoitus onnistui, virhe alemmissa
+  // vaiheissa vain lokitetaan eikä katoa hiljaa.
+  try {
+    if (tila === 'tehty') {
+      if (askel.opinto_aiheet) await etenetaOpintoKohde(askel.opinto_aiheet, 'opinto_aiheet');
+      else if (askel.taitosolmut) await etenetaOpintoKohde(askel.taitosolmut, 'taitosolmut');
+    }
+    // Vapautunut tarjolla-paikka täytetään HETI (ks. tayttaOpintoPaivanAskeleet-
+    // kommentti) — koskee sekä tehty ETTÄ ohitettu, molemmat vapauttavat paikan.
+    await tayttaOpintoPaivanAskeleet();
+  } catch (e) {
+    console.error('PACER-eteneminen tai täydennys epäonnistui askeleen kuittauksen jälkeen:', e);
+  } finally {
+    lataaOpintoPaivanAskeleet();
   }
-  // Vapautunut tarjolla-paikka täytetään HETI (ks. tayttaOpintoPaivanAskeleet-
-  // kommentti) — koskee sekä tehty ETTÄ ohitettu, molemmat vapauttavat paikan.
-  await tayttaOpintoPaivanAskeleet();
-  lataaOpintoPaivanAskeleet();
 }
 
 // "Tehty" etenee PACERia JA ajastaa spaced repetitionin — moottorin
