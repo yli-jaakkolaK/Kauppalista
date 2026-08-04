@@ -2530,6 +2530,39 @@ h1 {
   margin-top: 6px;
 }
 
+/* Siltatunnistuksen esikatselu (2026-08-05, ks. muistiinpanot.md
+   "Siltasolmut") — rivi kerrallaan hyväksyntä, sama dialog-box/list-runko
+   kuin muualla mutta omat pienet tekstitasot perustelulle/viittauksille. */
+.silta-ehdotus-rivi {
+  display: block;
+  padding: 10px 4px;
+  border-bottom: 1px solid var(--border-dash);
+}
+.silta-ehdotus-rivi:last-child { border-bottom: none; }
+.silta-ehdotus-yla {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.silta-ehdotus-nimi-input {
+  flex: 1;
+  font-family: 'Courier New', Courier, monospace;
+  font-size: 14px;
+  color: var(--text);
+  background: var(--ground);
+  border: 1px solid var(--border-dash);
+  border-radius: 4px;
+  padding: 5px 7px;
+}
+.silta-ehdotus-perustelu,
+.silta-ehdotus-viittaukset,
+.silta-ehdotus-kaaret {
+  font-size: 12px;
+  color: var(--muted);
+  margin-top: 4px;
+  padding-left: 24px;
+}
+
 /* Huolilippu (2026-08-04, ks. muistiinpanot.md "Huolilippu") — EI käytä
    kolmiportaisen merkkikielen sävyjä, oma neliportainen emoji-asteikko. */
 .huoli-pikalisays {

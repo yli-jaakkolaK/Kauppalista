@@ -243,12 +243,14 @@
 
     <hr class="divider">
 
-    <!-- Taitosolmut (2026-08-04, ks. muistiinpanot.md "Taitosolmut") —
-         graafirakenne (kaaret) opinto_aiheet-listan rinnalla, sama moottori.
-         Litteä lista tässä (ei omaa kurssikäsitettä, ks. `lahde`-kenttä). -->
-    <div class="section-title">🧩 Taitosolmut</div>
+    <!-- Siltasolmut (2026-08-05, ks. muistiinpanot.md "Siltasolmut") — VAIN
+         käsitteet jotka toistuvat kahdessa tai useammassa AKTIIVISESSA
+         kurssissa yhtä aikaa. Ei yksittäisen kurssin sisältöä (se on
+         opinto_kurssit/opinto_aiheet-radalla). Täyttyy AI-avusteisen
+         tunnistuksen + käyttäjän rivikohtaisen hyväksynnän kautta. -->
+    <div class="section-title">🧩 Taitosolmut <span class="opinto-kartta-linkki" id="silta-etsi-linkki">🌉 Etsi sillat</span></div>
     <ul class="list" id="taitosolmu-lista"></ul>
-    <p class="section-empty" id="taitosolmu-tyhja" style="display:none">Ei vielä taitosolmuja.</p>
+    <p class="section-empty" id="taitosolmu-tyhja" style="display:none">Ei vielä taitosolmuja. Sillat löytyvät automaattisesti "🌉 Etsi sillat" -toiminnolla, kun vähintään kaksi aktiivista kurssia on täyttänyt materiaalikenttänsä.</p>
 
     <div class="add-item">
       <span class="prefix">›</span>
@@ -350,6 +352,8 @@
       <h1 id="opinto-kurssi-title">✱ KURSSI ✱</h1>
       <button class="settings-btn" id="opinto-kurssi-poista-btn" title="Poista kurssi kokonaan">🗑</button>
     </div>
+
+    <p class="section-link" id="opinto-kurssi-tila-linkki"></p>
 
     <div class="section-title">📎 Materiaali</div>
     <textarea id="opinto-materiaali-teksti" class="jatkorivi-teksti" rows="2" placeholder="Linkki tai muistiinpano kurssin materiaaliin..."></textarea>
@@ -456,6 +460,22 @@
     </div>
   </div>
 
+  <!-- Siltatunnistuksen esikatselu/vahvistus (2026-08-05) — "äly ehdottaa,
+       ihminen kuittaa": rivi kerrallaan hyväksyntä ennen tallennusta, sama
+       periaate kuin muuallakin Satamassa. Ei koskaan automaattista
+       tallennusta. -->
+  <div class="dialog-overlay" id="silta-ehdotus-overlay" style="display:none">
+    <div class="dialog-box">
+      <p class="dialog-title">Ehdotetut sillat</p>
+      <ul class="list" id="silta-ehdotus-lista"></ul>
+      <p class="section-empty" id="silta-ehdotus-tyhja" style="display:none">Ei ehdotuksia tällä kertaa.</p>
+      <div class="dialog-buttons">
+        <button class="dialog-btn dialog-btn-cancel" id="silta-ehdotus-sulje">Sulje</button>
+        <button class="dialog-btn" id="silta-ehdotus-tallenna-btn">Tallenna hyväksytyt</button>
+      </div>
+    </div>
+  </div>
+
   <div class="container" id="asetukset-view" style="display:none">
     <div class="list-header">
       <button class="back-btn" id="asetukset-back-btn">‹</button>
@@ -513,6 +533,22 @@
     <div class="settings-row">
       <span>Huolilippu: paino josta päivä pakotetaan "raskaaksi"</span>
       <input type="number" class="settings-numero-input" id="huoli-raskas-kynnys-input" min="0" step="1">
+    </div>
+    <div class="settings-row">
+      <span>Aloittamaton kurssitehtävä saa kovan etusijan kun deadlineen on enintään N päivää</span>
+      <input type="number" class="settings-numero-input" id="kurssi-kiireellisyys-input" min="0" step="1">
+    </div>
+    <div class="settings-row">
+      <span>Siltasolmun ikkuna sulkeutuu N päivää ennen aikaisinta viittaavaa deadlinea</span>
+      <input type="number" class="settings-numero-input" id="silta-puskuri-input" min="0" step="1">
+    </div>
+    <div class="settings-row">
+      <span>Kiireellisyyden leviäminen tarvitsee-kaarten yli, enintään N askelta</span>
+      <input type="number" class="settings-numero-input" id="silta-leviamissyvyys-input" min="0" step="1">
+    </div>
+    <div class="settings-row">
+      <span>Opiskeluistunto kysyy vahvistusta jos kesto ylittää N tuntia</span>
+      <input type="number" class="settings-numero-input" id="sessio-jarkevyys-input" min="0" step="1">
     </div>
 
     <div class="section-title">⚓ Ankkurit</div>
