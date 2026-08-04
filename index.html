@@ -225,6 +225,37 @@
       <ul class="list" id="opinto-tanaan-lista"></ul>
     </div>
 
+    <!-- Huolilippu (2026-08-04, ks. muistiinpanot.md "Huolilippu") — kevyt
+         ennakoiva merkintä joka vaikuttaa Kuormavahtiin (opintoPaivanKuorma).
+         EI ristiriitapaketin väri/rakenne, oma pikkuosionsa. Kertaluontoinen
+         pikalisäys: valitse päivä + vakavuus, tallenna. -->
+    <div class="section-title">🚩 Huoli</div>
+    <div class="huoli-pikalisays">
+      <input type="date" id="huoli-pvm-input">
+      <div class="huoli-vakavuus-rivi">
+        <button class="huoli-vakavuus-btn" data-vakavuus="1">🟡</button>
+        <button class="huoli-vakavuus-btn" data-vakavuus="2">🟠</button>
+        <button class="huoli-vakavuus-btn" data-vakavuus="3">🔴</button>
+        <button class="huoli-vakavuus-btn" data-vakavuus="4">🏴</button>
+      </div>
+    </div>
+    <p class="section-empty">Merkitse päivä jolta ennakoit kuormaa (esim. sisarusriitaa) vaikka kalenteri näyttää rauhalliselta — väri ja läheisyys vaikuttavat yhdessä tämän päivän opiskelutarjontaan.</p>
+
+    <hr class="divider">
+
+    <!-- Taitosolmut (2026-08-04, ks. muistiinpanot.md "Taitosolmut") —
+         graafirakenne (kaaret) opinto_aiheet-listan rinnalla, sama moottori.
+         Litteä lista tässä (ei omaa kurssikäsitettä, ks. `lahde`-kenttä). -->
+    <div class="section-title">🧩 Taitosolmut</div>
+    <ul class="list" id="taitosolmu-lista"></ul>
+    <p class="section-empty" id="taitosolmu-tyhja" style="display:none">Ei vielä taitosolmuja.</p>
+
+    <div class="add-item">
+      <span class="prefix">›</span>
+      <input type="text" id="taitosolmu-uusi-input" placeholder="uuden taitosolmun nimi...">
+      <button id="taitosolmu-uusi-btn">+</button>
+    </div>
+
     <div id="hytti-tanaan-osio" style="display:none">
       <div class="section-title">📅 Tänään</div>
       <ul class="list" id="hytti-tanaan-list"></ul>
@@ -363,6 +394,68 @@
     <div id="opinto-kartta-sisalto"></div>
   </div>
 
+  <!-- Taitosolmut (2026-08-04, ks. muistiinpanot.md "Taitosolmut") — yhden
+       solmun näkymä: PACER-vaihe, lähde/linkki/tavoiteikkuna, vapaa
+       muistiinpanot-kenttä, kaaret (tarvitsee-portti + liittyy-kartta),
+       käsitekartta-editori (kynä+kumi+tekstilaatikot, ei OCR/AI). -->
+  <div class="container" id="taitosolmu-view" style="display:none">
+    <div class="list-header">
+      <button class="back-btn" id="taitosolmu-back-btn">‹</button>
+      <h1 id="taitosolmu-title">✱ TAITOSOLMU ✱</h1>
+      <button class="settings-btn" id="taitosolmu-poista-btn" title="Poista taitosolmu">🗑</button>
+    </div>
+
+    <select id="taitosolmu-vaihe-select" class="opinto-vaihe-select"></select>
+    <p class="taitosolmu-lahde" id="taitosolmu-lahde-teksti"></p>
+
+    <div class="add-item">
+      <span class="prefix">🔗</span>
+      <input type="text" id="taitosolmu-linkki-input" placeholder="linkki (valinnainen)...">
+    </div>
+    <div class="add-item">
+      <span class="prefix">🎯</span>
+      <input type="date" id="taitosolmu-tavoiteikkuna-input">
+    </div>
+
+    <div class="section-title">📝 Muistiinpanot</div>
+    <textarea id="taitosolmu-muistiinpanot-teksti" class="jatkorivi-teksti" rows="4" placeholder="Kysymyksiä primingistä, huomioita, mitä pitää palata vahvistamaan..."></textarea>
+    <button class="dialog-btn dialog-btn-cancel" id="taitosolmu-tallenna-btn" style="margin-top:6px">Tallenna</button>
+
+    <hr class="divider">
+
+    <div class="section-title">🖊 Käsitekartta</div>
+    <div class="kasitekartta-varit" id="kasitekartta-varit">
+      <button class="kasitekartta-vari-btn active" data-vari="#000000" style="background:#000000"></button>
+      <button class="kasitekartta-vari-btn" data-vari="#c0392b" style="background:#c0392b"></button>
+      <button class="kasitekartta-vari-btn" data-vari="#1f6feb" style="background:#1f6feb"></button>
+      <button class="kasitekartta-vari-btn" data-vari="#1a7f37" style="background:#1a7f37"></button>
+      <button class="kasitekartta-vari-btn" data-vari="#b8860b" style="background:#b8860b"></button>
+      <button class="kasitekartta-tyokalu-btn" id="kasitekartta-kumi-btn" title="Kumi">🧹</button>
+      <button class="kasitekartta-tyokalu-btn" id="kasitekartta-teksti-btn" title="Lisää teksti">Tt</button>
+      <button class="kasitekartta-tyokalu-btn" id="kasitekartta-tyhjenna-btn" title="Tyhjennä kaikki">Tyhjennä</button>
+    </div>
+    <div class="kasitekartta-wrap" id="kasitekartta-wrap">
+      <canvas id="kasitekartta-canvas" width="800" height="600"></canvas>
+    </div>
+    <button class="dialog-btn dialog-btn-cancel" id="kasitekartta-tallenna-btn" style="margin-top:6px">Tallenna käsitekartta</button>
+
+    <hr class="divider">
+
+    <div class="section-title">🚧 Tarvitsee (portti — kaikki oltava vähintään "Opiskelussa")</div>
+    <ul class="list" id="taitosolmu-tarvitsee-lista"></ul>
+    <div class="opinto-deadline-lisays">
+      <select id="taitosolmu-tarvitsee-select"></select>
+      <button class="dialog-btn dialog-btn-cancel" id="taitosolmu-tarvitsee-lisaa-btn">Lisää</button>
+    </div>
+
+    <div class="section-title">🔀 Liittyy (vain kartalle, ei vaikuta tarjontaan)</div>
+    <ul class="list" id="taitosolmu-liittyy-lista"></ul>
+    <div class="opinto-deadline-lisays">
+      <select id="taitosolmu-liittyy-select"></select>
+      <button class="dialog-btn dialog-btn-cancel" id="taitosolmu-liittyy-lisaa-btn">Lisää</button>
+    </div>
+  </div>
+
   <div class="container" id="asetukset-view" style="display:none">
     <div class="list-header">
       <button class="back-btn" id="asetukset-back-btn">‹</button>
@@ -412,6 +505,14 @@
     <div class="settings-row">
       <span>Varoitusmerkki päivälle jolla vähintään N kellonaikamenoa</span>
       <input type="number" class="settings-numero-input" id="kuormaraja-input" min="1" step="1">
+    </div>
+    <div class="settings-row">
+      <span>Huolilippu: paino josta päivä nousee vähintään "keski"-kuormaksi</span>
+      <input type="number" class="settings-numero-input" id="huoli-keski-kynnys-input" min="0" step="1">
+    </div>
+    <div class="settings-row">
+      <span>Huolilippu: paino josta päivä pakotetaan "raskaaksi"</span>
+      <input type="number" class="settings-numero-input" id="huoli-raskas-kynnys-input" min="0" step="1">
     </div>
 
     <div class="section-title">⚓ Ankkurit</div>

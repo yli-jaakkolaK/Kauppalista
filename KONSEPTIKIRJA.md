@@ -434,6 +434,8 @@ Näin systeemi vastaa Katrin ydintarpeeseen: "en halua arpoa mitä opiskella —
 
 Copilot-aikaa (iso). Vaihe 1 on itsenäinen ja rakennuskelpoinen heti kun aika sallii.
 
+**4.11-LISÄYS: TAITOSOLMUT — RAKENNETTU 2026-08-04 (graafirakenne opinto_aiheet-listan rinnalle).** Katri toimitti kaksi taitosolmulistaa (koodauskurssi, matikkarata) joissa on aitoja solmujen välisiä riippuvuuksia ja risteäviä käsitteitä — ei mahtunut yllä kuvatun `opinto_aiheet`-mallin litteään kurssi→aihe-rakenteeseen. Uusi `taitosolmut`/`taito_kaaret`-datamalli (owner_id+RLS, sama PACER-vaihe) SAMAN moottorin rinnalle, ei rinnakkaista konetta — `laskeOpintoPaivanAskeleet()` valitsee tänään-askeleet nyt kummastakin lähteestä yhdessä. `tarvitsee`-kaari on portinvartija AND-semantiikalla (kaikki esitiedot vähintään encoding), `liittyy`-kaari vain lukua varten (ei vaikuta tarjontaan), `opettaa` varattu tulevaa käyttöä varten. Samassa erässä myös Huolilippu (uusi, Kuormavahtiin syöttävä ennakoiva merkintä — ERI mekanismi kuin ristiriitapaketti) ja käsitekartta-editori (kynä+kumi+raahattavat tekstilaatikot, TIETOISESTI ilman käsialantunnistusta/tekoälyä — olisi ollut ensimmäinen poikkeus Opintopolun "ei älykutsua" -periaatteeseen). Täysi tekninen kuvaus, tuontidatan rajaukset ja avoin testaustarve: muistiinpanot.md "Taitosolmut + Huolilippu" -osio.
+
 ---
 
 ## OSA 5: MITEN TÄTÄ KEHITETÄÄN COPILOTIN KANSSA
