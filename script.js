@@ -21,6 +21,7 @@ function piilotaKaikkiNakymat() {
   document.getElementById('opinto-kurssi-view').style.display = 'none';
   document.getElementById('opinto-kartta-view').style.display = 'none';
   document.getElementById('taitosolmu-view').style.display = 'none';
+  document.getElementById('lapsi-view').style.display = 'none';
 }
 
 function showLoginView() {
@@ -2462,52 +2463,165 @@ function laskeMenoja(rivit) {
 // === PÄÄLLEKKÄISYYSMERKKI (2026-07-10, ks. muistiinpanot.md "Ristiriitamerkki") ===
 // Kaksi kellonaikaan sidottua tapahtumaa menevät päällekkäin samana päivänä.
 // Vain kalenteritapahtumat (ei ankkurit/Hytti) osallistuvat vertailuun.
+//
+// Ristiriitapaketti v2 (2026-08-06, ks. muistiinpanot.md "Ristiriitapaketti
+// v2"): siirtymapuskuri_min lisätään molempien tapahtumien molempiin päihin
+// ENNEN vertailua (matka-aika huomioitu), ja alle min_paallekkainen_min-
+// mittainen päällekkäisyys ei laukaise mitään — molemmat asetuksina, ei
+// kovakoodattuja (Katrin oma speksi).
+function aikaMinuutteina(aika) {
+  const osat = aika.split(':');
+  return Number(osat[0]) * 60 + Number(osat[1]);
+}
 function onkoAjallisestiPaallekkainen(a, b) {
   if (!a.event_time || !b.event_time) return false;
-  const aLoppu = a.event_end_time || a.event_time;
-  const bLoppu = b.event_end_time || b.event_time;
-  return a.event_time < bLoppu && b.event_time < aLoppu;
-}
-
-// Onko annettu ISO-päivä ylipäätään "rauhoitettu päivä" (kausi + arkipäivä +
-// ei loma-aikaa)? Pelkkä päivätason kelpoisuus — kellonaikaikkuna (klo 9-15)
-// tarkistetaan ERIKSEEN paallekkaisyysVakavuus():ssa itse päällekkäisyyden
-// ajankohdalle, ei koko päivälle. Kaikki asetuksina asetukset-taulussa
-// (sql/024), ei mitään kovakoodattua.
-function onkoRauhoitettuPaiva(isoPvm) {
-  const osat = isoPvm.split('-').map(Number);
-  const d = new Date(osat[0], osat[1] - 1, osat[2]);
-  const viikonpaivat = haeAsetusTeksti('ristiriita_viikonpaivat', '1,2,3,4,5').split(',').map(Number);
-  const isoViikonpaiva = d.getDay() === 0 ? 7 : d.getDay(); // 1=ma...7=su
-  if (viikonpaivat.indexOf(isoViikonpaiva) === -1) return false;
-
-  const kausiAlkaa = haeAsetusTeksti('ristiriita_kausi_alkaa', '08-01'); // MM-DD
-  const kausiLoppuu = haeAsetusTeksti('ristiriita_kausi_loppuu', '05-31');
-  const kkPv = isoPvm.slice(5); // "MM-DD"
-  // Kausi voi kiertää vuodenvaihteen yli (esim. elokuusta toukokuuhun).
-  const kausiVoimassa = kausiAlkaa <= kausiLoppuu
-    ? (kkPv >= kausiAlkaa && kkPv <= kausiLoppuu)
-    : (kkPv >= kausiAlkaa || kkPv <= kausiLoppuu);
-  if (!kausiVoimassa) return false;
-
-  const lomaValit = haeAsetusJSON('ristiriita_loma_valit', []);
-  const lomalla = (lomaValit || []).some(function(vali) { return isoPvm >= vali.alku && isoPvm <= vali.loppu; });
-  return !lomalla;
+  const puskuri = haeAsetusNumero('siirtymapuskuri_min', 30);
+  const vahimmaisKesto = haeAsetusNumero('min_paallekkainen_min', 15);
+  const aAlku = aikaMinuutteina(a.event_time) - puskuri;
+  const aLoppu = aikaMinuutteina(a.event_end_time || a.event_time) + puskuri;
+  const bAlku = aikaMinuutteina(b.event_time) - puskuri;
+  const bLoppu = aikaMinuutteina(b.event_end_time || b.event_time) + puskuri;
+  const paallekkaisAlku = Math.max(aAlku, bAlku);
+  const paallekkaisLoppu = Math.min(aLoppu, bLoppu);
+  return (paallekkaisLoppu - paallekkaisAlku) >= vahimmaisKesto;
 }
 
 // "Rauhoitus-ikkuna" hytti-melulle (Ristiriitapaketti, kohta 3, 2026-07-17,
-// ks. muistiinpanot.md) — YKSINKERTAINEN absoluuttinen päivämääräväli
-// (EI kiertävä kuten yllä oleva kausi), oma pari asetuksia
-// (rauhoitus_alku/rauhoitus_loppu, molemmat YYYY-MM-DD). Oletus TYHJÄ =
-// ei rauhoitusta ollenkaan — Katri asettaa arvon myöhemmin kun haluaa.
-// Tarkoitettu VAIN vaimentamaan toistuvia hytti-scopen rutiinipäällekkäisyyksiä
-// (esim. viikoittainen luento vs. arjen vakiokuvio), ei mitään muuta —
-// ks. paallekkaisyysVakavuus() alla.
+// ks. muistiinpanot.md) — YKSINKERTAINEN absoluuttinen päivämääräväli, oma
+// pari asetuksia (rauhoitus_alku/rauhoitus_loppu, molemmat YYYY-MM-DD).
+// Oletus TYHJÄ = ei rauhoitusta ollenkaan. Tarkoitettu VAIN vaimentamaan
+// toistuvia hytti-scopen rutiinipäällekkäisyyksiä (esim. viikoittainen
+// luento vs. arjen vakiokuvio) — TÄYSIN ERI mekanismi kuin alla oleva
+// lasten hoivaikkuna, ei kosketettu Ristiriitapaketti v2:ssa (Katrin oma
+// vahvistus: "onkoRauhoitusIkkunassa() pysyy koskemattomana").
 function onkoRauhoitusIkkunassa(isoPvm) {
   const alku = haeAsetusTeksti('rauhoitus_alku', '');
   const loppu = haeAsetusTeksti('rauhoitus_loppu', '');
   if (!alku || !loppu) return false;
   return isoPvm >= alku && isoPvm <= loppu;
+}
+
+// === LAPSET / HOIVAIKKUNA (Ristiriitapaketti v2, 2026-08-06, ks. sql/105,
+// muistiinpanot.md "Ristiriitapaketti v2") === Korvaa vanhan LITTEÄN,
+// kaikille lapsille yhteisen onkoRauhoitettuPaiva()-mallin (kausi+viikon-
+// päivät+lomalista+klo 9-15) lapsikohtaisella, todellisilla hoitoajoilla
+// lasketulla mallilla. Jaettu perheen data, ei owner_id-rajausta.
+let cachedLapset = [];
+let cachedLapsiViikkopohja = [];
+let cachedLukuvuosijaksot = [];
+let cachedLapsiPaivapoikkeus = [];
+
+async function paivitaLapsidata() {
+  const [lapsetRes, viikkopohjaRes, lukuvuosiRes, poikkeusRes] = await Promise.all([
+    db.from('lapset').select(),
+    db.from('lapsi_viikkopohja').select(),
+    db.from('lukuvuosijaksot').select(),
+    db.from('lapsi_paivapoikkeus').select(),
+  ]);
+  if (lapsetRes.error) console.error('Lasten haku epäonnistui:', lapsetRes.error);
+  if (viikkopohjaRes.error) console.error('Viikkopohjan haku epäonnistui:', viikkopohjaRes.error);
+  if (lukuvuosiRes.error) console.error('Lukuvuosijaksojen haku epäonnistui:', lukuvuosiRes.error);
+  if (poikkeusRes.error) console.error('Päiväpoikkeusten haku epäonnistui:', poikkeusRes.error);
+  cachedLapset = lapsetRes.data || [];
+  cachedLapsiViikkopohja = viikkopohjaRes.data || [];
+  cachedLukuvuosijaksot = lukuvuosiRes.data || [];
+  cachedLapsiPaivapoikkeus = poikkeusRes.data || [];
+}
+
+// Postgresin time-sarakkeet tulevat "HH:MM:SS" — normalisoidaan "HH:MM"
+// kauttaaltaan ettei merkkijonovertailu sekoa eripituisiin muotoihin.
+function aikaHHMM(t) {
+  return t ? t.slice(0, 5) : t;
+}
+
+function laskeLapsenIka(syntymapaiva, isoPvm) {
+  if (!syntymapaiva) return null;
+  const s = syntymapaiva.split('-').map(Number);
+  const p = isoPvm.split('-').map(Number);
+  let ika = p[0] - s[0];
+  if (p[1] < s[1] || (p[1] === s[1] && p[2] < s[2])) ika--;
+  return ika;
+}
+
+function haeViikkopohjaRivi(lapsiId, viikonpaiva) {
+  return cachedLapsiViikkopohja.find(function(r) { return r.lapsi_id === lapsiId && r.viikonpaiva === viikonpaiva; }) || null;
+}
+function haeLukuvuosijaksoPaivalle(lapsiId, isoPvm) {
+  return cachedLukuvuosijaksot.find(function(j) { return j.lapsi_id === lapsiId && isoPvm >= j.alkaa && isoPvm <= j.paattyy; }) || null;
+}
+function haePaivapoikkeusPaivalle(lapsiId, isoPvm) {
+  return cachedLapsiPaivapoikkeus.find(function(p) { return p.lapsi_id === lapsiId && p.paiva === isoPvm; }) || null;
+}
+
+// Palauttaa taulukon {alkaa,paattyy} ("HH:MM") -ikkunoita joina lapsi
+// TARVITSEE valvontaa annettuna päivänä — EI vielä ikäsoftauksia (ks.
+// tarvitseeLapsiValvontaa, joka tarvitsee myös päällekkäisyyden KESTON).
+// Prioriteetti: päiväpoikkeus > lukuvuosijakso > viikkopohja (sql/105).
+// "mukautettu"-poikkeus kattaa VAIN yhden poissaolo-ikkunan (esim. koulu
+// 9-14) — mahdollinen aamun hoivaikkuna ENNEN sitä on tietoinen rajaus,
+// ei mallinnettu (käyttötapaus on "poikkeava koulupäivä", ei "poikkeava
+// aamu").
+function haeHoivaikkunat(lapsi, isoPvm) {
+  const nukkumaanmeno = aikaHHMM(lapsi.nukkumaanmeno) || '20:30';
+  const poikkeus = haePaivapoikkeusPaivalle(lapsi.id, isoPvm);
+  if (poikkeus) {
+    if (poikkeus.tyyppi === 'poissa') return [];
+    if (poikkeus.tyyppi === 'kotona') return [{ alkaa: '00:00', paattyy: nukkumaanmeno }];
+    if (poikkeus.tyyppi === 'mukautettu' && poikkeus.alkaa && poikkeus.paattyy) {
+      return [
+        { alkaa: '00:00', paattyy: aikaHHMM(poikkeus.alkaa) },
+        { alkaa: aikaHHMM(poikkeus.paattyy), paattyy: nukkumaanmeno },
+      ].filter(function(ikkuna) { return ikkuna.alkaa < ikkuna.paattyy; });
+    }
+  }
+
+  const osat = isoPvm.split('-').map(Number);
+  const viikonpaiva = new Date(osat[0], osat[1] - 1, osat[2]).getDay(); // 0=su...6=la
+
+  const jakso = haeLukuvuosijaksoPaivalle(lapsi.id, isoPvm);
+  if (jakso && jakso.tyyppi !== 'koulussa') return [{ alkaa: '00:00', paattyy: nukkumaanmeno }];
+
+  const pohja = haeViikkopohjaRivi(lapsi.id, viikonpaiva);
+  if (!pohja) return [{ alkaa: '00:00', paattyy: nukkumaanmeno }]; // ei tietoa -> turvallisin oletus: koko päivä
+  return [
+    { alkaa: '00:00', paattyy: aikaHHMM(pohja.alkaa) },
+    { alkaa: aikaHHMM(pohja.paattyy), paattyy: nukkumaanmeno },
+  ].filter(function(ikkuna) { return ikkuna.alkaa < ikkuna.paattyy; });
+}
+
+function aikavaliPaallekkain(alku1, loppu1, alku2, loppu2) {
+  const alku = alku1 > alku2 ? alku1 : alku2;
+  const loppu = loppu1 < loppu2 ? loppu1 : loppu2;
+  return alku < loppu ? { alkaa: alku, paattyy: loppu } : null;
+}
+
+// Ratkaisee TARVITSEEKO tämä lapsi oikeasti valvontaa annetun päällekkäisyys-
+// ikkunan aikana. Ikäsoftaukset (Katrin oma määrittely, kaikki VALINNAISIA
+// kynnyksiä — null = kynnystä ei sovelleta):
+//  - tarvitsee_valvontaa=false TAI ika >= ika_yksin_illassa -> ei koskaan
+//  - ika >= ika_iltaan_asti -> ei ristiriitaa (pärjää koulun jälkeen iltaan)
+//  - ika >= ika_yksin_hetkittain JA päällekkäisyys < yksin_hetkittain_raja_min
+//    -> ei ristiriitaa (lyhyt "pärjää hetken yksin" -ikkuna)
+function tarvitseeLapsiValvontaa(lapsi, isoPvm, paallekkaisAlku, paallekkaisLoppu) {
+  if (!lapsi.tarvitsee_valvontaa) return false;
+  const ika = laskeLapsenIka(lapsi.syntymapaiva, isoPvm);
+  if (ika !== null && lapsi.ika_yksin_illassa != null && ika >= lapsi.ika_yksin_illassa) return false;
+
+  const hoivaikkunat = haeHoivaikkunat(lapsi, isoPvm);
+  const osuu = hoivaikkunat.some(function(ikkuna) {
+    return aikavaliPaallekkain(paallekkaisAlku, paallekkaisLoppu, ikkuna.alkaa, ikkuna.paattyy) !== null;
+  });
+  if (!osuu) return false;
+
+  if (ika !== null && lapsi.ika_iltaan_asti != null && ika >= lapsi.ika_iltaan_asti) return false;
+
+  if (ika !== null && lapsi.ika_yksin_hetkittain != null && ika >= lapsi.ika_yksin_hetkittain) {
+    const kesto = aikaMinuutteina(paallekkaisLoppu) - aikaMinuutteina(paallekkaisAlku);
+    const raja = haeAsetusNumero('yksin_hetkittain_raja_min', 90);
+    if (kesto < raja) return false;
+  }
+
+  return true;
 }
 
 // Kolmiportainen vakavuus kahden päällekkäisen tapahtuman välillä (Ristiriita-
@@ -2517,23 +2631,17 @@ function onkoRauhoitusIkkunassa(isoPvm) {
 //  - 'full'      saman syötteen sisäinen päällekkäisyys (aina), TAI KUMPI
 //                TAHANSA puoli on TUNNISTETTU (oma henkilökohtainen meno
 //                `_henkilo`, TAI oikealta kalenterisyötteeltä tuleva
-//                `syote_id` — myös jaettu perhetapahtuma jonka henkilo on
-//                NULL, koska perhetapahtuma OLETTAA MOLEMPIEN läsnäolon
-//                kunnes toisin sovitaan ja törmää siis kenen tahansa muuhun
-//                menoon täydellä voimalla). KORJATTU 2026-07-17: TÄMÄ KOSKEE
-//                MYÖS saman henkilön kahta omaa menoa — eilinen kevennys
-//                ("hänen oma päällekkäisyytensä, ei perheen kriisi") oli
-//                väärin, kukaan ei voi olla kahdessa paikassa itsekään.
-//  - 'attention' hytti-scopen päällekkäisyys erillisen rauhoitus-ikkunan
-//                (kohta 3) sisällä (muuten olisi 'full'), TAI kaksi TÄYSIN
-//                tuntematonta tapahtumaa (ei syote_id, ei henkilo kummallakaan
-//                puolella — ei mitään tunnistetta) rauhoitetun koulupäivän
-//                klo 9-15 -ikkunan ULKOPUOLELLA.
-//  - 'none'      kaksi täysin tuntematonta tapahtumaa joiden koko ajanjakso
-//                mahtuu rauhoitetun koulupäivän klo 9-15 -ikkunaan (olemassa
-//                oleva sääntö, ks. onkoRauhoitettuPaiva) — ainoa jäljellä
-//                oleva aidosti epävarma tapaus, kun kummallakaan puolella ei
-//                ole mitään tunnistetta ollenkaan.
+//                `syote_id`). TÄMÄ EI RIIPU LAPSISTA MITENKÄÄN (Katrin
+//                vahvistus 2026-08-06: "full = sama henkilö kahdessa
+//                paikassa, se on aina mahdotonta lapsista riippumatta").
+//  - 'attention' hytti-scopen päällekkäisyys rauhoitus-ikkunan sisällä
+//                (muuten olisi 'full'), TAI vähintään yksi lapsi (jota ei
+//                ole katettu kummankaan tapahtuman kattaa_lapset-kentässä)
+//                tarvitsee valvontaa juuri tällä päällekkäisyysikkunalla
+//                (Ristiriitapaketti v2, ks. tarvitseeLapsiValvontaa yllä).
+//  - 'none'      kumpikaan tapahtuma ei ole tunnistettu JA joko lapsia ei
+//                ole, tai kaikki tarvitsevat-valvontaa-lapset on katettu,
+//                tai kukaan lapsi ei ole hoivaikkunassa juuri silloin.
 function paallekkaisyysVakavuus(a, b, isoPvm) {
   if (a.syote_id && b.syote_id && a.syote_id === b.syote_id) return 'full';
 
@@ -2542,16 +2650,17 @@ function paallekkaisyysVakavuus(a, b, isoPvm) {
 
   if (a._henkilo || b._henkilo || a.syote_id || b.syote_id) return 'full';
 
-  if (!onkoRauhoitettuPaiva(isoPvm)) return 'attention';
-
   const aLoppu = a.event_end_time || a.event_time;
   const bLoppu = b.event_end_time || b.event_time;
-  const paallekkaisAlku = a.event_time > b.event_time ? a.event_time : b.event_time;
-  const paallekkaisLoppu = aLoppu < bLoppu ? aLoppu : bLoppu;
-  const kloAlkaa = haeAsetusTeksti('ristiriita_klo_alkaa', '09:00');
-  const kloLoppuu = haeAsetusTeksti('ristiriita_klo_loppuu', '15:00');
-  const kokoPaallekkaisyysIkkunassa = paallekkaisAlku.slice(0, 5) >= kloAlkaa && paallekkaisLoppu.slice(0, 5) <= kloLoppuu;
-  return kokoPaallekkaisyysIkkunassa ? 'none' : 'attention';
+  const paallekkaisAlku = aikaHHMM(a.event_time > b.event_time ? a.event_time : b.event_time);
+  const paallekkaisLoppu = aikaHHMM(aLoppu < bLoppu ? aLoppu : bLoppu);
+
+  const katetutLapset = new Set((a.kattaa_lapset || []).concat(b.kattaa_lapset || []));
+  const tarvitaanVartija = cachedLapset.some(function(lapsi) {
+    if (katetutLapset.has(lapsi.id)) return false;
+    return tarvitseeLapsiValvontaa(lapsi, isoPvm, paallekkaisAlku, paallekkaisLoppu);
+  });
+  return tarvitaanVartija ? 'attention' : 'none';
 }
 
 // Analysoi annetun päivän KAIKKI päällekkäisyydet kerralla — korvaa aiemman
@@ -2588,6 +2697,357 @@ function analysoiPaivanRistiriidat(rivit, isoPvm) {
 function ristiriitaAvain(fullIds) {
   return fullIds.join(',');
 }
+
+// === LAPSET-HALLINTA UI (Ristiriitapaketti v2, 2026-08-06, ks. sql/105,
+// muistiinpanot.md "Ristiriitapaketti v2") === Asetukset-näkymän "👶 Lapset"
+// -osiosta avautuva profiili + viikkopohja + lukuvuosijaksot + päivä-
+// poikkeukset samalla sivulla. Jaettu perheen data, ei owner_id-rajausta.
+async function lataaLapset() {
+  const { data, error } = await db.from('lapset').select().order('nimi');
+  if (error) {
+    console.error('Lasten haku epäonnistui:', error);
+    return;
+  }
+  const lapset = data || [];
+  const listEl = document.getElementById('lapset-lista');
+  listEl.innerHTML = '';
+  document.getElementById('lapset-tyhja').style.display = lapset.length === 0 ? 'block' : 'none';
+  lapset.forEach(function(lapsi) {
+    const li = document.createElement('li');
+    li.addEventListener('click', function() { avaaLapsi(lapsi); });
+    const teksti = document.createElement('span');
+    teksti.textContent = lapsi.nimi;
+    li.appendChild(teksti);
+    listEl.appendChild(li);
+  });
+}
+
+document.getElementById('lapsi-uusi-btn').addEventListener('click', async function() {
+  const input = document.getElementById('lapsi-uusi-input');
+  const nimi = input.value.trim();
+  if (!nimi) { input.focus(); return; }
+  const { error } = await db.from('lapset').insert({ nimi: nimi });
+  if (ilmoitaKirjoitusvirheesta(error, 'Lapsen lisäys')) return;
+  input.value = '';
+  lataaLapset();
+});
+document.getElementById('lapsi-uusi-input').addEventListener('keydown', function(e) {
+  if (e.key === 'Enter') document.getElementById('lapsi-uusi-btn').click();
+});
+
+function showLapsiView() {
+  piilotaKaikkiNakymat();
+  document.getElementById('lapsi-view').style.display = 'block';
+}
+
+let currentLapsi = null;
+const VIIKONPAIVA_NIMET = ['Su', 'Ma', 'Ti', 'Ke', 'To', 'Pe', 'La'];
+
+async function avaaLapsi(lapsi) {
+  currentLapsi = lapsi;
+  showLapsiView();
+  document.getElementById('lapsi-title').textContent = '✱ ' + lapsi.nimi.toUpperCase() + ' ✱';
+  document.getElementById('lapsi-nimi-input').value = lapsi.nimi;
+  document.getElementById('lapsi-syntymapaiva-input').value = lapsi.syntymapaiva || '';
+  document.getElementById('lapsi-hoitopaikka-select').value = lapsi.hoitopaikka_tyyppi || '';
+  document.getElementById('lapsi-nukkumaanmeno-input').value = lapsi.nukkumaanmeno ? lapsi.nukkumaanmeno.slice(0, 5) : '20:30';
+  document.getElementById('lapsi-ika-hetkittain-input').value = lapsi.ika_yksin_hetkittain != null ? lapsi.ika_yksin_hetkittain : '';
+  document.getElementById('lapsi-ika-iltaan-input').value = lapsi.ika_iltaan_asti != null ? lapsi.ika_iltaan_asti : '';
+  document.getElementById('lapsi-ika-illassa-input').value = lapsi.ika_yksin_illassa != null ? lapsi.ika_yksin_illassa : '';
+  document.getElementById('lapsi-valvonta-toggle').checked = lapsi.tarvitsee_valvontaa !== false;
+
+  await lataaLapsiViikkopohja();
+  await lataaLapsiLukuvuosijaksot();
+  await lataaLapsiPaivapoikkeukset();
+}
+
+document.getElementById('lapsi-back-btn').addEventListener('click', function() {
+  currentLapsi = null;
+  showAsetuksetView();
+  lataaLapset();
+});
+
+document.getElementById('lapsi-poista-btn').addEventListener('click', async function() {
+  if (!currentLapsi) return;
+  const vahvistus = await naytaVahvistus('Poistetaanko ' + currentLapsi.nimi + '?', 'Viikkopohja, lukuvuosijaksot ja päiväpoikkeukset poistuvat mukana.', 'Poista');
+  if (!vahvistus) return;
+  const { error } = await db.from('lapset').delete().eq('id', currentLapsi.id);
+  if (ilmoitaKirjoitusvirheesta(error, 'Lapsen poisto')) return;
+  currentLapsi = null;
+  showAsetuksetView();
+  lataaLapset();
+});
+
+document.getElementById('lapsi-tallenna-btn').addEventListener('click', async function() {
+  if (!currentLapsi) return;
+  const nimi = document.getElementById('lapsi-nimi-input').value.trim();
+  if (!nimi) { naytaIlmoitus('Nimi ei voi olla tyhjä'); return; }
+  function parseIka(id) {
+    const v = document.getElementById(id).value;
+    return v === '' ? null : Number(v);
+  }
+  const paivitys = {
+    nimi: nimi,
+    syntymapaiva: document.getElementById('lapsi-syntymapaiva-input').value || null,
+    hoitopaikka_tyyppi: document.getElementById('lapsi-hoitopaikka-select').value || null,
+    nukkumaanmeno: document.getElementById('lapsi-nukkumaanmeno-input').value || '20:30',
+    ika_yksin_hetkittain: parseIka('lapsi-ika-hetkittain-input'),
+    ika_iltaan_asti: parseIka('lapsi-ika-iltaan-input'),
+    ika_yksin_illassa: parseIka('lapsi-ika-illassa-input'),
+    tarvitsee_valvontaa: document.getElementById('lapsi-valvonta-toggle').checked,
+  };
+  const { error } = await db.from('lapset').update(paivitys).eq('id', currentLapsi.id);
+  if (ilmoitaKirjoitusvirheesta(error, 'Lapsen tiedon tallennus')) return;
+  Object.assign(currentLapsi, paivitys);
+  document.getElementById('lapsi-title').textContent = '✱ ' + nimi.toUpperCase() + ' ✱';
+  naytaIlmoitus('Tallennettu');
+});
+
+// Viikkopohja: 7 riviä (Ma-Su näyttöjärjestyksessä, tallennus JS:n omalla
+// getDay()-numeroinnilla 0=su...6=la, ks. sql/105 yläkommentti). Tyhjä rivi
+// (ei alkaa/paattyy-arvoa tallessa) tarkoittaa "ei koulua/pk tänä päivänä"
+// — hoivaikkuna kattaa silloin koko päivän (haeHoivaikkunat()-oletus), mikä
+// on jo oikea käytös viikonlopulle ilman erillistä kytkintä.
+async function lataaLapsiViikkopohja() {
+  if (!currentLapsi) return;
+  const { data, error } = await db.from('lapsi_viikkopohja').select().eq('lapsi_id', currentLapsi.id);
+  if (error) {
+    console.error('Viikkopohjan haku epäonnistui:', error);
+    return;
+  }
+  const rivitKartta = {};
+  (data || []).forEach(function(r) { rivitKartta[r.viikonpaiva] = r; });
+
+  const kontti = document.getElementById('lapsi-viikkopohja-rivit');
+  kontti.innerHTML = '';
+  [1, 2, 3, 4, 5, 6, 0].forEach(function(viikonpaiva) {
+    const rivi = rivitKartta[viikonpaiva];
+    const div = document.createElement('div');
+    div.className = 'opinto-deadline-lisays';
+
+    const label = document.createElement('span');
+    label.textContent = VIIKONPAIVA_NIMET[viikonpaiva];
+    label.className = 'lapsi-viikkopohja-label';
+    div.appendChild(label);
+
+    const alkaaInput = document.createElement('input');
+    alkaaInput.type = 'time';
+    alkaaInput.value = rivi ? rivi.alkaa.slice(0, 5) : '';
+    div.appendChild(alkaaInput);
+
+    const paattyyInput = document.createElement('input');
+    paattyyInput.type = 'time';
+    paattyyInput.value = rivi ? rivi.paattyy.slice(0, 5) : '';
+    div.appendChild(paattyyInput);
+
+    const tallennaNappi = document.createElement('button');
+    tallennaNappi.className = 'dialog-btn dialog-btn-cancel';
+    tallennaNappi.textContent = rivi ? 'Päivitä' : 'Aseta';
+    tallennaNappi.addEventListener('click', async function() {
+      const alkaa = alkaaInput.value;
+      const paattyy = paattyyInput.value;
+      if (!alkaa || !paattyy) { naytaIlmoitus('Anna molemmat kellonajat'); return; }
+      const { error: tallennusError } = await db.from('lapsi_viikkopohja')
+        .upsert({ lapsi_id: currentLapsi.id, viikonpaiva: viikonpaiva, alkaa: alkaa, paattyy: paattyy }, { onConflict: 'lapsi_id,viikonpaiva' });
+      if (ilmoitaKirjoitusvirheesta(tallennusError, 'Viikkopohjan tallennus')) return;
+      naytaIlmoitus('Tallennettu');
+      lataaLapsiViikkopohja();
+    });
+    div.appendChild(tallennaNappi);
+
+    if (rivi) {
+      const poistoNappi = document.createElement('button');
+      poistoNappi.className = 'delete-btn';
+      poistoNappi.textContent = '×';
+      poistoNappi.addEventListener('click', async function() {
+        const { error: poistoError } = await db.from('lapsi_viikkopohja').delete().eq('id', rivi.id);
+        if (ilmoitaKirjoitusvirheesta(poistoError, 'Viikkopohjarivin poisto')) return;
+        lataaLapsiViikkopohja();
+      });
+      div.appendChild(poistoNappi);
+    }
+
+    kontti.appendChild(div);
+  });
+}
+
+const LUKUVUOSI_TYYPPI_NIMET = { koulussa: 'Koulussa', loma: 'Loma', suunnittelupaiva: 'Suunnittelupäivä', arkipyha: 'Arkipyhä' };
+
+async function lataaLapsiLukuvuosijaksot() {
+  if (!currentLapsi) return;
+  const { data, error } = await db.from('lukuvuosijaksot').select().eq('lapsi_id', currentLapsi.id).order('alkaa');
+  if (error) {
+    console.error('Lukuvuosijaksojen haku epäonnistui:', error);
+    return;
+  }
+  const listEl = document.getElementById('lapsi-lukuvuosi-lista');
+  listEl.innerHTML = '';
+  (data || []).forEach(function(jakso) {
+    const li = document.createElement('li');
+    const teksti = document.createElement('span');
+    teksti.textContent = jakso.alkaa + ' – ' + jakso.paattyy + ' · ' + (LUKUVUOSI_TYYPPI_NIMET[jakso.tyyppi] || jakso.tyyppi);
+    li.appendChild(teksti);
+    const poisto = document.createElement('button');
+    poisto.className = 'delete-btn';
+    poisto.textContent = '×';
+    poisto.addEventListener('click', async function() {
+      const { error: poistoError } = await db.from('lukuvuosijaksot').delete().eq('id', jakso.id);
+      if (ilmoitaKirjoitusvirheesta(poistoError, 'Lukuvuosijakson poisto')) return;
+      lataaLapsiLukuvuosijaksot();
+    });
+    li.appendChild(poisto);
+    listEl.appendChild(li);
+  });
+}
+
+document.getElementById('lapsi-lukuvuosi-lisaa-btn').addEventListener('click', async function() {
+  if (!currentLapsi) return;
+  const alkaa = document.getElementById('lapsi-lukuvuosi-alkaa-input').value;
+  const paattyy = document.getElementById('lapsi-lukuvuosi-paattyy-input').value;
+  const tyyppi = document.getElementById('lapsi-lukuvuosi-tyyppi-select').value;
+  if (!alkaa || !paattyy) { naytaIlmoitus('Anna molemmat päivämäärät'); return; }
+  if (alkaa > paattyy) { naytaIlmoitus('Alkupäivä on loppupäivän jälkeen'); return; }
+  const { error } = await db.from('lukuvuosijaksot').insert({ lapsi_id: currentLapsi.id, alkaa: alkaa, paattyy: paattyy, tyyppi: tyyppi });
+  if (ilmoitaKirjoitusvirheesta(error, 'Lukuvuosijakson lisäys')) return;
+  document.getElementById('lapsi-lukuvuosi-alkaa-input').value = '';
+  document.getElementById('lapsi-lukuvuosi-paattyy-input').value = '';
+  lataaLapsiLukuvuosijaksot();
+});
+
+document.getElementById('lapsi-poikkeus-tyyppi-select').addEventListener('change', function() {
+  document.getElementById('lapsi-poikkeus-aika-rivi').style.display = this.value === 'mukautettu' ? 'flex' : 'none';
+});
+
+const PAIVAPOIKKEUS_TYYPPI_NIMET = { kotona: 'Kotona koko päivän', poissa: 'Poissa koko päivän', mukautettu: 'Mukautettu' };
+
+// Näytetään vain tulevat/tämänpäiväiset poikkeukset — menneet eivät ole enää
+// toiminnallisesti kiinnostavia (sama "vilkaisuarvo" -periaate kuin muualla).
+async function lataaLapsiPaivapoikkeukset() {
+  if (!currentLapsi) return;
+  const tanaan = paivamaaraISO(new Date());
+  const { data, error } = await db.from('lapsi_paivapoikkeus').select().eq('lapsi_id', currentLapsi.id).gte('paiva', tanaan).order('paiva');
+  if (error) {
+    console.error('Päiväpoikkeusten haku epäonnistui:', error);
+    return;
+  }
+  const listEl = document.getElementById('lapsi-poikkeus-lista');
+  listEl.innerHTML = '';
+  (data || []).forEach(function(poikkeus) {
+    const li = document.createElement('li');
+    const teksti = document.createElement('span');
+    let kuvaus = poikkeus.paiva + ' · ' + (PAIVAPOIKKEUS_TYYPPI_NIMET[poikkeus.tyyppi] || poikkeus.tyyppi);
+    if (poikkeus.tyyppi === 'mukautettu' && poikkeus.alkaa && poikkeus.paattyy) {
+      kuvaus += ' (' + poikkeus.alkaa.slice(0, 5) + '–' + poikkeus.paattyy.slice(0, 5) + ' poissa)';
+    }
+    if (poikkeus.huomio) kuvaus += ' — ' + poikkeus.huomio;
+    teksti.textContent = kuvaus;
+    li.appendChild(teksti);
+    const poisto = document.createElement('button');
+    poisto.className = 'delete-btn';
+    poisto.textContent = '×';
+    poisto.addEventListener('click', async function() {
+      const { error: poistoError } = await db.from('lapsi_paivapoikkeus').delete().eq('id', poikkeus.id);
+      if (ilmoitaKirjoitusvirheesta(poistoError, 'Päiväpoikkeuksen poisto')) return;
+      lataaLapsiPaivapoikkeukset();
+    });
+    li.appendChild(poisto);
+    listEl.appendChild(li);
+  });
+}
+
+document.getElementById('lapsi-poikkeus-lisaa-btn').addEventListener('click', async function() {
+  if (!currentLapsi) return;
+  const paiva = document.getElementById('lapsi-poikkeus-pvm-input').value;
+  const tyyppi = document.getElementById('lapsi-poikkeus-tyyppi-select').value;
+  const huomio = document.getElementById('lapsi-poikkeus-huomio-input').value.trim();
+  if (!paiva) { naytaIlmoitus('Valitse päivä'); return; }
+  const rivi = { lapsi_id: currentLapsi.id, paiva: paiva, tyyppi: tyyppi, huomio: huomio || null, alkaa: null, paattyy: null };
+  if (tyyppi === 'mukautettu') {
+    const alkaa = document.getElementById('lapsi-poikkeus-alkaa-input').value;
+    const paattyy = document.getElementById('lapsi-poikkeus-paattyy-input').value;
+    if (!alkaa || !paattyy) { naytaIlmoitus('Anna mukautetun ikkunan molemmat kellonajat'); return; }
+    rivi.alkaa = alkaa;
+    rivi.paattyy = paattyy;
+  }
+  const { error } = await db.from('lapsi_paivapoikkeus').upsert(rivi, { onConflict: 'lapsi_id,paiva' });
+  if (ilmoitaKirjoitusvirheesta(error, 'Päiväpoikkeuksen lisäys')) return;
+  document.getElementById('lapsi-poikkeus-pvm-input').value = '';
+  document.getElementById('lapsi-poikkeus-huomio-input').value = '';
+  lataaLapsiPaivapoikkeukset();
+});
+
+// kattaa_lapset-valinta yhdelle kalenteritapahtumalle (Ristiriitapaketti v2,
+// 2026-08-06) — "yksi kenttä, kolme käyttötapausta" (Katrin oma rajaus):
+// oma meno jossa lapsi mukana, toisen hoitajan hakeva tapahtuma, tai lapsi
+// pärjää yksin ilman kuljetusta. cachedLapset on jo ladattu kalenterin
+// avatessa (ks. paivitaLapsidata, kutsuttu lataaKalenteri()-ketjussa).
+function avaaKattaaLapsetValikko(rivi) {
+  const lista = document.getElementById('kattaa-lapset-lista');
+  lista.innerHTML = '';
+  document.getElementById('kattaa-lapset-tyhja').style.display = cachedLapset.length === 0 ? 'block' : 'none';
+  const katetut = new Set(rivi.kattaa_lapset || []);
+
+  cachedLapset.forEach(function(lapsi) {
+    const li = document.createElement('li');
+    const label = document.createElement('label');
+    label.style.display = 'flex';
+    label.style.alignItems = 'center';
+    label.style.gap = '8px';
+    label.style.width = '100%';
+    const checkbox = document.createElement('input');
+    checkbox.type = 'checkbox';
+    checkbox.checked = katetut.has(lapsi.id);
+    checkbox.dataset.lapsiId = lapsi.id;
+    label.appendChild(checkbox);
+    const teksti = document.createElement('span');
+    teksti.textContent = lapsi.nimi;
+    label.appendChild(teksti);
+    li.appendChild(label);
+    lista.appendChild(li);
+  });
+
+  document.getElementById('kattaa-lapset-tallenna-btn').onclick = async function() {
+    const valitut = Array.from(lista.querySelectorAll('input[type="checkbox"]:checked')).map(function(cb) { return Number(cb.dataset.lapsiId); });
+    const { error } = await db.from('kalenteri_tapahtumat').update({ kattaa_lapset: valitut.length ? valitut : null }).eq('id', rivi.id);
+    if (ilmoitaKirjoitusvirheesta(error, 'Katettujen lasten tallennus')) return;
+    rivi.kattaa_lapset = valitut.length ? valitut : null;
+    document.getElementById('kattaa-lapset-overlay').style.display = 'none';
+    naytaIlmoitus('Tallennettu');
+    lataaKalenteri();
+  };
+
+  document.getElementById('kattaa-lapset-overlay').style.display = 'flex';
+}
+document.getElementById('kattaa-lapset-sulje').addEventListener('click', function() {
+  document.getElementById('kattaa-lapset-overlay').style.display = 'none';
+});
+
+// Huolilippu tapahtuma-ankkuroituna (Ristiriitapaketti v2, sql/107) —
+// valinnainen LISÄYS päivämäärä-ankkuroituun huoleen (ei sijasta, Katrin
+// oma rajaus): pvm on silti aina mukana (huolienPaivanPaino() käyttää sitä
+// riippumatta tapahtuma-ankkurista), kalenteri_tapahtuma_id on vain
+// kontekstuaalinen "mihin tämä liittyy" -merkintä.
+function avaaHuoliTapahtumaValikko(rivi) {
+  document.getElementById('huoli-tapahtuma-overlay').style.display = 'flex';
+  document.querySelectorAll('#huoli-tapahtuma-vakavuus-rivi .huoli-vakavuus-btn').forEach(function(btn) {
+    btn.onclick = async function() {
+      if (!currentUserId) return;
+      const vakavuus = Number(btn.dataset.vakavuus);
+      const { error } = await db.from('paivan_huolet').insert({
+        owner_id: currentUserId,
+        pvm: rivi.event_date,
+        vakavuus: vakavuus,
+        kalenteri_tapahtuma_id: rivi.id,
+      });
+      if (ilmoitaKirjoitusvirheesta(error, 'Huolilipun tallennus')) return;
+      document.getElementById('huoli-tapahtuma-overlay').style.display = 'none';
+      naytaIlmoitus('Huoli merkitty: ' + rivi.title);
+    };
+  });
+}
+document.getElementById('huoli-tapahtuma-sulje').addEventListener('click', function() {
+  document.getElementById('huoli-tapahtuma-overlay').style.display = 'none';
+});
 
 // Onko annetun päivän 'full'-tason ristiriita jo kuitattu TÄSMÄLLEEN samalla
 // tapahtumajoukolla? Kartta ladataan paivitaRistiriitaKuittaukset():lla.
@@ -2949,6 +3409,8 @@ function piirraKalenteriRivi(rivi) {
   // katosi Satamasta hetkeksi ja synkka olisi tuonut sen takaisin.
   const menuItems = [
     { label: '⏰ Muistutus', onClick: function() { avaaMuistutusPaneeli('kalenteri', rivi.id, rivi.title, rivi.event_date, rivi.event_time, lataaKalenteri); } },
+    { label: '👶 Ketkä lapset katettu', onClick: function() { avaaKattaaLapsetValikko(rivi); } },
+    { label: '🚩 Merkitse huoli tähän', onClick: function() { avaaHuoliTapahtumaValikko(rivi); } },
   ];
   if (!rivi.ical_uid) {
     menuItems.push({
@@ -3079,6 +3541,7 @@ async function lataaKalenteri() {
 
   await paivitaAnkkuroidutAvaimet();
   await paivitaAsetukset();
+  await paivitaLapsidata();
   await paivitaMuistutuksetKartta();
   await paivitaRistiriitaKuittaukset();
 
@@ -5110,6 +5573,7 @@ function avaaOsio(osio) {
     synkkaaICloud();
   } else if (osio.route === 'asetukset') {
     showAsetuksetView();
+    lataaLapset();
     paivitaTiliTiedot();
     paivitaPushTila();
     paivitaSovellusTiedot();
@@ -5130,6 +5594,9 @@ function avaaOsio(osio) {
       document.getElementById('kesto-encoding-input').value = haeAsetusNumero('kesto_encoding_min', 45);
       document.getElementById('kesto-retrieval-input').value = haeAsetusNumero('kesto_retrieval_min', 20);
       document.getElementById('kesto-yllapito-input').value = haeAsetusNumero('kesto_yllapito_min', 10);
+      document.getElementById('siirtymapuskuri-input').value = haeAsetusNumero('siirtymapuskuri_min', 30);
+      document.getElementById('min-paallekkainen-input').value = haeAsetusNumero('min_paallekkainen_min', 15);
+      document.getElementById('yksin-hetkittain-raja-input').value = haeAsetusNumero('yksin_hetkittain_raja_min', 90);
       paivitaLaiturinPiilotusAsetukset();
     });
   } else if (osio.route === 'hytti') {
@@ -8077,6 +8544,9 @@ sidoHuoliKynnysInput('kesto-priming-input', 'kesto_priming_min', 15, 'Primingin 
 sidoHuoliKynnysInput('kesto-encoding-input', 'kesto_encoding_min', 45, 'Encodingin kestoarvio');
 sidoHuoliKynnysInput('kesto-retrieval-input', 'kesto_retrieval_min', 20, 'Retrievalin kestoarvio');
 sidoHuoliKynnysInput('kesto-yllapito-input', 'kesto_yllapito_min', 10, 'Ylläpidon kestoarvio');
+sidoHuoliKynnysInput('siirtymapuskuri-input', 'siirtymapuskuri_min', 30, 'Siirtymäpuskuri');
+sidoHuoliKynnysInput('min-paallekkainen-input', 'min_paallekkainen_min', 15, 'Vähimmäispäällekkäisyys');
+sidoHuoliKynnysInput('yksin-hetkittain-raja-input', 'yksin_hetkittain_raja_min', 90, 'Yksin hetkittäin -raja');
 
 // === MUISTUTUSPANEELIN NAPIT JA RULLAT ===
 // KORJATTU (2026-07-17, koonti 2 kohta 7 — "yksiköt eivät yhdisty"): vanha

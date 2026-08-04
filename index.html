@@ -477,6 +477,36 @@
        ihminen kuittaa": rivi kerrallaan hyväksyntä ennen tallennusta, sama
        periaate kuin muuallakin Satamassa. Ei koskaan automaattista
        tallennusta. -->
+  <!-- Ristiriitapaketti v2 (2026-08-06) — kattaa_lapset-valinta yhdelle
+       kalenteritapahtumalle (checkbox per lapsi) ja huolilipun tapahtuma-
+       ankkurointi (samat 4 vakavuustasoa kuin Hytin huoli-pikalisäys). -->
+  <div class="dialog-overlay" id="kattaa-lapset-overlay" style="display:none">
+    <div class="dialog-box">
+      <p class="dialog-title">Ketkä lapset katettu?</p>
+      <ul class="list" id="kattaa-lapset-lista"></ul>
+      <p class="section-empty" id="kattaa-lapset-tyhja" style="display:none">Ei lapsiprofiileja vielä — lisää ne Asetukset → 👶 Lapset.</p>
+      <div class="dialog-buttons">
+        <button class="dialog-btn dialog-btn-cancel" id="kattaa-lapset-sulje">Sulje</button>
+        <button class="dialog-btn" id="kattaa-lapset-tallenna-btn">Tallenna</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="dialog-overlay" id="huoli-tapahtuma-overlay" style="display:none">
+    <div class="dialog-box">
+      <p class="dialog-title">Merkitse huoli tähän tapahtumaan</p>
+      <div class="huoli-vakavuus-rivi" id="huoli-tapahtuma-vakavuus-rivi">
+        <button class="huoli-vakavuus-btn" data-vakavuus="1">🟡</button>
+        <button class="huoli-vakavuus-btn" data-vakavuus="2">🟠</button>
+        <button class="huoli-vakavuus-btn" data-vakavuus="3">🔴</button>
+        <button class="huoli-vakavuus-btn" data-vakavuus="4">🏴</button>
+      </div>
+      <div class="dialog-buttons">
+        <button class="dialog-btn dialog-btn-cancel" id="huoli-tapahtuma-sulje">Peruuta</button>
+      </div>
+    </div>
+  </div>
+
   <div class="dialog-overlay" id="silta-ehdotus-overlay" style="display:none">
     <div class="dialog-box">
       <p class="dialog-title">Ehdotetut sillat</p>
@@ -531,6 +561,36 @@
     <button class="login-btn settings-action-btn" id="sovellus-synkkaa-btn">Hae kalenteri nyt</button>
     <button class="login-btn settings-action-btn" id="aly-testi-btn">Testaa äly</button>
     <p class="section-empty" id="aly-testi-tulos" style="display:none"></p>
+
+    <hr class="divider">
+
+    <!-- Ristiriitapaketti v2 (2026-08-06, ks. muistiinpanot.md
+         "Ristiriitapaketti v2") — lapsiprofiilit joista hoivaikkuna
+         lasketaan. Jaettu perheen data (ei owner_id). -->
+    <div class="section-title">👶 Lapset</div>
+    <ul class="list" id="lapset-lista"></ul>
+    <p class="section-empty" id="lapset-tyhja" style="display:none">Ei vielä lapsiprofiileja — ristiriitalogiikka toimii ilman niitä samoin kuin ennen (kaikki tunnistamattomat päällekkäisyydet käsitellään "huomio"-tasolla).</p>
+    <div class="add-item">
+      <span class="prefix">›</span>
+      <input type="text" id="lapsi-uusi-input" placeholder="lapsen nimi...">
+      <button id="lapsi-uusi-btn">+</button>
+    </div>
+
+    <hr class="divider">
+
+    <div class="section-title">⚠️ Ristiriitapaketti</div>
+    <div class="settings-row">
+      <span>Siirtymäpuskuri: lisätään tapahtumien molempiin päihin ennen päällekkäisyyslaskentaa (min)</span>
+      <input type="number" class="settings-numero-input" id="siirtymapuskuri-input" min="0" step="1">
+    </div>
+    <div class="settings-row">
+      <span>Alle tämän mittainen päällekkäisyys ei laukaise mitään (min)</span>
+      <input type="number" class="settings-numero-input" id="min-paallekkainen-input" min="0" step="1">
+    </div>
+    <div class="settings-row">
+      <span>Ika_yksin_hetkittain-lapsille sallittu hoivaikkunan pituus ilman ristiriitaa (min)</span>
+      <input type="number" class="settings-numero-input" id="yksin-hetkittain-raja-input" min="0" step="1">
+    </div>
 
     <hr class="divider">
 
@@ -606,6 +666,103 @@
     <div class="section-title">✨ Mitä äly on tehnyt</div>
     <p class="section-empty" id="aly-log-tyhja" style="display:none">Ei vielä mitään.</p>
     <div class="aly-log-list" id="aly-log-list"></div>
+  </div>
+
+  <!-- Ristiriitapaketti v2 (2026-08-06) — yhden lapsen profiili + viikkopohja
+       + lukuvuosijaksot + päiväpoikkeukset samalla sivulla, kevyt kaava
+       (ei erillisiä alanäkymiä). -->
+  <div class="container" id="lapsi-view" style="display:none">
+    <div class="list-header">
+      <button class="back-btn" id="lapsi-back-btn">‹</button>
+      <h1 id="lapsi-title">✱ LAPSI ✱</h1>
+      <button class="settings-btn" id="lapsi-poista-btn" title="Poista lapsi kokonaan">🗑</button>
+    </div>
+
+    <div class="settings-row">
+      <span>Nimi</span>
+      <input type="text" class="settings-numero-input" id="lapsi-nimi-input">
+    </div>
+    <div class="settings-row">
+      <span>Syntymäpäivä</span>
+      <input type="date" class="settings-numero-input" id="lapsi-syntymapaiva-input">
+    </div>
+    <div class="settings-row">
+      <span>Hoitopaikka</span>
+      <select class="settings-numero-input" id="lapsi-hoitopaikka-select">
+        <option value="">(ei asetettu)</option>
+        <option value="koulu">Koulu</option>
+        <option value="paivakoti">Päiväkoti</option>
+        <option value="kotona">Kotona</option>
+      </select>
+    </div>
+    <div class="settings-row">
+      <span>Nukkumaanmeno (hoivaikkuna sulkeutuu)</span>
+      <input type="time" class="settings-numero-input" id="lapsi-nukkumaanmeno-input">
+    </div>
+    <div class="settings-row">
+      <span>Ikä josta pärjää hetken yksin (vuotta, tyhjä = ei käytössä)</span>
+      <input type="number" class="settings-numero-input" id="lapsi-ika-hetkittain-input" min="0" step="1">
+    </div>
+    <div class="settings-row">
+      <span>Ikä josta pärjää koulun jälkeen iltaan asti (vuotta, tyhjä = ei käytössä)</span>
+      <input type="number" class="settings-numero-input" id="lapsi-ika-iltaan-input" min="0" step="1">
+    </div>
+    <div class="settings-row">
+      <span>Ikä josta pärjää koko illan yksin (vuotta, tyhjä = ei käytössä)</span>
+      <input type="number" class="settings-numero-input" id="lapsi-ika-illassa-input" min="0" step="1">
+    </div>
+    <div class="settings-row">
+      <span>Tarvitsee valvontaa ylipäätään (pois = ei koskaan ristiriitoja tästä lapsesta)</span>
+      <label class="toggle">
+        <input type="checkbox" id="lapsi-valvonta-toggle">
+        <span class="toggle-track"></span>
+      </label>
+    </div>
+    <button class="dialog-btn dialog-btn-cancel" id="lapsi-tallenna-btn" style="margin-top:6px">Tallenna</button>
+
+    <hr class="divider">
+
+    <div class="section-title">📅 Viikkopohja</div>
+    <p class="section-empty">Kellonajat jolloin lapsi on poissa kotoa (koulu/päiväkoti) — muu aika on hoivaikkunaa nukkumaanmenoon asti.</p>
+    <div id="lapsi-viikkopohja-rivit"></div>
+
+    <hr class="divider">
+
+    <div class="section-title">🏫 Lukuvuosijaksot</div>
+    <ul class="list" id="lapsi-lukuvuosi-lista"></ul>
+    <div class="opinto-deadline-lisays">
+      <input type="date" id="lapsi-lukuvuosi-alkaa-input">
+      <input type="date" id="lapsi-lukuvuosi-paattyy-input">
+      <select id="lapsi-lukuvuosi-tyyppi-select">
+        <option value="loma">Loma</option>
+        <option value="suunnittelupaiva">Suunnittelupäivä</option>
+        <option value="arkipyha">Arkipyhä</option>
+        <option value="koulussa">Koulussa (poikkeuksellisesti)</option>
+      </select>
+      <button class="dialog-btn dialog-btn-cancel" id="lapsi-lukuvuosi-lisaa-btn">Lisää</button>
+    </div>
+
+    <hr class="divider">
+
+    <div class="section-title">📌 Päiväpoikkeukset</div>
+    <ul class="list" id="lapsi-poikkeus-lista"></ul>
+    <div class="opinto-deadline-lisays">
+      <input type="date" id="lapsi-poikkeus-pvm-input">
+      <select id="lapsi-poikkeus-tyyppi-select">
+        <option value="kotona">Kotona koko päivän</option>
+        <option value="poissa">Poissa koko päivän</option>
+        <option value="mukautettu">Mukautettu ikkuna</option>
+      </select>
+    </div>
+    <div class="opinto-deadline-lisays" id="lapsi-poikkeus-aika-rivi" style="display:none">
+      <input type="time" id="lapsi-poikkeus-alkaa-input">
+      <input type="time" id="lapsi-poikkeus-paattyy-input">
+    </div>
+    <div class="add-item">
+      <span class="prefix">›</span>
+      <input type="text" id="lapsi-poikkeus-huomio-input" placeholder="huomio (valinnainen)...">
+      <button id="lapsi-poikkeus-lisaa-btn">+</button>
+    </div>
   </div>
 
   <div class="container" id="laituri-view" style="display:none">

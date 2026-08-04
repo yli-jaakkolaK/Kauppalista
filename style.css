@@ -2475,6 +2475,19 @@ h1 {
   margin: 10px 0;
 }
 
+/* Ristiriitapaketti v2 (2026-08-06) — viikkopohjan päivälabel, sama rivi
+   kuin .opinto-deadline-lisays mutta kiinteä kapea leveys ettei aikakentät
+   hyppele rivistä toiseen eripituisten päivänimien takia. */
+.lapsi-viikkopohja-label {
+  display: flex;
+  align-items: center;
+  min-width: 26px;
+  font-family: 'Courier New', Courier, monospace;
+  font-size: 13px;
+  font-weight: bold;
+  color: var(--muted);
+}
+
 .opinto-deadline-lisays input[type="date"],
 .opinto-deadline-lisays select {
   font-family: 'Courier New', Courier, monospace;
