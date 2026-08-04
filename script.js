@@ -2512,11 +2512,14 @@ function paivitaPaivanOtsikko(otsikkoEl, teksti, rivit, isoPvm, kuormaraja) {
   const analyysi = analysoiPaivanRistiriidat(rivit, isoPvm);
   if (analyysi.vakavuus === 'full') {
     const kuitattu = onkoRistiriitaKuitattu(isoPvm, analyysi.fullIds);
-    otsikkoEl.appendChild(luoPaivaMerkki(
-      kuitattu ? 'keskustellaan' : 'ristiriita',
-      kuitattu ? 'keskusteltu ✓' : 'päällekkäin',
-      kuitattu ? 'Keskusteltu — napauta nähdäksesi kenen menot' : 'Kaksi eri henkilön (tai saman syötteen) menoa menee päällekkäin — napauta'
-    ));
+    // Ristiriitamerkki (2026-08-05, Katrin päätös 4b): ⚠️-symboli korvaa
+    // vanhan tekstipillerin ("päällekkäin") SAMASSA piirtopaikassa —
+    // pelkkä pilleri→symboli-vaihto, EI per-rivi-piirtologiikkaa. Kuitattu-
+    // tila ("keskusteltu ✓") pysyy tekstinä ennallaan — eri viesti (ratkaistu
+    // vs. tarvitsee huomiota), ei sama glyfi.
+    otsikkoEl.appendChild(kuitattu
+      ? luoPaivaMerkki('keskustellaan', 'keskusteltu ✓', 'Keskusteltu — napauta nähdäksesi kenen menot')
+      : luoPaivaMerkki('ristiriita-symboli', '⚠️', 'Kaksi eri henkilön (tai saman syötteen) menoa menee päällekkäin — napauta'));
     otsikkoEl.style.cursor = 'pointer';
     otsikkoEl.onclick = function(e) {
       e.stopPropagation();

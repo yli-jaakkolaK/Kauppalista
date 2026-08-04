@@ -2312,6 +2312,14 @@ h1 {
   border: 1px dashed var(--accent);
 }
 
+/* Ristiriitamerkki v2 (2026-08-05): ⚠️-symboli, EI pilleri — ei taustaa/
+   reunaa/isoja kirjaimia, pelkkä isompi glyfi jotta se erottuu ilman
+   tekstiselitystä (title-attribuutti kantaa selityksen edelleen). */
+.paiva-merkki--ristiriita-symboli {
+  font-size: 16px;
+  padding: 0 2px;
+}
+
 /* Ristiriitapaketti (2026-07-17): kevyt "huomio"-taso — saman henkilön oma
    tupla, tai rauhoitus-ikkunan sisällä vaimennettu hytti-päällekkäisyys.
    Sama sävy kuin Kuormavahdin merkillä (huomio-taso, ei koskaan punainen),
