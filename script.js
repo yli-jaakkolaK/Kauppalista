@@ -1024,6 +1024,39 @@ const OPINTO_VAIHE_OHJE = {
   yllapito: 'Nopea kertaus: käy aihe läpi omin sanoin muutamassa minuutissa, tarkista ettei mikään ole päässyt unohtumaan kokonaan.',
 };
 
+// Kiinteät PACER-vaihekestot (2026-08-05, ks. muistiinpanot.md "Aikaikkuna")
+// — VÄLIRATKAISU ennen kuin session-lokista (ks. sql/099) on kertynyt
+// oikeaa dataa. Säädettävissä Asetuksista per vaihe (kesto_<vaihe>_min),
+// EI kovakoodattu — kun kalibrointi joskus rakennetaan, nämä oletukset
+// voidaan korvata opituilla arvoilla ilman rakennemuutosta.
+const OPINTO_KESTO_ASETUS_AVAIN = {
+  priming: 'kesto_priming_min',
+  encoding: 'kesto_encoding_min',
+  retrieval: 'kesto_retrieval_min',
+  reference: 'kesto_reference_min',
+  yllapito: 'kesto_yllapito_min',
+};
+const OPINTO_KESTO_OLETUS = { priming: 15, encoding: 45, retrieval: 20, reference: 5, yllapito: 10 };
+function haeOpintoKestoMinuutteina(vaihe) {
+  return haeAsetusNumero(OPINTO_KESTO_ASETUS_AVAIN[vaihe], OPINTO_KESTO_OLETUS[vaihe]);
+}
+
+// Valmis, suoraan kopioitava Copilot/AI-prompti (2026-08-05, Katrin
+// täsmennys: EI älykutsua täällä — pelkkää merkkijonojen yhdistelyä
+// olemassa olevasta datasta, käyttäjä vie tekstin itse haluamaansa AI-
+// työkaluun). Nimi + vaihe riittävät, ei vaadi materiaalia/kuvausta.
+const OPINTO_PROMPTI_VAIHEELLE = {
+  priming: function(nimi) { return 'Anna minulle 5 kysymystä joita voisin miettiä ennen aiheen "' + nimi + '" opiskelua (priming-vaihe, en ole vielä lukenut mitään). Kysymykset numeroituina.'; },
+  encoding: function(nimi) { return 'Selitä miten aiheen "' + nimi + '" osat liittyvät toisiinsa ja aiemmin opittuun, käsitekarttamaisesti jäsenneltynä (encoding-vaihe) — keskity YHTEYKSIIN, ei irrallisiin faktoihin. Max 10 minuutin lukuinen selitys.'; },
+  retrieval: function(nimi) { return 'Luo 3 harjoitustehtävää aiheesta "' + nimi + '", retrieval-tasolle sopivina (ei katso materiaalia, palauta muistista). Anna tehtävät numeroituina, kukin alle 5 minuuttia.'; },
+  reference: function(nimi) { return 'Kokoa lyhyt, tarkka faktalista/kaavakokoelma aiheesta "' + nimi + '" viitteeksi (reference-vaihe) — ei selityksiä, vain tarkat faktat.'; },
+  yllapito: function(nimi) { return 'Anna minulle 3 nopeaa kertauskysymystä aiheesta "' + nimi + '" jotka testaavat onko jotain päässyt unohtumaan (ylläpitovaihe). Kysymykset numeroituina.'; },
+};
+function rakennaOpintoPrompti(nimi, vaihe) {
+  const rakentaja = OPINTO_PROMPTI_VAIHEELLE[vaihe] || OPINTO_PROMPTI_VAIHEELLE.encoding;
+  return rakentaja(nimi);
+}
+
 function opintoTanaanPvm() {
   return paivamaaraISO(new Date());
 }
@@ -1242,7 +1275,17 @@ function opintoPaivaaDeadlineen(aihe, kurssienDeadlinet, aiheidenDeadlinet, tana
 //   interleaving eri ryhmien välillä) lopulle tilalle, kurssit+sillat yhdessä.
 // Tämä on koodissa rikkomaton sääntö, ei vain todennäköinen pistelaskun
 // lopputulos.
-async function laskeOpintoPaivanAskeleet() {
+// poissuljetutAiheIdt/poissuljetutSolmuIdt (Set, valinnainen) — käytössä
+// täydennyskutsuissa (ks. tayttaOpintoPaivanAskeleet) jottei sama aihe/
+// taitosolmu tarjoudu uudelleen samana päivänä jo tarjottujen rinnalle.
+// maxAskeliaYlikirjoitus (valinnainen) — täydennyskutsu pyytää täsmälleen
+// sen verran kuin puuttuu, ei aina koko päivän oletusmäärää uudelleen.
+// ikkunaMin (valinnainen, ks. muistiinpanot.md "Aikaikkuna") — kun asetettu,
+// suodattaa POIS kandidaatit joiden vaihekohtainen kestoarvio (ks.
+// haeOpintoKestoMinuutteina) ei mahdu ikkunaan — koskee myös TASO 1:tä
+// (jos ei mahdu aikaan, ei näytetä vaikka olisi kiireellinen — aikaikkunan
+// koko pointti on ettei näytetä mitään mikä ei mahdu).
+async function laskeOpintoPaivanAskeleet(maxAskeliaYlikirjoitus, poissuljetutAiheIdt, poissuljetutSolmuIdt, ikkunaMin) {
   const tanaan = opintoTanaanPvm();
 
   const [{ data: aiheet, error: aiheError }, { data: solmut, error: solmutError }, { data: kaaret, error: kaaretError }, { data: viittausRivit, error: viittausError }] = await Promise.all([
@@ -1272,7 +1315,7 @@ async function laskeOpintoPaivanAskeleet() {
   (aiheDl || []).forEach(function(d) { if (!d.aihe_id) return; (aiheidenDeadlinet[d.aihe_id] = aiheidenDeadlinet[d.aihe_id] || []).push(d); });
 
   const kuormaTaso = await opintoPaivanKuorma();
-  const maxAskelia = kuormaTaso === 'raskas' ? 1 : 2;
+  const maxAskelia = maxAskeliaYlikirjoitus != null ? maxAskeliaYlikirjoitus : (kuormaTaso === 'raskas' ? 1 : 2);
 
   // --- Siltojen ikkunapaino + kiireellisyyden leviäminen (KAIKILLE
   // solmuille, ei vain tänään valmiille — ks. siltaOmaPaino-kommentti) ---
@@ -1293,6 +1336,8 @@ async function laskeOpintoPaivanAskeleet() {
   const vaiheKartta = {};
   kaikkiSolmut.forEach(function(s) { vaiheKartta[s.id] = s.vaihe; });
   const taitosolmuKandidaatit = kaikkiSolmut.filter(function(s) {
+    if (poissuljetutSolmuIdt && poissuljetutSolmuIdt.has(s.id)) return false;
+    if (ikkunaMin && haeOpintoKestoMinuutteina(s.vaihe) > ikkunaMin) return false;
     return taitosolmuOnValmis(s, tarvitseeKaaret, vaiheKartta) && opintoOnkoRipe(s, tanaan);
   });
 
@@ -1301,7 +1346,11 @@ async function laskeOpintoPaivanAskeleet() {
   // sellaisenaan tavoiteikkunalle koska se on samanmuotoinen yhden-kentän
   // deadline kuin taitosolmuilla) ---
   const aiheEhdokkaat = kaikkiAiheet
-    .filter(function(a) { return opintoOnkoRipe(a, tanaan); })
+    .filter(function(a) {
+      if (poissuljetutAiheIdt && poissuljetutAiheIdt.has(a.id)) return false;
+      if (ikkunaMin && haeOpintoKestoMinuutteina(a.vaihe) > ikkunaMin) return false;
+      return opintoOnkoRipe(a, tanaan);
+    })
     .map(function(a) {
       const kovaPaino = opintoDeadlinePaino(a, kurssienDeadlinet, aiheidenDeadlinet, tanaan);
       const pehmeaPaino = opintoDeadlinePainoSolmu(a, tanaan);
@@ -1363,7 +1412,7 @@ async function lataaOpintoPaivanAskeleet() {
   if (!currentUserId) return;
   const tanaan = opintoTanaanPvm();
   const { data: olemassa, error: olemassaError } = await db.from('opinto_paivan_askeleet')
-    .select('*, opinto_aiheet(*, opinto_kurssit(name)), taitosolmut(*)').eq('owner_id', currentUserId).eq('pvm', tanaan);
+    .select('*, opinto_aiheet(*, opinto_kurssit(name)), taitosolmut(*)').eq('owner_id', currentUserId).eq('pvm', tanaan).order('created_at');
   if (olemassaError) {
     console.error('Päivän askelten haku epäonnistui:', olemassaError);
     return;
@@ -1386,16 +1435,139 @@ async function lataaOpintoPaivanAskeleet() {
       // tapauksessa sen mikä kannassa oikeasti on (kumpi tahansa ehti ensin).
       if (insertError) console.error('Päivän askelten tallennus epäonnistui (voi olla harmiton kilpa-ajo):', insertError);
       const { data: uudet } = await db.from('opinto_paivan_askeleet')
-        .select('*, opinto_aiheet(*, opinto_kurssit(name)), taitosolmut(*)').eq('owner_id', currentUserId).eq('pvm', tanaan);
+        .select('*, opinto_aiheet(*, opinto_kurssit(name)), taitosolmut(*)').eq('owner_id', currentUserId).eq('pvm', tanaan).order('created_at');
       askeleet = uudet || [];
     }
   }
   await piirraOpintoTanaanOsio(askeleet);
 }
 
+// Lähes-reaaliaikainen täydennys (2026-08-05, Katrin eksplisiittinen pyyntö
+// rikkoa "kerran per päivä" -idempotenssi tässä kohtaa): kun askel merkitään
+// tehdyksi/ohitetuksi, tarjolla-paikka vapautuu — täytetään se HETI eikä
+// odoteta huomiseen. Poissulkee tälle päivälle jo tarjotut aiheet/taitosolmut
+// (poissuljetutAiheIdt/poissuljetutSolmuIdt, ks. laskeOpintoPaivanAskeleet)
+// jottei sama asia tarjoudu kahdesti samana päivänä.
+async function tayttaOpintoPaivanAskeleet() {
+  if (!currentUserId) return;
+  const tanaan = opintoTanaanPvm();
+  const { data: nykyiset, error } = await db.from('opinto_paivan_askeleet')
+    .select('aihe_id, taitosolmu_id, tila').eq('owner_id', currentUserId).eq('pvm', tanaan);
+  if (error) {
+    console.error('Täydennystä varten päivän askelten haku epäonnistui:', error);
+    return;
+  }
+  const rivit = nykyiset || [];
+  const tarjollaMaara = rivit.filter(function(r) { return r.tila === 'tarjolla'; }).length;
+  const kuormaTaso = await opintoPaivanKuorma();
+  const tavoiteMaara = kuormaTaso === 'raskas' ? 1 : 2;
+  const puuttuu = tavoiteMaara - tarjollaMaara;
+  if (puuttuu <= 0) return;
+
+  const poissuljetutAiheIdt = new Set(rivit.filter(function(r) { return r.aihe_id; }).map(function(r) { return r.aihe_id; }));
+  const poissuljetutSolmuIdt = new Set(rivit.filter(function(r) { return r.taitosolmu_id; }).map(function(r) { return r.taitosolmu_id; }));
+
+  const uudet = await laskeOpintoPaivanAskeleet(puuttuu, poissuljetutAiheIdt, poissuljetutSolmuIdt);
+  if (uudet.length === 0) return;
+  const { error: insertError } = await db.from('opinto_paivan_askeleet').insert(
+    uudet.map(function(e) {
+      return e.tyyppi === 'aihe'
+        ? { owner_id: currentUserId, aihe_id: e.item.id, pvm: tanaan }
+        : { owner_id: currentUserId, taitosolmu_id: e.item.id, pvm: tanaan };
+    })
+  );
+  if (insertError) console.error('Täydennysaskelten tallennus epäonnistui:', insertError);
+}
+
 function naytaOpintoOhje(vaihe) {
   naytaVahvistus('🎯 ' + OPINTO_VAIHE_NIMET[vaihe], OPINTO_VAIHE_OHJE[vaihe], 'Selvä');
 }
+
+// === AIKAIKKUNA (2026-08-05, ks. muistiinpanot.md "Aikaikkuna") ===
+// "Minulla on N minuuttia" — kertaluontoinen kysely SAMALLA moottorilla
+// (TASO 1 + deadline + kuorma) kuin Tänään-osio, suodatettuna kestoarviolla.
+// EI tallennu opinto_paivan_askeleet-tauluun (ei ole "tänään-askel", vain
+// vilkaisu) — jos käyttäjä haluaa oikeasti tehdä sen, hän avaa kohteen
+// normaalisti ja käyttää ▶ Aloita -session-lokia siellä.
+async function etsiIkkunaanSopivaAskel(ikkunaMin) {
+  const tulokset = await laskeOpintoPaivanAskeleet(1, null, null, ikkunaMin);
+  return tulokset.length > 0 ? tulokset[0] : null;
+}
+
+async function kopioiLeikepoydalle(teksti, nappi) {
+  try {
+    await navigator.clipboard.writeText(teksti);
+    const alkuperainen = nappi.textContent;
+    nappi.textContent = 'Kopioitu ✓';
+    setTimeout(function() { nappi.textContent = alkuperainen; }, 1500);
+  } catch (e) {
+    naytaIlmoitus('Kopiointi ei onnistunut — valitse teksti käsin');
+  }
+}
+
+function piirraOpintoIkkunaTulos(ehdokas, ikkunaMin) {
+  const kontti = document.getElementById('opinto-ikkuna-tulos');
+  kontti.innerHTML = '';
+  kontti.style.display = 'block';
+
+  if (!ehdokas) {
+    const tyhja = document.createElement('p');
+    tyhja.className = 'section-empty';
+    tyhja.textContent = 'Ei ' + ikkunaMin + ' minuuttiin mahtuvaa tehtävää juuri nyt.';
+    kontti.appendChild(tyhja);
+    return;
+  }
+
+  const kohde = ehdokas.item;
+  const alaotsikko = ehdokas.tyyppi === 'aihe'
+    ? (kohde.opinto_kurssit ? kohde.opinto_kurssit.name : '')
+    : (kohde.lahde || '');
+
+  const kortti = document.createElement('div');
+  kortti.className = 'opinto-ikkuna-kortti';
+
+  const otsikko = document.createElement('div');
+  otsikko.className = 'opinto-tanaan-otsikko';
+  otsikko.textContent = kohde.name + (alaotsikko ? ' · ' + alaotsikko : '');
+  kortti.appendChild(otsikko);
+
+  const meta = document.createElement('div');
+  meta.className = 'opinto-tanaan-vaihe';
+  meta.textContent = OPINTO_VAIHE_NIMET[kohde.vaihe] + ' · noin ' + haeOpintoKestoMinuutteina(kohde.vaihe) + ' min';
+  kortti.appendChild(meta);
+
+  const ohje = document.createElement('p');
+  ohje.className = 'opinto-ikkuna-ohje';
+  ohje.textContent = OPINTO_VAIHE_OHJE[kohde.vaihe];
+  kortti.appendChild(ohje);
+
+  const promptiTeksti = rakennaOpintoPrompti(kohde.name, kohde.vaihe);
+  const promptiLaatikko = document.createElement('textarea');
+  promptiLaatikko.className = 'opinto-ikkuna-prompti';
+  promptiLaatikko.readOnly = true;
+  promptiLaatikko.rows = 3;
+  promptiLaatikko.value = promptiTeksti;
+  kortti.appendChild(promptiLaatikko);
+
+  const kopioiNappi = document.createElement('button');
+  kopioiNappi.className = 'dialog-btn dialog-btn-cancel';
+  kopioiNappi.textContent = '📋 Kopioi Copilot-prompti';
+  kopioiNappi.addEventListener('click', function() { kopioiLeikepoydalle(promptiTeksti, kopioiNappi); });
+  kortti.appendChild(kopioiNappi);
+
+  kontti.appendChild(kortti);
+}
+
+document.querySelectorAll('.opinto-ikkuna-btn').forEach(function(btn) {
+  btn.addEventListener('click', async function() {
+    const ikkunaMin = Number(btn.dataset.min);
+    const alkuperainen = btn.textContent;
+    btn.textContent = '...';
+    const ehdokas = await etsiIkkunaanSopivaAskel(ikkunaMin);
+    btn.textContent = alkuperainen;
+    piirraOpintoIkkunaTulos(ehdokas, ikkunaMin);
+  });
+});
 
 // === SESSION-LOKI (2026-08-05, ks. sql/099, muistiinpanot.md "Session-
 // loki") === todellinen aktiivinen työaika, ▶ Aloita/⏸ Lopeta -pari. EI
@@ -1436,11 +1608,25 @@ async function lopetaOpintoSessio(sessioId, alkoiAt) {
   lataaOpintoPaivanAskeleet();
 }
 
-async function piirraOpintoTanaanOsio(askeleet) {
+// Häivytys (2026-08-05, Katrin täsmennys): tehty/ohitettu-kortti pysyy
+// näkyvissä kunnes tehdyn_nakyvyys_maara UUTTA askelta on tullut sen
+// JÄLKEEN samana päivänä (ei häviä heti napin painalluksesta). `jarjestetyt`
+// on jo created_at-järjestyksessä (ks. lataaOpintoPaivanAskeleet-kysely).
+function suodataNakyvatAskeleet(jarjestetyt) {
+  const nakyvyysMaara = haeAsetusNumero('tehdyn_nakyvyys_maara', 3);
+  return jarjestetyt.filter(function(askel, index) {
+    if (askel.tila === 'tarjolla') return true;
+    const uudempiaJalkeen = jarjestetyt.length - 1 - index;
+    return uudempiaJalkeen < nakyvyysMaara;
+  });
+}
+
+async function piirraOpintoTanaanOsio(kaikkiAskeleet) {
   const osio = document.getElementById('opinto-tanaan-osio');
   const lista = document.getElementById('opinto-tanaan-lista');
   lista.innerHTML = '';
 
+  const askeleet = suodataNakyvatAskeleet(kaikkiAskeleet || []);
   if (!askeleet || askeleet.length === 0) {
     osio.style.display = 'none';
     return;
@@ -1540,6 +1726,9 @@ async function merkitseOpintoAskel(askel, tila) {
     if (askel.opinto_aiheet) await etenetaOpintoKohde(askel.opinto_aiheet, 'opinto_aiheet');
     else if (askel.taitosolmut) await etenetaOpintoKohde(askel.taitosolmut, 'taitosolmut');
   }
+  // Vapautunut tarjolla-paikka täytetään HETI (ks. tayttaOpintoPaivanAskeleet-
+  // kommentti) — koskee sekä tehty ETTÄ ohitettu, molemmat vapauttavat paikan.
+  await tayttaOpintoPaivanAskeleet();
   lataaOpintoPaivanAskeleet();
 }
 
@@ -4898,6 +5087,11 @@ function avaaOsio(osio) {
       document.getElementById('silta-puskuri-input').value = haeAsetusNumero('silta_puskuri_paivia', 7);
       document.getElementById('silta-leviamissyvyys-input').value = haeAsetusNumero('silta_leviamissyvyys', 2);
       document.getElementById('sessio-jarkevyys-input').value = haeAsetusNumero('sessio_jarkevyys_tunnit', 3);
+      document.getElementById('tehdyn-nakyvyys-input').value = haeAsetusNumero('tehdyn_nakyvyys_maara', 3);
+      document.getElementById('kesto-priming-input').value = haeAsetusNumero('kesto_priming_min', 15);
+      document.getElementById('kesto-encoding-input').value = haeAsetusNumero('kesto_encoding_min', 45);
+      document.getElementById('kesto-retrieval-input').value = haeAsetusNumero('kesto_retrieval_min', 20);
+      document.getElementById('kesto-yllapito-input').value = haeAsetusNumero('kesto_yllapito_min', 10);
       paivitaLaiturinPiilotusAsetukset();
     });
   } else if (osio.route === 'hytti') {
@@ -7840,6 +8034,11 @@ sidoHuoliKynnysInput('kurssi-kiireellisyys-input', 'kurssi_kiireellisyys_paivia'
 sidoHuoliKynnysInput('silta-puskuri-input', 'silta_puskuri_paivia', 7, 'Sillan puskuri');
 sidoHuoliKynnysInput('silta-leviamissyvyys-input', 'silta_leviamissyvyys', 2, 'Kiireellisyyden leviämissyvyys');
 sidoHuoliKynnysInput('sessio-jarkevyys-input', 'sessio_jarkevyys_tunnit', 3, 'Session järkevyyskynnys');
+sidoHuoliKynnysInput('tehdyn-nakyvyys-input', 'tehdyn_nakyvyys_maara', 3, 'Tehdyn kortin näkyvyysmäärä');
+sidoHuoliKynnysInput('kesto-priming-input', 'kesto_priming_min', 15, 'Primingin kestoarvio');
+sidoHuoliKynnysInput('kesto-encoding-input', 'kesto_encoding_min', 45, 'Encodingin kestoarvio');
+sidoHuoliKynnysInput('kesto-retrieval-input', 'kesto_retrieval_min', 20, 'Retrievalin kestoarvio');
+sidoHuoliKynnysInput('kesto-yllapito-input', 'kesto_yllapito_min', 10, 'Ylläpidon kestoarvio');
 
 // === MUISTUTUSPANEELIN NAPIT JA RULLAT ===
 // KORJATTU (2026-07-17, koonti 2 kohta 7 — "yksiköt eivät yhdisty"): vanha

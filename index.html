@@ -215,6 +215,19 @@
 
     <hr class="divider">
 
+    <!-- Aikaikkuna (2026-08-05, ks. muistiinpanot.md "Aikaikkuna") — "minulla
+         on N minuuttia juuri nyt", moottori etsii sen mittaisen tehtävän
+         SAMALLA pisteytyksellä (TASO 1 + deadline + kuorma) kuin Tänään-
+         osio, mutta suodatettuna kestoarviolla. Kertaluontoinen kysely, ei
+         tallennu opinto_paivan_askeleet-tauluun. -->
+    <div class="section-title">⏱ Minulla on aikaa</div>
+    <div class="opinto-ikkuna-napit">
+      <button class="opinto-ikkuna-btn" data-min="15">15 min</button>
+      <button class="opinto-ikkuna-btn" data-min="30">30 min</button>
+      <button class="opinto-ikkuna-btn" data-min="45">45 min</button>
+    </div>
+    <div id="opinto-ikkuna-tulos" style="display:none"></div>
+
     <!-- Opintopolku VAIHE 2 (2026-07-21, ks. muistiinpanot.md "Opintopolku
          VAIHE 2" / KONSEPTIKIRJA.md 4.11) — arjen ohjaava ikkuna ("näkymä 1"),
          kolmen voiman moottorin tarjoamat 1-2 askelta tälle päivälle. EI
@@ -549,6 +562,26 @@
     <div class="settings-row">
       <span>Opiskeluistunto kysyy vahvistusta jos kesto ylittää N tuntia</span>
       <input type="number" class="settings-numero-input" id="sessio-jarkevyys-input" min="0" step="1">
+    </div>
+    <div class="settings-row">
+      <span>Tehty/ohitettu kortti pysyy näkyvissä kunnes N uutta askelta on tullut sen jälkeen</span>
+      <input type="number" class="settings-numero-input" id="tehdyn-nakyvyys-input" min="0" step="1">
+    </div>
+    <div class="settings-row">
+      <span>Aikaikkuna: kestoarvio priming-vaiheelle (min)</span>
+      <input type="number" class="settings-numero-input" id="kesto-priming-input" min="1" step="1">
+    </div>
+    <div class="settings-row">
+      <span>Aikaikkuna: kestoarvio encoding-vaiheelle (min)</span>
+      <input type="number" class="settings-numero-input" id="kesto-encoding-input" min="1" step="1">
+    </div>
+    <div class="settings-row">
+      <span>Aikaikkuna: kestoarvio retrieval-vaiheelle (min)</span>
+      <input type="number" class="settings-numero-input" id="kesto-retrieval-input" min="1" step="1">
+    </div>
+    <div class="settings-row">
+      <span>Aikaikkuna: kestoarvio ylläpitovaiheelle (min)</span>
+      <input type="number" class="settings-numero-input" id="kesto-yllapito-input" min="1" step="1">
     </div>
 
     <div class="section-title">⚓ Ankkurit</div>
