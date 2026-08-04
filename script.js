@@ -4042,19 +4042,24 @@ function piirraHyttiKorttiUI() {
 
   document.getElementById('hytti-rivi-add-rivi').style.display = lukutila ? 'none' : 'flex';
 
+  // BUGIKORJAUS (2026-08-05, Katrin löytö "Hytin kortteja ei voi poistaa"):
+  // arkistointinappi näkyi aiemmin VAIN card_type='paattyva'-korteille —
+  // 'jatkuva'-kortit (jotka ovat oletustyyppi uutta korttia luodessa, ks.
+  // hytti-tyyppi-valinta) eivät koskaan saaneet mitään poisto-/arkistointi-
+  // reittiä, jäivät pysyvästi listalle. Arkistointi/palautus on jo olemassa
+  // oleva, turvallinen mekanismi (status-kenttä, ei hard delete, sama
+  // periaate kuin muualla Satamassa) — laajennettu koskemaan KAIKKIA
+  // kortteja tyypistä riippumatta, ei vain 'paattyvä'-tyyppiä.
   const arkistoiNappi = document.getElementById('hytti-kortti-arkistoi-btn');
+  arkistoiNappi.style.display = 'flex';
   if (lukutila) {
-    arkistoiNappi.style.display = 'flex';
     arkistoiNappi.textContent = '↩';
     arkistoiNappi.title = 'Palauta aktiiviseksi';
     arkistoiNappi.onclick = function() { palautaHyttiKortti(); };
-  } else if (currentHyttiKortti.card_type === 'paattyva') {
-    arkistoiNappi.style.display = 'flex';
+  } else {
     arkistoiNappi.textContent = '📦';
     arkistoiNappi.title = 'Arkistoi';
     arkistoiNappi.onclick = function() { arkistoiHyttiKortti(); };
-  } else {
-    arkistoiNappi.style.display = 'none';
   }
 }
 
