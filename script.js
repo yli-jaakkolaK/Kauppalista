@@ -1621,12 +1621,18 @@ async function lopetaOpintoSessio(sessioId, alkoiAt) {
   lataaOpintoPaivanAskeleet();
 }
 
-// Häivytys (2026-08-05, Katrin täsmennys): tehty/ohitettu-kortti pysyy
-// näkyvissä kunnes tehdyn_nakyvyys_maara UUTTA askelta on tullut sen
-// JÄLKEEN samana päivänä (ei häviä heti napin painalluksesta). `jarjestetyt`
-// on jo created_at-järjestyksessä (ks. lataaOpintoPaivanAskeleet-kysely).
+// Häivytys (2026-08-05, täsmennetty 2026-08-06 oikean käytön perusteella):
+// tehty/ohitettu-kortti pysyy näkyvissä kunnes tehdyn_nakyvyys_maara UUTTA
+// askelta on tullut sen JÄLKEEN samana päivänä. Oletus 0 (Katrin korjaus
+// alkuperäiseen 3:een — hänen käyttötahdillaan, 1-2 asiaa päivässä, kolmen
+// uuden kertyminen olisi vienyt useita päiviä ja tuntunut jumiutumiselta):
+// heti kun jokin merkitään tehdyksi/ohitetuksi, se häviää näkyvistä VÄLITTÖMÄSTI
+// ja tayttaOpintoPaivanAskeleet() tuo tilalle uuden samalla hetkellä — ei
+// mitään "viimeisimmät N tehtyä" -jälkinäkymää. `jarjestetyt` on jo
+// created_at-järjestyksessä (ks. lataaOpintoPaivanAskeleet-kysely). Arvo
+// säädettävissä Asetuksista jos joku myöhemmin haluaa lyhyen historiajäljen.
 function suodataNakyvatAskeleet(jarjestetyt) {
-  const nakyvyysMaara = haeAsetusNumero('tehdyn_nakyvyys_maara', 3);
+  const nakyvyysMaara = haeAsetusNumero('tehdyn_nakyvyys_maara', 0);
   return jarjestetyt.filter(function(askel, index) {
     if (askel.tila === 'tarjolla') return true;
     const uudempiaJalkeen = jarjestetyt.length - 1 - index;
@@ -5119,7 +5125,7 @@ function avaaOsio(osio) {
       document.getElementById('silta-puskuri-input').value = haeAsetusNumero('silta_puskuri_paivia', 7);
       document.getElementById('silta-leviamissyvyys-input').value = haeAsetusNumero('silta_leviamissyvyys', 2);
       document.getElementById('sessio-jarkevyys-input').value = haeAsetusNumero('sessio_jarkevyys_tunnit', 3);
-      document.getElementById('tehdyn-nakyvyys-input').value = haeAsetusNumero('tehdyn_nakyvyys_maara', 3);
+      document.getElementById('tehdyn-nakyvyys-input').value = haeAsetusNumero('tehdyn_nakyvyys_maara', 0);
       document.getElementById('kesto-priming-input').value = haeAsetusNumero('kesto_priming_min', 15);
       document.getElementById('kesto-encoding-input').value = haeAsetusNumero('kesto_encoding_min', 45);
       document.getElementById('kesto-retrieval-input').value = haeAsetusNumero('kesto_retrieval_min', 20);
@@ -8066,7 +8072,7 @@ sidoHuoliKynnysInput('kurssi-kiireellisyys-input', 'kurssi_kiireellisyys_paivia'
 sidoHuoliKynnysInput('silta-puskuri-input', 'silta_puskuri_paivia', 7, 'Sillan puskuri');
 sidoHuoliKynnysInput('silta-leviamissyvyys-input', 'silta_leviamissyvyys', 2, 'Kiireellisyyden leviämissyvyys');
 sidoHuoliKynnysInput('sessio-jarkevyys-input', 'sessio_jarkevyys_tunnit', 3, 'Session järkevyyskynnys');
-sidoHuoliKynnysInput('tehdyn-nakyvyys-input', 'tehdyn_nakyvyys_maara', 3, 'Tehdyn kortin näkyvyysmäärä');
+sidoHuoliKynnysInput('tehdyn-nakyvyys-input', 'tehdyn_nakyvyys_maara', 0, 'Tehdyn kortin näkyvyysmäärä');
 sidoHuoliKynnysInput('kesto-priming-input', 'kesto_priming_min', 15, 'Primingin kestoarvio');
 sidoHuoliKynnysInput('kesto-encoding-input', 'kesto_encoding_min', 45, 'Encodingin kestoarvio');
 sidoHuoliKynnysInput('kesto-retrieval-input', 'kesto_retrieval_min', 20, 'Retrievalin kestoarvio');

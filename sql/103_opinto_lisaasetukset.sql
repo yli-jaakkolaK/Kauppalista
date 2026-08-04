@@ -15,7 +15,7 @@
 begin;
 
 insert into asetukset (key, value) values
-  ('tehdyn_nakyvyys_maara', '3'),
+  ('tehdyn_nakyvyys_maara', '0'),
   ('kesto_priming_min', '15'),
   ('kesto_encoding_min', '45'),
   ('kesto_retrieval_min', '20'),
