@@ -419,6 +419,29 @@ function isoDate(d) {
   return osat.year + '-' + osat.month + '-' + osat.day;
 }
 
+// Henkselit-vanheneminen (2026-08-05, ks. muistiinpanot.md "Henkselit") —
+// KOLMAS TASO 2 -tyyppinen deterministinen tarkistus samalla jaetulla 5 min
+// -cron-kadenssilla (ks. yllä tarkistaVahdittuLepo/tarkistaKevyenPaivanEhdotus
+// -kommentti, sama "ei uutta cron-job.org-työtä" -perustelu). Speksin sana
+// on TÄRKEÄ: "vaatii tarkistetun/ajastetun poiston, EI pelkkää päivämäärä-
+// vertailua" — rivi POISTETAAN oikeasti kun paattyy menee ohi (ei vain
+// suodateta pois asiakaspuolella), muuten vanha henkselit näkyisi ikuisesti
+// asetusten listassa ja Hytti-eston tarkistus löytäisi sen väärin jos joku
+// joskus muuttaisi kyselyä olettaen ettei umpeutuneita rivejä ole.
+async function tarkistaHenkselitVanheneminen() {
+  const nytIso = new Date().toISOString();
+  const poistoRes = await supabaseFetch('henkselit?paattyy=lt.' + encodeURIComponent(nytIso), {
+    method: 'DELETE',
+    headers: { Prefer: 'return=representation' },
+  });
+  if (!poistoRes.ok) {
+    console.error('[muistutukset-laheta] Henkseleiden vanhenemistarkistus epäonnistui:', poistoRes.status);
+    return 0;
+  }
+  const poistetut = await poistoRes.json();
+  return Array.isArray(poistetut) ? poistetut.length : 0;
+}
+
 module.exports = async function handler(req, res) {
   if (!SUPABASE_KEY) {
     return res.status(500).json({ error: 'SUPABASE_SERVICE_KEY puuttuu Vercelin ympäristömuuttujista' });
@@ -441,6 +464,7 @@ module.exports = async function handler(req, res) {
   let vahdittuNostettu = 0;
   let kevytPaivaTulos = null;
   let coupleTimeResult = null;
+  let henkselitPoistettu = 0;
   try {
     vahdittuNostettu = await tarkistaVahdittuLepo();
   } catch (e) {
@@ -455,6 +479,11 @@ module.exports = async function handler(req, res) {
     coupleTimeResult = await checkCoupleTimeProposal();
   } catch (e) {
     console.error('[muistutukset-laheta] Couple time proposal check threw an exception:', e.message);
+  }
+  try {
+    henkselitPoistettu = await tarkistaHenkselitVanheneminen();
+  } catch (e) {
+    console.error('[muistutukset-laheta] Henkseleiden vanhenemistarkistus heitti poikkeuksen:', e.message);
   }
 
   // BUGIKORJAUS/LAAJENNUS (2026-07-19, "Sinnikäs muistutus", ks.
@@ -476,7 +505,7 @@ module.exports = async function handler(req, res) {
   console.log('[muistutukset-laheta] ' + nyt.toISOString() + ': ' + (Array.isArray(kaikki) ? kaikki.length : 0) + ' päättämätöntä riviä tarkistettavana.');
 
   if (!Array.isArray(kaikki) || kaikki.length === 0) {
-    return res.status(200).json({ success: true, lahetetty: 0, tarkistettu: 0, vahdittu_nostettu: vahdittuNostettu, kevyt_paiva: kevytPaivaTulos, couple_time: coupleTimeResult });
+    return res.status(200).json({ success: true, lahetetty: 0, tarkistettu: 0, vahdittu_nostettu: vahdittuNostettu, kevyt_paiva: kevytPaivaTulos, couple_time: coupleTimeResult, henkselit_poistettu: henkselitPoistettu });
   }
 
   // Palauttaa muistutuksen sent_at:n takaisin nulliksi — käytetään kun claim
@@ -729,5 +758,5 @@ module.exports = async function handler(req, res) {
     }
   }
 
-  return res.status(200).json({ success: true, lahetetty: lahetetty, tarkistettu: tarkistettu, uudelleenyritetaan: jatetaanYrittamaan, vahdittu_nostettu: vahdittuNostettu, kevyt_paiva: kevytPaivaTulos, couple_time: coupleTimeResult });
+  return res.status(200).json({ success: true, lahetetty: lahetetty, tarkistettu: tarkistettu, uudelleenyritetaan: jatetaanYrittamaan, vahdittu_nostettu: vahdittuNostettu, kevyt_paiva: kevytPaivaTulos, couple_time: coupleTimeResult, henkselit_poistettu: henkselitPoistettu });
 };

@@ -101,6 +101,11 @@ let ankkuroidutAvaimet = new Set();
 // tahansa kirjautuneelle) kevyesti asiakaspuolelle, jotta "ehdota toiselle"
 // -toiminto tietää KENELLE ehdottaa ilman kovakoodattua UUID:tä.
 let toinenKayttaja = null; // { henkilo, user_id } tai null jos ei löytynyt
+// Kirjautuneen OMA henkilo ('katri'/'juha') — lisätty 2026-08-05 Henkseleitä
+// varten (script.js: omaHenkilo, käytössä henkselit-lomakkeella ja Hytti-
+// eston resolvennissa). Sama hytti_omistajat-haku kuin toinenKayttaja jo
+// tekee, ei uutta kyselyä — vain toinen puoli samasta tuloksesta.
+let omaHenkilo = null;
 async function paivitaHenkiloKartta() {
   const { data, error } = await db.from('hytti_omistajat').select('henkilo, user_id');
   if (error) {
@@ -108,6 +113,8 @@ async function paivitaHenkiloKartta() {
     return;
   }
   toinenKayttaja = (data || []).find(function(rivi) { return rivi.user_id !== currentUserId; }) || null;
+  const omaRivi = (data || []).find(function(rivi) { return rivi.user_id === currentUserId; });
+  omaHenkilo = omaRivi ? omaRivi.henkilo : null;
 }
 function henkiloNimi(henkilo) {
   return henkilo ? henkilo.charAt(0).toUpperCase() + henkilo.slice(1) : 'kumppanille';
@@ -1076,34 +1083,49 @@ function opintoTanaanPvm() {
 // mitä lähempänä tätä päivää ja mitä vakavampi väri (🟡1 🟠2 🔴3 🏴4).
 // Nostaa VAIN kuormatasoa ylöspäin, ei koskaan laske — kalenterin oma
 // laskenta on aina vähintään yhtä painava lähtökohta.
+// Puhdas, parametrisoitu versio huolipainon päiväkohtaisesta laskennasta
+// (irrotettu 2026-08-05 kalenterin kuukausi/viikkonäkymän taustaväriä
+// varten, ks. computeVisibleDayLoadLevels alempana) — sama ±14pv painotettu
+// summa kuin ennenkin, mutta ottaa kohdepäivän JA valmiiksi haetun
+// huoli-taulukon parametrina, jotta koko taulun voi hakea KERRAN ja laskea
+// monelle päivälle sen sijaan että joka päivä tekisi oman kyselynsä.
+function computeConcernWeightForDate(isoPvm, huolet) {
+  const kohde = new Date(isoPvm + 'T00:00:00');
+  return (huolet || []).reduce(function(summa, h) {
+    const paivaEro = Math.round(Math.abs(new Date(h.pvm + 'T00:00:00') - kohde) / 86400000);
+    if (paivaEro > 14) return summa;
+    return summa + (15 - paivaEro) * h.vakavuus;
+  }, 0);
+}
+
 async function huolienPaivanPaino() {
-  const tanaan = new Date(opintoTanaanPvm() + 'T00:00:00');
   const { data: huolet, error } = await db.from('paivan_huolet').select('pvm, vakavuus');
   if (error) {
     console.error('Huolilippujen haku epäonnistui:', error);
     return 0;
   }
-  return (huolet || []).reduce(function(summa, h) {
-    const paivaEro = Math.round(Math.abs(new Date(h.pvm + 'T00:00:00') - tanaan) / 86400000);
-    if (paivaEro > 14) return summa;
-    return summa + (15 - paivaEro) * h.vakavuus;
-  }, 0);
+  return computeConcernWeightForDate(opintoTanaanPvm(), huolet);
+}
+
+// Puhdas kynnyslogiikka irrotettu tästä samasta syystä kuin yllä
+// (computeConcernWeightForDate) — ottaa valmiiksi lasketun ajallisten
+// tapahtumien määrän ja huolipainon parametrina.
+function deriveDayLoadLevel(ajallistenMaara, huoliPaino) {
+  const raja = haeAsetusNumero('paivan_menoraja', 5);
+  let taso = ajallistenMaara === 0 ? 'kevyt' : (ajallistenMaara >= raja ? 'raskas' : 'keski');
+  const huoliRaskasKynnys = haeAsetusNumero('huoli_raskas_kynnys', 30);
+  const huoliKeskiKynnys = haeAsetusNumero('huoli_keski_kynnys', 10);
+  if (huoliPaino >= huoliRaskasKynnys) taso = 'raskas';
+  else if (huoliPaino >= huoliKeskiKynnys && taso === 'kevyt') taso = 'keski';
+  return taso;
 }
 
 async function opintoPaivanKuorma() {
   const tanaan = opintoTanaanPvm();
   const { count } = await db.from('kalenteri_tapahtumat').select('id', { count: 'exact', head: true })
     .eq('event_date', tanaan).not('event_time', 'is', null);
-  const raja = haeAsetusNumero('paivan_menoraja', 5);
-  const maara = count || 0;
-  let taso = maara === 0 ? 'kevyt' : (maara >= raja ? 'raskas' : 'keski');
-
   const huoliPaino = await huolienPaivanPaino();
-  const huoliRaskasKynnys = haeAsetusNumero('huoli_raskas_kynnys', 30);
-  const huoliKeskiKynnys = haeAsetusNumero('huoli_keski_kynnys', 10);
-  if (huoliPaino >= huoliRaskasKynnys) taso = 'raskas';
-  else if (huoliPaino >= huoliKeskiKynnys && taso === 'kevyt') taso = 'keski';
-  return taso;
+  return deriveDayLoadLevel(count || 0, huoliPaino);
 }
 
 // PACER jäsentää: aihe on ylipäätään kandidaatti VAIN jos sen nykyinen vaihe
@@ -1287,6 +1309,14 @@ function opintoPaivaaDeadlineen(aihe, kurssienDeadlinet, aiheidenDeadlinet, tana
 // (jos ei mahdu aikaan, ei näytetä vaikka olisi kiireellinen — aikaikkunan
 // koko pointti on ettei näytetä mitään mikä ei mahdu).
 async function laskeOpintoPaivanAskeleet(maxAskeliaYlikirjoitus, poissuljetutAiheIdt, poissuljetutSolmuIdt, ikkunaMin) {
+  // Henkselit-esto (2026-08-05, ks. muistiinpanot.md "Henkselit") — YKSI
+  // choke point kaikille kolmelle kutsupaikalle (lataaOpintoPaivanAskeleet,
+  // tayttaOpintoPaivanAskeleet, etsiIkkunaanSopivaAskel), ks. Henkselit-speksi
+  // "seuraavaa opiskeluaskelta ei ehdoteta oletuksena". Per-henkilö
+  // ohitettavissa (henkselit-esta-hytti-toggle asetuksissa) — oletus PÄÄLLÄ.
+  if (omaHenkilo && henkselitEstaaHytin(omaHenkilo) && await onkoOmaHenkselitAktiivinenNyt()) {
+    return [];
+  }
   const tanaan = opintoTanaanPvm();
 
   const [{ data: aiheet, error: aiheError }, { data: solmut, error: solmutError }, { data: kaaret, error: kaaretError }, { data: viittausRivit, error: viittausError }] = await Promise.all([
@@ -2692,6 +2722,79 @@ function analysoiPaivanRistiriidat(rivit, isoPvm) {
   return { vakavuus: vakavuus, fullIds: fullIds };
 }
 
+function minutesToHHMM(min) {
+  const h = Math.floor(min / 60) % 24;
+  const m = Math.round(min % 60);
+  return String(h).padStart(2, '0') + ':' + String(m).padStart(2, '0');
+}
+
+// Henkselit-versio paallekkaisyysVakavuus:sta (2026-08-05, ks.
+// muistiinpanot.md "Henkselit") — MOLEMMAT vanhemmat henkselöity SAMANAIKAI-
+// SESTI on eri kysymys kuin kaksi kalenteritapahtumaa päällekkäin (ei
+// tapahtumapareja, ei syote_id:tä), joten TIETOISESTI OMA, rinnakkainen
+// tarkistus — EI ujutettu paallekkaisyysVakavuus/analysoiPaivanRistiriidat:n
+// fullIds/kuittaus-koneistoon, joka on suunniteltu nimenomaan VERTAILTAVIEN
+// tapahtumaparien varalle (avaaRistiriitaVahvistus odottaa oikeita
+// tapahtuma-id:itä, ei henkselit-rivi-id:itä). Sama ⚠️-merkki näkyy
+// käyttäjälle kummastakin syystä, ks. paivanRistiriitaTila alempana, mutta
+// napautuskäyttäytyminen eroaa (ks. kutsupaikat).
+//
+// Palauttaa true jos löytyy ajanhetki jolloin SEKÄ katri ETTÄ juha ovat
+// henkselöity JA vähintään yksi valvontaa tarvitseva lapsi on hoivaikkunassa
+// sillä hetkellä eikä ole katettu minkään sinä päivänä näkyvän tapahtuman
+// kattaa_lapset-kentässä (ks. tarvitseeLapsiValvontaa, paallekkaisyysVakavuus
+// — sama ikäsoftaus-/hoivaikkunalogiikka, uudelleenkäytetty sellaisenaan).
+// Speksin sana on "sallitaan mutta näytetään ristiriitavaroitus" — EI
+// koskaan kova esto, pelkkä signaali.
+function henkselitAiheuttaaRistiriidan(henkselitSinaPaivana, tapahtumatSinaPaivana, isoPvm) {
+  const katrit = henkselitSinaPaivana.filter(function(r) { return r.henkilo === 'katri'; });
+  const juhat = henkselitSinaPaivana.filter(function(r) { return r.henkilo === 'juha'; });
+  if (katrit.length === 0 || juhat.length === 0) return false;
+
+  const katetutLapset = new Set();
+  tapahtumatSinaPaivana.forEach(function(t) { (t.kattaa_lapset || []).forEach(function(id) { katetutLapset.add(id); }); });
+
+  for (let i = 0; i < katrit.length; i++) {
+    for (let j = 0; j < juhat.length; j++) {
+      const kOsuus = henkselitPaivaosuus(katrit[i], isoPvm);
+      const jOsuus = henkselitPaivaosuus(juhat[j], isoPvm);
+      if (!kOsuus || !jOsuus) continue;
+      const paallekkaisAlkuMin = Math.max(kOsuus.alkuMin, jOsuus.alkuMin);
+      const paallekkaisLoppuMin = Math.min(kOsuus.loppuMin, jOsuus.loppuMin);
+      if (paallekkaisLoppuMin <= paallekkaisAlkuMin) continue;
+      const paallekkaisAlku = minutesToHHMM(paallekkaisAlkuMin);
+      const paallekkaisLoppu = minutesToHHMM(paallekkaisLoppuMin);
+      const tarvitaanVartija = cachedLapset.some(function(lapsi) {
+        if (katetutLapset.has(lapsi.id)) return false;
+        return tarvitseeLapsiValvontaa(lapsi, isoPvm, paallekkaisAlku, paallekkaisLoppu);
+      });
+      if (tarvitaanVartija) return true;
+    }
+  }
+  return false;
+}
+
+// Yhdistää tapahtumaparipohjaisen (analysoiPaivanRistiriidat) JA henkselit-
+// pohjaisen (henkselitAiheuttaaRistiriidan) ristiriitasignaalin yhdeksi
+// näytettäväksi tilaksi kutsupaikkoja varten — KAKSI ERI, RINNAKKAISTA
+// mekanismia (eri syyt, eri kuittaustapa: tapahtumapareilla on "keskusteltu"
+// kuittaus, henkselit-versiolla ei ole mitään pysyvää kuittaustilaa, koska
+// se ei viittaa oikeisiin tapahtuma-id:ihin), mutta käyttäjän silmissä sama
+// ⚠️-merkki. henkselitSinaPaivana voi olla undefined kutsupaikoissa jotka
+// eivät (vielä) hae henkseleitä — käsitellään silloin tyhjänä listana.
+function paivanRistiriitaTila(paivanKaikki, iso, henkselitSinaPaivana) {
+  const paivanAjallisiaMaara = paivanKaikki.filter(function(t) { return t.event_time; }).length;
+  const tapahtumaRistiriita = paivanAjallisiaMaara > 1 ? analysoiPaivanRistiriidat(paivanKaikki, iso) : { vakavuus: 'none', fullIds: [] };
+  const tapahtumaOnRistiriita = tapahtumaRistiriita.vakavuus === 'full' && !onkoRistiriitaKuitattu(iso, tapahtumaRistiriita.fullIds);
+  const henkselitOnRistiriita = henkselitAiheuttaaRistiriidan(henkselitSinaPaivana || [], paivanKaikki, iso);
+  return {
+    vakavuus: tapahtumaRistiriita.vakavuus,
+    fullIds: tapahtumaRistiriita.fullIds,
+    onRistiriita: tapahtumaOnRistiriita || henkselitOnRistiriita,
+    henkselitOnRistiriita: henkselitOnRistiriita,
+  };
+}
+
 // Rakentaa "Keskusteltu"-kuittauksen allekirjoitusavaimen (event_date +
 // osallistuvien tapahtumien id-joukko) — ks. analysoiPaivanRistiriidat.
 function ristiriitaAvain(fullIds) {
@@ -3187,7 +3290,14 @@ function luoPaivaMerkki(savy, teksti, title, onClick) {
 // addEventListener) nollataan JOKA piirrolla ettei vanhoja kuuntelijoita jää
 // kertymään samaan, uudelleenkäytettyyn otsikkoEl-elementtiin (esim.
 // #kalenteri-otsikko pysyy samana DOM-solmuna päivästä toiseen).
-function paivitaPaivanOtsikko(otsikkoEl, teksti, rivit, isoPvm, kuormaraja) {
+// henkselitSinaPaivana (2026-08-05, ks. muistiinpanot.md "Henkselit") on
+// VALINNAINEN — kutsujat jotka eivät (vielä) hae henkseleitä toimivat
+// ennallaan (oletus tyhjä lista, henkselitAiheuttaaRistiriidan palauttaa
+// silloin aina false). Vain 'full' JA 'ei-kuitattu'-tilassa NÄYTETÄÄN
+// henkselit-merkki OMANA ⚠️:na jos tapahtumapohjaista full-ristiriitaa ei jo
+// ole (muuten kaksi ⚠️-merkkiä samassa otsikossa olisi kohinaa) — sama
+// "kaksi eri, rinnakkaista mekanismia" -periaate kuin paivanRistiriitaTila:ssa.
+function paivitaPaivanOtsikko(otsikkoEl, teksti, rivit, isoPvm, kuormaraja, henkselitSinaPaivana) {
   otsikkoEl.textContent = teksti;
   otsikkoEl.onclick = null;
   otsikkoEl.style.cursor = '';
@@ -3209,6 +3319,11 @@ function paivitaPaivanOtsikko(otsikkoEl, teksti, rivit, isoPvm, kuormaraja) {
     };
   } else if (analyysi.vakavuus === 'attention') {
     otsikkoEl.appendChild(luoPaivaMerkki('ristiriita-huomio', 'huomaa', 'Kevyt päällekkäisyys tänä päivänä — ei vaadi toimenpidettä'));
+  } else if (henkselitAiheuttaaRistiriidan(henkselitSinaPaivana || [], rivit, isoPvm)) {
+    otsikkoEl.appendChild(luoPaivaMerkki('ristiriita-symboli', '⚠️', 'Molemmat vanhemmat henkselöity samaan aikaan — lapsi voi jäädä ilman valvontaa', function(e) {
+      e.stopPropagation();
+      naytaIlmoitus('Molemmat vanhemmat ovat henkselöity samaan aikaan tänä päivänä, eikä kaikkia valvontaa tarvitsevia lapsia ole katettu millään tapahtumalla.');
+    }));
   }
   const maara = laskeMenoja(rivit);
   if (maara >= kuormaraja) {
@@ -3237,6 +3352,325 @@ function tapahtumaKattaaPaivan(t, isoPaiva) {
 
 function onkoMonipaivainen(t) {
   return !!t.event_end_date && t.event_end_date !== t.event_date;
+}
+
+// === HENKSELIT-HALLINTA UI (2026-08-05, ks. muistiinpanot.md "Henkselit",
+// sql/109) === Asetukset-näkymän "🎗️ Henkselit" -osiosta hallittu per-
+// vanhempi "olen poissa laskuista" -aikaikkuna. VAIN luonti/muokkaus/poisto
+// — EI mitään kalenterinäkymän puolella (speksin tietoinen rajaus, harvoin
+// tarvittava). Merkitsijä on AINA kirjautunut itse (omaHenkilo) — lomakkeella
+// ei ole henkilövalitsinta. Kalenterivisualisointi (värit, tasoylivetopalkki)
+// ja ristiriita-/Hytti-kytkennät ovat OMISSA osioissaan alempana, tämä on
+// pelkkä CRUD.
+let currentHenkselitEdit = null; // muokattavan rivin id, tai null = uusi
+
+function nollaaHenkselitLomake() {
+  currentHenkselitEdit = null;
+  document.getElementById('henkselit-pvm-input').value = paivamaaraISO(new Date());
+  document.getElementById('henkselit-alku-input').value = '07:00';
+  document.getElementById('henkselit-loppu-input').value = '00:00';
+  document.getElementById('henkselit-tallenna-btn').textContent = 'Merkitse henkselit';
+  document.getElementById('henkselit-peruuta-btn').style.display = 'none';
+}
+
+// "24:00" ihmiselle selkeämpi kuin "seuraavan päivän 00:00" kun kyse on
+// "koko illan/yön" -merkinnästä (ks. nollaaHenkselitLomake:n oletusloppu).
+function muotoileHenkselitAikavali(alkuISO, loppuISO) {
+  const alku = new Date(alkuISO);
+  const loppu = new Date(loppuISO);
+  const klo = function(d) { return String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0'); };
+  const pvm = function(d) { return d.getDate() + '.' + (d.getMonth() + 1) + '.'; };
+  let teksti = pvm(alku) + ' ' + klo(alku) + '–';
+  if (paivamaaraISO(alku) !== paivamaaraISO(loppu)) teksti += pvm(loppu) + ' ';
+  const loppuKeskiyolla = loppu.getHours() === 0 && loppu.getMinutes() === 0;
+  teksti += loppuKeskiyolla ? '24:00' : klo(loppu);
+  return teksti;
+}
+
+async function lataaHenkselit() {
+  const { data, error } = await db.from('henkselit').select().order('alkaa');
+  if (error) {
+    console.error('Henkseleiden haku epäonnistui:', error);
+    return;
+  }
+  const rivit = data || [];
+  const listEl = document.getElementById('henkselit-lista');
+  listEl.innerHTML = '';
+  document.getElementById('henkselit-tyhja').style.display = rivit.length === 0 ? 'block' : 'none';
+  rivit.forEach(function(rivi) {
+    const li = document.createElement('li');
+    li.addEventListener('click', function() { avaaHenkselitMuokkaus(rivi); });
+
+    const teksti = document.createElement('span');
+    teksti.textContent = henkiloNimi(rivi.henkilo) + ': ' + muotoileHenkselitAikavali(rivi.alkaa, rivi.paattyy);
+    li.appendChild(teksti);
+
+    const poisto = document.createElement('button');
+    poisto.className = 'delete-btn';
+    poisto.textContent = '×';
+    poisto.addEventListener('click', async function(e) {
+      e.stopPropagation();
+      const vahvistus = await naytaVahvistus('Poistetaanko henkselit?', henkiloNimi(rivi.henkilo) + ': ' + muotoileHenkselitAikavali(rivi.alkaa, rivi.paattyy), 'Poista');
+      if (!vahvistus) return;
+      const { error: poistoError } = await db.from('henkselit').delete().eq('id', rivi.id);
+      if (ilmoitaKirjoitusvirheesta(poistoError, 'Henkseleiden poisto')) return;
+      if (currentHenkselitEdit === rivi.id) nollaaHenkselitLomake();
+      lataaHenkselit();
+    });
+    li.appendChild(poisto);
+
+    listEl.appendChild(li);
+  });
+}
+
+// Vain oman henkilon rivin voi avata muokkaukseen — muutoin tallennus
+// (joka aina kirjoittaa henkilo=omaHenkilo) siirtäisi rivin hiljaa toisen
+// nimiin. Poisto (yllä) pysyy sallittuna kummankin riville, kuten muukin
+// tämän sovelluksen jaettu perheen data (ei owner_id-rajausta).
+function avaaHenkselitMuokkaus(rivi) {
+  if (rivi.henkilo !== omaHenkilo) {
+    naytaIlmoitus(henkiloNimi(rivi.henkilo) + ' oman henkselin voi muokata vain hän itse — poistaa voi kyllä.');
+    return;
+  }
+  currentHenkselitEdit = rivi.id;
+  const alku = new Date(rivi.alkaa);
+  const loppu = new Date(rivi.paattyy);
+  document.getElementById('henkselit-pvm-input').value = paivamaaraISO(alku);
+  document.getElementById('henkselit-alku-input').value = String(alku.getHours()).padStart(2, '0') + ':' + String(alku.getMinutes()).padStart(2, '0');
+  document.getElementById('henkselit-loppu-input').value = String(loppu.getHours()).padStart(2, '0') + ':' + String(loppu.getMinutes()).padStart(2, '0');
+  document.getElementById('henkselit-tallenna-btn').textContent = 'Tallenna muutos';
+  document.getElementById('henkselit-peruuta-btn').style.display = 'block';
+}
+
+document.getElementById('henkselit-peruuta-btn').addEventListener('click', nollaaHenkselitLomake);
+
+document.getElementById('henkselit-tallenna-btn').addEventListener('click', async function() {
+  if (!omaHenkilo) {
+    naytaIlmoitus('Omaa henkilöä ei tunnistettu (hytti_omistajat) — henkseleitä ei voi merkitä.');
+    return;
+  }
+  const pvmStr = document.getElementById('henkselit-pvm-input').value;
+  const alkuStr = document.getElementById('henkselit-alku-input').value;
+  const loppuStr = document.getElementById('henkselit-loppu-input').value;
+  if (!pvmStr || !alkuStr || !loppuStr) { naytaIlmoitus('Täytä päivä, alku ja loppu.'); return; }
+
+  const alku = new Date(pvmStr + 'T' + alkuStr + ':00');
+  // Ei erillistä "koko päivä" vs. "aikaikkuna" -valintaa (ks. speksi) — sama
+  // rulla kattaa molemmat YHDELLÄ säännöllä: jos loppu <= alku kellonajan
+  // mukaan, loppu tulkitaan SEURAAVAN päivän kellonajaksi (oletus 00:00 =
+  // puoleenyöhön asti = "koko tämän päivän loppuun").
+  const loppu = new Date(pvmStr + 'T' + loppuStr + ':00');
+  if (loppu <= alku) loppu.setDate(loppu.getDate() + 1);
+
+  const rivi = { henkilo: omaHenkilo, alkaa: alku.toISOString(), paattyy: loppu.toISOString() };
+  const kysely = currentHenkselitEdit
+    ? db.from('henkselit').update(rivi).eq('id', currentHenkselitEdit)
+    : db.from('henkselit').insert(rivi);
+  const { error } = await kysely;
+  if (ilmoitaKirjoitusvirheesta(error, 'Henkseleiden tallennus')) return;
+  nollaaHenkselitLomake();
+  lataaHenkselit();
+});
+
+// Henkselit-Hytti-kytkentä (ks. speksi "voi sallia/muokata tämän per
+// käyttäjä"): PER HENKILÖ, ei per laite — DB-asetus samalla avain-arvo-
+// taululla kuin muutkin (asetukset), avain NAMESPACED henkilon mukaan koska
+// taulu on perheen yhteinen, ei per-käyttäjä-rivitetty. Oletus PÄÄLLÄ
+// (estää) — turvallisin oletus on "henkselit tarkoittaa oikeasti poissa",
+// ei hiljaa jatkaa ehdottamista. Käytetään laskeOpintoPaivanAskeleet():ssä.
+function henkselitEstaaHyttinAsetusAvain(henkilo) {
+  return 'henkselit_esta_hytti_' + henkilo;
+}
+function henkselitEstaaHytin(henkilo) {
+  return haeAsetusTeksti(henkselitEstaaHyttinAsetusAvain(henkilo), 'true') !== 'false';
+}
+
+// Onko OMA (kirjautuneen) henkselit voimassa juuri nyt? Käytössä
+// laskeOpintoPaivanAskeleet():n (Hytin kolmen voiman moottori) ja
+// lataaAnkkurit():n (Hytti-scopen ankkurit) esto-tarkistuksissa. Erillinen
+// pieni kysely eikä osa fetchVisibleHenkselit-kalenterihakua — nämä kaksi
+// kutsupaikkaa eivät muuten koskaan lataa kalenterin henkselit-dataa, ja
+// tämä on huomattavasti halvempi kuin koko kalenterinäkymän datapolku.
+async function onkoOmaHenkselitAktiivinenNyt() {
+  if (!omaHenkilo) return false;
+  const nytIso = new Date().toISOString();
+  const { data, error } = await db.from('henkselit').select('id')
+    .eq('henkilo', omaHenkilo)
+    .lte('alkaa', nytIso)
+    .gte('paattyy', nytIso)
+    .limit(1);
+  if (error) {
+    console.error('Henkseleiden tarkistus (Hytti-esto) epäonnistui:', error);
+    return false;
+  }
+  return (data || []).length > 0;
+}
+document.getElementById('henkselit-esta-hytti-toggle').addEventListener('change', async function(e) {
+  if (!omaHenkilo) return;
+  const { error } = await db.from('asetukset').upsert(
+    { key: henkselitEstaaHyttinAsetusAvain(omaHenkilo), value: String(e.target.checked) },
+    { onConflict: 'key' }
+  );
+  if (ilmoitaKirjoitusvirheesta(error, 'Henkselit-Hytti-asetuksen tallennus')) return;
+  await paivitaAsetukset();
+});
+
+// === KALENTERIN OMISTAJAVÄRIT (2026-08-05, Kalenteri UI -uudistus) ===
+// Kiinteä 4-värinen paletti henkilön mukaan, käytössä kuukausi- ja
+// viikkonäkymän palkeissa. EI koske päivänäkymää (piirraKalenteriRivi),
+// joka näyttää edelleen syötteen omaa _vari-kenttää koskemattomana — tämä
+// on tietoinen rajaus, ei unohdus (ks. Kalenteri UI -speksi "Ei muuteta").
+// 'lapset' ei ole tällä hetkellä saavutettavissa mistään oikeasta syötteestä
+// (henkilo-sarakkeen check-constraint sallii vain katri/juha/null) — varattu
+// tulevaa lapsikohtaista kalenterisyötettä varten.
+const EVENT_OWNER_COLORS = { katri: '#e05555', juha: '#3b82d6', molemmat: '#a855c7', lapset: '#6b6660' };
+function resolveEventOwnerColor(tapahtuma) {
+  if (tapahtuma._henkilo === 'katri') return EVENT_OWNER_COLORS.katri;
+  if (tapahtuma._henkilo === 'juha') return EVENT_OWNER_COLORS.juha;
+  if (tapahtuma._henkilo === 'lapset') return EVENT_OWNER_COLORS.lapset;
+  return EVENT_OWNER_COLORS.molemmat;
+}
+// K/J/Y/L — Y = "Yhteinen" (jaettu/perhe, ei henkilo-tietoa).
+function resolveEventOwnerLetter(tapahtuma) {
+  if (tapahtuma._henkilo === 'katri') return 'K';
+  if (tapahtuma._henkilo === 'juha') return 'J';
+  if (tapahtuma._henkilo === 'lapset') return 'L';
+  return 'Y';
+}
+
+// Muuntaa kellonajan ("HH:MM" tai "HH:MM:SS") prosenttiosuudeksi 07:00–23:00
+// -aikajanasta (0-100, päihin leikattuna) — sama akseli kuukausipalkeissa
+// JA viikon aikajananäkymässä (ks. Kalenteri UI -speksi).
+const KALENTERI_AIKAJANA_ALKU_MIN = 7 * 60;
+const KALENTERI_AIKAJANA_PITUUS_MIN = 16 * 60;
+function minutesToPercent(min) {
+  return Math.max(0, Math.min(100, (min - KALENTERI_AIKAJANA_ALKU_MIN) / KALENTERI_AIKAJANA_PITUUS_MIN * 100));
+}
+function timeToPercent(hhmm) {
+  return minutesToPercent(aikaMinuutteina(hhmm));
+}
+
+// === HENKSELIT — HAKU JA ASETTELU KALENTERINÄKYMÄÄN (2026-08-05, ks.
+// muistiinpanot.md "Henkselit") === CRUD-puoli asuu HENKSELIT-HALLINTA UI
+// -osiossa yllä; tämä osio on pelkkää lukua/asettelua kalenterin kolmelle
+// näkymälle (kuukausi/viikko/päivä) JA ristiriitalogiikalle (ks. alempana
+// henkselitPaallekkaisyys).
+function henkselitVari(henkilo) {
+  return henkilo === 'juha' ? 'henkselit-juha' : 'henkselit-katri';
+}
+
+// Hakee kaikki henkselit-rivit jotka MENEVÄT PÄÄLLEKKÄIN annetun ISO-
+// päivävälin kanssa (sama "hae vähän liikaa, rajaa asiakaspuolella" -periaate
+// kuin kalenterin muissakin hauissa, ks. tapahtumaKattaaPaivan).
+async function fetchVisibleHenkselit(rangeAlkuIso, rangeLoppuIso) {
+  const alkuRaja = new Date(rangeAlkuIso + 'T00:00:00');
+  const loppuRaja = new Date(rangeLoppuIso + 'T23:59:59');
+  const { data, error } = await db.from('henkselit').select()
+    .lte('alkaa', loppuRaja.toISOString())
+    .gte('paattyy', alkuRaja.toISOString());
+  if (error) {
+    console.error('Henkseleiden haku kalenterinäkymään epäonnistui:', error);
+    return [];
+  }
+  return data || [];
+}
+
+// Henkselit-rivin osuma annetulle ISO-päivälle minuutteina keskiyöstä
+// (0-1440), leikattu päivän rajoihin. null jos rivi ei osu tälle päivälle
+// lainkaan (fetchVisibleHenkselit hakee koko näkyvän välin, joten yksittäistä
+// päivää kohti pitää vielä suodattaa/leikata erikseen, sama kaksivaiheinen
+// malli kuin tapahtumaKattaaPaivan+event_end_date-parilla).
+function henkselitPaivaosuus(rivi, iso) {
+  const paivanAlku = new Date(iso + 'T00:00:00');
+  const alkuMin = (new Date(rivi.alkaa) - paivanAlku) / 60000;
+  const loppuMin = (new Date(rivi.paattyy) - paivanAlku) / 60000;
+  if (loppuMin <= 0 || alkuMin >= 1440) return null;
+  return { alkuMin: Math.max(0, alkuMin), loppuMin: Math.min(1440, loppuMin) };
+}
+
+function henkselitKattaaKokoPaivan(osuus) {
+  return osuus.alkuMin <= 0 && osuus.loppuMin >= 1440;
+}
+
+// Päivänäkymä on tietoisesti muuten koskematon (lista, täydet nimet/kellon-
+// ajat, ks. Kalenteri UI -speksi) — Henkselit on ainoa lisäys sinne, JA se on
+// tietoisesti VAIN bannereita, ei mitään taustavärikerrosta (päivänäkymässä
+// ei ole aikajanaa jota taustalla voisi kellonajallisesti rajata). Piirretään
+// listan YLÄPUOLELLE (kutsutaan ennen piirraKalenteriPaivaRyhma:aa).
+function piirraHenkselitBanneri(sisalto, henkselitLista, iso) {
+  henkselitLista
+    .filter(function(rivi) { return henkselitPaivaosuus(rivi, iso) !== null; })
+    .forEach(function(rivi) {
+      const banneri = document.createElement('div');
+      banneri.className = 'henkselit-banneri ' + henkselitVari(rivi.henkilo);
+      banneri.textContent = '🎗️ ' + henkiloNimi(rivi.henkilo) + ' henkselöity ' + muotoileHenkselitAikavali(rivi.alkaa, rivi.paattyy);
+      sisalto.appendChild(banneri);
+    });
+}
+
+// Laskee yhden tapahtuman palkin sijainnin annettuna päivänä (iso) — jaettu
+// kuukausi- ja viikkonäkymän kokopäivä/yön yli -rivin kesken, ks. Kalenteri
+// UI -speksi kohta "Yön yli / koko päivä -tapahtumat". Palauttaa
+// {left, right, reunaLuokka} — right on merkkijono ('0' tai undefined),
+// jättäen kutsujan päättää käyttääkö left+width vai left+right -paria.
+function computeEventBarLayout(tapahtuma, iso) {
+  if (onkoMonipaivainen(tapahtuma)) {
+    const loppuPvm = tapahtuma.event_end_date || tapahtuma.event_date;
+    if (iso === tapahtuma.event_date) {
+      const left = tapahtuma.event_time ? timeToPercent(tapahtuma.event_time) : 0;
+      return { left: left, right: 0, reunaLuokka: 'kalenteri-palkki--lahto' };
+    }
+    if (iso === loppuPvm) {
+      const oikeaReuna = tapahtuma.event_end_time ? (100 - timeToPercent(tapahtuma.event_end_time)) : 0;
+      return { left: 0, right: oikeaReuna, reunaLuokka: 'kalenteri-palkki--tulo' };
+    }
+    return { left: 0, right: 0, reunaLuokka: 'kalenteri-palkki--keski' };
+  }
+  if (!tapahtuma.event_time) {
+    return { left: 0, right: 0, reunaLuokka: '' };
+  }
+  const left = timeToPercent(tapahtuma.event_time);
+  const kestoMin = tapahtuma.event_end_time
+    ? Math.max(aikaMinuutteina(tapahtuma.event_end_time) - aikaMinuutteina(tapahtuma.event_time), 0)
+    : 0;
+  const width = Math.max(kestoMin / KALENTERI_AIKAJANA_PITUUS_MIN * 100, 10);
+  return { left: left, width: width, reunaLuokka: '' };
+}
+
+// Kuukausi/viikkonäkymän taustaväri JA huolilippumerkki (2026-08-05, ks.
+// Kalenteri UI -speksi "Päivän kuorma taustavärinä" ja "Merkit") — SAMA
+// Kuormavahti-kynnyslogiikka kuin opintoPaivanKuorma():ssa
+// (deriveDayLoadLevel, computeConcernWeightForDate), mutta laskettuna
+// KAIKILLE näkyville päiville kerralla YHDELLÄ huolikyselyllä sen sijaan
+// että joka päiväruutu tekisi oman DB-kyselynsä. tapahtumat = jo haettu
+// data (lataaKalenteri), ei uutta kalenteri_tapahtumat-kyselyä tarvita —
+// ajallisten määrä lasketaan paikallisesti. huoliIsot on erillinen
+// TARKKA (ei painotettu) joukko päivistä joilla on vähintään yksi
+// huolilippu-rivi — kuormataso saa nostaa itseään huolen painosta, mutta
+// itse 🟠-merkki on kyllä/ei sen mukaan onko juuri tälle päivälle lippu.
+async function computeVisibleDaySignals(tapahtumat, isoPaivat) {
+  const { data: huolet, error } = await db.from('paivan_huolet').select('pvm, vakavuus');
+  if (error) console.error('Huolilippujen haku kalenterin taustaväriä/merkkejä varten epäonnistui:', error);
+
+  const ajallistenMaaratPaivittain = new Map();
+  tapahtumat.forEach(function(t) {
+    if (!t.event_time) return;
+    ajallistenMaaratPaivittain.set(t.event_date, (ajallistenMaaratPaivittain.get(t.event_date) || 0) + 1);
+  });
+
+  const huoliIsot = new Set((huolet || []).map(function(h) { return h.pvm; }));
+  const kuormaTasot = new Map();
+  isoPaivat.forEach(function(iso) {
+    const huoliPaino = computeConcernWeightForDate(iso, huolet || []);
+    kuormaTasot.set(iso, deriveDayLoadLevel(ajallistenMaaratPaivittain.get(iso) || 0, huoliPaino));
+  });
+  return { kuormaTasot: kuormaTasot, huoliIsot: huoliIsot };
+}
+
+function dayLoadCssClass(taso) {
+  if (taso === 'raskas') return 'pv-kuorma-raskas';
+  if (taso === 'keski') return 'pv-kuorma-keski';
+  return '';
 }
 
 function viikonAlku(d) {
@@ -3558,6 +3992,8 @@ async function lataaKalenteri() {
       };
     });
 
+    const paivanHenkselit = await fetchVisibleHenkselit(tanaanIso, tanaanIso);
+
     // Kuormavahti + ristiriitamerkki: lasketaan ENNEN ankkurit/Hytti-rivien
     // lisäystä, koska ne eivät kuulu kalenterin kuormaan/ristiriitoihin
     // (molemmat suodattavat ne pois joka tapauksessa, mutta selkeämpi laskea
@@ -3567,7 +4003,8 @@ async function lataaKalenteri() {
       otsikko,
       rivit,
       tanaanIso,
-      haeAsetusNumero('paivan_menoraja', 5)
+      haeAsetusNumero('paivan_menoraja', 5),
+      paivanHenkselit
     );
 
     if (tanaanIso === paivamaaraISO(new Date())) {
@@ -3604,23 +4041,25 @@ async function lataaKalenteri() {
       }
     }
 
+    piirraHenkselitBanneri(sisalto, paivanHenkselit, tanaanIso);
     piirraKalenteriPaivaRyhma(sisalto, jarjestaAjanMukaan(rivit), null);
     return;
   }
 
   if (kalenteriTila === 'viikko') {
+    const viikonIsot = [];
     for (let i = 0; i < 7; i++) {
       const pvm = new Date(alku);
       pvm.setDate(pvm.getDate() + i);
-      const iso = paivamaaraISO(pvm);
-      const otsikkoTeksti = KALENTERI_PAIVAT[pvm.getDay()] + ' ' + pvm.getDate() + '.' + (pvm.getMonth() + 1) + '.';
-      const paivanTapahtumat = data.filter(function(t) { return tapahtumaKattaaPaivan(t, iso); });
-      piirraKalenteriPaivaRyhma(sisalto, paivanTapahtumat, otsikkoTeksti, haeAsetusNumero('paivan_menoraja', 5), iso);
+      viikonIsot.push(paivamaaraISO(pvm));
     }
+    const signaalit = await computeVisibleDaySignals(data, viikonIsot);
+    const viikonHenkselit = await fetchVisibleHenkselit(viikonIsot[0], viikonIsot[6]);
+    piirraViikkoAikajana(sisalto, data, alku, signaalit.kuormaTasot, viikonHenkselit);
     return;
   }
 
-  piirraKuukausiRuudukko(sisalto, data, kalenteriPvm.getMonth());
+  await piirraKuukausiRuudukko(sisalto, data, kalenteriPvm.getMonth());
 }
 
 // === KUUKAUSINÄKYMÄ: RUUDUKKO + MONIPÄIVÄISTEN TAPAHTUMIEN PALKIT ===
@@ -3656,119 +4095,172 @@ function laskeViikonLinjat(viikonTapahtumat) {
   return linjat;
 }
 
-// Piirtää yhden päiväruudun sisällön: päivänumero, monipäiväisten
-// tapahtumien palkkirivit (linjan mukaisessa järjestyksessä) ja sen jälkeen
-// yksipäiväiset tapahtumat pienenä tekstinä.
+// Enintään kolme päällekkäistä palkkia per päiväruutu (Kalenteri UI -speksi,
+// kiinteät top-arvot). Yhdistää viikkotason monipäiväisten "linjat" (jo
+// laskettu laskeViikonLinjat, jatkuvuus viikon yli) ja tämän päivän
+// yksipäiväiset (ajalliset + koko päivän) samaan pinoon: yksipäiväiset
+// saavat ensimmäisen vapaan linjan alkamisajan mukaisessa järjestyksessä,
+// oikeasti päällekkäisiä ajallisia tapahtumia varoen. Jos linjat loppuvat
+// kesken, ylimääräiset jätetään hiljaisesti piirtämättä — kuukausiruutu on
+// tilannekatsaus, ei täydellinen luettelo (koko sisältö näkyy päivänäkymässä).
+// Neljä linjaa (2026-08-05, Katrin korjaus "we are 4") — ohuemmat
+// palkit/tiiviimpi pitch (3px korkeus, 7px väli 12px:stä alkaen) jotta
+// neljäs linja mahtuu ilman että ruutu kasvaa kohtuuttomasti (ks.
+// .kalenteri-kuukausi-palkki/-palkit style.css:ssä, korkeus nostettu samassa
+// muutoksessa).
+const KUUKAUSI_MAX_LINJOJA = 4;
+const KUUKAUSI_LINJA_TOP_PX = [12, 19, 26, 33];
+
+function assignMonthDayLanes(paivanMonipaivaisetKattavat, paivanYksipaivaiset, viikonLinjat) {
+  const linjaVapaaAlkaen = new Array(KUUKAUSI_MAX_LINJOJA).fill(-Infinity);
+  const tulos = [];
+
+  paivanMonipaivaisetKattavat.forEach(function(t) {
+    const linja = viikonLinjat.get(t.id);
+    if (linja !== undefined && linja < KUUKAUSI_MAX_LINJOJA) {
+      linjaVapaaAlkaen[linja] = Infinity;
+      tulos.push({ tapahtuma: t, linja: linja });
+    }
+  });
+
+  paivanYksipaivaiset
+    .slice()
+    .sort(function(a, b) { return (a.event_time || '').localeCompare(b.event_time || ''); })
+    .forEach(function(t) {
+      const alku = t.event_time ? aikaMinuutteina(t.event_time) : -Infinity;
+      const loppu = t.event_time ? aikaMinuutteina(t.event_end_time || t.event_time) : Infinity;
+      const linja = linjaVapaaAlkaen.findIndex(function(vapaaAlkaen) { return vapaaAlkaen <= alku; });
+      if (linja === -1) return;
+      linjaVapaaAlkaen[linja] = loppu;
+      tulos.push({ tapahtuma: t, linja: linja });
+    });
+
+  return tulos;
+}
+
+// Piirtää yhden päiväruudun sisällön: päivänumero (vasen yläkulma), enintään
+// kaksi merkkiä (⚠️ ristiriita, 🟠 huolilippu, oikea yläkulma) ja
+// aikajanapalkit — EI tekstiä, EI tapahtumanimiä (Kalenteri UI -uudistus,
+// 2026-08-05, korvaa aiemman tekstipohjaisen ruudun kokonaan). Kuorma näkyy
+// pelkkänä solun taustavärinä (ks. dayLoadCssClass), ei enää omana pisteenä.
 // SUORITUSKYKYKORJAUS (2026-07-17, ks. muistiinpanot.md "Kuukausinäkymän
 // hitaus") — paivittainYksipaivaiset on esilaskettu Map (event_date -> rivit,
 // ks. piirraKuukausiRuudukko) ja monipaivaiset on jo valmiiksi suodatettu
 // pienempi joukko, joten tämä funktio ei enää tee YHTÄÄN O(n) .filter()-
 // läpikäyntiä koko kuukauden datasta per päiväruutu (aiemmin kolme).
-function piirraKuukausiPaiva(pvm, paivittainYksipaivaiset, monipaivaiset, linjat, linjojaViikolla, kuluvaKuukausi, kuormaraja) {
+function piirraKuukausiPaiva(pvm, paivittainYksipaivaiset, monipaivaiset, viikonLinjat, kuluvaKuukausi, kuormaTasot, huoliIsot, henkselitLista) {
   const iso = paivamaaraISO(pvm);
   const solu = document.createElement('div');
   solu.className = 'kalenteri-kuukausi-paiva';
   if (pvm.getMonth() !== kuluvaKuukausi) solu.classList.add('ulkopuolinen');
   if (iso === paivamaaraISO(new Date())) solu.classList.add('tanaan');
+  const kuormaLuokka = dayLoadCssClass(kuormaTasot.get(iso));
+  if (kuormaLuokka) solu.classList.add(kuormaLuokka);
 
   const paivanYksipaivaiset = paivittainYksipaivaiset.get(iso) || [];
   const paivanMonipaivaisetKattavat = monipaivaiset.filter(function(t) { return tapahtumaKattaaPaivan(t, iso); });
   const paivanKaikki = paivanYksipaivaiset.concat(paivanMonipaivaisetKattavat);
 
-  const pvmRivi = document.createElement('div');
-  pvmRivi.className = 'kalenteri-kuukausi-pvm-rivi';
+  // Henkselit-tausta (2026-08-05, ks. muistiinpanot.md "Henkselit") — oma
+  // visuaalinen kerros kuormavärin PÄÄLLÄ mutta päivänumeron/merkkien/
+  // palkkien ALLA (ks. .henkselit-tausta z-index style.css:ssä),
+  // pointer-events:none jotta koko solun napautus (alla) pysyy täysin
+  // käytettävissä sen läpi. Osittainen ikkuna EI saa omaa aikajanaa
+  // kuukausiruudussa (ei tunti-granulariteettia täällä toisin kuin viikossa)
+  // — merkitään sen sijaan himmeämpänä (--osittainen) koko päivän peittävän
+  // version sijaan, ks. henkselitKattaaKokoPaivan.
+  henkselitLista
+    .map(function(rivi) { return { rivi: rivi, osuus: henkselitPaivaosuus(rivi, iso) }; })
+    .filter(function(x) { return x.osuus !== null; })
+    .forEach(function(x) {
+      const tausta = document.createElement('div');
+      tausta.className = 'henkselit-tausta ' + henkselitVari(x.rivi.henkilo) + (henkselitKattaaKokoPaivan(x.osuus) ? '' : ' henkselit-tausta--osittainen');
+      tausta.title = henkiloNimi(x.rivi.henkilo) + ' henkselöity ' + muotoileHenkselitAikavali(x.rivi.alkaa, x.rivi.paattyy);
+      solu.appendChild(tausta);
+    });
 
   const pvmEl = document.createElement('span');
   pvmEl.className = 'kalenteri-kuukausi-pvm';
   pvmEl.textContent = pvm.getDate();
-  pvmRivi.appendChild(pvmEl);
+  solu.appendChild(pvmEl);
 
-  // Kuukausiruutu on liian pieni täydelle merkkipillerille (ks. Kuormavahti/
-  // ristiriitamerkki agenda- ja viikkonäkymässä) — sama kolmiportainen
-  // väriohjaus tiivistettynä pieneksi pisteeksi päivänumeron viereen.
-  // BUGIKORJAUS (2026-07-17, "OSA X kohta 2 ei toimi"): piste EI ollut
-  // napautettava — koko ruudun napautus vei vain päivänäkymään, ei koskaan
-  // avannut vahvistusta suoraan. Piste on nyt itse napautettava (isompi
-  // hit-alue ::before-pseudoelementillä, ks. style.css) ja pysäyttää
-  // tapahtuman (stopPropagation) ettei ruudun oma navigointi laukea samalla.
   // Vain päivät joilla on vähintään kaksi kellonaikaan sidottua tapahtumaa
   // voivat ylipäätään olla päällekkäin — vältetään O(k²)-parivertailu (ja
   // pelkkä funktiokutsu) turhaan yleisimmässä tapauksessa (0-1 ajallista
-  // tapahtumaa päivässä).
-  const paivanAjallisiaMaara = paivanKaikki.filter(function(t) { return t.event_time; }).length;
-  const paivanRistiriita = paivanAjallisiaMaara > 1 ? analysoiPaivanRistiriidat(paivanKaikki, iso) : { vakavuus: 'none', fullIds: [] };
-  if (paivanRistiriita.vakavuus === 'full') {
-    const kuitattu = onkoRistiriitaKuitattu(iso, paivanRistiriita.fullIds);
-    const piste = document.createElement('span');
-    piste.className = 'kalenteri-kuukausi-piste kalenteri-kuukausi-piste--napautettava ' + (kuitattu ? 'kalenteri-kuukausi-piste--keskustellaan' : 'kalenteri-kuukausi-piste--ristiriita');
-    piste.title = kuitattu ? 'Keskusteltu — napauta nähdäksesi kenen menot' : 'Päällekkäin — napauta nähdäksesi kenen menot';
-    piste.addEventListener('click', function(e) {
-      e.stopPropagation();
-      avaaRistiriitaVahvistus(iso, paivanKaikki, paivanRistiriita.fullIds);
-    });
-    pvmRivi.appendChild(piste);
-  } else if (paivanRistiriita.vakavuus === 'attention') {
-    const piste = document.createElement('span');
-    piste.className = 'kalenteri-kuukausi-piste kalenteri-kuukausi-piste--huomio';
-    piste.title = 'Kevyt päällekkäisyys';
-    pvmRivi.appendChild(piste);
-  } else if (laskeMenoja(paivanKaikki) >= kuormaraja) {
-    const piste = document.createElement('span');
-    piste.className = 'kalenteri-kuukausi-piste kalenteri-kuukausi-piste--kuorma';
-    piste.textContent = String(laskeMenoja(paivanKaikki));
-    piste.title = laskeMenoja(paivanKaikki) + ' menoa';
-    pvmRivi.appendChild(piste);
+  // tapahtumaa päivässä). Kuitattu ("keskusteltu") ristiriita ei enää saa
+  // omaa merkkiään täällä — tilannekatsaus näyttää vain vielä avoimet asiat,
+  // päivänäkymän oma otsikko (paivitaPaivanOtsikko, koskematon) näyttää
+  // kuittaustilan tarkemmin.
+  const paivanRistiriita = paivanRistiriitaTila(paivanKaikki, iso, henkselitLista);
+  const onRistiriita = paivanRistiriita.onRistiriita;
+  const onHuolilippu = huoliIsot.has(iso);
+
+  // Iso merkki (2026-08-05, ks. muistiinpanot.md "Henkselit" — kuukausi-
+  // näkymän tilavarausosio): kuukausiruudussa oli n. 2/3 tyhjää tekstitöntä
+  // tilaa, otetaan käyttöön kun päivällä on ristiriita TAI huolilippu —
+  // "erottuu heti nopealla vilkaisulla" sen sijaan että piilossa 8px/5px
+  // nurkkamerkkinä. Ristiriita voittaa jos molemmat (kiireellisempi) — silloin
+  // huolilippu jää pieneksi nurkkapisteeksi ristiriitamerkin viereen, EI
+  // omaa isoa merkkiä (kaksi isoa merkkiä samassa ruudussa olisi enemmän
+  // kohinaa kuin signaalia). Piirretään bareja/pvm-numeroa EDELTÄ DOM:ssa
+  // (matalampi z-index, ks. style.css) jotta ne pysyvät täysin luettavina
+  // ison merkin päällä — henkselit-taustan tavoin isokaan merkki ei saa
+  // hämärtää muuta sisältöä.
+  if (onRistiriita) {
+    const isoMerkki = document.createElement('span');
+    isoMerkki.className = 'kalenteri-kuukausi-iso-merkki';
+    isoMerkki.textContent = '⚠️';
+    solu.appendChild(isoMerkki);
+  } else if (onHuolilippu) {
+    const isoMerkki = document.createElement('span');
+    isoMerkki.className = 'kalenteri-kuukausi-iso-merkki kalenteri-kuukausi-iso-merkki--huoli';
+    isoMerkki.textContent = '🟠';
+    solu.appendChild(isoMerkki);
   }
 
-  solu.appendChild(pvmRivi);
+  if (onRistiriita || onHuolilippu) {
+    const merkit = document.createElement('div');
+    merkit.className = 'kalenteri-kuukausi-merkit';
+    if (onRistiriita) {
+      const varoitus = document.createElement('span');
+      varoitus.className = 'kalenteri-kuukausi-merkki-ristiriita';
+      varoitus.textContent = '⚠️';
+      varoitus.title = paivanRistiriita.fullIds.length > 0 ? 'Päällekkäin — napauta nähdäksesi kenen menot' : 'Molemmat vanhemmat henkselöity samaan aikaan — lapsi voi jäädä ilman valvontaa';
+      varoitus.addEventListener('click', function(e) {
+        e.stopPropagation();
+        if (paivanRistiriita.fullIds.length > 0) {
+          avaaRistiriitaVahvistus(iso, paivanKaikki, paivanRistiriita.fullIds);
+        } else {
+          naytaIlmoitus('Molemmat vanhemmat ovat henkselöity samaan aikaan tänä päivänä, eikä kaikkia valvontaa tarvitsevia lapsia ole katettu millään tapahtumalla.');
+        }
+      });
+      merkit.appendChild(varoitus);
+    }
+    if (onHuolilippu) {
+      const huoli = document.createElement('span');
+      huoli.className = 'kalenteri-kuukausi-merkki-huoli';
+      huoli.title = 'Huolilippu tälle päivälle';
+      merkit.appendChild(huoli);
+    }
+    solu.appendChild(merkit);
+  }
 
-  if (linjojaViikolla > 0) {
+  const linjoitetut = assignMonthDayLanes(paivanMonipaivaisetKattavat, paivanYksipaivaiset, viikonLinjat);
+  if (linjoitetut.length > 0) {
     const palkitEl = document.createElement('div');
     palkitEl.className = 'kalenteri-kuukausi-palkit';
-    for (let linja = 0; linja < linjojaViikolla; linja++) {
-      const tapahtuma = paivanMonipaivaisetKattavat.find(function(t) { return linjat.get(t.id) === linja; });
+    linjoitetut.forEach(function(kohde) {
+      const asettelu = computeEventBarLayout(kohde.tapahtuma, iso);
       const palkki = document.createElement('div');
-      if (tapahtuma) {
-        palkki.className = 'kalenteri-kuukausi-palkki';
-        palkki.style.backgroundColor = tapahtuma._vari || 'var(--accent)';
-        // Teksti näkyy vain palkin ensimmäisessä näkyvässä ruudussa —
-        // joko tapahtuman todellisena alkupäivänä tai viikon ensimmäisenä
-        // päivänä jos tapahtuma alkoi jo edellisellä viikolla.
-        if (iso === tapahtuma.event_date || pvm.getDay() === 1) {
-          palkki.textContent = tapahtuma.title;
-        }
-      } else {
-        palkki.className = 'kalenteri-kuukausi-palkki-tyhja';
-      }
+      palkki.className = 'kalenteri-kuukausi-palkki' + (asettelu.reunaLuokka ? ' ' + asettelu.reunaLuokka : '');
+      palkki.style.top = KUUKAUSI_LINJA_TOP_PX[kohde.linja] + 'px';
+      palkki.style.left = asettelu.left + '%';
+      if (asettelu.width !== undefined) palkki.style.width = asettelu.width + '%';
+      else palkki.style.right = asettelu.right + '%';
+      palkki.style.backgroundColor = resolveEventOwnerColor(kohde.tapahtuma);
       palkitEl.appendChild(palkki);
-    }
-    solu.appendChild(palkitEl);
-  }
-
-  // Hytti-scopen (oma opiskelu/työ) yksipäiväiset tapahtumat niputetaan yhdeksi
-  // kompaktiksi lukumerkinnäksi ("▫N") sen sijaan että jokainen luento veisi
-  // oman rivinsä — kuukausiruutu on liian pieni listaamaan koko lukujärjestystä,
-  // agenda/viikkonäkymä (piirraKalenteriRivi) näyttää ne silti yksitellen.
-  const yksipaivaiset = paivanYksipaivaiset.filter(function(t) { return t._scope !== 'hytti'; });
-  const hyttiYksipaivaiset = paivanYksipaivaiset.filter(function(t) { return t._scope === 'hytti'; });
-  if (yksipaivaiset.length > 0 || hyttiYksipaivaiset.length > 0) {
-    const listaEl = document.createElement('div');
-    listaEl.className = 'kalenteri-kuukausi-tapahtumat';
-    yksipaivaiset.forEach(function(t) {
-      const rivi = document.createElement('div');
-      rivi.className = 'kalenteri-kuukausi-tapahtuma';
-      if (t._vari) rivi.style.color = t._vari;
-      rivi.textContent = (t.event_time ? t.event_time.slice(0, 5) + ' ' : '') + t.title;
-      listaEl.appendChild(rivi);
     });
-    if (hyttiYksipaivaiset.length > 0) {
-      const hyttiRivi = document.createElement('div');
-      hyttiRivi.className = 'kalenteri-kuukausi-tapahtuma kalenteri-kuukausi-tapahtuma-hytti';
-      hyttiRivi.textContent = '▫' + hyttiYksipaivaiset.length;
-      hyttiRivi.title = hyttiYksipaivaiset.map(function(t) { return t.title; }).join(', ');
-      listaEl.appendChild(hyttiRivi);
-    }
-    solu.appendChild(listaEl);
+    solu.appendChild(palkitEl);
   }
 
   solu.addEventListener('click', function() {
@@ -3781,8 +4273,7 @@ function piirraKuukausiPaiva(pvm, paivittainYksipaivaiset, monipaivaiset, linjat
   return solu;
 }
 
-function piirraKuukausiRuudukko(sisalto, kaikkiTapahtumat, kuluvaKuukausi) {
-  const kuormaraja = haeAsetusNumero('paivan_menoraja', 5);
+async function piirraKuukausiRuudukko(sisalto, kaikkiTapahtumat, kuluvaKuukausi) {
   const ruudukko = document.createElement('div');
   ruudukko.className = 'kalenteri-kuukausi-ruudukko';
 
@@ -3819,6 +4310,15 @@ function piirraKuukausiRuudukko(sisalto, kaikkiTapahtumat, kuluvaKuukausi) {
   const ruudukonLoppu = viikonAlku(kuunViimeinen);
   ruudukonLoppu.setDate(ruudukonLoppu.getDate() + 6);
 
+  const ruudukonIsot = [];
+  let signaaliPvm = new Date(ruudukonAlku);
+  while (signaaliPvm <= ruudukonLoppu) {
+    ruudukonIsot.push(paivamaaraISO(signaaliPvm));
+    signaaliPvm.setDate(signaaliPvm.getDate() + 1);
+  }
+  const signaalit = await computeVisibleDaySignals(kaikkiTapahtumat, ruudukonIsot);
+  const henkselit = await fetchVisibleHenkselit(ruudukonIsot[0], ruudukonIsot[ruudukonIsot.length - 1]);
+
   let viikonPvm = new Date(ruudukonAlku);
   while (viikonPvm <= ruudukonLoppu) {
     const viikonPaivat = [];
@@ -3833,17 +4333,200 @@ function piirraKuukausiRuudukko(sisalto, kaikkiTapahtumat, kuluvaKuukausi) {
       return t.event_date <= viikonLoppuIso && (t.event_end_date || t.event_date) >= viikonAlkuIso;
     });
     const linjat = laskeViikonLinjat(viikonMonipaivaiset);
-    const linjojaViikolla = new Set(linjat.values()).size;
 
     const viikkorivi = document.createElement('div');
     viikkorivi.className = 'kalenteri-kuukausi-viikko';
     viikonPaivat.forEach(function(pvm) {
-      viikkorivi.appendChild(piirraKuukausiPaiva(pvm, yksipaivaisetPaivittain, monipaivaiset, linjat, linjojaViikolla, kuluvaKuukausi, kuormaraja));
+      viikkorivi.appendChild(piirraKuukausiPaiva(pvm, yksipaivaisetPaivittain, monipaivaiset, linjat, kuluvaKuukausi, signaalit.kuormaTasot, signaalit.huoliIsot, henkselit));
     });
     ruudukko.appendChild(viikkorivi);
   }
 
   sisalto.appendChild(ruudukko);
+}
+
+// === VIIKKONÄKYMÄN AIKAJANA (2026-08-05, Kalenteri UI -uudistus) ===
+// Korvaa vanhan listapohjaisen viikkonäkymän (7x piirraKalenteriPaivaRyhma,
+// sama rivipiirtäjä kuin päivänäkymässä) omalla aikajanarenderöijällään.
+// TIETOISESTI EI kutsu piirraKalenteriRivi():tä — päivänäkymä pysyy täysin
+// koskemattomana (ks. Kalenteri UI -speksi "Ei muuteta"), joten tämä on
+// oma, rinnakkainen piirtopolku eikä haaroitus jaetussa funktiossa.
+//
+// Rakenne per päiväsarake: yläosassa kapea "kokopäivä"-rivi (yön yli/koko
+// päivä -tapahtumat, sama reunalogiikka kuin kuukausinäkymän palkeissa,
+// ks. computeEventBarLayout), sen alla tuntiruudukko jossa ajalliset
+// tapahtumat asemoidaan absoluuttisesti top/height-prosentteina samalta
+// 07–23-akselilta (KALENTERI_AIKAJANA_*, ks. minutesToPercent).
+const VIIKKO_KOKOPAIVA_MAX_LINJOJA = 2;
+const VIIKKO_KOKOPAIVA_LINJA_TOP_PX = [0, 8];
+// Pidä samassa kuin style.css:n .kalenteri-viikko-tuntialue { height } —
+// tarvitaan tässä koska palkin korkeus px:nä ratkaisee näytetäänkö nimi
+// (ks. VIIKKO_BADGE_NIMI_RAJA_PX, "≥28px" Kalenteri UI -speksissä).
+const VIIKKO_TUNTIALUE_KORKEUS_PX = 400;
+const VIIKKO_BADGE_NIMI_RAJA_PX = 28;
+
+function piirraViikkoKokopaivaRivi(paivanKaikki, iso) {
+  const rivi = document.createElement('div');
+  rivi.className = 'kalenteri-viikko-kokopaiva';
+  paivanKaikki
+    .filter(function(t) { return onkoMonipaivainen(t) || !t.event_time; })
+    .slice(0, VIIKKO_KOKOPAIVA_MAX_LINJOJA)
+    .forEach(function(t, i) {
+      const asettelu = computeEventBarLayout(t, iso);
+      const palkki = document.createElement('div');
+      palkki.className = 'kalenteri-viikko-kokopaiva-palkki' + (asettelu.reunaLuokka ? ' ' + asettelu.reunaLuokka : '');
+      palkki.style.top = VIIKKO_KOKOPAIVA_LINJA_TOP_PX[i] + 'px';
+      palkki.style.left = asettelu.left + '%';
+      if (asettelu.width !== undefined) palkki.style.width = asettelu.width + '%';
+      else palkki.style.right = asettelu.right + '%';
+      palkki.style.backgroundColor = resolveEventOwnerColor(t);
+      rivi.appendChild(palkki);
+    });
+  return rivi;
+}
+
+// Ryhmittää päivän ajalliset tapahtumat ketjutetusti päällekkäisiin
+// klustereihin (samaan tapaan kuin laskeViikonLinjat, mutta kellonajan
+// eikä päivämäärän mukaan) ja jakaa klusterin oman aika-alueen tasan sen
+// tapahtumien kesken — "korkeussuunnassa alekkain, 50%/50% korkeudesta"
+// kahden päällekkäisen tapauksessa (Kalenteri UI -speksi), yleistettynä
+// N:lle tapahtumalle.
+function assignWeekOverlapSlots(paivanAjalliset) {
+  const klusterit = [];
+  paivanAjalliset
+    .slice()
+    .sort(function(a, b) { return aikaMinuutteina(a.event_time) - aikaMinuutteina(b.event_time); })
+    .forEach(function(t) {
+      const alku = aikaMinuutteina(t.event_time);
+      const loppu = t.event_end_time ? aikaMinuutteina(t.event_end_time) : alku + 30;
+      const viimeinen = klusterit[klusterit.length - 1];
+      if (viimeinen && alku < viimeinen.klusterinLoppu) {
+        viimeinen.tapahtumat.push(t);
+        viimeinen.klusterinLoppu = Math.max(viimeinen.klusterinLoppu, loppu);
+      } else {
+        klusterit.push({ klusterinLoppu: loppu, tapahtumat: [t] });
+      }
+    });
+
+  const tulos = [];
+  klusterit.forEach(function(k) {
+    const n = k.tapahtumat.length;
+    const alkuMinimit = k.tapahtumat.map(function(t) { return aikaMinuutteina(t.event_time); });
+    const loppuMinimit = k.tapahtumat.map(function(t) { return t.event_end_time ? aikaMinuutteina(t.event_end_time) : aikaMinuutteina(t.event_time) + 30; });
+    const topPct = minutesToPercent(Math.min.apply(null, alkuMinimit));
+    const loppuPct = minutesToPercent(Math.max.apply(null, loppuMinimit));
+    const korkeusPct = Math.max(loppuPct - topPct, 0);
+    k.tapahtumat.forEach(function(t, i) {
+      tulos.push({ tapahtuma: t, topPct: topPct + (i / n) * korkeusPct, heightPct: korkeusPct / n });
+    });
+  });
+  return tulos;
+}
+
+// Henkselit-tausta viikon tuntialueella (2026-08-05, ks. muistiinpanot.md
+// "Henkselit") — TÄYSIN samat top%/height%-koordinaatit kuin tapahtuma-
+// palkeilla (minutesToPercent, sama 07-23-akseli), leikattu automaattisesti
+// akselin päihin (ks. henkselitPaivaosuus). Lisätty ENNEN tapahtumapalkkeja
+// DOM:ssa (ks. style.css:n .henkselit-tausta z-index) jotta palkit pysyvät
+// täysin luettavina taustan päällä — "ei peitä eikä hämärrä alla olevia
+// tapahtumia näkyvyydeltään" (speksi).
+function piirraViikkoHenkselitTausta(henkselitLista, iso) {
+  return henkselitLista
+    .map(function(rivi) { return { rivi: rivi, osuus: henkselitPaivaosuus(rivi, iso) }; })
+    .filter(function(x) { return x.osuus !== null; })
+    .map(function(x) {
+      const tausta = document.createElement('div');
+      tausta.className = 'henkselit-tausta ' + henkselitVari(x.rivi.henkilo) + (henkselitKattaaKokoPaivan(x.osuus) ? '' : ' henkselit-tausta--osittainen');
+      tausta.style.top = minutesToPercent(x.osuus.alkuMin) + '%';
+      tausta.style.height = Math.max(minutesToPercent(x.osuus.loppuMin) - minutesToPercent(x.osuus.alkuMin), 0) + '%';
+      tausta.style.left = '0';
+      tausta.style.right = '0';
+      tausta.title = henkiloNimi(x.rivi.henkilo) + ' henkselöity ' + muotoileHenkselitAikavali(x.rivi.alkaa, x.rivi.paattyy);
+      return tausta;
+    });
+}
+
+function piirraViikkoTuntialue(paivanAjalliset, henkselitLista, iso) {
+  const alue = document.createElement('div');
+  alue.className = 'kalenteri-viikko-tuntialue';
+  piirraViikkoHenkselitTausta(henkselitLista, iso).forEach(function(tausta) { alue.appendChild(tausta); });
+  assignWeekOverlapSlots(paivanAjalliset).forEach(function(kohde) {
+    const t = kohde.tapahtuma;
+    const palkki = document.createElement('div');
+    palkki.className = 'kalenteri-viikko-palkki';
+    palkki.style.top = kohde.topPct + '%';
+    palkki.style.height = kohde.heightPct + '%';
+    const vari = resolveEventOwnerColor(t);
+    palkki.style.borderLeftColor = vari;
+    palkki.style.backgroundColor = vari + '26'; // ~15% peittävyys (hex-alpha)
+
+    const merkki = document.createElement('span');
+    merkki.className = 'kalenteri-viikko-merkki';
+    merkki.style.backgroundColor = vari;
+    merkki.textContent = resolveEventOwnerLetter(t);
+    palkki.appendChild(merkki);
+
+    const korkeusPx = kohde.heightPct / 100 * VIIKKO_TUNTIALUE_KORKEUS_PX;
+    if (korkeusPx >= VIIKKO_BADGE_NIMI_RAJA_PX) {
+      const nimi = document.createElement('span');
+      nimi.className = 'kalenteri-viikko-nimi';
+      nimi.textContent = t.title;
+      palkki.appendChild(nimi);
+    } else {
+      palkki.title = (t.event_time ? t.event_time.slice(0, 5) + ' ' : '') + t.title;
+    }
+
+    alue.appendChild(palkki);
+  });
+  return alue;
+}
+
+function piirraViikkoAikajana(sisalto, data, viikonAlkuPvm, kuormaTasot, henkselitLista) {
+  const aikajana = document.createElement('div');
+  aikajana.className = 'kalenteri-viikko-aikajana';
+
+  const tuntiGutter = document.createElement('div');
+  tuntiGutter.className = 'kalenteri-viikko-tuntigutter';
+  [8, 12, 16, 20].forEach(function(h) {
+    const label = document.createElement('span');
+    label.className = 'kalenteri-viikko-tuntileima';
+    label.style.top = minutesToPercent(h * 60) + '%';
+    label.textContent = h;
+    tuntiGutter.appendChild(label);
+  });
+  aikajana.appendChild(tuntiGutter);
+
+  for (let i = 0; i < 7; i++) {
+    const pvm = new Date(viikonAlkuPvm);
+    pvm.setDate(pvm.getDate() + i);
+    const iso = paivamaaraISO(pvm);
+    const paivanKaikki = data.filter(function(t) { return tapahtumaKattaaPaivan(t, iso); });
+    const paivanAjalliset = paivanKaikki.filter(function(t) { return t.event_time && !onkoMonipaivainen(t); });
+
+    const sarake = document.createElement('div');
+    sarake.className = 'kalenteri-viikko-paiva';
+    const kuormaLuokka = dayLoadCssClass(kuormaTasot.get(iso));
+    if (kuormaLuokka) sarake.classList.add(kuormaLuokka);
+    if (iso === paivamaaraISO(new Date())) sarake.classList.add('tanaan');
+
+    const otsikko = document.createElement('div');
+    otsikko.className = 'kalenteri-viikko-paiva-otsikko';
+    otsikko.textContent = VIIKONPAIVA_LYHENTEET[(pvm.getDay() + 6) % 7] + ' ' + pvm.getDate() + '.' + (pvm.getMonth() + 1) + '.';
+    otsikko.addEventListener('click', function() {
+      kalenteriPvm = new Date(pvm);
+      kalenteriTila = 'paiva';
+      document.querySelectorAll('.kalenteri-tila-btn').forEach(function(b) { b.classList.toggle('active', b.dataset.tila === 'paiva'); });
+      lataaKalenteri();
+    });
+    sarake.appendChild(otsikko);
+
+    sarake.appendChild(piirraViikkoKokopaivaRivi(paivanKaikki, iso));
+    sarake.appendChild(piirraViikkoTuntialue(paivanAjalliset, henkselitLista, iso));
+
+    aikajana.appendChild(sarake);
+  }
+
+  sisalto.appendChild(aikajana);
 }
 
 // === KALENTERIN KUITTAUSJONO ===
@@ -4006,10 +4689,11 @@ async function paivitaRistiriitaPallura() {
     (rivitPaivittain[t.event_date] = rivitPaivittain[t.event_date] || []).push(rivi);
   });
   await paivitaRistiriitaKuittaukset();
+  const henkselit = await fetchVisibleHenkselit(tanaan, paivamaaraISO(loppu));
   let maara = 0;
   Object.keys(rivitPaivittain).forEach(function(pvm) {
-    const analyysi = analysoiPaivanRistiriidat(rivitPaivittain[pvm], pvm);
-    if (analyysi.vakavuus === 'full' && !onkoRistiriitaKuitattu(pvm, analyysi.fullIds)) maara++;
+    const tila = paivanRistiriitaTila(rivitPaivittain[pvm], pvm, henkselit);
+    if (tila.onRistiriita) maara++;
   });
   ristiriitaPalluraMaara = maara;
   paivitaKalenteriBadge();
@@ -4854,6 +5538,12 @@ async function lataaAnkkurit() {
   }
 
   cachedAnkkurit = data || [];
+  // Henkselit-esto (2026-08-05, ks. muistiinpanot.md "Henkselit") — VAIN
+  // Hytin omat ankkurit piiloon oman henkselöinnin ajaksi, ei koko listaa
+  // (esim. Laiturin/kalenterin ankkurit näkyvät edelleen normaalisti).
+  if (omaHenkilo && henkselitEstaaHytin(omaHenkilo) && await onkoOmaHenkselitAktiivinenNyt()) {
+    cachedAnkkurit = cachedAnkkurit.filter(function(a) { return a.source !== 'hytti'; });
+  }
   await paivitaMuistutuksetKartta();
   // Näkyvien ankkureiden määrä on nyt asetus (Asetukset → ⚓ Ankkurit,
   // ankkurit-nayta-maara-input), oletus 3 kuten ennen — 0 on sallittu
@@ -5574,6 +6264,8 @@ function avaaOsio(osio) {
   } else if (osio.route === 'asetukset') {
     showAsetuksetView();
     lataaLapset();
+    nollaaHenkselitLomake();
+    lataaHenkselit();
     paivitaTiliTiedot();
     paivitaPushTila();
     paivitaSovellusTiedot();
@@ -5581,6 +6273,7 @@ function avaaOsio(osio) {
     loadAiLog();
     markAiLogSeen();
     paivitaAsetukset().then(function() {
+      if (omaHenkilo) document.getElementById('henkselit-esta-hytti-toggle').checked = henkselitEstaaHytin(omaHenkilo);
       document.getElementById('kuormaraja-input').value = haeAsetusNumero('paivan_menoraja', 5);
       document.getElementById('ankkurit-nayta-maara-input').value = haeAsetusNumero('ankkurit_nayta_maara', 3);
       document.getElementById('huoli-keski-kynnys-input').value = haeAsetusNumero('huoli_keski_kynnys', 10);
@@ -6169,6 +6862,7 @@ async function lataaLaituri(hakusana) {
     piirraJatkorivit(rivi, li, nakyvatJatkorivit);
     piirraKauppaEhdotusKortti(rivi, li);
     piirraHetkiSiltaKortti(rivi, li);
+    piirraHoitoJasennysKortti(rivi, li);
   });
 
   paivitaLaituriArkisto();
@@ -7132,6 +7826,257 @@ function jasennaAlyJSON(teksti) {
   }
 }
 
+// === LAITURI-JÄSENNYS (2026-08-05, ks. muistiinpanot.md "Laituri-jäsennys") ===
+// Vapaan Laituri-tekstin äly-jäsennys hoito/kuljetus/yöpyminen/päiväpoikkeus
+// -merkinnäksi Ristiriitapaketti v2:n tauluihin (kalenteri_tapahtumat.
+// kattaa_lapset / lapsi_paivapoikkeus). SAMA /api/aly-putki kuin
+// siltatunnistuksella (rakennaSiltaPrompti/etsiSiltoja yllä) — EI uutta
+// endpointtia. "Äly ehdottaa, ihminen kuittaa": TUNNISTUS on paikallinen,
+// halpa, ei-älyllinen heuristiikka joka VAIN näyttää kortin — itse
+// älykutsu laukeaa vasta käyttäjän omasta "Tarkista"-napista, sama
+// tietoinen "manuaalinen liipaisin" -periaate kuin ✨ Kysy ehdotus /
+// 🌉 Etsi sillat. Ei koskaan automaattista tallennusta — kaikki kentät
+// esitäytettyjä mutta muokattavissa dialogissa ennen Tallenna-nappia.
+
+// Kevyt paikallinen tunnistus: löytyykö tekstistä JOKIN tunnettu lapsen
+// nimi JA jokin päivä-/aikaviite. Ei älyä eikä väärä positiivinen maksa
+// mitään (kortin voi aina ohittaa "Ei liity" -napilla) — tarkoitettu VAIN
+// päättämään kannattaako kortti näyttää, ei jäsentämään mitään itse.
+const HOITO_PAIVASANAT = ['tänään', 'huomenna', 'ylihuomenna', 'maanantai', 'tiistai', 'keskiviikko', 'torstai', 'perjantai', 'lauantai', 'sunnuntai', 'ma', 'ti', 'ke', 'to', 'pe', 'la', 'su'];
+function naytaakoHoitomerkinnalta(teksti) {
+  if (!teksti || cachedLapset.length === 0) return false;
+  const pieni = teksti.toLowerCase();
+  const loytyyLapsi = cachedLapset.some(function(lapsi) { return pieni.indexOf(lapsi.nimi.toLowerCase()) !== -1; });
+  if (!loytyyLapsi) return false;
+  return HOITO_PAIVASANAT.some(function(sana) { return pieni.indexOf(sana) !== -1; }) || /\d{1,2}\.\d{1,2}\.?/.test(pieni);
+}
+
+// Ohitetut murut (2026-08-05) muistetaan localStorageen — ilman tätä "Ei
+// liity" -napin painallus unohtuisi seuraavalla Laituri-latauksella ja
+// kortti tulisi takaisin joka kerta kunnes muru arkistoidaan/sijoitetaan.
+// Ei uutta DB-saraketta tälle — kevyt, laitekohtainen riittää (sama
+// perustelu kuin HYTTI_KALENTERISSA_KEY:llä).
+const LAITURI_HOITO_OHITETUT_KEY = 'kauppalista_laituri_hoito_ohitetut';
+function haeHoitoOhitetut() {
+  try {
+    return new Set(JSON.parse(localStorage.getItem(LAITURI_HOITO_OHITETUT_KEY) || '[]'));
+  } catch (e) {
+    return new Set();
+  }
+}
+function merkitseHoitoOhitetuksi(muruId) {
+  const ohitetut = haeHoitoOhitetut();
+  ohitetut.add(muruId);
+  localStorage.setItem(LAITURI_HOITO_OHITETUT_KEY, JSON.stringify(Array.from(ohitetut)));
+}
+
+// Sama insertAdjacentElement('afterend', ...) -kaava kuin piirraKauppaEhdotusKortti/
+// piirraHetkiSiltaKortti — kortti murun OMAN rivin JÄLKEEN sisaruksena.
+function piirraHoitoJasennysKortti(rivi, li) {
+  if (!naytaakoHoitomerkinnalta(rivi.content) || haeHoitoOhitetut().has(rivi.id)) return;
+
+  const kortti = document.createElement('li');
+  kortti.className = 'laituri-ehdotus-rivi';
+
+  const teksti = document.createElement('span');
+  teksti.textContent = 'Näyttää hoito-/kuljetusmerkinnältä';
+  kortti.appendChild(teksti);
+
+  const napit = document.createElement('span');
+  napit.className = 'laituri-ehdotus-napit';
+
+  const tarkistaNappi = document.createElement('button');
+  tarkistaNappi.className = 'dialog-btn dialog-btn-cancel';
+  tarkistaNappi.textContent = 'Tarkista';
+  tarkistaNappi.addEventListener('click', function() { pyydaHoitoJasennys(rivi, tarkistaNappi); });
+  napit.appendChild(tarkistaNappi);
+
+  const eiNappi = document.createElement('button');
+  eiNappi.className = 'dialog-btn dialog-btn-cancel';
+  eiNappi.textContent = 'Ei liity';
+  eiNappi.addEventListener('click', function() {
+    merkitseHoitoOhitetuksi(rivi.id);
+    kortti.remove();
+  });
+  napit.appendChild(eiNappi);
+
+  kortti.appendChild(napit);
+  li.insertAdjacentElement('afterend', kortti);
+}
+
+function rakennaHoitoJasennysPrompti(teksti) {
+  const tanaan = new Date();
+  const tanaanIso = paivamaaraISO(tanaan);
+  const viikonpaiva = KALENTERI_PAIVAT[tanaan.getDay()];
+  const lapsiNimet = cachedLapset.map(function(l) { return l.nimi; }).join(', ') || '(ei lapsiprofiileja)';
+  return 'Tehtäväsi on jäsentää suomenkielinen vapaamuotoinen muistiinpano perheen kalenteria varten.\n' +
+    'Tänään on ' + viikonpaiva + ' ' + tanaanIso + '.\n' +
+    'Perheen lapset: ' + lapsiNimet + '.\n\n' +
+    'Muistiinpano: "' + teksti + '"\n\n' +
+    'Palauta VAIN JSON tässä muodossa, ei muuta tekstiä:\n' +
+    '{\n' +
+    '  "type": "event" tai "paivapoikkeus" tai "unclear",\n' +
+    '  "title": "lyhyt suomenkielinen otsikko",\n' +
+    '  "date": "VVVV-KK-PP",\n' +
+    '  "end_date": "VVVV-KK-PP tai null (vain jos yöpyminen/monipäiväinen)",\n' +
+    '  "start_time": "TT:MM tai null",\n' +
+    '  "end_time": "TT:MM tai null",\n' +
+    '  "children": ["nimi", ...] (vain yllä listatuista lapsista, tarkka kirjoitusasu),\n' +
+    '  "event_kind": "hoito" tai "kuljetus" tai "yöpyminen" tai null,\n' +
+    '  "paivapoikkeus_kind": "kotona" tai "poissa" tai "mukautettu" tai null\n' +
+    '}\n' +
+    'Päättele suhteelliset päivämäärät ("huomenna", "ke") tämän päivän mukaan. ' +
+    'Jos et pysty päättelemään päivää lainkaan, käytä tämänpäiväistä päivämäärää ja aseta "type" arvoon "unclear".';
+}
+
+async function pyydaHoitoJasennys(rivi, nappi) {
+  const alkuperainenTeksti = nappi.textContent;
+  nappi.disabled = true;
+  nappi.textContent = 'Tarkistetaan...';
+
+  const prompti = rakennaHoitoJasennysPrompti(rivi.content);
+  let tulos = null;
+  let virhe = null;
+  try {
+    const { data: sessioData } = await db.auth.getSession();
+    const token = sessioData.session ? sessioData.session.access_token : null;
+    const vastaus = await fetch('/api/aly', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
+      body: JSON.stringify({ prompt: prompti, max_tokens: 500 }),
+    });
+    tulos = await vastaus.json();
+    if (!vastaus.ok) virhe = tulos.error || 'Äly ei osannut tätä, kokeile myöhemmin';
+  } catch (e) {
+    virhe = 'Äly ei osannut tätä, kokeile myöhemmin';
+  }
+
+  nappi.disabled = false;
+  nappi.textContent = alkuperainenTeksti;
+  if (virhe) {
+    naytaIlmoitus('Jäsennys epäonnistui: ' + virhe);
+    return;
+  }
+
+  const jasennetty = jasennaAlyJSON(tulos.text);
+  if (!jasennetty || !jasennetty.date) {
+    naytaIlmoitus('Äly ei osannut tulkita tätä muistiinpanoa.');
+    return;
+  }
+
+  avaaHoitoJasennysDialogi(rivi, jasennetty);
+}
+
+function paivitaHoitoJasennysKentat() {
+  const onEvent = document.getElementById('hoito-jasennys-paatyyppi').value === 'event';
+  document.getElementById('hoito-jasennys-event-kentat').style.display = onEvent ? 'block' : 'none';
+  document.getElementById('hoito-jasennys-poikkeus-kentat').style.display = onEvent ? 'none' : 'block';
+}
+document.getElementById('hoito-jasennys-paatyyppi').addEventListener('change', paivitaHoitoJasennysKentat);
+
+// Esitäyttää dialogin äly-jäsennyksen tuloksella — KAIKKI kentät jäävät
+// muokattavaksi, mukaan lukien lapsivalinnat (nimi-täsmäytys on karkea
+// pieni kirjain -vertailu, ei tarkoitettu 100% luotettavaksi, ks.
+// naytaakoHoitomerkinnalta-kommentti samasta periaatteesta).
+function avaaHoitoJasennysDialogi(rivi, jasennetty) {
+  document.getElementById('hoito-jasennys-alkuperainen').textContent = '"' + rivi.content + '"';
+
+  const paatyyppi = jasennetty.type === 'paivapoikkeus' ? 'paivapoikkeus' : 'event';
+  document.getElementById('hoito-jasennys-paatyyppi').value = paatyyppi;
+  paivitaHoitoJasennysKentat();
+
+  const tanaanIso = paivamaaraISO(new Date());
+  document.getElementById('hoito-jasennys-otsikko').value = jasennetty.title || rivi.content.slice(0, 60);
+  document.getElementById('hoito-jasennys-event-laji').value = ['hoito', 'kuljetus', 'yöpyminen'].indexOf(jasennetty.event_kind) !== -1 ? jasennetty.event_kind : 'hoito';
+  document.getElementById('hoito-jasennys-pvm').value = jasennetty.date || tanaanIso;
+  document.getElementById('hoito-jasennys-loppupvm').value = jasennetty.end_date || '';
+  document.getElementById('hoito-jasennys-alku').value = jasennetty.start_time || '';
+  document.getElementById('hoito-jasennys-loppu').value = jasennetty.end_time || '';
+
+  document.getElementById('hoito-jasennys-poikkeus-pvm').value = jasennetty.date || tanaanIso;
+  document.getElementById('hoito-jasennys-poikkeus-tyyppi').value = ['kotona', 'poissa', 'mukautettu'].indexOf(jasennetty.paivapoikkeus_kind) !== -1 ? jasennetty.paivapoikkeus_kind : 'kotona';
+  document.getElementById('hoito-jasennys-poikkeus-alku').value = jasennetty.start_time || '';
+  document.getElementById('hoito-jasennys-poikkeus-loppu').value = jasennetty.end_time || '';
+
+  const lista = document.getElementById('hoito-jasennys-lapset-lista');
+  lista.innerHTML = '';
+  document.getElementById('hoito-jasennys-lapset-tyhja').style.display = cachedLapset.length === 0 ? 'block' : 'none';
+  const tunnistetutNimet = new Set((jasennetty.children || []).map(function(n) { return String(n).toLowerCase(); }));
+  cachedLapset.forEach(function(lapsi) {
+    const li = document.createElement('li');
+    const label = document.createElement('label');
+    label.style.display = 'flex';
+    label.style.alignItems = 'center';
+    label.style.gap = '8px';
+    label.style.width = '100%';
+    const checkbox = document.createElement('input');
+    checkbox.type = 'checkbox';
+    checkbox.checked = tunnistetutNimet.has(lapsi.nimi.toLowerCase());
+    checkbox.dataset.lapsiId = lapsi.id;
+    label.appendChild(checkbox);
+    const teksti = document.createElement('span');
+    teksti.textContent = lapsi.nimi;
+    label.appendChild(teksti);
+    li.appendChild(label);
+    lista.appendChild(li);
+  });
+
+  document.getElementById('hoito-jasennys-tallenna-btn').onclick = function() { tallennaHoitoJasennys(rivi); };
+  document.getElementById('hoito-jasennys-overlay').style.display = 'flex';
+}
+
+document.getElementById('hoito-jasennys-sulje').addEventListener('click', function() {
+  document.getElementById('hoito-jasennys-overlay').style.display = 'none';
+});
+
+// Tallennus haarautuu kahteen TÄYSIN ERI tauluun valitun päätyypin mukaan —
+// ks. Laituri-jäsennys-speksi ja tutkimusmuistio: hoito/kuljetus/yöpyminen
+// ovat kalenteri_tapahtumat-rivejä (kattaa_lapset kertoo ketkä katettu),
+// päiväpoikkeus on YKSI lapsi_paivapoikkeus-rivi PER valittu lapsi (upsert
+// (lapsi_id,paiva)-uniikin päälle, sama malli kuin avaaLapsi-näkymän oma
+// tallennus). Merkitsee murun ohitetuksi VASTA onnistuneen kirjoituksen
+// jälkeen ("vahvistus seuraa todellisuutta").
+async function tallennaHoitoJasennys(rivi) {
+  const valitutLapsetIdt = Array.from(document.getElementById('hoito-jasennys-lapset-lista').querySelectorAll('input[type="checkbox"]:checked')).map(function(cb) { return Number(cb.dataset.lapsiId); });
+  const paatyyppi = document.getElementById('hoito-jasennys-paatyyppi').value;
+
+  if (paatyyppi === 'event') {
+    const pvm = document.getElementById('hoito-jasennys-pvm').value;
+    if (!pvm) { naytaIlmoitus('Anna päivä.'); return; }
+    const otsikko = document.getElementById('hoito-jasennys-otsikko').value.trim() || rivi.content.slice(0, 60);
+    const { error } = await db.from('kalenteri_tapahtumat').insert({
+      title: otsikko,
+      event_date: pvm,
+      event_end_date: document.getElementById('hoito-jasennys-loppupvm').value || null,
+      event_time: document.getElementById('hoito-jasennys-alku').value || null,
+      event_end_time: document.getElementById('hoito-jasennys-loppu').value || null,
+      user_id: currentUserId,
+      kattaa_lapset: valitutLapsetIdt.length ? valitutLapsetIdt : null,
+    });
+    if (ilmoitaKirjoitusvirheesta(error, 'Kalenterimerkinnän tallennus')) return;
+  } else {
+    const pvm = document.getElementById('hoito-jasennys-poikkeus-pvm').value;
+    if (!pvm) { naytaIlmoitus('Anna päivä.'); return; }
+    if (valitutLapsetIdt.length === 0) { naytaIlmoitus('Valitse vähintään yksi lapsi.'); return; }
+    const tyyppi = document.getElementById('hoito-jasennys-poikkeus-tyyppi').value;
+    const rivit = valitutLapsetIdt.map(function(lapsiId) {
+      const poikkeusRivi = { lapsi_id: lapsiId, paiva: pvm, tyyppi: tyyppi, huomio: null, alkaa: null, paattyy: null };
+      if (tyyppi === 'mukautettu') {
+        poikkeusRivi.alkaa = document.getElementById('hoito-jasennys-poikkeus-alku').value || null;
+        poikkeusRivi.paattyy = document.getElementById('hoito-jasennys-poikkeus-loppu').value || null;
+      }
+      return poikkeusRivi;
+    });
+    const { error } = await db.from('lapsi_paivapoikkeus').upsert(rivit, { onConflict: 'lapsi_id,paiva' });
+    if (ilmoitaKirjoitusvirheesta(error, 'Päiväpoikkeuksen tallennus')) return;
+  }
+
+  merkitseHoitoOhitetuksi(rivi.id);
+  document.getElementById('hoito-jasennys-overlay').style.display = 'none';
+  naytaIlmoitus('Tallennettu kalenteriin.');
+  lataaLaituri(document.getElementById('laituri-search').value.trim());
+}
+
 // Laituri-avustaja (2026-07-12) — ensimmäinen oikea älyominaisuus äly-putken
 // päälle (ks. COPILOT.md "Äly-putki" -osio, "tapa A": sama /api/aly, uusi
 // prompti). ÄLY EHDOTTAA, IHMINEN KUITTAA: kysyy äly-putkelta ehdotuksen
@@ -7337,6 +8282,11 @@ async function deleteList(list, refreshView) {
 function siirryKirjautumisenJalkeen() {
   showHomeView();
   paivitaHenkiloKartta();
+  // Ladattu tässä (eikä vain lataaKalenteri():ssä kuten ennen Laituri-
+  // jäsennystä) koska naytaakoHoitomerkinnalta() (Laituri-jäsennys, ks.
+  // muistiinpanot.md) tarvitsee cachedLapset:in jo silloin jos käyttäjä
+  // avaa Laiturin ennen Kalenteria koskaan käymättä.
+  paivitaLapsidata();
   lataaKotinakyma();
 }
 

@@ -507,6 +507,90 @@
     </div>
   </div>
 
+  <!-- Laituri-jäsennys (2026-08-05, ks. muistiinpanot.md "Laituri-jäsennys")
+       — vapaan Laituri-tekstin äly-jäsennys hoito/kuljetus/yöpyminen/
+       päiväpoikkeus-merkinnäksi. SAMA /api/aly-putki ja "äly ehdottaa,
+       ihminen kuittaa" -periaate kuin siltatunnistuksella (#silta-ehdotus-
+       overlay yllä) — EI automaattista tallennusta, kaikki kentät
+       muokattavissa ennen Tallenna-nappia. -->
+  <div class="dialog-overlay" id="hoito-jasennys-overlay" style="display:none">
+    <div class="dialog-box">
+      <p class="dialog-title">Tarkista hoitomerkintä</p>
+      <p class="section-empty" id="hoito-jasennys-alkuperainen" style="display:block"></p>
+
+      <div class="settings-row">
+        <span>Merkinnän tyyppi</span>
+        <select id="hoito-jasennys-paatyyppi">
+          <option value="event">Kalenterimerkintä (hoito/kuljetus/yöpyminen)</option>
+          <option value="paivapoikkeus">Päiväpoikkeus (esim. kotona tänään)</option>
+        </select>
+      </div>
+
+      <div id="hoito-jasennys-event-kentat">
+        <div class="settings-row">
+          <span>Otsikko</span>
+          <input type="text" id="hoito-jasennys-otsikko">
+        </div>
+        <div class="settings-row">
+          <span>Laji</span>
+          <select id="hoito-jasennys-event-laji">
+            <option value="hoito">Hoito</option>
+            <option value="kuljetus">Kuljetus</option>
+            <option value="yöpyminen">Yöpyminen</option>
+          </select>
+        </div>
+        <div class="settings-row">
+          <span>Päivä</span>
+          <input type="date" id="hoito-jasennys-pvm">
+        </div>
+        <div class="settings-row">
+          <span>Loppupäivä (vain yöpyminen)</span>
+          <input type="date" id="hoito-jasennys-loppupvm">
+        </div>
+        <div class="settings-row">
+          <span>Alkaa</span>
+          <input type="time" id="hoito-jasennys-alku">
+        </div>
+        <div class="settings-row">
+          <span>Päättyy</span>
+          <input type="time" id="hoito-jasennys-loppu">
+        </div>
+      </div>
+
+      <div id="hoito-jasennys-poikkeus-kentat" style="display:none">
+        <div class="settings-row">
+          <span>Päivä</span>
+          <input type="date" id="hoito-jasennys-poikkeus-pvm">
+        </div>
+        <div class="settings-row">
+          <span>Poikkeuksen tyyppi</span>
+          <select id="hoito-jasennys-poikkeus-tyyppi">
+            <option value="kotona">Kotona</option>
+            <option value="poissa">Poissa (ei valvontatarvetta)</option>
+            <option value="mukautettu">Mukautettu aikaikkuna</option>
+          </select>
+        </div>
+        <div class="settings-row">
+          <span>Poissaolo alkaa (vain mukautettu)</span>
+          <input type="time" id="hoito-jasennys-poikkeus-alku">
+        </div>
+        <div class="settings-row">
+          <span>Poissaolo päättyy (vain mukautettu)</span>
+          <input type="time" id="hoito-jasennys-poikkeus-loppu">
+        </div>
+      </div>
+
+      <p class="section-title" style="margin-top:12px">Ketkä lapset</p>
+      <ul class="list" id="hoito-jasennys-lapset-lista"></ul>
+      <p class="section-empty" id="hoito-jasennys-lapset-tyhja" style="display:none">Ei lapsiprofiileja vielä — lisää ne Asetukset → 👶 Lapset.</p>
+
+      <div class="dialog-buttons">
+        <button class="dialog-btn dialog-btn-cancel" id="hoito-jasennys-sulje">Peruuta</button>
+        <button class="dialog-btn" id="hoito-jasennys-tallenna-btn">Tallenna</button>
+      </div>
+    </div>
+  </div>
+
   <div class="dialog-overlay" id="silta-ehdotus-overlay" style="display:none">
     <div class="dialog-box">
       <p class="dialog-title">Ehdotetut sillat</p>
@@ -574,6 +658,39 @@
       <span class="prefix">›</span>
       <input type="text" id="lapsi-uusi-input" placeholder="lapsen nimi...">
       <button id="lapsi-uusi-btn">+</button>
+    </div>
+
+    <hr class="divider">
+
+    <!-- Henkselit (2026-08-05, ks. muistiinpanot.md "Henkselit") — per-
+         vanhempi "olen poissa laskuista" -aikaikkuna. Hallinta VAIN
+         täältä asetuksista, ei kalenterinäkymässä (tietoinen rajaus,
+         speksin mukaan — harvoin tarvittava). Henkilö ei ole valittavissa
+         lomakkeella — merkintä on aina kirjautuneen oman henkilon nimissä
+         (ks. omaHenkilo script.js:ssä). -->
+    <div class="section-title">🎗️ Henkselit</div>
+    <ul class="list" id="henkselit-lista"></ul>
+    <p class="section-empty" id="henkselit-tyhja" style="display:none">Ei aktiivisia tai tulevia henkseleitä.</p>
+    <div class="settings-row">
+      <span>Päivä</span>
+      <input type="date" id="henkselit-pvm-input">
+    </div>
+    <div class="settings-row">
+      <span>Alkaa</span>
+      <input type="time" id="henkselit-alku-input">
+    </div>
+    <div class="settings-row">
+      <span>Päättyy (klo 00 = puoleenyöhön)</span>
+      <input type="time" id="henkselit-loppu-input">
+    </div>
+    <button class="login-btn settings-action-btn" id="henkselit-tallenna-btn">Merkitse henkselit</button>
+    <button class="login-btn settings-action-btn" id="henkselit-peruuta-btn" style="display:none">Peruuta muokkaus</button>
+    <div class="settings-row">
+      <span>Henkselit estää Hytin ehdotukset tänä aikana (oma asetus)</span>
+      <label class="toggle">
+        <input type="checkbox" id="henkselit-esta-hytti-toggle">
+        <span class="toggle-track"></span>
+      </label>
     </div>
 
     <hr class="divider">
