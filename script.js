@@ -831,12 +831,48 @@ async function lataaOpintoAiheet() {
     });
     vaiheSelect.addEventListener('change', async function() {
       const uusi = vaiheSelect.value;
-      const { error: vaiheError } = await db.from('opinto_aiheet').update({ vaihe: uusi }).eq('id', aihe.id);
+      const nytIso = new Date().toISOString();
+      const { error: vaiheError } = await db.from('opinto_aiheet').update({ vaihe: uusi, viimeksi_kosketettu: nytIso }).eq('id', aihe.id);
       if (ilmoitaKirjoitusvirheesta(vaiheError, 'Vaiheen päivitys')) return;
       aihe.vaihe = uusi;
+      aihe.viimeksi_kosketettu = nytIso;
       vaiheSelect.className = 'opinto-vaihe-select opinto-vaihe-' + uusi;
     });
     li.appendChild(vaiheSelect);
+
+    // PACER-ohje (2026-08-05, ks. HYTTI_SPEKSI §8) — sama "lue lisää"
+    // kuin Tänään-kortilla, saatavilla myös suoraan kurssinäkymästä.
+    const ohjeNappi = document.createElement('button');
+    ohjeNappi.className = 'link-btn';
+    ohjeNappi.textContent = 'ℹ️';
+    ohjeNappi.title = 'Mitä tässä vaiheessa konkreettisesti tehdään';
+    ohjeNappi.addEventListener('click', function(e) {
+      e.stopPropagation();
+      naytaOpintoOhje(aihe.vaihe, aihe);
+    });
+    li.appendChild(ohjeNappi);
+
+    // Materiaalilinkki per opiskelusolmu (2026-08-05, ks. HYTTI_SPEKSI §5) —
+    // täydentää kurssitason materiaali-tekstikenttää, ei korvaa. Kevyt
+    // prompt() sama malli kuin muillakin yksittäisillä tekstiarvoilla tässä
+    // koodikannassa (ks. esim. hytti-kalenterisuodatin-linkki) — ei omaa
+    // dialogia tämän kokoiselle tarpeelle.
+    const materiaaliNappi = document.createElement('button');
+    materiaaliNappi.className = 'link-btn';
+    materiaaliNappi.textContent = aihe.materiaali ? '🔗' : '➕🔗';
+    materiaaliNappi.title = aihe.materiaali
+      ? aihe.materiaali + (aihe.viimeksi_kosketettu ? '\n\nViimeksi kosketettu: ' + new Date(aihe.viimeksi_kosketettu).toLocaleString('fi-FI') : '')
+      : 'Lisää materiaalilinkki tälle opiskelusolmulle';
+    materiaaliNappi.addEventListener('click', async function(e) {
+      e.stopPropagation();
+      const uusi = prompt('Materiaalilinkki (' + aihe.name + '):', aihe.materiaali || '');
+      if (uusi === null) return;
+      const { error: materiaaliError } = await db.from('opinto_aiheet').update({ materiaali: uusi.trim() || null }).eq('id', aihe.id);
+      if (ilmoitaKirjoitusvirheesta(materiaaliError, 'Materiaalilinkin tallennus')) return;
+      aihe.materiaali = uusi.trim() || null;
+      lataaOpintoAiheet();
+    });
+    li.appendChild(materiaaliNappi);
 
     const poisto = document.createElement('button');
     poisto.className = 'delete-btn';
@@ -1022,7 +1058,20 @@ document.getElementById('opinto-kartta-back-btn').addEventListener('click', func
 // kokonaan kandidaattijoukosta.
 
 const OPINTO_SR_VALIT_PV = [1, 3, 7, 21]; // kevenevä kertaustahti (spec: "1pv→3pv→7pv→21pv...")
-const OPINTO_YLLAPITO_VALI_PV = 60; // ylläpitovaiheen kiinteä jatkokertaustahti SR-kierron jälkeen
+// Ylläpitovälin PITENEMINEN (2026-08-05, ks. HYTTI_SPEKSI_2026-08-05.md §10/§12
+// kohta 3 — "korjattava vika": väli toisti aiemmin tasaista 60pv-sykliä
+// ikuisesti, speksi vaatii pitenemisen). Ensimmäinen ylläpitokierros pysyy
+// 60pv:ssä (ei muutosta vanhaan käyttäytymiseen sillä hetkellä), sen jälkeen
+// kerroin 1.5 per kierros, katto 365pv ettei väli karkaa käytännössä
+// ikuisuuteen. sr_interval_index jatkaa kasvamistaan retrieval-taulukon
+// (OPINTO_SR_VALIT_PV) jälkeenkin — indeksi taulukon pituus = ylläpidon
+// ensimmäinen kierros (kierros 0), +1 joka seuraava, ks. yllapidonSeuraavaVali.
+const OPINTO_YLLAPITO_ALKUVALI_PV = 60;
+const OPINTO_YLLAPITO_KERROIN = 1.5;
+const OPINTO_YLLAPITO_MAX_PV = 365;
+function yllapidonSeuraavaVali(yllapitoKierros) {
+  return Math.min(Math.round(OPINTO_YLLAPITO_ALKUVALI_PV * Math.pow(OPINTO_YLLAPITO_KERROIN, yllapitoKierros)), OPINTO_YLLAPITO_MAX_PV);
+}
 
 const OPINTO_VAIHE_OHJE = {
   priming: 'Silmäile aihe kokonaan läpi ilman että pysähdyt yksityiskohtiin. Kysy itseltäsi: mistä tässä on kyse, mitkä ovat pääkohdat? Keskity VAIN kokonaiskuvan hahmottamiseen — et vielä opettele mitään ulkoa.',
@@ -1325,9 +1374,22 @@ async function laskeOpintoPaivanAskeleet(maxAskeliaYlikirjoitus, poissuljetutAih
     db.from('taito_kaaret').select('from_id, to_id, tyyppi').eq('owner_id', currentUserId),
     db.from('taitosolmu_viittaukset').select('taitosolmu_id, aihe_id').eq('owner_id', currentUserId),
   ]);
-  if (aiheError || solmutError || kaaretError || viittausError) {
-    console.error('Moottorin datan haku epäonnistui:', aiheError || solmutError || kaaretError || viittausError);
+  // Armollinen virheenkäsittely (2026-08-05, ks. HYTTI_SPEKSI_2026-08-05.md
+  // §12 kohta 1 / §16 kohta 3, korjaa auditissa löydetyn kriittisen vian):
+  // opinto_aiheet on pakollinen (VARSINAINEN kurssirata, ei mitään
+  // ehdotuksia ilman sitä) — aiheError on siis edelleen fataali. MUTTA
+  // silta-puoli (taitosolmut/taito_kaaret/taitosolmu_viittaukset) on
+  // VALINNAINEN LISÄKERROS, ei koskaan saa hiljentää KOKO moottoria jos se
+  // yksin epäonnistuu (esim. migraatio ajamatta) — pelkkiä opinto_aiheet-
+  // käyttäjiä ei saa jättää tyhjän päälle. Alempana kaikki silta-muuttujat
+  // (kaikkiSolmut/tarvitseeKaaret/viittausRivit) käyttävät jo `|| []`
+  // -oletusta, joten pelkkä virheen kirjaus + tyhjä data riittää.
+  if (aiheError) {
+    console.error('Moottorin aihe-datan haku epäonnistui:', aiheError);
     return [];
+  }
+  if (solmutError || kaaretError || viittausError) {
+    console.error('Moottorin silta-datan haku epäonnistui (jatketaan silti pelkillä opinto_aiheilla):', solmutError || kaaretError || viittausError);
   }
   const kaikkiAiheet = aiheet || [];
   const kaikkiSolmut = solmut || [];
@@ -1510,8 +1572,19 @@ async function tayttaOpintoPaivanAskeleet() {
   if (insertError) console.error('Täydennysaskelten tallennus epäonnistui:', insertError);
 }
 
-function naytaOpintoOhje(vaihe) {
-  naytaVahvistus('🎯 ' + OPINTO_VAIHE_NIMET[vaihe], OPINTO_VAIHE_OHJE[vaihe], 'Selvä');
+// kohde (valinnainen, 2026-08-05, ks. HYTTI_SPEKSI_2026-08-05.md §8) —
+// "tehtäväkohtainen 'lue lisää' -taso: mitä juuri tälle tehtävälle
+// konkreettisesti tehdään". Ei älyä (tietoinen rajaus, ks. Opintopolun
+// oma "ei mitään älykutsua" -periaate) — konkretisointi tulee TOISTAISEKSI
+// vain kohteen omasta materiaali/linkki-kentästä (opinto_aiheet.materiaali,
+// sql/110; taitosolmut.linkki, sql/092), jos sellainen on annettu.
+// Materiaalista todella oppiva ohjaus ("systeemi oppii tarkemmin mitä
+// missäkin vaiheessa pitäisi tehdä") on speksin oma myöhempi vaihe, ei
+// tässä.
+function naytaOpintoOhje(vaihe, kohde) {
+  const linkki = kohde ? (kohde.materiaali || kohde.linkki) : null;
+  const teksti = OPINTO_VAIHE_OHJE[vaihe] + (linkki ? '\n\nMateriaali tähän: ' + linkki : '');
+  naytaVahvistus('🎯 ' + OPINTO_VAIHE_NIMET[vaihe], teksti, 'Selvä');
 }
 
 // === AIKAIKKUNA (2026-08-05, ks. muistiinpanot.md "Aikaikkuna") ===
@@ -1708,6 +1781,23 @@ async function piirraOpintoTanaanOsio(kaikkiAskeleet) {
     vaiheTeksti.textContent = OPINTO_VAIHE_NIMET[kohde.vaihe];
     kortti.appendChild(vaiheTeksti);
 
+    // PACER-kehote (2026-08-05, ks. HYTTI_SPEKSI §8) — "systeemi ei koskaan
+    // päätä vaihetta puolesta, mutta ehdottaa AINA". ✓ Tehty on jo aina
+    // vienyt seuraavaan vaiheeseen, mutta käyttäjä ei näe ETUKÄTEEN mihin —
+    // tämä tekee ehdotuksen NÄKYVÄKSI ilman että se muuttaa mitään
+    // automaattisesti. Vain TÄMÄ kehoterivi on kytkettävissä pois
+    // asetuksista (pacer_kehote_paalla, oletus päällä) — ei koko
+    // PACER-ohjaus (ohje-nappi pysyy aina).
+    if (askel.tila === 'tarjolla' && haeAsetusTeksti('pacer_kehote_paalla', 'true') !== 'false') {
+      const seuraavaVaihe = seuraavaOpintoVaiheKuvaus(kohde);
+      if (seuraavaVaihe) {
+        const kehote = document.createElement('div');
+        kehote.className = 'opinto-tanaan-kehote';
+        kehote.textContent = 'Ehdotus: "✓ Tehty" siirtää vaiheeseen "' + seuraavaVaihe + '".';
+        kortti.appendChild(kehote);
+      }
+    }
+
     if (askel.tila === 'tarjolla') {
       const napit = document.createElement('div');
       napit.className = 'opinto-tanaan-napit';
@@ -1736,7 +1826,7 @@ async function piirraOpintoTanaanOsio(kaikkiAskeleet) {
       const ohjeNappi = document.createElement('button');
       ohjeNappi.className = 'dialog-btn dialog-btn-cancel';
       ohjeNappi.textContent = 'Näytä ohje';
-      ohjeNappi.addEventListener('click', function() { naytaOpintoOhje(kohde.vaihe); });
+      ohjeNappi.addEventListener('click', function() { naytaOpintoOhje(kohde.vaihe, kohde); });
       napit.appendChild(ohjeNappi);
 
       const ohitaNappi = document.createElement('button');
@@ -1804,6 +1894,20 @@ async function merkitseOpintoAskel(askel, tila) {
 // välin jälkeen) siirtyminen yllapito-tilaan ("aihe ei koskaan valmistu,
 // siirtyy ylläpito-tilaan"). yllapito: pysyy yllapito-tilassa, jatkaa
 // kiinteällä kertaustahdilla ikuisesti.
+// Puhdas "mitä ✓ Tehty TEKISI" -ennuste ilman sivuvaikutuksia (2026-08-05,
+// ks. HYTTI_SPEKSI §8) — peilaa etenetaOpintoKohde():n haarautumisen, EI
+// kirjoita mitään. null = kohde ei etene ollenkaan (reference-vaihe).
+function seuraavaOpintoVaiheKuvaus(kohde) {
+  if (kohde.vaihe === 'priming') return OPINTO_VAIHE_NIMET.encoding;
+  if (kohde.vaihe === 'encoding') return OPINTO_VAIHE_NIMET.retrieval;
+  if (kohde.vaihe === 'retrieval') {
+    const seuraavaIndeksi = kohde.sr_interval_index + 1;
+    return seuraavaIndeksi < OPINTO_SR_VALIT_PV.length ? OPINTO_VAIHE_NIMET.retrieval : OPINTO_VAIHE_NIMET.yllapito;
+  }
+  if (kohde.vaihe === 'yllapito') return OPINTO_VAIHE_NIMET.yllapito;
+  return null;
+}
+
 async function etenetaOpintoKohde(kohde, taulu) {
   if (!kohde) return;
   let paivitys = null;
@@ -1819,15 +1923,21 @@ async function etenetaOpintoKohde(kohde, taulu) {
       const seuraava = new Date(Date.now() + OPINTO_SR_VALIT_PV[seuraavaIndeksi] * 86400000);
       paivitys = { sr_interval_index: seuraavaIndeksi, sr_next_review: paivamaaraISO(seuraava) };
     } else {
-      const seuraava = new Date(Date.now() + OPINTO_YLLAPITO_VALI_PV * 86400000);
+      const vali = yllapidonSeuraavaVali(0);
+      const seuraava = new Date(Date.now() + vali * 86400000);
       paivitys = { vaihe: 'yllapito', sr_interval_index: seuraavaIndeksi, sr_next_review: paivamaaraISO(seuraava) };
     }
   } else if (kohde.vaihe === 'yllapito') {
-    const seuraava = new Date(Date.now() + OPINTO_YLLAPITO_VALI_PV * 86400000);
-    paivitys = { sr_next_review: paivamaaraISO(seuraava) };
+    const yllapitoKierros = kohde.sr_interval_index - OPINTO_SR_VALIT_PV.length + 1;
+    const vali = yllapidonSeuraavaVali(yllapitoKierros);
+    const seuraava = new Date(Date.now() + vali * 86400000);
+    paivitys = { sr_interval_index: kohde.sr_interval_index + 1, sr_next_review: paivamaaraISO(seuraava) };
   }
 
   if (!paivitys) return;
+  // viimeksi_kosketettu (2026-08-05, ks. HYTTI_SPEKSI §5) — vain opinto_aiheet
+  // -taululla on tämä sarake (sql/110), taitosolmuilla ei.
+  if (taulu === 'opinto_aiheet') paivitys.viimeksi_kosketettu = new Date().toISOString();
   const { error } = await db.from(taulu).update(paivitys).eq('id', kohde.id);
   if (error) console.error('PACER/SR-eteneminen epäonnistui (' + taulu + '):', error);
 }
@@ -2169,6 +2279,13 @@ document.getElementById('taitosolmu-vaihe-select').addEventListener('change', as
   if (ilmoitaKirjoitusvirheesta(error, 'Vaiheen tallennus')) return;
   currentTaitosolmu.vaihe = e.target.value;
   e.target.className = 'opinto-vaihe-select opinto-vaihe-' + e.target.value;
+});
+
+// PACER-ohje (2026-08-05, ks. HYTTI_SPEKSI §8) — sama "lue lisää" kuin
+// Tänään-kortilla ja kurssinäkymän aihelistalla.
+document.getElementById('taitosolmu-ohje-btn').addEventListener('click', function() {
+  if (!currentTaitosolmu) return;
+  naytaOpintoOhje(currentTaitosolmu.vaihe, currentTaitosolmu);
 });
 
 document.getElementById('taitosolmu-tallenna-btn').addEventListener('click', async function() {
@@ -3512,6 +3629,17 @@ document.getElementById('henkselit-esta-hytti-toggle').addEventListener('change'
     { onConflict: 'key' }
   );
   if (ilmoitaKirjoitusvirheesta(error, 'Henkselit-Hytti-asetuksen tallennus')) return;
+  await paivitaAsetukset();
+});
+
+// PACER-kehote-kytkin (2026-08-05, ks. HYTTI_SPEKSI §8 — "tämä kehote-
+// mekanismi, EI koko PACER-ohjaus, pitää voida kytkeä pois asetuksista").
+document.getElementById('pacer-kehote-toggle').addEventListener('change', async function(e) {
+  const { error } = await db.from('asetukset').upsert(
+    { key: 'pacer_kehote_paalla', value: String(e.target.checked) },
+    { onConflict: 'key' }
+  );
+  if (ilmoitaKirjoitusvirheesta(error, 'PACER-kehotteen asetuksen tallennus')) return;
   await paivitaAsetukset();
 });
 
@@ -6274,6 +6402,7 @@ function avaaOsio(osio) {
     markAiLogSeen();
     paivitaAsetukset().then(function() {
       if (omaHenkilo) document.getElementById('henkselit-esta-hytti-toggle').checked = henkselitEstaaHytin(omaHenkilo);
+      document.getElementById('pacer-kehote-toggle').checked = haeAsetusTeksti('pacer_kehote_paalla', 'true') !== 'false';
       document.getElementById('kuormaraja-input').value = haeAsetusNumero('paivan_menoraja', 5);
       document.getElementById('ankkurit-nayta-maara-input').value = haeAsetusNumero('ankkurit_nayta_maara', 3);
       document.getElementById('huoli-keski-kynnys-input').value = haeAsetusNumero('huoli_keski_kynnys', 10);
@@ -6863,6 +6992,7 @@ async function lataaLaituri(hakusana) {
     piirraKauppaEhdotusKortti(rivi, li);
     piirraHetkiSiltaKortti(rivi, li);
     piirraHoitoJasennysKortti(rivi, li);
+    piirraMateriaaliJasennysKortti(rivi, li);
   });
 
   paivitaLaituriArkisto();
@@ -8074,6 +8204,233 @@ async function tallennaHoitoJasennys(rivi) {
   merkitseHoitoOhitetuksi(rivi.id);
   document.getElementById('hoito-jasennys-overlay').style.display = 'none';
   naytaIlmoitus('Tallennettu kalenteriin.');
+  lataaLaituri(document.getElementById('laituri-search').value.trim());
+}
+
+// === MATERIAALIN SYÖTTÖPUTKI — TEKSTIOSA (2026-08-05, ks.
+// HYTTI_SPEKSI_2026-08-05.md §9) === Sama kolmivaiheinen malli kuin
+// Laituri-jäsennyksellä yllä: paikallinen heuristiikka näyttää kortin,
+// käyttäjän oma "Tarkista"-napin painallus laukaisee /api/aly-kutsun,
+// tulos aukeaa esitäytettynä mutta muokattavana lomakkeena.
+//
+// TIETOISESTI RAJATTU TÄSSÄ ERÄSSÄ: vain TEKSTI (Laituriin kirjoitettu/
+// liitetty kurssimateriaali — esim. syllabus, aikataulu, litteroitu
+// videotranskripti). Speksin oma prioriteettijärjestys tukee tätä rajausta
+// suoraan: "Ensisijainen: jos videolla on valmis kopioitava transkripti...
+// käyttäjä kopioi sen suoraan Laituriin TEKSTINÄ" — tekstipolku on jo
+// speksin OMA ensisijainen reitti, ei kiertotie. Liitetiedostojen
+// (ppt/pdf/kuvat/doc) raahaus/jäsennys vaatisi kokonaan uutta
+// infrastruktuuria (tiedostojen tallennus, uusi /api-reitti joka osaa
+// välittää liitteitä Anthropicille, docx/pptx-purku — mikään näistä ei ole
+// tällä hetkellä olemassa eikä testattavissa tässä istunnossa ilman oikeaa
+// tiedostoa/livepalvelinta) — TIETOINEN, OMA jatkovaihe, ei arvattu tässä.
+function naytaakoKurssimateriaalilta(teksti) {
+  if (!teksti || teksti.length < 120) return false;
+  const paivamaaraosumat = (teksti.match(/\b\d{1,2}\.\d{1,2}\.(?:\d{2,4})?\b|\b\d{4}-\d{2}-\d{2}\b/g) || []).length;
+  return paivamaaraosumat >= 3;
+}
+
+const LAITURI_MATERIAALI_OHITETUT_KEY = 'kauppalista_laituri_materiaali_ohitetut';
+function haeMateriaaliOhitetut() {
+  try {
+    return new Set(JSON.parse(localStorage.getItem(LAITURI_MATERIAALI_OHITETUT_KEY) || '[]'));
+  } catch (e) {
+    return new Set();
+  }
+}
+function merkitseMateriaaliOhitetuksi(muruId) {
+  const ohitetut = haeMateriaaliOhitetut();
+  ohitetut.add(muruId);
+  localStorage.setItem(LAITURI_MATERIAALI_OHITETUT_KEY, JSON.stringify(Array.from(ohitetut)));
+}
+
+function piirraMateriaaliJasennysKortti(rivi, li) {
+  if (!naytaakoKurssimateriaalilta(rivi.content) || haeMateriaaliOhitetut().has(rivi.id)) return;
+
+  const kortti = document.createElement('li');
+  kortti.className = 'laituri-ehdotus-rivi';
+
+  const teksti = document.createElement('span');
+  teksti.textContent = 'Näyttää kurssimateriaalilta (aikataulu/deadlinet)';
+  kortti.appendChild(teksti);
+
+  const napit = document.createElement('span');
+  napit.className = 'laituri-ehdotus-napit';
+
+  const tarkistaNappi = document.createElement('button');
+  tarkistaNappi.className = 'dialog-btn dialog-btn-cancel';
+  tarkistaNappi.textContent = 'Tarkista';
+  tarkistaNappi.addEventListener('click', function() { pyydaMateriaaliJasennys(rivi, tarkistaNappi); });
+  napit.appendChild(tarkistaNappi);
+
+  const eiNappi = document.createElement('button');
+  eiNappi.className = 'dialog-btn dialog-btn-cancel';
+  eiNappi.textContent = 'Ei liity';
+  eiNappi.addEventListener('click', function() {
+    merkitseMateriaaliOhitetuksi(rivi.id);
+    kortti.remove();
+  });
+  napit.appendChild(eiNappi);
+
+  kortti.appendChild(napit);
+  li.insertAdjacentElement('afterend', kortti);
+}
+
+function rakennaMateriaaliJasennysPrompti(teksti) {
+  const tanaanIso = paivamaaraISO(new Date());
+  return 'Tehtäväsi on jäsentää kurssimateriaali (esim. syllabus, aikataulu, litteroitu luento) rakenteeseen jota opiskelun seurantasovellus käyttää.\n' +
+    'Tänään on ' + tanaanIso + '.\n\n' +
+    'Materiaali: "' + teksti + '"\n\n' +
+    'Palauta VAIN JSON tässä muodossa, ei muuta tekstiä:\n' +
+    '{\n' +
+    '  "kurssi_nimi": "kurssin nimi jos pääteltävissä, muuten paras arvaus",\n' +
+    '  "aiheet": [{ "nimi": "väliotsikon/aiheen nimi", "tavoiteikkuna": "VVVV-KK-PP tai null" }],\n' +
+    '  "deadlinet": [{ "pvm": "VVVV-KK-PP", "tyyppi": "koe" tai "palautus" }]\n' +
+    '}\n' +
+    'Poimi VAIN materiaalissa oikeasti mainitut asiat, älä keksi. Aiheiden pitää olla väliotsikkotason kokonaisuuksia ' +
+    '(ei liian pieniä yksittäisiä käsitteitä, ei liian isoja koko-kurssin-kokoisia).';
+}
+
+async function pyydaMateriaaliJasennys(rivi, nappi) {
+  const alkuperainenTeksti = nappi.textContent;
+  nappi.disabled = true;
+  nappi.textContent = 'Tarkistetaan...';
+
+  const prompti = rakennaMateriaaliJasennysPrompti(rivi.content);
+  let tulos = null;
+  let virhe = null;
+  try {
+    const { data: sessioData } = await db.auth.getSession();
+    const token = sessioData.session ? sessioData.session.access_token : null;
+    const vastaus = await fetch('/api/aly', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
+      body: JSON.stringify({ prompt: prompti, max_tokens: 1500 }),
+    });
+    tulos = await vastaus.json();
+    if (!vastaus.ok) virhe = tulos.error || 'Äly ei osannut tätä, kokeile myöhemmin';
+  } catch (e) {
+    virhe = 'Äly ei osannut tätä, kokeile myöhemmin';
+  }
+
+  nappi.disabled = false;
+  nappi.textContent = alkuperainenTeksti;
+  if (virhe) {
+    naytaIlmoitus('Jäsennys epäonnistui: ' + virhe);
+    return;
+  }
+
+  const jasennetty = jasennaAlyJSON(tulos.text);
+  if (!jasennetty || (!Array.isArray(jasennetty.aiheet) && !Array.isArray(jasennetty.deadlinet))) {
+    naytaIlmoitus('Äly ei osannut tulkita tätä materiaalia.');
+    return;
+  }
+
+  avaaMateriaaliJasennysDialogi(rivi, jasennetty);
+}
+
+function avaaMateriaaliJasennysDialogi(rivi, jasennetty) {
+  document.getElementById('materiaali-jasennys-alkuperainen').textContent = '"' + rivi.content.slice(0, 200) + (rivi.content.length > 200 ? '…' : '') + '"';
+  document.getElementById('materiaali-jasennys-kurssi-input').value = jasennetty.kurssi_nimi || '';
+
+  const aiheLista = document.getElementById('materiaali-jasennys-aihe-lista');
+  aiheLista.innerHTML = '';
+  const aiheet = Array.isArray(jasennetty.aiheet) ? jasennetty.aiheet : [];
+  document.getElementById('materiaali-jasennys-aihe-tyhja').style.display = aiheet.length === 0 ? 'block' : 'none';
+  aiheet.forEach(function(aihe) {
+    const li = document.createElement('li');
+    const checkbox = document.createElement('input');
+    checkbox.type = 'checkbox';
+    checkbox.checked = true;
+    li.appendChild(checkbox);
+    const nimiInput = document.createElement('input');
+    nimiInput.type = 'text';
+    nimiInput.className = 'jatkorivi-teksti';
+    nimiInput.value = aihe.nimi || '';
+    li.appendChild(nimiInput);
+    const pvmInput = document.createElement('input');
+    pvmInput.type = 'date';
+    pvmInput.value = aihe.tavoiteikkuna || '';
+    li.appendChild(pvmInput);
+    li._checkbox = checkbox;
+    li._nimiInput = nimiInput;
+    li._pvmInput = pvmInput;
+    aiheLista.appendChild(li);
+  });
+
+  const deadlineLista = document.getElementById('materiaali-jasennys-deadline-lista');
+  deadlineLista.innerHTML = '';
+  const deadlinet = Array.isArray(jasennetty.deadlinet) ? jasennetty.deadlinet : [];
+  document.getElementById('materiaali-jasennys-deadline-tyhja').style.display = deadlinet.length === 0 ? 'block' : 'none';
+  deadlinet.forEach(function(dl) {
+    const li = document.createElement('li');
+    const checkbox = document.createElement('input');
+    checkbox.type = 'checkbox';
+    checkbox.checked = true;
+    li.appendChild(checkbox);
+    const pvmInput = document.createElement('input');
+    pvmInput.type = 'date';
+    pvmInput.value = dl.pvm || '';
+    li.appendChild(pvmInput);
+    const tyyppiSelect = document.createElement('select');
+    ['koe', 'palautus'].forEach(function(t) {
+      const optio = document.createElement('option');
+      optio.value = t;
+      optio.textContent = t === 'koe' ? 'Koe' : 'Palautus';
+      if (t === dl.tyyppi) optio.selected = true;
+      tyyppiSelect.appendChild(optio);
+    });
+    li.appendChild(tyyppiSelect);
+    li._checkbox = checkbox;
+    li._pvmInput = pvmInput;
+    li._tyyppiSelect = tyyppiSelect;
+    deadlineLista.appendChild(li);
+  });
+
+  document.getElementById('materiaali-jasennys-tallenna-btn').onclick = function() { tallennaMateriaaliJasennys(rivi); };
+  document.getElementById('materiaali-jasennys-overlay').style.display = 'flex';
+}
+
+document.getElementById('materiaali-jasennys-sulje').addEventListener('click', function() {
+  document.getElementById('materiaali-jasennys-overlay').style.display = 'none';
+});
+
+// Löytää olemassa olevan AKTIIVISEN kurssin täsmällisellä nimellä, tai luo
+// uuden — EI koskaan hiljaista duplikaattia jos nimi jo täsmää (sama "yksi
+// koti" -periaate kuin muuallakin).
+async function haeTaiLuoOpintoKurssiNimella(nimi) {
+  const { data: olemassaOleva, error: hakuError } = await db.from('opinto_kurssit').select().eq('name', nimi).maybeSingle();
+  if (hakuError) return { error: hakuError };
+  if (olemassaOleva) return { data: olemassaOleva };
+  return await db.from('opinto_kurssit').insert({ name: nimi, owner_id: currentUserId }).select().single();
+}
+
+async function tallennaMateriaaliJasennys(rivi) {
+  const kurssiNimi = document.getElementById('materiaali-jasennys-kurssi-input').value.trim();
+  if (!kurssiNimi) { naytaIlmoitus('Anna kurssin nimi.'); return; }
+
+  const { data: kurssi, error: kurssiError } = await haeTaiLuoOpintoKurssiNimella(kurssiNimi);
+  if (ilmoitaKirjoitusvirheesta(kurssiError, 'Kurssin haku/luonti')) return;
+
+  const valitutAiheet = Array.from(document.getElementById('materiaali-jasennys-aihe-lista').children)
+    .filter(function(li) { return li._checkbox.checked && li._nimiInput.value.trim(); })
+    .map(function(li) { return { kurssi_id: kurssi.id, name: li._nimiInput.value.trim(), tavoiteikkuna: li._pvmInput.value || null }; });
+  if (valitutAiheet.length > 0) {
+    const { error } = await db.from('opinto_aiheet').insert(valitutAiheet);
+    if (ilmoitaKirjoitusvirheesta(error, 'Aiheiden tallennus')) return;
+  }
+
+  const valitutDeadlinet = Array.from(document.getElementById('materiaali-jasennys-deadline-lista').children)
+    .filter(function(li) { return li._checkbox.checked && li._pvmInput.value; })
+    .map(function(li) { return { kurssi_id: kurssi.id, pvm: li._pvmInput.value, tyyppi: li._tyyppiSelect.value }; });
+  if (valitutDeadlinet.length > 0) {
+    const { error } = await db.from('opinto_deadlinet').insert(valitutDeadlinet);
+    if (ilmoitaKirjoitusvirheesta(error, 'Deadlinejen tallennus')) return;
+  }
+
+  merkitseMateriaaliOhitetuksi(rivi.id);
+  document.getElementById('materiaali-jasennys-overlay').style.display = 'none';
+  naytaIlmoitus('Tallennettu Opintopolulle (' + kurssiNimi + ').');
   lataaLaituri(document.getElementById('laituri-search').value.trim());
 }
 

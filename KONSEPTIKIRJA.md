@@ -77,6 +77,14 @@ Ennen kuin rakennat ominaisuuden, kysy: ratkeaisiko tämä sopimuksella ihmisten
 **Natiivikomponentteja (iOS-rulla ajanvalinnassa, jakovalikot, tiedostovalitsimet, päivämäärävalinnat) käytetään niin paljon kuin mahdollista** — ei vain sallita vaan suositaan: ne ovat käyttäjälle valmiiksi tuttuja joka muusta appista, alusta ylläpitää ne, ne ovat esteettömiä ja luotettavia, ja niiden kustomointi rikkoo sekä tuttuuden että usein toiminnan (custom-ajanvalitsimet ym. ovat bugialtis laji — säästä se vaiva). Rakennusohje: ennen kuin rakennat oman UI-komponentin, tarkista onko natiivi joka tekee saman. Sataman oma visuaalinen kieli (tunnistettava look) pätee siellä missä SISÄLTÖ luodaan ja katsotaan; syöttö- ja järjestelmäkomponentit saavat olla natiiveja. Se pieni visuaalinen sauma natiivin ja oman ilmeen välillä EI ole vika — Applen omat apitkin tekevät niin.
 *Syntytarina (18.7.):* iOS-natiivi aikarulla toi Katrin mieleen ristiriidan "kuittilookin" kanssa ja houkutuksen muuttaa koko ilme. Linjaus: natiivia käytetään auliisti, sauma on sallittu, koko ilmettä EI revitä auki. Visuaalisen yhtenäisyyden pohdinta (jos oma ilme tuntuu epäyhtenäiseltä ITSENSÄ kanssa) jää Katrin myöhempään harkintaan Copilot-aikana — mahdollinen työkalu silloin: kevyt design-kieli-dokumentti (värit, fontit, kulmat, välit, painiketyylit) jota vasten yhtenäistetään PIKKUHILJAA, ei kertaremonttina. "Kirjaa tyyli, korjaa kohti sitä ajan kanssa" — ei "muuta kaikki nyt".
 
+### 14. Rakenna aina olemassa olevan päälle, älä rinnakkaista konetta
+Jos uusi ominaisuus voisi olla toisen jo olemassa olevan muunnos, se on. Ennen uuden taulun/moottorin/näkymän rakentamista kysytään: onko tämä oikeasti uusi asia, vai sama asia jota ei vielä ole mietitty loppuun asti?
+*Syntytarina:* käytännössä noudatettu toistuvasti ilman että sääntö oli kirjattuna — mm. Taitosolmut rakennettiin nimenomaan "SAMAN moottorin rinnalle, ei rinnakkaista konetta" (2026-08-04). Kirjattiin tähän vasta 2026-08-05 Hytti/Opintopolku-auditoinnin yhteydessä, kun havaittiin että 95 taitosolmua oli 2026-08-04 rakennettu virheellisesti koko kahden kurssin sisällöksi ja kumottu seuraavana päivänä — sääntö olisi estänyt sen jos se olisi ollut kirjattuna etukäteen. *Ks. HYTTI_SPEKSI_2026-08-05.md.*
+
+### 15. Kaikella on yksi koti
+Sama tieto/tila elää yhdessä paikassa kerrallaan, ei kahdessa rinnakkaisessa esityksessä joiden pitäisi pysyä synkassa käsin.
+*Syntytarina:* kirjattu tähän asti vain ankkureille ("jokaisella ankkurilla on koti", periaate 104/§7b:n koti-mekanismi) — yleistettiin 2026-08-05 Hytti/Opintopolku-auditoinnin yhteydessä havaittuaan saman periaatteen ohjaavan käytäntöä muuallakin (esim. Laiturin koti-osoitin) ilman että sitä oli koskaan kirjattu yleisenä sääntönä.
+
 ---
 
 ## OSA 2: KÄYTTÄJÄT

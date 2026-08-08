@@ -423,6 +423,7 @@
     </div>
 
     <select id="taitosolmu-vaihe-select" class="opinto-vaihe-select"></select>
+    <button class="link-btn" id="taitosolmu-ohje-btn" title="Mitä tässä vaiheessa konkreettisesti tehdään">ℹ️</button>
     <p class="taitosolmu-lahde" id="taitosolmu-lahde-teksti"></p>
 
     <div class="add-item">
@@ -591,6 +592,38 @@
     </div>
   </div>
 
+  <!-- Materiaalin syöttöputki (2026-08-05, ks. HYTTI_SPEKSI_2026-08-05.md §9)
+       — TEKSTIPOHJAINEN osa vain (liitetiedostojen raahaus/ppt/pdf/doc-
+       jäsennys on OMA, isompi, ei tässä erässä rakennettu jatko, ks.
+       muistiinpanot.md). Sama "äly ehdottaa, ihminen kuittaa" -periaate:
+       Laituriin liitetty/kopioitu kurssimateriaaliteksti (esim. syllabus,
+       aikataulu, deadline-lista) jäsennetään esitäytetyksi mutta
+       muokattavaksi lomakkeeksi ennen tallennusta. -->
+  <div class="dialog-overlay" id="materiaali-jasennys-overlay" style="display:none">
+    <div class="dialog-box">
+      <p class="dialog-title">Tarkista kurssimateriaali</p>
+      <p class="section-empty" id="materiaali-jasennys-alkuperainen" style="display:block"></p>
+
+      <div class="settings-row">
+        <span>Kurssi</span>
+        <input type="text" id="materiaali-jasennys-kurssi-input" placeholder="kurssin nimi (uusi tai olemassa oleva)...">
+      </div>
+
+      <p class="section-title" style="margin-top:12px">Aiheet</p>
+      <ul class="list" id="materiaali-jasennys-aihe-lista"></ul>
+      <p class="section-empty" id="materiaali-jasennys-aihe-tyhja" style="display:none">Ei tunnistettuja aiheita.</p>
+
+      <p class="section-title" style="margin-top:12px">Deadlinet</p>
+      <ul class="list" id="materiaali-jasennys-deadline-lista"></ul>
+      <p class="section-empty" id="materiaali-jasennys-deadline-tyhja" style="display:none">Ei tunnistettuja deadlineja.</p>
+
+      <div class="dialog-buttons">
+        <button class="dialog-btn dialog-btn-cancel" id="materiaali-jasennys-sulje">Peruuta</button>
+        <button class="dialog-btn" id="materiaali-jasennys-tallenna-btn">Tallenna</button>
+      </div>
+    </div>
+  </div>
+
   <div class="dialog-overlay" id="silta-ehdotus-overlay" style="display:none">
     <div class="dialog-box">
       <p class="dialog-title">Ehdotetut sillat</p>
@@ -715,6 +748,13 @@
     <div class="settings-row">
       <span>Varoitusmerkki päivälle jolla vähintään N kellonaikamenoa</span>
       <input type="number" class="settings-numero-input" id="kuormaraja-input" min="1" step="1">
+    </div>
+    <div class="settings-row">
+      <span>PACER-kehote: näytä "✓ Tehty siirtää vaiheeseen X" Tänään-korteilla</span>
+      <label class="toggle">
+        <input type="checkbox" id="pacer-kehote-toggle">
+        <span class="toggle-track"></span>
+      </label>
     </div>
     <div class="settings-row">
       <span>Huolilippu: paino josta päivä nousee vähintään "keski"-kuormaksi</span>
