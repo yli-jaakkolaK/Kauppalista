@@ -1,0 +1,304 @@
+/* ==========================================================================
+   SATAMA — design system
+   Merikartta & loki -teema. Paletti, typografia ja peruskomponentit.
+   Lähde: satama-komponentit.html + satama-kartta-v6.html (chat-mockupit, 2026-08-07/08)
+   ========================================================================== */
+
+@import url('https://fonts.googleapis.com/css2?family=Courier+Prime:ital,wght@0,400;0,700;1,400&display=swap');
+
+:root{
+  /* --- Paletti --- */
+  --paperi:   #EAE6DC;  /* tausta */
+  --muste:    #221F1A;  /* teksti */
+  --matalikko:#F0C79E;  /* < 50% vahvuus / raskas kuorma */
+  --karikko:  #E0A46F;  /* SOS / hyvin matala */
+  --vaara:    #B8433A;  /* huolilippu, ristiriita */
+  --syvanne:  #3F5F53;  /* >= 50% vahvuus, "hallussa" */
+  --messinki: #9C7A43;  /* KAIKKI kosketettava (napit, kehykset, valitsimet) */
+  --sinappi:  #C29A2E;  /* koriste (helmen kiilto, korostukset) — EI kosketus */
+
+  /* sininen on varattu Juhan kalenterille - ei käytetä muualla */
+
+  /* --- Hiusviivat / vaimeat sävyt mustesta --- */
+  --hius:       rgba(34,31,26,.16);
+  --hius-vahva: rgba(34,31,26,.34);
+  --vaimea:     rgba(34,31,26,.55);
+
+  /* --- Pyöristykset --- */
+  --r-luettava:    3px;   /* kaikki mitä LUETAAN: kortit, paneelit, arkit */
+  --r-kosketettava:13px;  /* kaikki mitä KOSKETETAAN: napit, valitsimet */
+
+  /* --- Liike: "veden alla", ei napsahduksia --- */
+  --kelluu: cubic-bezier(.24,.72,.30,1);
+  --hidas:  820ms;
+  --keski:  520ms;
+}
+
+/* ==========================================================================
+   Perusta
+   ========================================================================== */
+*{box-sizing:border-box}
+html,body{margin:0}
+body{
+  background:var(--paperi);
+  color:var(--muste);
+  font-family:'Courier Prime', ui-monospace, monospace;
+  font-size:16px;
+  line-height:1.5;
+  -webkit-font-smoothing:antialiased;
+}
+
+/* hyvin hienovarainen kartan rakeisuus taustalla — EI tekstuuritapetti */
+body::before{
+  content:'';position:fixed;inset:0;pointer-events:none;z-index:0;
+  background-image:radial-gradient(rgba(34,31,26,.045) .5px, transparent .5px);
+  background-size:3px 3px;
+}
+
+@media (prefers-reduced-motion:reduce){
+  *,*::before,*::after{animation:none!important;transition-duration:.01ms!important}
+}
+
+/* ==========================================================================
+   Typografinen asteikko
+   Yksi fontti koko systeemiin (Courier Prime). Koko + harvennus + paino
+   tekevät hierarkian, ei fonttipari. "Syvyysluku" = paljas numero ilman
+   laatikkoa tai selitettä — merikartan tapa esittää tärkein tieto.
+   ========================================================================== */
+.syvyysluku{font-size:46px;line-height:.92;letter-spacing:-.03em;font-weight:700}
+.otsake     {font-size:22px;letter-spacing:-.01em;font-weight:700}
+.leipa      {font-size:15px}
+.merkinta   {font-size:12.5px;letter-spacing:.16em;text-transform:uppercase;color:var(--vaimea)}
+.pieni      {font-size:12.5px;color:var(--vaimea)}
+
+/* ==========================================================================
+   Osiorakenne
+   ========================================================================== */
+.osio{margin:0 0 40px}
+.osio-nimi{
+  font-size:11px;letter-spacing:.28em;text-transform:uppercase;
+  color:var(--vaimea);margin:0 0 14px;
+  display:flex;align-items:center;gap:10px;
+}
+.osio-nimi::after{content:'';flex:1;height:1px;background:var(--hius)}
+.selite{font-size:12.5px;color:var(--vaimea);margin:10px 0 0;line-height:1.6}
+
+/* ==========================================================================
+   Yleinen "luettava" pinta — kortit, paneelit, arkit
+   Kuitti-vs-iOS-periaate: kaikki mitä LUETAAN saa tämän pinnan.
+   ========================================================================== */
+.arkki, .paneeli{
+  background:rgba(255,253,248,.5);
+  border:1px solid var(--hius);
+  border-radius:var(--r-luettava);
+  padding:16px;
+}
+
+/* ==========================================================================
+   Nyt-kortti
+   Koko kortti on painettava — EI erillistä nuoli-nappia oikeassa kulmassa.
+   Vasen reuna: syvyyskäyrä (syvänne-väri) = "tämä on nyt pinnalla".
+   ========================================================================== */
+.nyt{
+  display:block;width:100%;text-align:left;font-family:inherit;color:inherit;cursor:pointer;
+  position:relative;overflow:hidden;
+  background:rgba(255,253,248,.5);
+  border:1px solid var(--hius-vahva);
+  border-radius:var(--r-luettava);
+  padding:15px 17px 14px 20px;
+  transition:transform var(--keski) var(--kelluu),
+             box-shadow var(--keski) var(--kelluu),
+             background var(--keski) var(--kelluu);
+}
+.nyt::before{
+  content:'';position:absolute;left:0;top:0;bottom:0;width:3px;
+  background:var(--syvanne);
+}
+.nyt:hover,.nyt:focus-visible{
+  transform:translateY(-2px);
+  background:rgba(255,253,248,.78);
+  box-shadow:0 6px 18px rgba(34,31,26,.11);
+}
+.nyt:active{transform:translateY(0) scale(.994)}
+.nyt:focus-visible{outline:2px solid var(--sinappi);outline-offset:3px}
+
+.nyt-ylarivi{display:flex;align-items:flex-start;gap:14px}
+.nyt-kurssi {font-size:12.5px;color:var(--vaimea);letter-spacing:.04em;margin-bottom:2px}
+.nyt-solmu  {font-size:19px;font-weight:700;letter-spacing:-.01em;line-height:1.25}
+.nyt-aika   {font-size:30px;font-weight:700;letter-spacing:-.03em;line-height:1;padding-top:2px;flex:none}
+
+.nyt-alarivi{
+  display:flex;align-items:center;gap:10px;
+  margin-top:12px;padding-top:11px;
+  border-top:1px dotted var(--hius-vahva);
+}
+.vaihe{font-size:11px;letter-spacing:.2em;text-transform:uppercase;color:var(--syvanne);font-weight:700}
+.nyt-alarivi .pieni{margin-left:auto}
+
+/* ==========================================================================
+   Boost — kiinteät napit (EI liukusäädintä, ks. perustelu speksissä)
+   ========================================================================== */
+.boost{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+.min{
+  position:relative;
+  border:1px solid var(--hius-vahva);
+  border-radius:var(--r-kosketettava);
+  background:linear-gradient(165deg,rgba(255,252,244,.7),rgba(234,230,220,.25));
+  backdrop-filter:blur(7px);-webkit-backdrop-filter:blur(7px);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.6);
+  padding:13px 4px 10px;cursor:pointer;font-family:inherit;color:var(--muste);
+  transition:transform var(--keski) var(--kelluu),
+             box-shadow var(--keski) var(--kelluu),
+             border-color var(--keski) var(--kelluu);
+}
+.min b{display:block;font-size:25px;font-weight:700;letter-spacing:-.04em;line-height:1}
+.min span{display:block;font-size:10px;letter-spacing:.16em;color:var(--vaimea);margin-top:4px}
+.min:hover,.min:focus-visible{transform:translateY(-3px);box-shadow:inset 0 1px 0 rgba(255,255,255,.7),0 6px 16px rgba(34,31,26,.13)}
+.min:active{transform:translateY(-1px) scale(.97)}
+
+/* älyn ehdotus (esim. "ehtii 30 minuuttia ennen bussia") */
+.min.ehdotus{border-color:var(--messinki);box-shadow:inset 0 1px 0 rgba(255,255,255,.7),0 0 0 3px rgba(156,122,67,.13)}
+.min.ehdotus::after{
+  content:'ehtii';position:absolute;top:-8px;left:50%;transform:translateX(-50%);
+  font-size:9px;letter-spacing:.14em;text-transform:uppercase;
+  background:var(--messinki);color:#FDFBF6;padding:2px 7px;border-radius:2px;
+}
+
+/* ==========================================================================
+   iOS-natiivi valitsin (rulla)
+   Lasi lämpimästi sävytetty + messinkikehys = instrumentti kartan päällä,
+   ei vieras kontrolli. Haptiikka: kevyt naps jokaisella pykälällä.
+   ========================================================================== */
+.rulla{
+  position:relative;height:132px;overflow:hidden;
+  border:1px solid rgba(156,122,67,.42);
+  border-radius:var(--r-kosketettava);
+  background:linear-gradient(180deg,rgba(234,230,220,.9),rgba(255,252,244,.55) 50%,rgba(234,230,220,.9));
+  backdrop-filter:blur(11px);-webkit-backdrop-filter:blur(11px);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.7);
+}
+.rulla-lista{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center}
+.rulla-rivi{height:33px;line-height:33px;font-size:17px;color:var(--vaimea);transition:all var(--keski) var(--kelluu)}
+.rulla-rivi.valittu{font-size:22px;font-weight:700;color:var(--muste)}
+.rulla-rivi.kauko{opacity:.32;font-size:15px}
+.rulla-ikkuna{
+  position:absolute;left:9px;right:9px;top:50%;height:36px;transform:translateY(-50%);
+  border-top:1px solid rgba(156,122,67,.5);border-bottom:1px solid rgba(156,122,67,.5);
+  background:rgba(156,122,67,.07);pointer-events:none;border-radius:5px;
+}
+
+/* ==========================================================================
+   Yleinen kosketettava nappi (saadin) — käytetään mm. Kartan
+   näkymänvaihtimissa ja muissa valitsimissa.
+   ========================================================================== */
+.saadin{
+  font-family:inherit;font-size:11.5px;letter-spacing:.12em;text-transform:uppercase;
+  padding:8px 13px;border-radius:var(--r-kosketettava);cursor:pointer;color:var(--muste);
+  border:1px solid rgba(156,122,67,.5);
+  background:linear-gradient(165deg,rgba(255,252,244,.72),rgba(234,230,220,.28));
+  backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.65);
+  transition:all var(--keski) var(--kelluu);
+}
+.saadin:hover{transform:translateY(-2px)}
+.saadin[aria-pressed=true]{
+  border-color:var(--messinki);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.65),0 0 0 3px rgba(156,122,67,.15);
+}
+.saadin:focus-visible{outline:2px solid var(--messinki);outline-offset:2px}
+
+/* ==========================================================================
+   Kalenteririvi
+   Täytetty merkki = kiinteä piste maailmassa (live, menee perhekalenteriin).
+   Avoin merkki = oma opiskelu, väistää ja siirtyy.
+   EI kuormaväriä tässä — kuorma asuu Ruorin jaetulla kalenterisegmentillä.
+   ========================================================================== */
+.kal{border-top:1px solid var(--hius)}
+.kal-rivi{display:flex;gap:13px;padding:11px 2px;border-bottom:1px solid var(--hius);align-items:baseline}
+.kal-aika{font-size:15px;font-weight:700;flex:none;width:46px;letter-spacing:-.02em}
+.kal-teksti{flex:1;min-width:0}
+.kal-teksti b{font-weight:700;font-size:15px}
+.kal-teksti .pieni{display:block;margin-top:1px}
+
+.merkki{flex:none;width:9px;height:9px;margin-top:5px;border-radius:50%}
+.merkki.live{background:var(--muste)}
+.merkki.oma{border:1.5px solid var(--syvanne);background:transparent}
+.matka{font-size:11px;letter-spacing:.06em;color:var(--vaimea);padding-left:59px;padding-bottom:9px;margin-top:-4px}
+
+/* ==========================================================================
+   Solmu ylläpidossa (Reitti-osion alareuna)
+   ========================================================================== */
+.solmu{display:flex;align-items:center;gap:12px;padding:11px 0;border-bottom:1px dotted var(--hius-vahva)}
+.solmu:last-child{border-bottom:0}
+.solmu-nimi{flex:1;font-size:15px}
+.unohtuu{
+  font-family:inherit;font-size:11px;letter-spacing:.1em;text-transform:uppercase;
+  border:1px solid var(--hius-vahva);background:transparent;color:var(--vaimea);
+  padding:5px 9px;border-radius:9px;cursor:pointer;
+  transition:all var(--keski) var(--kelluu);
+}
+.unohtuu:hover,.unohtuu:focus-visible{border-color:var(--vaara);color:var(--vaara)}
+
+/* ==========================================================================
+   Hytin otsake + välilehdet
+   SATAMA-header ei jatku tänne. Välilehdet renderöidään listasta
+   (datavetoinen määrä), ei kolmena kovakoodattuna nappina.
+   ========================================================================== */
+.hytti-otsake{display:flex;align-items:baseline;justify-content:space-between;margin-bottom:13px}
+.hytti-otsake h2{margin:0;font-size:27px;font-weight:700;letter-spacing:-.02em}
+
+.valilehdet{display:flex;gap:2px;border-bottom:1px solid var(--hius-vahva)}
+.vl{
+  font-family:inherit;font-size:13px;letter-spacing:.1em;text-transform:uppercase;
+  background:none;border:0;border-bottom:2px solid transparent;
+  padding:9px 14px;margin-bottom:-1px;color:var(--vaimea);cursor:pointer;
+  transition:color var(--keski) var(--kelluu),border-color var(--keski) var(--kelluu);
+}
+.vl[aria-selected=true]{color:var(--muste);font-weight:700;border-bottom-color:var(--muste)}
+.vl:focus-visible{outline:2px solid var(--messinki);outline-offset:2px;border-radius:3px}
+
+/* ==========================================================================
+   Helmi — ainoa pyöreä, kiiltävä, valoa taittava muoto koko systeemissä.
+   Tarkoituksella harvinainen: 1-10 kertaa lukukaudessa.
+   ========================================================================== */
+.helmi{
+  display:flex;gap:13px;padding:14px 15px;
+  background:rgba(255,253,248,.5);
+  border:1px solid var(--hius);border-radius:var(--r-luettava);
+}
+.helmi-piste{
+  flex:none;width:13px;height:13px;border-radius:50%;margin-top:4px;
+  background:radial-gradient(circle at 34% 30%,#fff,var(--matalikko) 62%,var(--sinappi));
+  box-shadow:0 1px 3px rgba(34,31,26,.2);
+}
+.helmi p{margin:0;font-size:14.5px;line-height:1.55}
+
+/* ==========================================================================
+   Tyhjä tila — kutsu, ei moite. Ei laskuria, ei numeroa.
+   ========================================================================== */
+.tyhja{
+  text-align:center;padding:30px 20px;
+  border:1px dashed var(--hius-vahva);border-radius:var(--r-luettava);
+}
+.tyhja .luotaus{font-size:11px;letter-spacing:.28em;text-transform:uppercase;color:var(--vaimea)}
+.tyhja p{margin:9px 0 0;font-size:15px;max-width:33ch;margin-inline:auto;line-height:1.6}
+
+/* ==========================================================================
+   Kuormasuoja — sama pohja kuin tyhjä tila, vastakkainen johtopäätös:
+   paljon menoja edessä → ei ehdoteta, suojellaan ylikuormittumiselta.
+   ========================================================================== */
+.suoja{
+  padding:15px 16px;border-radius:var(--r-luettava);
+  background:var(--matalikko);border:1px solid rgba(34,31,26,.14);
+}
+.suoja b{display:block;font-size:11px;letter-spacing:.2em;text-transform:uppercase;margin-bottom:5px}
+.suoja p{margin:0;font-size:14.5px;line-height:1.55}
+
+/* ==========================================================================
+   Liikeapuluokat
+   ========================================================================== */
+.kelluva{animation:kellu 5.5s var(--kelluu) infinite}
+@keyframes kellu{0%,100%{transform:translateY(0)}50%{transform:translateY(-7px)}}
+
+.nouse{animation:nouse var(--hidas) var(--kelluu) both}
+@keyframes nouse{from{opacity:0;transform:translateY(15px)}to{opacity:1;transform:translateY(0)}}

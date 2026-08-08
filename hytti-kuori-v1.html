@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="fi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Hytti — kuori v1</title>
+<link rel="stylesheet" href="satama-design-system.css">
+<style>
+/* Sivun kehysasettelu — EI osa design-systemiä itseään (satama-design-
+   system.css antaa tokenit + komponentit, ei sivun max-width/padding-
+   kehystä), pieni oma lisä tälle sivulle. */
+.sivu{position:relative;z-index:1;max-width:520px;margin:0 auto;padding:26px 18px 90px}
+#sisalto{margin-top:18px}
+.tila-tyhja{padding:32px 4px;color:var(--vaimea);font-size:13.5px;line-height:1.7}
+</style>
+</head>
+<body>
+<div class="sivu">
+
+  <div class="hytti-otsake"><h2>Hytti</h2><span class="pieni" id="pvm"></span></div>
+
+  <div class="valilehdet" role="tablist" id="valilehdet"></div>
+
+  <div id="sisalto"></div>
+
+</div>
+
+<script>
+// Datavetoinen välilehtilista (Katrin vaatimus #3) — lisää/poista/järjestää
+// muuttamalla vain tätä taulukkoa, ei uutta nappia HTML:ään.
+const VALILEHDET = [
+  { id: 'nyt', nimi: 'Nyt' },
+  { id: 'reitti', nimi: 'Reitti' },
+  { id: 'kartta', nimi: 'Kartta' },
+];
+let aktiivinenValilehti = 'nyt';
+
+// Kiinteä esimerkkidata (Katrin vaatimus #4) — EI oikeaa dataa/logiikkaa.
+const NYT_ESIMERKKI = {
+  kurssi: 'Introduction to Programming',
+  solmu: 'Ehtolauseet',
+  klo: '14:30',
+  vaihe: 'Retrieval',
+  kesto: '25 min',
+};
+
+const PAIVAT = ['su', 'ma', 'ti', 'ke', 'to', 'pe', 'la'];
+function paivamaaraTeksti(d) {
+  return PAIVAT[d.getDay()] + ' ' + d.getDate() + '.' + (d.getMonth() + 1) + '.';
+}
+document.getElementById('pvm').textContent = paivamaaraTeksti(new Date());
+
+function piirraValilehdet() {
+  const kehys = document.getElementById('valilehdet');
+  kehys.innerHTML = '';
+  VALILEHDET.forEach(function(vl) {
+    const nappi = document.createElement('button');
+    nappi.className = 'vl';
+    nappi.type = 'button';
+    nappi.setAttribute('role', 'tab');
+    nappi.setAttribute('aria-selected', String(vl.id === aktiivinenValilehti));
+    nappi.textContent = vl.nimi;
+    nappi.addEventListener('click', function() {
+      aktiivinenValilehti = vl.id;
+      piirraValilehdet();
+      piirraSisalto();
+    });
+    kehys.appendChild(nappi);
+  });
+}
+
+// Nyt-kortti — TARKALLEEN satama-design-system.css:n .nyt/.nyt-ylarivi/
+// .nyt-kurssi/.nyt-solmu/.nyt-aika/.nyt-alarivi/.vaihe/.pieni -luokilla,
+// ei omaa CSS:ää tässä tiedostossa. Koko kortti <button>, ei nuoli-nappia.
+function piirraNytKortti() {
+  const kortti = document.createElement('button');
+  kortti.className = 'nyt nouse';
+  kortti.type = 'button';
+  kortti.innerHTML =
+    '<div class="nyt-ylarivi">' +
+      '<div>' +
+        '<div class="nyt-kurssi">' + NYT_ESIMERKKI.kurssi + '</div>' +
+        '<div class="nyt-solmu">' + NYT_ESIMERKKI.solmu + '</div>' +
+      '</div>' +
+      '<div class="nyt-aika">' + NYT_ESIMERKKI.klo + '</div>' +
+    '</div>' +
+    '<div class="nyt-alarivi">' +
+      '<span class="vaihe">' + NYT_ESIMERKKI.vaihe + '</span>' +
+      '<span class="pieni">' + NYT_ESIMERKKI.kesto + '</span>' +
+    '</div>';
+  // Ei vielä logiikkaa (Katrin rajaus) — napautus ei tee mitään oikeaa.
+  kortti.addEventListener('click', function() { console.log('Nyt-kortti painettu (ei vielä logiikkaa)'); });
+  return kortti;
+}
+
+function piirraSisalto() {
+  const kehys = document.getElementById('sisalto');
+  kehys.innerHTML = '';
+  if (aktiivinenValilehti === 'nyt') {
+    kehys.appendChild(piirraNytKortti());
+    return;
+  }
+  const tyhja = document.createElement('p');
+  tyhja.className = 'tila-tyhja';
+  tyhja.textContent = (aktiivinenValilehti === 'reitti' ? 'Reitti' : 'Kartta') + ' — ei vielä rakennettu.';
+  kehys.appendChild(tyhja);
+}
+
+piirraValilehdet();
+piirraSisalto();
+</script>
+</body>
+</html>

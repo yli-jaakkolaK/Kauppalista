@@ -49,6 +49,45 @@
   }
 }
 
+/* === MERIKARTTA/LOKI-VISUAALINEN KIELI (2026-08-08) ===
+   TÄMÄ ON KOKO SATAMAN TULEVA VISUAALINEN KIELI, ei vain Hytin — Katrin
+   oma vahvistus 2026-08-08. Täysi lähde (koko design-system.css, kaikki
+   komponenttiluokat — arkki/nyt/boost/rulla/saadin/kal/helmi/tyhjä/suoja
+   ym.) on tallennettu erikseen: satama-design-system.css (Katri liitti
+   sisällön chattiin 2026-08-08 kun satama-komponentit.html-tiedostoa ei
+   löytynyt levyltä). TÄÄLLÄ on vain tokenit — rekisteröity globaalisti
+   custom propertyinä. KÄYTÖSSÄ TOISTAISEKSI vain Hytin uudessa kuoressa
+   (hytti-kuori-v1.html) — muut näkymät (Kauppalista, Laituri, Kalenteri
+   ym.) EIVÄT ole vielä siirtyneet tähän kieleen, se on oma, myöhempi
+   näkymä kerrallaan -migraatio, ei tehty tässä erässä. EI omaa tumma
+   teema -varianttia (design-systemissä ei ollut yhtä) — jos/kun
+   tarvitaan, se on oma, myöhempi päätös, ei arvattava nyt.
+   --vaara TARKOITUKSELLA JÄTETTY POIS tästä globaalista :root-lohkosta,
+   vaikka se ON osa design-systemiä (arvo #B8433A, ks. satama-design-
+   system.css) — se törmäisi sovelluksen jo olemassa olevaan, laajasti
+   käytettyyn, tumma/vaalea-teemalliseen --vaara-muuttujaan (kalenterin
+   ristiriitamerkintä ym.), eikä hiljaista törmäystä haluta. Kun Hytin
+   uusi kuori joskus tarvitsee "vaara"-väriä oikeasti, se on oma päätös
+   miten nimetä (esim. --loki-vaara), ei ratkaista tässä. */
+:root {
+  --paperi: #EAE6DC;
+  --muste: #221F1A;
+  --matalikko: #F0C79E;
+  --karikko: #E0A46F;
+  --syvanne: #3F5F53;
+  --messinki: #9C7A43;
+  --sinappi: #C29A2E;
+  --hius: rgba(34, 31, 26, .16);
+  --hius-vahva: rgba(34, 31, 26, .34);
+  --vaimea: rgba(34, 31, 26, .55);
+  --r-luettava: 3px;
+  --r-kosketettava: 13px;
+  --kelluu: cubic-bezier(.24, .72, .30, 1);
+  --keski: 520ms;
+  --hidas: 820ms;
+  --fontti-loki: 'Courier Prime', ui-monospace, monospace;
+}
+
 body {
   font-family: 'Courier New', Courier, monospace;
   background: var(--ground);
