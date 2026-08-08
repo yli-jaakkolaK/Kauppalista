@@ -1,0 +1,358 @@
+<!DOCTYPE html>
+<html lang="fi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Satama — Ruori</title>
+<link href="https://fonts.googleapis.com/css2?family=Courier+Prime:ital,wght@0,400;0,700;1,400&display=swap" rel="stylesheet">
+<style>
+:root{
+  --paperi:#EAE6DC;--muste:#221F1A;
+  --matalikko:#F0C79E;--karikko:#E0A46F;--vaara:#B8433A;
+  --syvanne:#3F5F53;--messinki:#9C7A43;--sinappi:#C29A2E;
+  --hius:rgba(34,31,26,.16);--hius-vahva:rgba(34,31,26,.34);--vaimea:rgba(34,31,26,.55);
+  --r-luettava:3px;--r-kosketettava:13px;
+  --kelluu:cubic-bezier(.24,.72,.30,1);--hidas:820ms;--keski:520ms;
+}
+*{box-sizing:border-box}html,body{margin:0}
+body{
+  background:var(--paperi);color:var(--muste);
+  font-family:'Courier Prime',ui-monospace,monospace;font-size:16px;line-height:1.5;
+  -webkit-font-smoothing:antialiased;
+}
+body::before{
+  content:'';position:fixed;inset:0;pointer-events:none;z-index:0;
+  background-image:radial-gradient(rgba(34,31,26,.045) .5px,transparent .5px);background-size:3px 3px;
+}
+.puhelin{position:relative;z-index:1;max-width:400px;margin:0 auto;padding:18px 16px 100px}
+.pieni{font-size:12.5px;color:var(--vaimea)}
+@media (prefers-reduced-motion:reduce){*,*::before{animation:none!important;transition-duration:.01ms!important}}
+
+/* ---------- yleinen segmentti ---------- */
+.segmentti{
+  display:block;width:100%;text-align:left;font-family:inherit;color:inherit;cursor:pointer;
+  background:rgba(255,253,248,.5);border:1px solid var(--hius);border-radius:var(--r-luettava);
+  padding:15px 16px;margin-bottom:12px;
+  transition:transform var(--keski) var(--kelluu),background var(--keski) var(--kelluu),box-shadow var(--keski) var(--kelluu);
+}
+.segmentti:hover,.segmentti:focus-visible{transform:translateY(-2px);background:rgba(255,253,248,.76);box-shadow:0 6px 16px rgba(34,31,26,.10)}
+.segmentti:active{transform:translateY(0) scale(.996)}
+.segmentti:focus-visible{outline:2px solid var(--messinki);outline-offset:3px}
+.otsikkorivi{display:flex;align-items:center;gap:8px;margin-bottom:2px}
+.otsikkorivi .luotaus{flex:1}
+.luotaus{font-size:10.5px;letter-spacing:.24em;text-transform:uppercase;color:var(--vaimea)}
+.piste{width:5px;height:5px;border-radius:50%;background:var(--vaara);flex:none}
+
+/* ==========================================================================
+   OTSAKE
+   ========================================================================== */
+.otsake{display:flex;justify-content:space-between;align-items:flex-start;padding:2px 2px 22px}
+.otsake-vas{flex:1;min-width:0}
+.tunnus{font-size:15px;letter-spacing:.3em;color:var(--vaimea);margin:0 0 12px}
+
+.kuormakytkin{display:flex;align-items:center;gap:9px;margin-bottom:12px;cursor:pointer;
+  background:none;border:0;padding:0;font-family:inherit}
+.kytkin{width:34px;height:19px;border-radius:5px;border:1px solid var(--hius-vahva);
+  background:var(--paperi);position:relative;flex:none;transition:all var(--keski) var(--kelluu)}
+.kytkin i{position:absolute;top:2px;left:2px;width:13px;height:13px;border-radius:3px;
+  background:var(--muste);transition:transform var(--keski) var(--kelluu)}
+.kuormakytkin.paalla .kytkin{border-color:var(--vaara)}
+.kuormakytkin.paalla .kytkin i{background:var(--vaara);transform:translateX(15px)}
+.kytkin-teksti{font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--vaara);
+  opacity:0;transition:opacity var(--keski) var(--kelluu)}
+.kuormakytkin.paalla .kytkin-teksti{opacity:1}
+
+.paivamaara{display:flex;align-items:baseline;gap:9px}
+.paivamaara b{font-size:44px;font-weight:700;letter-spacing:-.035em;line-height:.85}
+.paivapino{display:flex;flex-direction:column;line-height:1.15}
+.paivapino .vk{font-size:19px;font-weight:700}
+.paivapino .kk{font-size:10.5px;letter-spacing:.16em;color:var(--vaimea);text-transform:uppercase}
+
+.kello-kehys{
+  flex:none;width:150px;height:150px;border-radius:20px;
+  border:1px solid rgba(156,122,67,.42);
+  background:linear-gradient(160deg,rgba(255,252,244,.7),rgba(234,230,220,.3));
+  backdrop-filter:blur(9px);-webkit-backdrop-filter:blur(9px);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.65);
+  display:grid;place-items:center;
+}
+
+/* ---------- Nosto (harvinainen) ---------- */
+.nosto{border-left:3px solid var(--vaara);padding-left:15px}
+.nosto .luotaus{color:var(--vaara)}
+.nosto-teksti{font-size:15px;font-weight:700;margin:2px 0 8px}
+.nosto-tila{font-size:11px;color:var(--vaimea);letter-spacing:.06em}
+
+/* ---------- Kalenteri ---------- */
+.kalenteri{padding:0;overflow:hidden}
+.kal-yla{padding:15px 16px 13px}
+.kal-aika{font-size:22px;font-weight:700;letter-spacing:-.02em}
+.kal-lisaa{font-size:13px;color:var(--vaimea);margin-left:6px}
+.kal-lippu{padding:12px 16px;border-top:1px dotted var(--hius-vahva);background:rgba(184,67,58,.05)}
+.kal-lippu-ylarivi{display:flex;align-items:center;gap:9px;margin-bottom:3px}
+.tagi-raskas{font-size:10px;letter-spacing:.16em;text-transform:uppercase;font-weight:700;
+  padding:2px 7px;border-radius:2px;background:var(--matalikko);color:var(--muste)}
+.tagi-sos{background:var(--karikko);color:var(--muste)}
+.kal-lippu-rivi{font-size:14px;font-weight:700}
+.kal-lippu-syy{font-size:12px;color:var(--vaara);margin-top:2px}
+.kal-selite{padding:9px 16px;border-top:1px solid var(--hius);font-size:11.5px;color:var(--vaimea)}
+
+/* ---------- Sää ---------- */
+.saa-yla{display:flex;align-items:center;gap:10px;margin-bottom:12px}
+.saa-lampo{font-size:30px;font-weight:700;letter-spacing:-.02em}
+.leimat{margin-left:auto;display:flex}
+.leima{font-size:10.5px;letter-spacing:.04em;display:flex;align-items:center;gap:3px;
+  color:var(--vaimea);transform:rotate(var(--kallistus,0deg));margin-left:-6px;
+  background:var(--paperi);padding:1px 4px}
+.saa-jana{display:flex;justify-content:space-between}
+.saa-slotti{text-align:center;font-size:11px;color:var(--vaimea);flex:1}
+.saa-slotti .t{display:block;font-size:12.5px;color:var(--muste);font-weight:700;margin-top:2px}
+.sade{height:3px;background:var(--muste);border-radius:2px;margin-top:6px;position:relative}
+.sade span{position:absolute;top:5px;left:50%;transform:translateX(-50%);font-size:9.5px;color:var(--vaimea)}
+
+/* ---------- Ankkurit ---------- */
+.ankkurit{background:none;border:0;padding:0;box-shadow:none;cursor:default}
+.ankkurit:hover{transform:none;background:none;box-shadow:none}
+.ankkuri-rivi{
+  display:flex;align-items:center;gap:11px;padding:12px 15px;margin-bottom:8px;
+  background:rgba(255,253,248,.5);border:1px solid var(--hius);border-radius:var(--r-luettava);
+  transition:opacity var(--hidas) var(--kelluu),transform var(--hidas) var(--kelluu);
+}
+.ankkuri-rivi.poistuu{opacity:0;transform:translateX(24px)}
+.ankkuri-rivi input{width:16px;height:16px;accent-color:var(--syvanne);flex:none}
+.ankkuri-rivi span{font-size:14.5px}
+
+/* ---------- Hytti ---------- */
+.hytti-luento{display:flex;align-items:center;gap:6px;margin-bottom:6px}
+.hytti-luento .piste{background:var(--vaara)}
+.hytti-luento span{font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--vaara);font-weight:700}
+.hytti-ylarivi{display:flex;align-items:flex-start;gap:14px}
+.hytti-aika{font-size:32px;font-weight:700;letter-spacing:-.03em;line-height:1}
+.hytti-teksti{flex:1;min-width:0}
+.hytti-kurssi{font-size:12.5px;color:var(--vaimea)}
+.hytti-aihe{font-size:18px;font-weight:700;line-height:1.25;margin-top:1px}
+.hytti-sali{font-size:11.5px;color:var(--vaimea);margin-top:2px}
+.avaa{
+  flex:none;width:36px;height:36px;border-radius:10px;
+  border:1px solid rgba(156,122,67,.5);
+  background:linear-gradient(160deg,rgba(255,252,244,.85),rgba(234,230,220,.4));
+  backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.75);
+  display:grid;place-items:center;color:var(--muste);
+}
+.hytti-alarivi{margin-top:12px;padding-top:11px;border-top:1px dotted var(--hius-vahva)}
+.hytti-vaihe{font-size:11px;letter-spacing:.2em;text-transform:uppercase;color:var(--syvanne);font-weight:700}
+.hytti-vihje{font-size:14px;margin-top:5px;line-height:1.5}
+
+/* ---------- Kuormitustila päällä ---------- */
+.rauha{padding:22px 18px;text-align:center;border:1px dashed var(--hius-vahva);border-radius:var(--r-luettava);margin-bottom:12px}
+.rauha b{display:block;font-size:11px;letter-spacing:.2em;text-transform:uppercase;color:var(--vaara);margin-bottom:8px}
+.rauha p{margin:0;font-size:14.5px;line-height:1.6;color:var(--vaimea);max-width:30ch;margin-inline:auto}
+
+/* ---------- Alapalkki ---------- */
+.alapalkki{
+  position:fixed;left:0;right:0;bottom:0;z-index:2;
+  display:flex;justify-content:space-around;padding:10px 6px 16px;
+  background:rgba(234,230,220,.86);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);
+  border-top:1px solid var(--hius-vahva);
+}
+.tabi{background:none;border:0;font-family:inherit;display:flex;flex-direction:column;align-items:center;
+  gap:4px;color:var(--vaimea);cursor:pointer;padding:2px 6px}
+.tabi svg{width:22px;height:22px}
+.tabi span{font-size:9.5px;letter-spacing:.08em;text-transform:uppercase}
+.tabi.aktiivinen{color:var(--muste)}
+.tabi.aktiivinen svg{stroke:var(--muste)}
+
+</style>
+</head>
+<body>
+<div class="puhelin">
+
+  <!-- OTSAKE -->
+  <div class="otsake">
+    <div class="otsake-vas">
+      <p class="tunnus">S A T A M A</p>
+      <button class="kuormakytkin" id="kuormanappi">
+        <span class="kytkin"><i></i></span>
+        <span class="kytkin-teksti">Kuormitustila</span>
+      </button>
+      <div class="paivamaara">
+        <b>7</b>
+        <div class="paivapino"><span class="vk">to</span><span class="kk">elokuuta</span></div>
+      </div>
+    </div>
+    <div class="kello-kehys">
+      <svg width="134" height="134" viewBox="0 0 110 110">
+        <circle cx="55" cy="55" r="52" fill="none" stroke="#221F1A" stroke-width="1"/>
+        <g id="viivat"></g>
+        <g id="numerot" font-family="'Courier Prime',monospace" font-size="10" fill="#221F1A" text-anchor="middle" dominant-baseline="middle"></g>
+        <line id="tuntiviisari" x1="55" y1="55" stroke="#221F1A" stroke-width="3" stroke-linecap="round"/>
+        <line id="minuuttiviisari" x1="55" y1="55" stroke="#221F1A" stroke-width="1.6" stroke-linecap="round"/>
+        <circle cx="55" cy="55" r="2.4" fill="#221F1A"/>
+      </svg>
+    </div>
+  </div>
+
+  <!-- NOSTO -->
+  <div class="segmentti nosto" id="nosto-osio">
+    <div class="otsikkorivi"><span class="luotaus">Nosto</span></div>
+    <div class="nosto-teksti">Symmetrinen salaus — deadline huomenna</div>
+    <div class="nosto-tila">Ei aloitettu</div>
+  </div>
+
+  <!-- KALENTERI -->
+  <button class="segmentti kalenteri">
+    <div class="kal-yla">
+      <span class="kal-aika">10:00</span><span class="kal-lisaa">Kampaaja + 2 muuta</span>
+    </div>
+    <div class="kal-lippu">
+      <div class="kal-lippu-ylarivi">
+        <span class="tagi-raskas">RASKAS</span><span class="pieni">14:00</span>
+      </div>
+      <div class="kal-lippu-rivi">Juha: palaveri, Espoo</div>
+      <div class="kal-lippu-syy">Molemmat varattuina · lapset kotona</div>
+    </div>
+    <div class="kal-selite">Eilen lyhyet yöunet</div>
+  </button>
+
+  <!-- SÄÄ -->
+  <button class="segmentti saa">
+    <div class="saa-yla">
+      <span style="font-size:22px">☁︎</span>
+      <span class="saa-lampo">17°</span>
+      <div class="leimat">
+        <span class="leima" style="--kallistus:-4deg">☂ Sateenvarjo</span>
+        <span class="leima" style="--kallistus:3deg">🧢 Hattu</span>
+      </div>
+    </div>
+    <div class="saa-jana">
+      <div class="saa-slotti">8<span class="t">14°</span></div>
+      <div class="saa-slotti">10<span class="t">15°</span></div>
+      <div class="saa-slotti">12<span class="t">17°</span></div>
+      <div class="saa-slotti">14<span class="t">17°</span></div>
+      <div class="saa-slotti">16<span class="t">16°</span></div>
+      <div class="saa-slotti">18<span class="t">15°</span></div>
+    </div>
+    <div class="sade" style="margin-left:33%;width:34%"><span>60%</span></div>
+  </button>
+
+  <!-- ANKKURIT -->
+  <div class="segmentti ankkurit">
+    <div class="otsikkorivi"><span class="luotaus">Ankkurit</span></div>
+    <div id="ankkuri-lista">
+      <label class="ankkuri-rivi"><input type="checkbox"><span>Vastaa Sannalle sähköpostiin</span></label>
+      <label class="ankkuri-rivi"><input type="checkbox"><span>Tilaa uudet kengät Rebekalle</span></label>
+      <label class="ankkuri-rivi"><input type="checkbox"><span>Varaa hammaslääkäriaika</span></label>
+    </div>
+  </div>
+
+  <!-- HYTTI -->
+  <button class="segmentti hytti">
+    <div class="hytti-luento"><span class="piste"></span><span>Luento tänään</span></div>
+    <div class="hytti-ylarivi">
+      <span class="hytti-aika">10:15</span>
+      <div class="hytti-teksti">
+        <div class="hytti-kurssi">Introduction to Programming</div>
+        <div class="hytti-aihe">Ehtolauseet</div>
+        <div class="hytti-sali">Karaportti 2, sali B248</div>
+      </div>
+      <span class="avaa"><svg width="14" height="14" viewBox="0 0 15 15" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 11L11 4M11 4H5.5M11 4v5.5"/></svg></span>
+    </div>
+    <div class="hytti-alarivi">
+      <div class="hytti-vaihe">Priming</div>
+      <div class="hytti-vihje">Kirjoita luennon aikana kolme kysymystä joihin haluat vastauksen.</div>
+    </div>
+  </button>
+
+  <!-- RAUHA (kuormitustila päällä) -->
+  <div class="rauha" id="rauha-osio" style="display:none">
+    <b>Kuormitustila päällä</b>
+    <p>Ankkurit ja Hytti ovat piilossa. Ne odottavat siellä missä olivatkin.</p>
+  </div>
+
+</div>
+
+<nav class="alapalkki">
+  <button class="tabi aktiivinen">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+      <circle cx="12" cy="12" r="6.2"/>
+      <circle cx="12" cy="12" r="2"/>
+      <path d="M12 5.8V1.6M12 18.2v4.2M5.8 12H1.6M18.2 12h4.2"/>
+      <path d="M7.6 7.6L4.6 4.6M16.4 7.6l3-3M7.6 16.4l-3 3M16.4 16.4l3 3"/>
+    </svg>
+    <span>Ruori</span>
+  </button>
+  <button class="tabi">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+      <circle cx="12" cy="12" r="8.4"/>
+      <circle cx="12" cy="12" r="3.6"/>
+      <path d="M6.05 6.05l2.55 2.55M17.95 6.05l-2.55 2.55M6.05 17.95l2.55-2.55M17.95 17.95l-2.55-2.55" stroke-width="2.4"/>
+    </svg>
+    <span>Laituri</span>
+  </button>
+  <button class="tabi">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="5" width="16" height="16" rx="1.5"/><path d="M4 9.5h16M8 3v4M16 3v4"/></svg>
+    <span>Kalenteri</span>
+  </button>
+  <button class="tabi">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M6 21V9l6-5 6 5v12"/><rect x="10" y="13" width="4" height="8"/></svg>
+    <span>Hytti</span>
+  </button>
+  <button class="tabi">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="5" cy="12" r="1.4"/><circle cx="12" cy="12" r="1.4"/><circle cx="19" cy="12" r="1.4"/></svg>
+    <span>Lisää</span>
+  </button>
+</nav>
+
+<script>
+const svg='http://www.w3.org/2000/svg';
+const viivat=document.getElementById('viivat'), numerot=document.getElementById('numerot');
+for(let i=0;i<60;i++){
+  const a=i*6*Math.PI/180, iso=i%5===0;
+  const r1=iso?42:47, r2=52;
+  const l=document.createElementNS(svg,'line');
+  l.setAttribute('x1',55+r1*Math.sin(a));l.setAttribute('y1',55-r1*Math.cos(a));
+  l.setAttribute('x2',55+r2*Math.sin(a));l.setAttribute('y2',55-r2*Math.cos(a));
+  l.setAttribute('stroke','#221F1A');l.setAttribute('stroke-width',iso?1.3:.6);
+  l.setAttribute('opacity',iso?0.85:0.35);
+  viivat.appendChild(l);
+}
+[12,1,2,3,4,5,6,7,8,9,10,11].forEach(h=>{
+  const a=(h%12)*30*Math.PI/180;
+  const t=document.createElementNS(svg,'text');
+  t.setAttribute('x',55+36*Math.sin(a));t.setAttribute('y',55-36*Math.cos(a));
+  t.setAttribute('font-weight','700');t.setAttribute('font-size',13);
+  t.textContent=h; numerot.appendChild(t);
+});
+function paivitaKello(){
+  const nyt=new Date(),h=nyt.getHours()%12,m=nyt.getMinutes();
+  const ha=(h+m/60)*30*Math.PI/180, ma=m*6*Math.PI/180;
+  document.getElementById('tuntiviisari').setAttribute('x2',55+26*Math.sin(ha));
+  document.getElementById('tuntiviisari').setAttribute('y2',55-26*Math.cos(ha));
+  document.getElementById('minuuttiviisari').setAttribute('x2',55+38*Math.sin(ma));
+  document.getElementById('minuuttiviisari').setAttribute('y2',55-38*Math.cos(ma));
+}
+paivitaKello(); setInterval(paivitaKello,15000);
+
+document.querySelectorAll('.ankkuri-rivi input').forEach(cb=>{
+  cb.addEventListener('change',()=>{
+    if(cb.checked){
+      const rivi=cb.closest('.ankkuri-rivi');
+      rivi.classList.add('poistuu');
+      setTimeout(()=>rivi.remove(),820);
+    }
+  });
+});
+
+const kytkin=document.getElementById('kuormanappi'), rauha=document.getElementById('rauha-osio');
+const hytti=document.querySelector('.hytti'), ankkurit=document.querySelector('.ankkurit');
+function asetaKuorma(paalla){
+  kytkin.classList.toggle('paalla',paalla);
+  rauha.style.display=paalla?'block':'none';
+  hytti.style.display=paalla?'none':'block';
+  ankkurit.style.display=paalla?'none':'block';
+}
+kytkin.addEventListener('click',()=>asetaKuorma(!kytkin.classList.contains('paalla')));
+</script>
+</body>
+</html>
