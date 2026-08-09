@@ -313,6 +313,9 @@ async function lataaKotinakyma() {
   loadAnchorCandidates();
   paivitaRistiriitaPallura();
   paivitaPaivamaara();
+  lataaRuoriKalenteri();
+  lataaRuoriHytti();
+  paivitaRuoriNakyvyys();
 }
 
 // Hakee kategorian listat ja piirtää ne annettuun säiliöön. Käytetään sekä
@@ -5594,12 +5597,217 @@ document.getElementById('hytti-arkisto-sulje').addEventListener('click', functio
   document.getElementById('hytti-arkisto-overlay').style.display = 'none';
 });
 
-// Näyttää tämänpäiväisen päivämäärän suomeksi etusivun yläosassa
+// Näyttää tämänpäiväisen päivämäärän Ruorin otsakkeessa — iso numero +
+// viikonpäivä/kuukausi-pino (2026-08-08, ks. satama-ruori.html-mockup;
+// korvasi aiemman yksirivisen "torstai 7. elokuuta" -tekstin #home-datessa).
 function paivitaPaivamaara() {
   const paivat = ['sunnuntai', 'maanantai', 'tiistai', 'keskiviikko', 'torstai', 'perjantai', 'lauantai'];
   const kuukaudet = ['tammikuuta', 'helmikuuta', 'maaliskuuta', 'huhtikuuta', 'toukokuuta', 'kesäkuuta', 'heinäkuuta', 'elokuuta', 'syyskuuta', 'lokakuuta', 'marraskuuta', 'joulukuuta'];
   const nyt = new Date();
-  document.getElementById('home-date').textContent = paivat[nyt.getDay()] + ' ' + nyt.getDate() + '. ' + kuukaudet[nyt.getMonth()];
+  document.getElementById('ruori-paiva-numero').textContent = nyt.getDate();
+  document.getElementById('ruori-viikonpaiva').textContent = paivat[nyt.getDay()].slice(0, 2);
+  document.getElementById('ruori-kuukausi').textContent = kuukaudet[nyt.getMonth()];
+}
+
+// === RUORI-KELLO (2026-08-08) === analoginen kello otsakkeen messinki-
+// kehyksessä, ks. satama-ruori.html. Tick-viivat/numerot piirretään kerran
+// (eivät muutu), viisarit päivittyvät 15s välein — kello ei ole eikä
+// tarvitse olla sekuntitarkka tässä käyttötarkoituksessa.
+function alustaRuoriKello() {
+  const viivat = document.getElementById('ruori-kello-viivat');
+  const numerot = document.getElementById('ruori-kello-numerot');
+  if (!viivat || !numerot || viivat.childElementCount > 0) return;
+  const svgNs = 'http://www.w3.org/2000/svg';
+  for (let i = 0; i < 60; i++) {
+    const kulma = i * 6 * Math.PI / 180, iso = i % 5 === 0;
+    const r1 = iso ? 42 : 47, r2 = 52;
+    const viiva = document.createElementNS(svgNs, 'line');
+    viiva.setAttribute('x1', 55 + r1 * Math.sin(kulma));
+    viiva.setAttribute('y1', 55 - r1 * Math.cos(kulma));
+    viiva.setAttribute('x2', 55 + r2 * Math.sin(kulma));
+    viiva.setAttribute('y2', 55 - r2 * Math.cos(kulma));
+    viiva.setAttribute('stroke', '#221F1A');
+    viiva.setAttribute('stroke-width', iso ? 1.3 : .6);
+    viiva.setAttribute('opacity', iso ? 0.85 : 0.35);
+    viivat.appendChild(viiva);
+  }
+  // Kaikki 12 tuntinumeroa samalla painolla/koolla (2026-08-08, Katrin
+  // korjaus alkuperäiseen "vain 12/3/6/9" -versioon) — ei himmennettyjä
+  // välinumeroita, kello luettava yhdellä vilkaisulla.
+  [12, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11].forEach(function(h) {
+    const kulma = (h % 12) * 30 * Math.PI / 180;
+    const teksti = document.createElementNS(svgNs, 'text');
+    teksti.setAttribute('x', 55 + 36 * Math.sin(kulma));
+    teksti.setAttribute('y', 55 - 36 * Math.cos(kulma));
+    teksti.textContent = h;
+    numerot.appendChild(teksti);
+  });
+}
+
+function paivitaRuoriKello() {
+  const tuntiviisari = document.getElementById('ruori-tuntiviisari');
+  const minuuttiviisari = document.getElementById('ruori-minuuttiviisari');
+  if (!tuntiviisari || !minuuttiviisari) return;
+  const nyt = new Date(), h = nyt.getHours() % 12, m = nyt.getMinutes();
+  const ha = (h + m / 60) * 30 * Math.PI / 180, ma = m * 6 * Math.PI / 180;
+  tuntiviisari.setAttribute('x2', 55 + 26 * Math.sin(ha));
+  tuntiviisari.setAttribute('y2', 55 - 26 * Math.cos(ha));
+  minuuttiviisari.setAttribute('x2', 55 + 38 * Math.sin(ma));
+  minuuttiviisari.setAttribute('y2', 55 - 38 * Math.cos(ma));
+}
+
+alustaRuoriKello();
+paivitaRuoriKello();
+setInterval(paivitaRuoriKello, 15000);
+
+// === RUORI: KUORMITUSTILA (2026-08-08) === manuaalinen "olen ylikuormittunut,
+// piilota Ankkurit ja Hytti" -kytkin, ks. satama-ruori.html. Puhtaasti
+// paikallinen (localStorage) tila — EI Supabase-riviä, koska tämä on
+// hetkellinen näkymäsuodatin eikä jaettua/pysyvää dataa muille laitteille.
+const RUORI_KUORMITUSTILA_AVAIN = 'ruori_kuormitustila';
+let ruoriHyttiOnData = false;
+
+function ruoriKuormitustilaPaalla() {
+  return localStorage.getItem(RUORI_KUORMITUSTILA_AVAIN) === '1';
+}
+
+// Yhdistää kuormitustilan JA segmentin oman datan saatavuuden yhdeksi
+// näkyvyyspäätökseksi Hytille (Ankkurit näkyy aina paitsi kuormitustilassa,
+// koska sillä ei ole omaa "ei dataa" -tyhjää tilaa tällä sivulla).
+function paivitaRuoriNakyvyys() {
+  const paalla = ruoriKuormitustilaPaalla();
+  const kytkin = document.getElementById('kuormanappi');
+  const rauha = document.getElementById('rauha-osio');
+  const ankkuritSegmentti = document.querySelector('#home-view .segmentti.ankkurit');
+  const hyttiSegmentti = document.getElementById('ruori-hytti-segmentti');
+  if (kytkin) kytkin.classList.toggle('paalla', paalla);
+  if (rauha) rauha.style.display = paalla ? 'block' : 'none';
+  if (ankkuritSegmentti) ankkuritSegmentti.style.display = paalla ? 'none' : 'block';
+  if (hyttiSegmentti) hyttiSegmentti.style.display = (!paalla && ruoriHyttiOnData) ? 'block' : 'none';
+}
+
+document.getElementById('kuormanappi').addEventListener('click', function() {
+  localStorage.setItem(RUORI_KUORMITUSTILA_AVAIN, ruoriKuormitustilaPaalla() ? '0' : '1');
+  paivitaRuoriNakyvyys();
+});
+
+// === RUORI: KALENTERI-SEGMENTTI (2026-08-08) === tämän päivän ensimmäinen
+// tapahtuma + ristiriita/huolilippu-tila, ks. satama-ruori.html. Käyttää
+// TÄSMÄLLEEN samoja ristiriita-/huolilaskentafunktioita kuin oikea
+// Kalenteri-näkymä (paivanRistiriitaTila, computeVisibleDaySignals) — ei
+// omaa, eriytyvää päättelyä samasta asiasta. Napautus vie oikeaan
+// päivänäkymään, sama reitti kuin sections-list-ruudukon Kalenteri-ruudulla.
+async function lataaRuoriKalenteri() {
+  const tanaanIso = paivamaaraISO(new Date());
+  const puskuriAlku = new Date();
+  puskuriAlku.setDate(puskuriAlku.getDate() - MONIPAIVAINEN_PUSKURI_PV);
+
+  const segmentti = document.getElementById('ruori-kalenteri-segmentti');
+  const tyhja = document.getElementById('ruori-kalenteri-tyhja');
+
+  const { data: haetut, error } = await db.from('kalenteri_tapahtumat')
+    .select('*, kalenteri_syotteet(vari, henkilo, scope)')
+    .gte('event_date', paivamaaraISO(puskuriAlku))
+    .lte('event_date', tanaanIso)
+    .order('event_time', { nullsFirst: false });
+
+  if (error) {
+    console.error('Ruorin kalenterikatsauksen haku epäonnistui:', error);
+    segmentti.style.display = 'none';
+    tyhja.style.display = 'none';
+    return;
+  }
+
+  const rivit = (haetut || [])
+    .map(function(t) {
+      return Object.assign({}, t, {
+        _henkilo: t.kalenteri_syotteet ? t.kalenteri_syotteet.henkilo : null,
+        _scope: t.kalenteri_syotteet ? t.kalenteri_syotteet.scope : null,
+      });
+    })
+    .filter(function(t) { return tapahtumaKattaaPaivan(t, tanaanIso); });
+
+  if (rivit.length === 0) {
+    segmentti.style.display = 'none';
+    tyhja.style.display = 'block';
+    return;
+  }
+  tyhja.style.display = 'none';
+  segmentti.style.display = 'block';
+  segmentti.onclick = function() { avaaOsio({ route: 'kalenteri' }); };
+
+  const jarjestetyt = jarjestaAjanMukaan(rivit.slice());
+  const eka = jarjestetyt[0];
+  document.getElementById('ruori-kal-aika').textContent = eka.event_time ? eka.event_time.slice(0, 5) : 'Koko päivä';
+  document.getElementById('ruori-kal-lisaa').textContent = jarjestetyt.length > 1
+    ? (eka.title + ' + ' + (jarjestetyt.length - 1) + ' muuta')
+    : eka.title;
+
+  const henkselit = await fetchVisibleHenkselit(tanaanIso, tanaanIso);
+  const ristiriita = paivanRistiriitaTila(rivit, tanaanIso, henkselit);
+  const signaalit = await computeVisibleDaySignals(rivit, [tanaanIso]);
+  const onHuoli = signaalit.huoliIsot.has(tanaanIso);
+
+  const lippu = document.getElementById('ruori-kal-lippu');
+  const tagi = document.getElementById('ruori-kal-tagi');
+  const syy = document.getElementById('ruori-kal-lippu-syy');
+  if (ristiriita.onRistiriita) {
+    lippu.style.display = 'block';
+    tagi.textContent = '⚠️ RISTIRIITA';
+    tagi.classList.add('tagi-ristiriita');
+    const nimet = rivit.filter(function(t) { return ristiriita.fullIds.indexOf(t.id) !== -1; }).map(function(t) { return t.title; });
+    syy.textContent = nimet.length ? (nimet.join(' · ') + ' menevät päällekkäin') : 'Kaksi menoa päällekkäin tänään';
+  } else if (onHuoli) {
+    lippu.style.display = 'block';
+    tagi.textContent = '🟠 HUOLI';
+    tagi.classList.remove('tagi-ristiriita');
+    syy.textContent = 'Tälle päivälle on merkitty huolilippu.';
+  } else {
+    lippu.style.display = 'none';
+  }
+}
+
+// === RUORI: HYTTI-SEGMENTTI (2026-08-08) === tämän päivän ensimmäinen
+// "tarjolla"-tilainen PACER-askel, ks. satama-ruori.html. LUKEE VAIN jo
+// olemassa olevia opinto_paivan_askeleet-rivejä (sama kysely kuin
+// lataaOpintoPaivanAskeleet(), mutta ilman sen laskenta/insert-sivuvaikutusta)
+// — jos päivän askelia ei ole vielä laskettu (Hytti-näkymää ei ole avattu
+// tänään), segmentti piiloutuu kuten muutkin tyhjät Ruori-segmentit, EIKÄ
+// laukaise laskentaa itse home-sivulta käsin. Ei näytä kellonaikaa: PACER-
+// askelilla ei ole kellonaikaa, mockupin "10:15" olisi tässä keksittyä dataa.
+async function lataaRuoriHytti() {
+  ruoriHyttiOnData = false;
+  if (!currentUserId) { paivitaRuoriNakyvyys(); return; }
+  const tanaan = opintoTanaanPvm();
+  const { data, error } = await db.from('opinto_paivan_askeleet')
+    .select('*, opinto_aiheet(*, opinto_kurssit(name)), taitosolmut(*)')
+    .eq('owner_id', currentUserId).eq('pvm', tanaan).eq('tila', 'tarjolla')
+    .order('created_at').limit(1);
+
+  if (error) {
+    console.error('Ruorin Hytti-katsauksen haku epäonnistui:', error);
+    paivitaRuoriNakyvyys();
+    return;
+  }
+
+  const askel = (data || [])[0];
+  const kohde = askel && (askel.opinto_aiheet || askel.taitosolmut);
+  if (!kohde) { paivitaRuoriNakyvyys(); return; }
+
+  const alaotsikko = askel.opinto_aiheet
+    ? (kohde.opinto_kurssit ? kohde.opinto_kurssit.name : '')
+    : (kohde.lahde || '');
+  document.getElementById('ruori-hytti-kurssi').textContent = alaotsikko;
+  document.getElementById('ruori-hytti-aihe').textContent = kohde.name;
+  document.getElementById('ruori-hytti-vaihe').textContent = OPINTO_VAIHE_NIMET[kohde.vaihe];
+  const seuraava = seuraavaOpintoVaiheKuvaus(kohde);
+  document.getElementById('ruori-hytti-vihje').textContent = seuraava
+    ? ('Ehdotus: "✓ Tehty" siirtää vaiheeseen "' + seuraava + '".')
+    : 'Tämä aihe on jo hallussa.';
+  document.getElementById('ruori-hytti-segmentti').onclick = function() { avaaOsio({ route: 'hytti' }); };
+
+  ruoriHyttiOnData = true;
+  paivitaRuoriNakyvyys();
 }
 
 let cachedAnkkurit = [];
@@ -5744,6 +5952,12 @@ async function lataaAnkkurit() {
     });
     li.appendChild(teksti);
 
+    // Muistutuksen aikamerkki (2026-08-08, Ruori-uudistus): itse ⏰-toiminto
+    // asuu nyt ⋯-valikossa (ks. alempana), mutta asetettu aika näkyy silti
+    // tekstin perässä — reminderTimeBadge() on rakennettu juuri tätä varten.
+    const muistutusBadge = reminderTimeBadge('ankkuri', ankkuri.id);
+    if (muistutusBadge) li.appendChild(muistutusBadge);
+
     // BUGIKORJAUS (2026-07-14, "Ankkurien hätäkorjaus"): kolme käsin luotua
     // ankkuria katosi vahinkopainalluksista jäljettömiin — käsin luotu ankkuri
     // ON sisältö (ei vain osoitin lähteeseen, ks. "Ankkuriarkkitehtuuri"-
@@ -5797,23 +6011,44 @@ async function lataaAnkkurit() {
     });
     li.appendChild(irrotaNappi);
 
-    // Siirto myös TAVALLISILLE ankkureille (ei enää vain ehdotuksille), ks.
-    // "💬-ehdotuksen elinkaari": hyväksytty ehdotus muuttuu tavalliseksi
-    // ankkuriksi eikä tarve siirtää sitä katoa hyväksymisen myötä.
-    li.appendChild(siirraNappi(ankkuri.id, lataaAnkkurit));
-
-    li.appendChild(luoMuistutusNappi('ankkuri', ankkuri.id, ankkuri.content, null, ankkuri.event_time, lataaAnkkurit));
-
+    // ⋯-valikko (2026-08-08, Ruori-uudistus, Katrin pyyntö): Siirrä/Muistutus/
+    // Ehdota olivat aiemmin kolme erillistä ikonia rivin lopussa (yhdessä ⚓:n
+    // kanssa neljä-viisi ikonia) — nyt saman "⋯"-valikon takana, sama
+    // createOverflowButton/openRowMenu-koneisto kuin muualla sovelluksessa
+    // (esim. Varasto/elävät rivit). ⚓ pysyy omana, aina näkyvänä nappina
+    // rivin oikeassa reunassa. Jokaisen kohdan TOIMINNALLISUUS on täsmälleen
+    // sama kuin ennen (siirraNappi/luoMuistutusNappi/"Ehdota X:lle" -logiikat
+    // sellaisenaan) — vain napautusreitti muuttui.
+    const ankkuriValikko = [
+      {
+        label: 'Muistutus',
+        onClick: function() { avaaMuistutusPaneeli('ankkuri', ankkuri.id, ankkuri.content, null, ankkuri.event_time, lataaAnkkurit); },
+      },
+      {
+        label: 'Siirrä myöhemmäksi',
+        onClick: function() {
+          const vastaus = prompt('Nouse uudelleen kuinka monen tunnin päästä?', '24');
+          if (vastaus === null) return;
+          const tunteja = parseInt(vastaus, 10);
+          if (!tunteja || tunteja < 1) return;
+          const uusiHetki = new Date();
+          uusiHetki.setHours(uusiHetki.getHours() + tunteja);
+          db.from('ankkurit').update({ visible_from: uusiHetki.toISOString() }).eq('id', ankkuri.id).then(function(res) {
+            ilmoitaKirjoitusvirheesta(res.error, 'Ankkurin siirto');
+            lataaAnkkurit();
+          });
+        },
+      },
+    ];
     // "Ehdota [Nimi]:lle" toiselle lähtöpisteenä (2026-07-18, ks.
     // muistiinpanot.md "💬-ehdotuksen löydettävyys") — tilanne "kirjoitin
-    // itselleni, tajusin että kuuluukin hänelle". Harvemmin tarvittu (vain
-    // korjaava tapaus, ei pääkäyttötapa) → ⋯-valikkoon eikä omaksi napiksi,
-    // rivillä on jo viisi ikonia. Luo UUDEN Laituri-murun kotina (ei käytä
-    // tämän ankkurin omaa lähdettä — se voi olla mikä tahansa taulu, ei aina
-    // laituri), täsmälleen sama koneisto kuin lisäysvaiheen kohdevalinnalla.
+    // itselleni, tajusin että kuuluukin hänelle". Luo UUDEN Laituri-murun
+    // kotina (ei käytä tämän ankkurin omaa lähdettä — se voi olla mikä
+    // tahansa taulu, ei aina laituri), täsmälleen sama koneisto kuin
+    // lisäysvaiheen kohdevalinnalla.
     if (toinenKayttaja) {
       const ankkuriAvain = 'ankkuri:' + ankkuri.id;
-      li.appendChild(createOverflowButton(li, [{
+      ankkuriValikko.push({
         label: 'Ehdota ' + henkiloAllatiivi(toinenKayttaja.henkilo),
         onClick: async function() {
           if (ehdotetutTassaIstunnossa.has(ankkuriAvain)) {
@@ -5824,8 +6059,9 @@ async function lataaAnkkurit() {
           naytaIlmoitus(onnistui ? ('Ehdotettu ' + henkiloAllatiivi(toinenKayttaja.henkilo)) : 'Ehdotuksen lähetys epäonnistui');
           if (onnistui) ehdotetutTassaIstunnossa.add(ankkuriAvain);
         },
-      }]));
+      });
     }
+    li.appendChild(createOverflowButton(li, ankkuriValikko));
 
     listEl.appendChild(li);
   });

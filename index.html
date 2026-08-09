@@ -23,24 +23,95 @@
     <button class="login-btn" id="login-btn">Kirjaudu Googlella</button>
   </div>
 
-  <div class="container" id="home-view" style="display:none">
-    <h1>✱ SATAMA ✱</h1>
-    <div class="subtitle" id="home-date"></div>
-    <hr class="divider">
+  <!-- RUORI (2026-08-08, merikartta/loki-visuaalinen kieli, ks.
+       satama-ruori.html-mockup ja satama-design-system.css) — v7-speksin
+       segmenttirakenne: Kalenteri/Ankkurit/Hytti ovat oikealla datalla,
+       Sää ja Nosto puuttuvat toistaiseksi (Sää vaatisi uuden sää-API:n,
+       Nostolle ei vielä ole "mikä on tärkein" -sääntöä). #sections-list
+       (navigointiruudukko Laituriin/Muistilappuihin/Varastoon/Asetuksiin)
+       on ainoa reitti niihin näkymiin eikä kuulu v7-speksiin, joten se
+       säilyy ennallaan Hytin alla siihen asti kunnes oikea alapalkki
+       rakennetaan. -->
+  <div class="container ruori" id="home-view" style="display:none">
 
-    <div class="section-title">⚓ Ankkurit <span class="inline-badge" id="anchor-candidates-badge" style="display:none"></span></div>
-    <ul class="list" id="ankkurit-list"></ul>
-    <p class="section-link" id="ankkurit-laajenna" style="display:none"></p>
-    <p class="anchor-candidates-title" id="anchor-candidates-title" style="display:none">Ehdotukset</p>
-    <ul class="list" id="anchor-candidates-list"></ul>
-    <div class="add-item">
-      <span class="prefix">›</span>
-      <input type="text" id="ankkurit-input" placeholder="uusi ankkuri...">
-      <button id="ankkurit-add-btn">+</button>
+    <div class="otsake">
+      <div class="otsake-vas">
+        <p class="tunnus">S A T A M A</p>
+        <button class="kuormakytkin" id="kuormanappi">
+          <span class="kytkin"><i></i></span>
+          <span class="kytkin-teksti">Kuormitustila</span>
+        </button>
+        <div class="paivamaara">
+          <b id="ruori-paiva-numero"></b>
+          <div class="paivapino"><span class="vk" id="ruori-viikonpaiva"></span><span class="kk" id="ruori-kuukausi"></span></div>
+        </div>
+      </div>
+      <div class="kello-kehys">
+        <svg width="150" height="150" viewBox="0 0 110 110">
+          <circle cx="55" cy="55" r="52" fill="none" stroke="#221F1A" stroke-width="1"/>
+          <g id="ruori-kello-viivat"></g>
+          <g id="ruori-kello-numerot" font-family="'Courier Prime',monospace" font-size="10" font-weight="700" fill="#221F1A" text-anchor="middle" dominant-baseline="middle"></g>
+          <line id="ruori-tuntiviisari" x1="55" y1="55" stroke="#221F1A" stroke-width="3" stroke-linecap="round"/>
+          <line id="ruori-minuuttiviisari" x1="55" y1="55" stroke="#221F1A" stroke-width="1.6" stroke-linecap="round"/>
+          <circle cx="55" cy="55" r="2.4" fill="#221F1A"/>
+        </svg>
+      </div>
     </div>
 
-    <div class="section-title">🌅 Horisontissa</div>
-    <p class="section-empty" id="horisontissa-empty">Ei vielä mitään seurattavaa.</p>
+    <!-- KALENTERI -->
+    <button class="segmentti kalenteri" id="ruori-kalenteri-segmentti" style="display:none">
+      <div class="kal-yla">
+        <span class="kal-aika" id="ruori-kal-aika"></span><span class="kal-lisaa" id="ruori-kal-lisaa"></span>
+      </div>
+      <div class="kal-lippu" id="ruori-kal-lippu" style="display:none">
+        <div class="kal-lippu-ylarivi">
+          <span class="tagi-raskas" id="ruori-kal-tagi"></span>
+        </div>
+        <div class="kal-lippu-syy" id="ruori-kal-lippu-syy"></div>
+      </div>
+    </button>
+    <div class="segmentti kalenteri" id="ruori-kalenteri-tyhja" style="display:none">
+      <div class="otsikkorivi"><span class="luotaus">Kalenteri</span></div>
+      <p class="pieni">Ei tapahtumia tänään.</p>
+    </div>
+
+    <!-- ANKKURIT -->
+    <div class="segmentti ankkurit">
+      <div class="otsikkorivi"><span class="luotaus">Ankkurit</span><span class="inline-badge" id="anchor-candidates-badge" style="display:none"></span></div>
+      <ul class="list" id="ankkurit-list"></ul>
+      <p class="section-link" id="ankkurit-laajenna" style="display:none"></p>
+      <p class="anchor-candidates-title pieni" id="anchor-candidates-title" style="display:none">Ehdotukset</p>
+      <ul class="list" id="anchor-candidates-list"></ul>
+      <div class="add-item">
+        <span class="prefix">›</span>
+        <input type="text" id="ankkurit-input" placeholder="uusi ankkuri...">
+        <button id="ankkurit-add-btn">+</button>
+      </div>
+    </div>
+
+    <!-- HYTTI (2026-08-08: kortti näyttää tämän päivän ensimmäisen "tarjolla"
+         PACER-askeleen, EI kalenteriaikaa — opinto_paivan_askeleet-rivillä ei
+         ole kellonaikaa, joten "10:15"-tyylinen aikanäyttö mockupista olisi
+         keksittyä. Piilossa jos tälle päivälle ei (vielä) ole PACER-askelia. -->
+    <button class="segmentti hytti" id="ruori-hytti-segmentti" style="display:none">
+      <div class="hytti-luento"><span class="piste"></span><span>Hytissä tänään</span></div>
+      <div class="hytti-ylarivi">
+        <div class="hytti-teksti">
+          <div class="hytti-kurssi" id="ruori-hytti-kurssi"></div>
+          <div class="hytti-aihe" id="ruori-hytti-aihe"></div>
+        </div>
+      </div>
+      <div class="hytti-alarivi">
+        <div class="hytti-vaihe" id="ruori-hytti-vaihe"></div>
+        <div class="hytti-vihje" id="ruori-hytti-vihje"></div>
+      </div>
+    </button>
+
+    <!-- RAUHA (kuormitustila päällä) -->
+    <div class="rauha" id="rauha-osio" style="display:none">
+      <b>Kuormitustila päällä</b>
+      <p>Ankkurit ja Hytti ovat piilossa. Ne odottavat siellä missä olivatkin.</p>
+    </div>
 
     <div class="sections-grid" id="sections-list"></div>
 
