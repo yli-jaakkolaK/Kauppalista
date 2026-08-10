@@ -9,9 +9,9 @@ Tämä tiedosto on eri asia kuin **muistiinpanot.md** (projektin historia, pää
 ## Työskentelysäännöt agentille (lisätty 2026-08-03)
 
 1. **Jokaisen työn alussa** lue ensin KONSEPTIKIRJA.md, muistiinpanot.md ja COPILOT.md. Näiden pitää olla aina työskentelyn lähtökohta, jotta seuraat projektin nykyistä suuntaa eikä vain yksittäistä pientä tehtävää.
-2. **Kun jokin tehtävä on valmis**, tee automaattisesti commit ja push ilman erillistä kysymystä, jos työ on sellaisessa tilassa että se voidaan turvallisesti tallentaa. Käytä selkeää ja kuvaavaa commit-viestiä.
+2. **Kun jokin tehtävä on valmis**, tee automaattisesti bump, commit ja push ilman erillistä kysymystä, jos työ on sellaisessa tilassa että se voidaan turvallisesti tallentaa. Käytä selkeää ja kuvaavaa commit-viestiä.
 3. **Backup tulee tehdä säännöllisesti**. Tee järkevä varmuuskopiointi ainakin silloin, kun on tehty paljon muutoksia, kun tehdään merkittävä arkkitehtuurimuutos tai ainakin kerran viikossa jos työtä on jatkettu pitkään. Muista kirjata tästä relevantti huomio muistiinpanot.md:hen ja tarvittaessa BACKUP.md:hen.
-4. **Kun kerrot mitä olet tehnyt**, päivitä samalla myös KONSEPTIKIRJA.md, muistiinpanot.md ja COPILOT.md tarvittaessa niin, että seuraava työntekijä tai agentti näkee mistä jatketaan. Älä jätä työtilannetta epäselväksi.
+4. **Kun kerrot yhteenvedossa mitä olet tehnyt**, päivitä samalla myös KONSEPTIKIRJA.md, muistiinpanot.md ja COPILOT.md tarvittaessa niin, että seuraava työntekijä tai agentti näkee mistä jatketaan. Älä jätä työtilannetta epäselväksi. Copilot.md tulee näin haluan agentin toimivan/ohjeita työskentelytavoista. Konseptikirjaan tulee visioita ja periaatteita, millainen satama on ja muistiinpanot.md on historiikki menneistä erityisesti vähän hankalammista bugeista ja miten ratkaisu löydettiin'. Tämän muistiinpanon lopussa tulisi olla osio, joka kertoo mitä viimeksi tehtiin ja mitä seuraavaksi olisi tarkoitus tehdä. Tuo kohta päivitetään joka kerta kun jotin rakennetaan. 
 5. **Älä aloita uutta suurta muutosta ilman kontekstin lukemista.** Jos olet epävarma, lue ensin dokumentaatiota ja tarkista nykyinen tila ennen kuin edetään.
 
 ---

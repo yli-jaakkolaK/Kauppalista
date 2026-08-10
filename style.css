@@ -2710,6 +2710,18 @@ h1 {
 .opinto-vaihe-retrieval { color: var(--accent-text); }
 .opinto-vaihe-reference { color: var(--muted); }
 .opinto-vaihe-yllapito { color: var(--muted); }
+.opinto-vaihe-overlearning { color: var(--muted); }
+
+/* PACER-tyyppivalitsin + kertausjonossa-merkki (sql/111, 2026-08-10) —
+   oma pieni luokka, ei jaeta .opinto-vaihe-select:n kanssa vaikka
+   ulkoasu on sama, koska nämä ovat kaksi eri akselia (ks. HYTTI_SPEKSI.md
+   §7.4). #opinto-aihe-lista-rivit saavat wrapata: rivillä on nyt kuusi
+   elementtiä (vaihe+kertaus+tyyppi+ohje+materiaali+poisto) eikä kaikki
+   mahdu enää yhdelle riville ilman että aiheen nimi katkeaa mitättömäksi. */
+.opinto-pacer-select { font-family: 'Courier New', Courier, monospace; font-size: 12px; color: var(--text); background: var(--ground); border: 1px solid var(--border-dash); border-radius: 4px; padding: 4px; }
+.opinto-kertausjonossa-merkki { color: var(--muted); font-size: 13px; }
+#opinto-aihe-lista li { flex-wrap: wrap; }
+#opinto-aihe-lista li span:first-child { flex-basis: 100%; }
 
 .opinto-kartta-kurssi {
   border: 1px solid var(--border-dash);
@@ -3381,3 +3393,25 @@ h1 {
 @media (prefers-reduced-motion: reduce) {
   .ruori *, .ruori *::before { animation: none !important; transition-duration: .01ms !important; }
 }
+
+/* Kurssikontekstinen materiaalin sisääntulo Laiturissa (2026-08-10, ks.
+   HYTTI_SPEKSI.md §8.3) — tavallista appi-tyyliä, ei merikartta-kieltä
+   (Laituri ei ole vielä siirtynyt siihen). */
+.laituri-materiaali-banneri {
+  display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  padding: 9px 12px; margin-bottom: 10px;
+  background: var(--ground); border: 1px solid var(--accent); border-radius: 8px;
+  font-size: 13px; color: var(--accent-text);
+}
+
+/* Hytin ikkunat -asetukset (2026-08-10, ks. HYTTI_SPEKSI.md §4.5/§4.5b) */
+.hytti-opiskeluaika-rivi {
+  display: grid; grid-template-columns: 1fr auto auto; align-items: center; gap: 8px;
+  padding: 6px 0; font-size: 14px;
+}
+.hytti-ikkuna-lisays {
+  display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin: 8px 0 4px;
+}
+.hytti-ikkuna-lisays select,
+.hytti-ikkuna-lisays input[type="time"] { width: auto; }
+.hytti-ikkuna-lisays input[type="text"] { flex: 1; min-width: 100px; }

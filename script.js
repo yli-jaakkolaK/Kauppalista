@@ -675,21 +675,52 @@ document.getElementById('vahdittu-back-btn').addEventListener('click', function(
 // Yksityinen — sama owner_id-RLS-periaate kuin hytti_kortit/hytti_rivit
 // (sql/016), EI Katri-kohtaista kovakoodausta koodissa, RLS hoitaa rajauksen.
 
+// yllapito pysyy tässä sanastossa VAIN taitosolmuja varten (vanha malli,
+// koskematon Vaihe 5:een asti, ks. HYTTI_SPEKSI.md §13). overlearning on
+// opinto_aiheiden (solmujen) uusi, PERO:n oma vapaaehtoinen vaihe
+// (sql/111, 2026-08-10).
 const OPINTO_VAIHE_NIMET = {
   priming: 'Aloittamatta',
   encoding: 'Opiskelussa',
   retrieval: 'Kertauksessa',
   reference: 'Hallussa',
   yllapito: 'Ylläpidossa',
+  overlearning: 'Syventämässä',
 };
-const OPINTO_VAIHE_JARJESTYS = ['priming', 'encoding', 'retrieval', 'reference', 'yllapito'];
+const OPINTO_VAIHE_JARJESTYS = ['priming', 'encoding', 'retrieval', 'reference', 'yllapito']; // taitosolmut
+const PERO_VAIHE_JARJESTYS = ['priming', 'encoding', 'retrieval', 'reference', 'overlearning']; // opinto_aiheet
+
+// Palauttaa kohteen vaihe-arvon riippumatta siitä onko kyseessä opinto_aihe
+// (pero_vaihe, sql/111) vai taitosolmu (vaihe, vanha malli, koskematon) —
+// näiden kahden kentän nimet eivät koskaan esiinny samalla rivillä, joten
+// tarkistus on yksiselitteinen ilman että kutsujan tarvitsee tietää taulua.
+function kohdeVaihe(kohde) {
+  return kohde.pero_vaihe !== undefined ? kohde.pero_vaihe : kohde.vaihe;
+}
 
 // Kokonaiskartan kolme väriryhmää (2c:n speksi: "hallussa/työn alla/edessä").
-function opintoVaiheRyhma(vaihe) {
-  if (vaihe === 'reference' || vaihe === 'yllapito') return 'hallussa';
+// kertausjonossa (2026-08-10, vain opinto_aiheet) korvaa vanhan
+// "vaihe==='yllapito'"-tarkistuksen tässä — solmu joka on kertausjonossa on
+// yhtä lailla "hallussa" riippumatta siitä että pero_vaihe pysyy
+// 'retrieval'-arvossa koko ylläpitokierron ajan.
+function opintoVaiheRyhma(vaihe, kertausjonossa) {
+  if (vaihe === 'reference' || vaihe === 'yllapito' || vaihe === 'overlearning' || kertausjonossa) return 'hallussa';
   if (vaihe === 'encoding' || vaihe === 'retrieval') return 'tyon-alla';
   return 'edessa';
 }
+
+// PACER-tietotyyppiluokittelu (sql/111, 2026-08-10, ks. sung-metodi.md §2)
+// — ERI akseli kuin PERO-vaihe yllä. evidence/reference ovat kannassa
+// sallittuja mutta V1:n käyttöliittymä ei tarjoa niitä vielä valittavaksi
+// (PACER_TYYPPI_V1) — ks. HYTTI_SPEKSI.md §7.4.
+const PACER_TYYPPI_NIMET = {
+  procedural: 'Proseduraalinen (miten tehdään)',
+  analogous: 'Analoginen (liittyy tuttuun)',
+  conceptual: 'Käsitteellinen (mitä se on)',
+  evidence: 'Todiste (faktat)',
+  reference: 'Viite (suora muisti)',
+};
+const PACER_TYYPPI_V1 = ['procedural', 'analogous', 'conceptual'];
 
 async function lataaOpintoKurssit() {
   const { data, error } = await db.from('opinto_kurssit').select().order('sort_order');
@@ -793,6 +824,11 @@ document.getElementById('opinto-kurssi-poista-btn').addEventListener('click', as
   lataaOpintoKurssit();
 });
 
+document.getElementById('opinto-lisaa-materiaalia-btn').addEventListener('click', function() {
+  if (!currentOpintoKurssi) return;
+  avaaLaiturinMateriaalille(currentOpintoKurssi);
+});
+
 document.getElementById('opinto-materiaali-tallenna-btn').addEventListener('click', async function() {
   if (!currentOpintoKurssi) return;
   const uusi = document.getElementById('opinto-materiaali-teksti').value.trim();
@@ -821,27 +857,62 @@ async function lataaOpintoAiheet() {
     teksti.textContent = aihe.name;
     li.appendChild(teksti);
 
-    // VAIHE 1: käsin vaihdettava tila, EI automaattista etenemistä (moottori
-    // on Vaihe 2, ks. muistiinpanot.md "Opintopolku").
+    // VAIHE 1a: käsin vaihdettava PERO-tila, EI automaattista etenemistä
+    // (moottori/vaiheensiirtymät ovat Vaihe 2, ks. HYTTI_SPEKSI.md §13).
+    // pero_vaihe (sql/111) korvaa vanhan opinto_aiheet.vaihe:n — 2026-08-10.
     const vaiheSelect = document.createElement('select');
-    vaiheSelect.className = 'opinto-vaihe-select opinto-vaihe-' + aihe.vaihe;
-    OPINTO_VAIHE_JARJESTYS.forEach(function(v) {
+    vaiheSelect.className = 'opinto-vaihe-select opinto-vaihe-' + aihe.pero_vaihe;
+    PERO_VAIHE_JARJESTYS.forEach(function(v) {
       const optio = document.createElement('option');
       optio.value = v;
       optio.textContent = OPINTO_VAIHE_NIMET[v];
-      if (v === aihe.vaihe) optio.selected = true;
+      if (v === aihe.pero_vaihe) optio.selected = true;
       vaiheSelect.appendChild(optio);
     });
     vaiheSelect.addEventListener('change', async function() {
       const uusi = vaiheSelect.value;
       const nytIso = new Date().toISOString();
-      const { error: vaiheError } = await db.from('opinto_aiheet').update({ vaihe: uusi, viimeksi_kosketettu: nytIso }).eq('id', aihe.id);
+      const { error: vaiheError } = await db.from('opinto_aiheet').update({ pero_vaihe: uusi, viimeksi_kosketettu: nytIso }).eq('id', aihe.id);
       if (ilmoitaKirjoitusvirheesta(vaiheError, 'Vaiheen päivitys')) return;
-      aihe.vaihe = uusi;
+      aihe.pero_vaihe = uusi;
       aihe.viimeksi_kosketettu = nytIso;
       vaiheSelect.className = 'opinto-vaihe-select opinto-vaihe-' + uusi;
     });
     li.appendChild(vaiheSelect);
+
+    if (aihe.kertausjonossa) {
+      const kertausMerkki = document.createElement('span');
+      kertausMerkki.className = 'opinto-kertausjonossa-merkki';
+      kertausMerkki.textContent = '↻';
+      kertausMerkki.title = 'Kertausjonossa — ylläpitokertaus tulossa';
+      li.appendChild(kertausMerkki);
+    }
+
+    // PACER-tietotyyppi (sql/111, 2026-08-10, ks. HYTTI_SPEKSI.md §7.4 /
+    // sung-metodi.md §2) — päätyyppi + valinnainen sivutyyppi, ERI akseli
+    // kuin yllä oleva PERO-vaihe. V1 tarjoaa käyttäjälle vain kolme
+    // ensimmäistä tyyppiä (evidence/reference varattu, ei vielä käytössä).
+    const paatyyppiSelect = document.createElement('select');
+    paatyyppiSelect.className = 'opinto-pacer-select';
+    paatyyppiSelect.title = 'PACER-tietotyyppi (päätyyppi)';
+    const paatyyppiTyhja = document.createElement('option');
+    paatyyppiTyhja.value = '';
+    paatyyppiTyhja.textContent = 'Tyyppi?';
+    paatyyppiSelect.appendChild(paatyyppiTyhja);
+    PACER_TYYPPI_V1.forEach(function(t) {
+      const optio = document.createElement('option');
+      optio.value = t;
+      optio.textContent = PACER_TYYPPI_NIMET[t];
+      if (t === aihe.pacer_paatyyppi) optio.selected = true;
+      paatyyppiSelect.appendChild(optio);
+    });
+    paatyyppiSelect.addEventListener('change', async function() {
+      const uusi = paatyyppiSelect.value || null;
+      const { error: tyyppiError } = await db.from('opinto_aiheet').update({ pacer_paatyyppi: uusi }).eq('id', aihe.id);
+      if (ilmoitaKirjoitusvirheesta(tyyppiError, 'PACER-päätyypin tallennus')) return;
+      aihe.pacer_paatyyppi = uusi;
+    });
+    li.appendChild(paatyyppiSelect);
 
     // PACER-ohje (2026-08-05, ks. HYTTI_SPEKSI §8) — sama "lue lisää"
     // kuin Tänään-kortilla, saatavilla myös suoraan kurssinäkymästä.
@@ -851,7 +922,7 @@ async function lataaOpintoAiheet() {
     ohjeNappi.title = 'Mitä tässä vaiheessa konkreettisesti tehdään';
     ohjeNappi.addEventListener('click', function(e) {
       e.stopPropagation();
-      naytaOpintoOhje(aihe.vaihe, aihe);
+      naytaOpintoOhje(aihe.pero_vaihe, aihe);
     });
     li.appendChild(ohjeNappi);
 
@@ -978,7 +1049,7 @@ async function lataaOpintoKartta() {
 
   for (const kurssi of kurssit) {
     const [{ data: aiheet }, { data: kurssiDeadlinet }, { data: aiheDeadlinet }] = await Promise.all([
-      db.from('opinto_aiheet').select('vaihe').eq('kurssi_id', kurssi.id),
+      db.from('opinto_aiheet').select('pero_vaihe, kertausjonossa').eq('kurssi_id', kurssi.id),
       db.from('opinto_deadlinet').select('pvm').eq('kurssi_id', kurssi.id).gte('pvm', paivamaaraISO(new Date())).order('pvm').limit(1),
       db.from('opinto_deadlinet').select('pvm, aihe_id, opinto_aiheet!inner(kurssi_id)').eq('opinto_aiheet.kurssi_id', kurssi.id).gte('pvm', paivamaaraISO(new Date())).order('pvm').limit(1),
     ]);
@@ -1001,7 +1072,7 @@ async function lataaOpintoKartta() {
       palkki.appendChild(lohko);
     } else {
       ['hallussa', 'tyon-alla', 'edessa'].forEach(function(ryhma) {
-        const osuus = aiheet.filter(function(a) { return opintoVaiheRyhma(a.vaihe) === ryhma; }).length;
+        const osuus = aiheet.filter(function(a) { return opintoVaiheRyhma(a.pero_vaihe, a.kertausjonossa) === ryhma; }).length;
         if (osuus === 0) return;
         const lohko = document.createElement('div');
         lohko.className = 'opinto-kartta-lohko--' + ryhma;
@@ -1082,6 +1153,7 @@ const OPINTO_VAIHE_OHJE = {
   retrieval: 'Sulje kirja/muistiinpanot kokonaan. Selitä aihe ääneen tai kirjoita omin sanoin ilman apuja. Tarkista vasta jälkeenpäin mitä jäi puuttumaan tai epäselväksi.',
   reference: 'Tämä aihe on merkitty hallussa olevaksi viitetiedoksi — ei aktiivista kertausta, palaa tähän vain tarvittaessa.',
   yllapito: 'Nopea kertaus: käy aihe läpi omin sanoin muutamassa minuutissa, tarkista ettei mikään ole päässyt unohtumaan kokonaan.',
+  overlearning: 'Vapaaehtoinen syvennys: piirrä ydinrakenne muistista ja laajenna sitä oman ajattelusi suuntaan, tai ratkaise tehtävä joka on vaikeampi kuin kurssin vaatimustaso. Ei estä aiheen valmistumista.',
 };
 
 // Kiinteät PACER-vaihekestot (2026-08-05, ks. muistiinpanot.md "Aikaikkuna")
@@ -1095,8 +1167,9 @@ const OPINTO_KESTO_ASETUS_AVAIN = {
   retrieval: 'kesto_retrieval_min',
   reference: 'kesto_reference_min',
   yllapito: 'kesto_yllapito_min',
+  overlearning: 'kesto_overlearning_min',
 };
-const OPINTO_KESTO_OLETUS = { priming: 15, encoding: 45, retrieval: 20, reference: 5, yllapito: 10 };
+const OPINTO_KESTO_OLETUS = { priming: 15, encoding: 45, retrieval: 20, reference: 5, yllapito: 10, overlearning: 30 };
 function haeOpintoKestoMinuutteina(vaihe) {
   return haeAsetusNumero(OPINTO_KESTO_ASETUS_AVAIN[vaihe], OPINTO_KESTO_OLETUS[vaihe]);
 }
@@ -1111,6 +1184,7 @@ const OPINTO_PROMPTI_VAIHEELLE = {
   retrieval: function(nimi) { return 'Luo 3 harjoitustehtävää aiheesta "' + nimi + '", retrieval-tasolle sopivina (ei katso materiaalia, palauta muistista). Anna tehtävät numeroituina, kukin alle 5 minuuttia.'; },
   reference: function(nimi) { return 'Kokoa lyhyt, tarkka faktalista/kaavakokoelma aiheesta "' + nimi + '" viitteeksi (reference-vaihe) — ei selityksiä, vain tarkat faktat.'; },
   yllapito: function(nimi) { return 'Anna minulle 3 nopeaa kertauskysymystä aiheesta "' + nimi + '" jotka testaavat onko jotain päässyt unohtumaan (ylläpitovaihe). Kysymykset numeroituina.'; },
+  overlearning: function(nimi) { return 'Anna minulle yksi selvästi vaatimustasoa vaikeampi syventävä tehtävä tai kysymys aiheesta "' + nimi + '" (overlearning-vaihe, vapaaehtoinen syvennys).'; },
 };
 function rakennaOpintoPrompti(nimi, vaihe) {
   const rakentaja = OPINTO_PROMPTI_VAIHEELLE[vaihe] || OPINTO_PROMPTI_VAIHEELLE.encoding;
@@ -1186,8 +1260,9 @@ async function opintoPaivanKuorma() {
 // sr_next_review on jo koittanut (ei ehdoteta kertausta ennen aikaansa).
 // reference EI OLE KOSKAAN kandidaatti (ks. tulkintapäätös yllä).
 function opintoOnkoRipe(aihe, tanaan) {
-  if (aihe.vaihe === 'priming' || aihe.vaihe === 'encoding') return true;
-  if (aihe.vaihe === 'retrieval' || aihe.vaihe === 'yllapito') {
+  const vaihe = kohdeVaihe(aihe);
+  if (vaihe === 'priming' || vaihe === 'encoding' || vaihe === 'overlearning') return true;
+  if (vaihe === 'retrieval' || vaihe === 'yllapito') {
     return !aihe.sr_next_review || aihe.sr_next_review <= tanaan;
   }
   return false;
@@ -1211,7 +1286,7 @@ function opintoDeadlinePaino(aihe, kurssienDeadlinet, aiheidenDeadlinet, tanaan)
 // pois (iso negatiivinen pistemäärä, suodatetaan alempana). Kevyenä päivänä
 // uusi työ saa pienen bonuksen ("kevyt päivä → raskaampi encoding sallitaan").
 function opintoKuormaBonus(vaihe, kuormaTaso) {
-  const kevytTyo = vaihe === 'retrieval' || vaihe === 'yllapito';
+  const kevytTyo = vaihe === 'retrieval' || vaihe === 'yllapito' || vaihe === 'overlearning';
   if (kuormaTaso === 'raskas') return kevytTyo ? 50 : -1000;
   if (kuormaTaso === 'kevyt') return kevytTyo ? 0 : 20;
   return 0;
@@ -1261,7 +1336,7 @@ function opintoRyhmaAvain(ehdokas) {
 // kaava käyttää vain jäljellä olevia päiviä sulkeutumiseen, joten muoto on jo
 // oikea (suuri heti alussa, pieni lopussa) ilman erillistä aikaleimaa.
 function siltaOnAuki(viittaavatAiheet) {
-  return viittaavatAiheet.length > 0 && viittaavatAiheet.some(function(a) { return a.vaihe !== 'priming'; });
+  return viittaavatAiheet.length > 0 && viittaavatAiheet.some(function(a) { return a.pero_vaihe !== 'priming'; });
 }
 
 // Sulkeutuminen = aikaisin viittaavien aiheiden deadline (kurssi/aihe-taso
@@ -1444,13 +1519,13 @@ async function laskeOpintoPaivanAskeleet(maxAskeliaYlikirjoitus, poissuljetutAih
   const aiheEhdokkaat = kaikkiAiheet
     .filter(function(a) {
       if (poissuljetutAiheIdt && poissuljetutAiheIdt.has(a.id)) return false;
-      if (ikkunaMin && haeOpintoKestoMinuutteina(a.vaihe) > ikkunaMin) return false;
+      if (ikkunaMin && haeOpintoKestoMinuutteina(a.pero_vaihe) > ikkunaMin) return false;
       return opintoOnkoRipe(a, tanaan);
     })
     .map(function(a) {
       const kovaPaino = opintoDeadlinePaino(a, kurssienDeadlinet, aiheidenDeadlinet, tanaan);
       const pehmeaPaino = opintoDeadlinePainoSolmu(a, tanaan);
-      return { tyyppi: 'aihe', item: a, pisteet: Math.max(kovaPaino, pehmeaPaino) + opintoKuormaBonus(a.vaihe, kuormaTaso) };
+      return { tyyppi: 'aihe', item: a, pisteet: Math.max(kovaPaino, pehmeaPaino) + opintoKuormaBonus(a.pero_vaihe, kuormaTaso) };
     });
   const solmuEhdokkaat = taitosolmuKandidaatit.map(function(s) {
     return { tyyppi: 'taitosolmu', item: s, pisteet: (lopullisetSiltaPainot.get(s.id) || 0) + opintoKuormaBonus(s.vaihe, kuormaTaso) };
@@ -1463,7 +1538,7 @@ async function laskeOpintoPaivanAskeleet(maxAskeliaYlikirjoitus, poissuljetutAih
   // --- TASO 1: kova etusija ---
   const kurssiKiireellisyysPaivia = haeAsetusNumero('kurssi_kiireellisyys_paivia', 3);
   const tier1 = aiheEhdokkaat.filter(function(e) {
-    if (e.item.vaihe !== 'priming') return false;
+    if (e.item.pero_vaihe !== 'priming') return false;
     const d = opintoPaivaaDeadlineen(e.item, kurssienDeadlinet, aiheidenDeadlinet, tanaan);
     return d !== null && d <= kurssiKiireellisyysPaivia;
   });
@@ -1638,17 +1713,18 @@ function piirraOpintoIkkunaTulos(ehdokas, ikkunaMin) {
   otsikko.textContent = kohde.name + (alaotsikko ? ' · ' + alaotsikko : '');
   kortti.appendChild(otsikko);
 
+  const kohdeVaiheArvo = kohdeVaihe(kohde);
   const meta = document.createElement('div');
   meta.className = 'opinto-tanaan-vaihe';
-  meta.textContent = OPINTO_VAIHE_NIMET[kohde.vaihe] + ' · noin ' + haeOpintoKestoMinuutteina(kohde.vaihe) + ' min';
+  meta.textContent = OPINTO_VAIHE_NIMET[kohdeVaiheArvo] + ' · noin ' + haeOpintoKestoMinuutteina(kohdeVaiheArvo) + ' min';
   kortti.appendChild(meta);
 
   const ohje = document.createElement('p');
   ohje.className = 'opinto-ikkuna-ohje';
-  ohje.textContent = OPINTO_VAIHE_OHJE[kohde.vaihe];
+  ohje.textContent = OPINTO_VAIHE_OHJE[kohdeVaiheArvo];
   kortti.appendChild(ohje);
 
-  const promptiTeksti = rakennaOpintoPrompti(kohde.name, kohde.vaihe);
+  const promptiTeksti = rakennaOpintoPrompti(kohde.name, kohdeVaiheArvo);
   const promptiLaatikko = document.createElement('textarea');
   promptiLaatikko.className = 'opinto-ikkuna-prompti';
   promptiLaatikko.readOnly = true;
@@ -1707,7 +1783,7 @@ async function haeKeskenaOlevaSessio() {
 }
 
 async function aloitaOpintoSessio(askel, kohde) {
-  const rivi = { owner_id: currentUserId, vaihe: kohde.vaihe };
+  const rivi = { owner_id: currentUserId, vaihe: kohdeVaihe(kohde) };
   rivi[askel.opinto_aiheet ? 'aihe_id' : 'taitosolmu_id'] = kohde.id;
   const { error } = await db.from('opinto_sessiot').insert(rivi);
   if (ilmoitaKirjoitusvirheesta(error, 'Session aloitus')) return;
@@ -1781,7 +1857,7 @@ async function piirraOpintoTanaanOsio(kaikkiAskeleet) {
 
     const vaiheTeksti = document.createElement('div');
     vaiheTeksti.className = 'opinto-tanaan-vaihe';
-    vaiheTeksti.textContent = OPINTO_VAIHE_NIMET[kohde.vaihe];
+    vaiheTeksti.textContent = OPINTO_VAIHE_NIMET[kohdeVaihe(kohde)];
     kortti.appendChild(vaiheTeksti);
 
     // PACER-kehote (2026-08-05, ks. HYTTI_SPEKSI §8) — "systeemi ei koskaan
@@ -1829,7 +1905,7 @@ async function piirraOpintoTanaanOsio(kaikkiAskeleet) {
       const ohjeNappi = document.createElement('button');
       ohjeNappi.className = 'dialog-btn dialog-btn-cancel';
       ohjeNappi.textContent = 'Näytä ohje';
-      ohjeNappi.addEventListener('click', function() { naytaOpintoOhje(kohde.vaihe, kohde); });
+      ohjeNappi.addEventListener('click', function() { naytaOpintoOhje(kohdeVaihe(kohde), kohde); });
       napit.appendChild(ohjeNappi);
 
       const ohitaNappi = document.createElement('button');
@@ -1890,24 +1966,27 @@ async function merkitseOpintoAskel(askel, tila) {
 }
 
 // "Tehty" etenee PACERia JA ajastaa spaced repetitionin — moottorin
-// kirjoittava puolisko, YHTEINEN opinto_aiheet- ja taitosolmut-tauluille
-// (identtinen sr_interval_index/sr_next_review-pari molemmissa, ks. sql/092).
-// priming→encoding (ei SR:ää vielä). encoding→retrieval JA ensimmäinen
-// SR-kertaushetki. retrieval: joko seuraava kevenevä väli TAI (viimeisen
-// välin jälkeen) siirtyminen yllapito-tilaan ("aihe ei koskaan valmistu,
-// siirtyy ylläpito-tilaan"). yllapito: pysyy yllapito-tilassa, jatkaa
-// kiinteällä kertaustahdilla ikuisesti.
-// Puhdas "mitä ✓ Tehty TEKISI" -ennuste ilman sivuvaikutuksia (2026-08-05,
-// ks. HYTTI_SPEKSI §8) — peilaa etenetaOpintoKohde():n haarautumisen, EI
-// kirjoita mitään. null = kohde ei etene ollenkaan (reference-vaihe).
+// kirjoittava puolisko. HAARAUTUU 2026-08-10 alkaen (sql/111,
+// HYTTI_SPEKSI.md §7.4): taitosolmut käyttää YHÄ vanhaa vaihe='yllapito'
+// -mallia koskemattomana (Vaihe 5:n asia), opinto_aiheet käyttää UUTTA
+// mallia jossa pero_vaihe pysyy 'retrieval'-arvossa pysyvästi SR-kierron
+// alettua ja kertausjonossa-lippu (ei vaihearvo) kertoo onko kiinteä
+// alkukertaustaulukko (OPINTO_SR_VALIT_PV) käyty läpi. Puhdas "mitä ✓ Tehty
+// TEKISI" -ennuste ilman sivuvaikutuksia — peilaa etenetaOpintoKohde():n
+// haarautumisen, EI kirjoita mitään. null = kohde ei etene ollenkaan
+// (reference-vaihe, tai opinto_aihe joka on jo kertausjonossa — Vaihe 2 tuo
+// kehote-mekanismin joka voi tarjota siirtymän overlearningiin, ei tässä).
 function seuraavaOpintoVaiheKuvaus(kohde) {
-  if (kohde.vaihe === 'priming') return OPINTO_VAIHE_NIMET.encoding;
-  if (kohde.vaihe === 'encoding') return OPINTO_VAIHE_NIMET.retrieval;
-  if (kohde.vaihe === 'retrieval') {
+  const onAihe = kohde.pero_vaihe !== undefined;
+  const vaihe = kohdeVaihe(kohde);
+  if (vaihe === 'priming') return OPINTO_VAIHE_NIMET.encoding;
+  if (vaihe === 'encoding') return OPINTO_VAIHE_NIMET.retrieval;
+  if (vaihe === 'retrieval') {
+    if (onAihe) return null;
     const seuraavaIndeksi = kohde.sr_interval_index + 1;
     return seuraavaIndeksi < OPINTO_SR_VALIT_PV.length ? OPINTO_VAIHE_NIMET.retrieval : OPINTO_VAIHE_NIMET.yllapito;
   }
-  if (kohde.vaihe === 'yllapito') return OPINTO_VAIHE_NIMET.yllapito;
+  if (vaihe === 'yllapito') return OPINTO_VAIHE_NIMET.yllapito;
   return null;
 }
 
@@ -1915,32 +1994,60 @@ async function etenetaOpintoKohde(kohde, taulu) {
   if (!kohde) return;
   let paivitys = null;
 
-  if (kohde.vaihe === 'priming') {
-    paivitys = { vaihe: 'encoding' };
-  } else if (kohde.vaihe === 'encoding') {
-    const ensiKertaus = new Date(Date.now() + OPINTO_SR_VALIT_PV[0] * 86400000);
-    paivitys = { vaihe: 'retrieval', sr_interval_index: 0, sr_next_review: paivamaaraISO(ensiKertaus) };
-  } else if (kohde.vaihe === 'retrieval') {
-    const seuraavaIndeksi = kohde.sr_interval_index + 1;
-    if (seuraavaIndeksi < OPINTO_SR_VALIT_PV.length) {
-      const seuraava = new Date(Date.now() + OPINTO_SR_VALIT_PV[seuraavaIndeksi] * 86400000);
-      paivitys = { sr_interval_index: seuraavaIndeksi, sr_next_review: paivamaaraISO(seuraava) };
-    } else {
-      const vali = yllapidonSeuraavaVali(0);
-      const seuraava = new Date(Date.now() + vali * 86400000);
-      paivitys = { vaihe: 'yllapito', sr_interval_index: seuraavaIndeksi, sr_next_review: paivamaaraISO(seuraava) };
+  if (taulu === 'opinto_aiheet') {
+    if (kohde.pero_vaihe === 'priming') {
+      paivitys = { pero_vaihe: 'encoding' };
+    } else if (kohde.pero_vaihe === 'encoding') {
+      const ensiKertaus = new Date(Date.now() + OPINTO_SR_VALIT_PV[0] * 86400000);
+      paivitys = { pero_vaihe: 'retrieval', sr_interval_index: 0, sr_next_review: paivamaaraISO(ensiKertaus) };
+    } else if (kohde.pero_vaihe === 'retrieval') {
+      const seuraavaIndeksi = kohde.sr_interval_index + 1;
+      if (seuraavaIndeksi < OPINTO_SR_VALIT_PV.length) {
+        const seuraava = new Date(Date.now() + OPINTO_SR_VALIT_PV[seuraavaIndeksi] * 86400000);
+        paivitys = { sr_interval_index: seuraavaIndeksi, sr_next_review: paivamaaraISO(seuraava) };
+      } else if (!kohde.kertausjonossa) {
+        // Vastaa vanhan mallin "vaihe: yllapito" -siirtymää: EI enää oma
+        // vaihearvo, vain lippu — pero_vaihe pysyy 'retrieval'.
+        const vali = yllapidonSeuraavaVali(0);
+        const seuraava = new Date(Date.now() + vali * 86400000);
+        paivitys = { kertausjonossa: true, sr_interval_index: seuraavaIndeksi, sr_next_review: paivamaaraISO(seuraava) };
+      } else {
+        const yllapitoKierros = seuraavaIndeksi - OPINTO_SR_VALIT_PV.length;
+        const vali = yllapidonSeuraavaVali(yllapitoKierros);
+        const seuraava = new Date(Date.now() + vali * 86400000);
+        paivitys = { sr_interval_index: seuraavaIndeksi, sr_next_review: paivamaaraISO(seuraava) };
+      }
     }
-  } else if (kohde.vaihe === 'yllapito') {
-    const yllapitoKierros = kohde.sr_interval_index - OPINTO_SR_VALIT_PV.length + 1;
-    const vali = yllapidonSeuraavaVali(yllapitoKierros);
-    const seuraava = new Date(Date.now() + vali * 86400000);
-    paivitys = { sr_interval_index: kohde.sr_interval_index + 1, sr_next_review: paivamaaraISO(seuraava) };
+    // reference/overlearning: käyttäjä täppää itse (sung-metodi.md §7), ei
+    // etene automaattisesti tästä funktiosta.
+    if (paivitys) paivitys.viimeksi_kosketettu = new Date().toISOString();
+  } else {
+    // taitosolmut — VANHA malli koskemattomana (Vaihe 5:n asia, ei kosketa
+    // nyt, ks. HYTTI_SPEKSI.md §13).
+    if (kohde.vaihe === 'priming') {
+      paivitys = { vaihe: 'encoding' };
+    } else if (kohde.vaihe === 'encoding') {
+      const ensiKertaus = new Date(Date.now() + OPINTO_SR_VALIT_PV[0] * 86400000);
+      paivitys = { vaihe: 'retrieval', sr_interval_index: 0, sr_next_review: paivamaaraISO(ensiKertaus) };
+    } else if (kohde.vaihe === 'retrieval') {
+      const seuraavaIndeksi = kohde.sr_interval_index + 1;
+      if (seuraavaIndeksi < OPINTO_SR_VALIT_PV.length) {
+        const seuraava = new Date(Date.now() + OPINTO_SR_VALIT_PV[seuraavaIndeksi] * 86400000);
+        paivitys = { sr_interval_index: seuraavaIndeksi, sr_next_review: paivamaaraISO(seuraava) };
+      } else {
+        const vali = yllapidonSeuraavaVali(0);
+        const seuraava = new Date(Date.now() + vali * 86400000);
+        paivitys = { vaihe: 'yllapito', sr_interval_index: seuraavaIndeksi, sr_next_review: paivamaaraISO(seuraava) };
+      }
+    } else if (kohde.vaihe === 'yllapito') {
+      const yllapitoKierros = kohde.sr_interval_index - OPINTO_SR_VALIT_PV.length + 1;
+      const vali = yllapidonSeuraavaVali(yllapitoKierros);
+      const seuraava = new Date(Date.now() + vali * 86400000);
+      paivitys = { sr_interval_index: kohde.sr_interval_index + 1, sr_next_review: paivamaaraISO(seuraava) };
+    }
   }
 
   if (!paivitys) return;
-  // viimeksi_kosketettu (2026-08-05, ks. HYTTI_SPEKSI §5) — vain opinto_aiheet
-  // -taululla on tämä sarake (sql/110), taitosolmuilla ei.
-  if (taulu === 'opinto_aiheet') paivitys.viimeksi_kosketettu = new Date().toISOString();
   const { error } = await db.from(taulu).update(paivitys).eq('id', kohde.id);
   if (error) console.error('PACER/SR-eteneminen epäonnistui (' + taulu + '):', error);
 }
@@ -5799,7 +5906,7 @@ async function lataaRuoriHytti() {
     : (kohde.lahde || '');
   document.getElementById('ruori-hytti-kurssi').textContent = alaotsikko;
   document.getElementById('ruori-hytti-aihe').textContent = kohde.name;
-  document.getElementById('ruori-hytti-vaihe').textContent = OPINTO_VAIHE_NIMET[kohde.vaihe];
+  document.getElementById('ruori-hytti-vaihe').textContent = OPINTO_VAIHE_NIMET[kohdeVaihe(kohde)];
   const seuraava = seuraavaOpintoVaiheKuvaus(kohde);
   document.getElementById('ruori-hytti-vihje').textContent = seuraava
     ? ('Ehdotus: "✓ Tehty" siirtää vaiheeseen "' + seuraava + '".')
@@ -6607,6 +6714,7 @@ async function lataaOsiot() {
 // Avaa osion sen route-kentän mukaan. Vain 'laituri' on toistaiseksi toiminnallinen.
 function avaaOsio(osio) {
   if (osio.route === 'laituri') {
+    peruLaiturinMateriaaliKonteksti();
     showLaituriView();
     lataaLaituri();
     palautaLaituriLuonnos();
@@ -6655,8 +6763,11 @@ function avaaOsio(osio) {
       document.getElementById('siirtymapuskuri-input').value = haeAsetusNumero('siirtymapuskuri_min', 30);
       document.getElementById('min-paallekkainen-input').value = haeAsetusNumero('min_paallekkainen_min', 15);
       document.getElementById('yksin-hetkittain-raja-input').value = haeAsetusNumero('yksin_hetkittain_raja_min', 90);
+      document.getElementById('aterian-kesto-input').value = haeAsetusNumero('aterian_kesto_min', 30);
       paivitaLaiturinPiilotusAsetukset();
     });
+    lataaHyttiOpiskeluaika();
+    lataaHyttiSuljetutIkkunat();
   } else if (osio.route === 'hytti') {
     showHyttiView();
     lataaHyttiPaanakyma();
@@ -8466,6 +8577,46 @@ function naytaakoKurssimateriaalilta(teksti) {
   return paivamaaraosumat >= 3;
 }
 
+// Kurssikontekstinen materiaalin sisääntulo (2026-08-10, ks. HYTTI_SPEKSI.md
+// §8.3, CODE_vaihe1_vastaukset.md) — "+ Lisää materiaalia" kurssinäkymässä
+// vie Laituriin TIETÄEN jo mihin kurssiin materiaali kuuluu. Kun tämä on
+// asetettu: (1) materiaaliKohdeUudetRivit-joukkoon lisätyt rivit ohittavat
+// naytaakoKurssimateriaalilta()-heuristiikan kokonaan (spekin sana: se on
+// arvaus jota EI tarvita kun kurssi on jo tiedossa), (2) jäsennysdialogin
+// kurssi-nimikenttä esitäytetään ja lukitaan (käyttäjän ei tarvitse kirjoittaa
+// sitä). Ei vaikuta MIHINKÄÄN muuhun Laiturin riviin — vain juuri tässä
+// kontekstissa lisättyihin uusiin riveihin (materiaaliKohdeUudetRivit).
+let materiaaliKohdeKurssi = null;
+let materiaaliKohdeUudetRivit = new Set();
+
+function avaaLaiturinMateriaalille(kurssi) {
+  materiaaliKohdeKurssi = { id: kurssi.id, name: kurssi.name };
+  materiaaliKohdeUudetRivit = new Set();
+  showLaituriView();
+  lataaLaituri();
+  palautaLaituriLuonnos();
+  merkitseLaituriNahdyksi();
+  paivitaLaiturinMateriaaliBanneri();
+  document.getElementById('laituri-input').focus();
+}
+
+function peruLaiturinMateriaaliKonteksti() {
+  materiaaliKohdeKurssi = null;
+  materiaaliKohdeUudetRivit = new Set();
+  paivitaLaiturinMateriaaliBanneri();
+}
+
+function paivitaLaiturinMateriaaliBanneri() {
+  const banneri = document.getElementById('laituri-materiaali-banneri');
+  if (!banneri) return;
+  if (materiaaliKohdeKurssi) {
+    banneri.style.display = 'flex';
+    document.getElementById('laituri-materiaali-banneri-teksti').textContent = 'Materiaalia kurssille: ' + materiaaliKohdeKurssi.name;
+  } else {
+    banneri.style.display = 'none';
+  }
+}
+
 const LAITURI_MATERIAALI_OHITETUT_KEY = 'kauppalista_laituri_materiaali_ohitetut';
 function haeMateriaaliOhitetut() {
   try {
@@ -8481,7 +8632,11 @@ function merkitseMateriaaliOhitetuksi(muruId) {
 }
 
 function piirraMateriaaliJasennysKortti(rivi, li) {
-  if (!naytaakoKurssimateriaalilta(rivi.content) || haeMateriaaliOhitetut().has(rivi.id)) return;
+  if (haeMateriaaliOhitetut().has(rivi.id)) return;
+  // Kurssikontekstissa (ks. avaaLaiturinMateriaalille) juuri lisätyt rivit
+  // ohittavat heuristiikan kokonaan — kurssi on jo tiedossa napista, ei
+  // tarvitse arvata onko teksti kurssimateriaalia (HYTTI_SPEKSI.md §8.3).
+  if (!naytaakoKurssimateriaalilta(rivi.content) && !materiaaliKohdeUudetRivit.has(rivi.id)) return;
 
   const kortti = document.createElement('li');
   kortti.className = 'laituri-ehdotus-rivi';
@@ -8567,7 +8722,11 @@ async function pyydaMateriaaliJasennys(rivi, nappi) {
 
 function avaaMateriaaliJasennysDialogi(rivi, jasennetty) {
   document.getElementById('materiaali-jasennys-alkuperainen').textContent = '"' + rivi.content.slice(0, 200) + (rivi.content.length > 200 ? '…' : '') + '"';
-  document.getElementById('materiaali-jasennys-kurssi-input').value = jasennetty.kurssi_nimi || '';
+  const kurssiInput = document.getElementById('materiaali-jasennys-kurssi-input');
+  // Kurssikontekstissa (ks. avaaLaiturinMateriaalille) kurssi on jo tiedossa
+  // — käyttäjän ei tarvitse kirjoittaa/tarkistaa sitä (HYTTI_SPEKSI.md §8.3).
+  kurssiInput.value = materiaaliKohdeKurssi ? materiaaliKohdeKurssi.name : (jasennetty.kurssi_nimi || '');
+  kurssiInput.disabled = !!materiaaliKohdeKurssi;
 
   const aiheLista = document.getElementById('materiaali-jasennys-aihe-lista');
   aiheLista.innerHTML = '';
@@ -8664,9 +8823,18 @@ async function tallennaMateriaaliJasennys(rivi) {
     if (ilmoitaKirjoitusvirheesta(error, 'Deadlinejen tallennus')) return;
   }
 
-  merkitseMateriaaliOhitetuksi(rivi.id);
+  // Hyväksytty materiaali ei jää näkyville Laituriin — sama tietokantalippu
+  // kuin muilla kohdetyypeillä (piilota_laiturista, ks. lataaLaituri:n
+  // eq('piilota_laiturista', false)), EI selainkohtainen localStorage-
+  // merkintä joka ei kulkisi laitteiden välillä (HYTTI_SPEKSI.md §8.3,
+  // korjattu 2026-08-10). merkitseMateriaaliOhitetuksi() pysyy käytössä
+  // VAIN "Ei liity" -hylkäykselle (ks. piirraMateriaaliJasennysKortti) —
+  // se on eri asia: ehdotuksen hylkäys, ei sisällön piilotus.
+  const { error: piilotaError } = await db.from('laituri').update({ piilota_laiturista: true }).eq('id', rivi.id);
+  if (piilotaError) console.error('Materiaalin piilotus Laiturista epäonnistui (tallennus onnistui silti):', piilotaError);
   document.getElementById('materiaali-jasennys-overlay').style.display = 'none';
   naytaIlmoitus('Tallennettu Opintopolulle (' + kurssiNimi + ').');
+  peruLaiturinMateriaaliKonteksti();
   lataaLaituri(document.getElementById('laituri-search').value.trim());
 }
 
@@ -9868,8 +10036,13 @@ document.getElementById('muistilaput-back-btn').addEventListener('click', functi
 
 // Laituri (linkki renderöidään dynaamisesti lataaOsiot():ssa)
 document.getElementById('laituri-back-btn').addEventListener('click', function() {
+  peruLaiturinMateriaaliKonteksti();
   showHomeView();
   lataaKotinakyma();
+});
+
+document.getElementById('laituri-materiaali-banneri-peruuta').addEventListener('click', function() {
+  peruLaiturinMateriaaliKonteksti();
 });
 
 document.getElementById('laituri-add-btn').addEventListener('click', async function() {
@@ -9893,13 +10066,17 @@ document.getElementById('laituri-add-btn').addEventListener('click', async funct
 
   const teemaSelect = document.getElementById('laituri-teema-select');
   const teemaId = teemaSelect && teemaSelect.value ? teemaSelect.value : null;
-  const { error } = await db.from('laituri').insert({ user_id: currentUserId, content: teksti });
+  // .select().single() (2026-08-10, ks. HYTTI_SPEKSI.md §8.3): tarvitaan
+  // uuden rivin id materiaaliKohdeUudetRivit-merkintää varten kun ollaan
+  // kurssin "+ Lisää materiaalia" -kontekstissa, ks. alla.
+  const { data: uusiRivi, error } = await db.from('laituri').insert({ user_id: currentUserId, content: teksti }).select().single();
   // "Ei koskaan kadota ajatusta" -periaate koskee myös epäonnistunutta
   // kirjoitusta: kenttää/luonnosta EI tyhjennetä jos kirjoitus ei onnistunut,
   // muuten juuri se turvaverkko (localStorage-luonnos) katoaisi samalla
   // hetkellä kun sille olisi eniten tarvetta (ks. muistiinpanot.md
   // "Kirjoituspolkujen auditointi").
   if (ilmoitaKirjoitusvirheesta(error, 'Laituri-lisäys')) return;
+  if (materiaaliKohdeKurssi && uusiRivi) materiaaliKohdeUudetRivit.add(uusiRivi.id);
   laituriInput.value = '';
   tyhjennaLaituriLuonnos();
   lataaLaituri(document.getElementById('laituri-search').value.trim());
@@ -10090,6 +10267,117 @@ sidoHuoliKynnysInput('kesto-yllapito-input', 'kesto_yllapito_min', 10, 'Ylläpid
 sidoHuoliKynnysInput('siirtymapuskuri-input', 'siirtymapuskuri_min', 30, 'Siirtymäpuskuri');
 sidoHuoliKynnysInput('min-paallekkainen-input', 'min_paallekkainen_min', 15, 'Vähimmäispäällekkäisyys');
 sidoHuoliKynnysInput('yksin-hetkittain-raja-input', 'yksin_hetkittain_raja_min', 90, 'Yksin hetkittäin -raja');
+sidoHuoliKynnysInput('aterian-kesto-input', 'aterian_kesto_min', 30, 'Aterian kesto');
+
+// === HYTIN IKKUNAT (2026-08-10, ks. HYTTI_SPEKSI.md §4.5/§4.5b, sql/112) ===
+// Vaihe 1a: pelkkä tallennus ja hallinta — generaattori (Vaihe 3) ei vielä
+// lue näitä mihinkään. viikonpaiva 0=su...6=la, sama numerointi kuin
+// lapsi_viikkopohjassa (sql/105).
+const VIIKONPAIVA_NIMET_HYTTI = ['Su', 'Ma', 'Ti', 'Ke', 'To', 'Pe', 'La'];
+
+async function lataaHyttiOpiskeluaika() {
+  if (!currentUserId) return;
+  const { data, error } = await db.from('hytti_opiskeluaika').select().eq('owner_id', currentUserId);
+  if (error) {
+    console.error('Opiskeluajan haku epäonnistui:', error);
+    return;
+  }
+  const kartta = {};
+  (data || []).forEach(function(r) { kartta[r.viikonpaiva] = r; });
+
+  const ruudukko = document.getElementById('hytti-opiskeluaika-ruudukko');
+  ruudukko.innerHTML = '';
+  for (let vp = 0; vp < 7; vp++) {
+    const rivi = kartta[vp];
+    const el = document.createElement('div');
+    el.className = 'hytti-opiskeluaika-rivi';
+
+    const nimi = document.createElement('span');
+    nimi.textContent = VIIKONPAIVA_NIMET_HYTTI[vp];
+    el.appendChild(nimi);
+
+    const alkuInput = document.createElement('input');
+    alkuInput.type = 'time';
+    alkuInput.className = 'settings-numero-input';
+    alkuInput.value = rivi ? rivi.alkaa.slice(0, 5) : '09:00';
+    el.appendChild(alkuInput);
+
+    const loppuInput = document.createElement('input');
+    loppuInput.type = 'time';
+    loppuInput.className = 'settings-numero-input';
+    loppuInput.value = rivi ? rivi.paattyy.slice(0, 5) : '15:30';
+    el.appendChild(loppuInput);
+
+    async function tallenna() {
+      const alku = alkuInput.value, loppu = loppuInput.value;
+      if (!alku || !loppu || alku >= loppu) {
+        naytaIlmoitus('Alun pitää olla ennen loppua');
+        return;
+      }
+      const { error: tallennusError } = await db.from('hytti_opiskeluaika')
+        .upsert({ owner_id: currentUserId, viikonpaiva: vp, alkaa: alku, paattyy: loppu }, { onConflict: 'owner_id,viikonpaiva' });
+      if (tallennusError) {
+        console.error('Opiskeluajan tallennus epäonnistui:', tallennusError);
+        naytaIlmoitus('Tallennus epäonnistui');
+        return;
+      }
+      naytaIlmoitus(VIIKONPAIVA_NIMET_HYTTI[vp] + ': ' + alku + '–' + loppu);
+    }
+    alkuInput.addEventListener('change', tallenna);
+    loppuInput.addEventListener('change', tallenna);
+
+    ruudukko.appendChild(el);
+  }
+}
+
+async function lataaHyttiSuljetutIkkunat() {
+  if (!currentUserId) return;
+  const { data, error } = await db.from('hytti_suljetut_ikkunat').select().eq('owner_id', currentUserId).order('viikonpaiva').order('alkaa');
+  if (error) {
+    console.error('Suljettujen ikkunoiden haku epäonnistui:', error);
+    return;
+  }
+  const listEl = document.getElementById('hytti-suljetut-ikkunat-lista');
+  listEl.innerHTML = '';
+  (data || []).forEach(function(ikkuna) {
+    const li = document.createElement('li');
+    const teksti = document.createElement('span');
+    teksti.textContent = VIIKONPAIVA_NIMET_HYTTI[ikkuna.viikonpaiva] + ' ' + ikkuna.alkaa.slice(0, 5) + '–' + ikkuna.paattyy.slice(0, 5) + (ikkuna.syy ? ' — ' + ikkuna.syy : '');
+    li.appendChild(teksti);
+    const poisto = document.createElement('button');
+    poisto.className = 'delete-btn';
+    poisto.textContent = '×';
+    poisto.addEventListener('click', async function() {
+      const { error: poistoError } = await db.from('hytti_suljetut_ikkunat').delete().eq('id', ikkuna.id);
+      if (ilmoitaKirjoitusvirheesta(poistoError, 'Suljetun ikkunan poisto')) return;
+      lataaHyttiSuljetutIkkunat();
+    });
+    li.appendChild(poisto);
+    listEl.appendChild(li);
+  });
+}
+
+const suljettuIkkunaViikonpaivaSelect = document.getElementById('suljettu-ikkuna-viikonpaiva');
+VIIKONPAIVA_NIMET_HYTTI.forEach(function(nimi, vp) {
+  const optio = document.createElement('option');
+  optio.value = String(vp);
+  optio.textContent = nimi;
+  suljettuIkkunaViikonpaivaSelect.appendChild(optio);
+});
+
+document.getElementById('suljettu-ikkuna-lisaa-btn').addEventListener('click', async function() {
+  const vp = parseInt(suljettuIkkunaViikonpaivaSelect.value, 10);
+  const alku = document.getElementById('suljettu-ikkuna-alku').value;
+  const loppu = document.getElementById('suljettu-ikkuna-loppu').value;
+  const syy = document.getElementById('suljettu-ikkuna-syy').value.trim();
+  if (!alku || !loppu || alku >= loppu) { naytaIlmoitus('Anna kelvollinen aikaväli'); return; }
+  const { error } = await db.from('hytti_suljetut_ikkunat').insert({ owner_id: currentUserId, viikonpaiva: vp, alkaa: alku, paattyy: loppu, syy: syy || null });
+  if (ilmoitaKirjoitusvirheesta(error, 'Suljetun ikkunan lisäys')) return;
+  document.getElementById('suljettu-ikkuna-alku').value = '';
+  document.getElementById('suljettu-ikkuna-loppu').value = '';
+  document.getElementById('suljettu-ikkuna-syy').value = '';
+  lataaHyttiSuljetutIkkunat();
+});
 
 // === MUISTUTUSPANEELIN NAPIT JA RULLAT ===
 // KORJATTU (2026-07-17, koonti 2 kohta 7 — "yksiköt eivät yhdisty"): vanha

@@ -463,6 +463,12 @@
     <hr class="divider">
 
     <div class="section-title">🧭 Aiheet</div>
+
+    <!-- Kurssikontekstinen materiaalin sisääntulo (2026-08-10, ks.
+         HYTTI_SPEKSI.md §3.4/§8.3) — vie Laituriin TIETÄEN jo mihin
+         kurssiin materiaali kuuluu, ks. avaaLaiturinMateriaalille(). -->
+    <button class="dialog-btn dialog-btn-cancel" id="opinto-lisaa-materiaalia-btn" style="margin-bottom:10px">+ Lisää materiaalia</button>
+
     <ul class="list" id="opinto-aihe-lista"></ul>
     <p class="section-empty" id="opinto-aihe-tyhja" style="display:none">Ei vielä aiheita.</p>
 
@@ -884,6 +890,30 @@
 
     <hr class="divider">
 
+    <!-- Hytin ikkunat (2026-08-10, ks. HYTTI_SPEKSI.md §4.5/§4.5b, sql/112)
+         — Vaihe 1a: pelkkä tallennus/hallinta, generaattori (Vaihe 3) ei
+         vielä lue näitä mihinkään. -->
+    <div class="section-title">🕐 Hytin ikkunat</div>
+    <div class="settings-row">
+      <span>Aterian kesto (min)</span>
+      <input type="number" class="settings-numero-input" id="aterian-kesto-input" min="1" step="1">
+    </div>
+
+    <p class="section-empty">Päivän opiskeluaika (oletus 09:00–15:30, säädettävissä päiväkohtaisesti)</p>
+    <div id="hytti-opiskeluaika-ruudukko"></div>
+
+    <p class="section-empty">Suljetut ikkunat — generaattorin rajoite, ei näy päivänäkymässä</p>
+    <ul class="list" id="hytti-suljetut-ikkunat-lista"></ul>
+    <div class="hytti-ikkuna-lisays">
+      <select id="suljettu-ikkuna-viikonpaiva" class="settings-numero-input"></select>
+      <input type="time" id="suljettu-ikkuna-alku" class="settings-numero-input">
+      <input type="time" id="suljettu-ikkuna-loppu" class="settings-numero-input">
+      <input type="text" id="suljettu-ikkuna-syy" class="settings-numero-input" placeholder="syy (valinnainen)">
+      <button class="dialog-btn dialog-btn-cancel" id="suljettu-ikkuna-lisaa-btn">+ Lisää</button>
+    </div>
+
+    <hr class="divider">
+
     <!-- 7c (2026-08-03, ks. KONSEPTIKIRJA.md): kohdekohtainen oletus "ei
          tarvitse näkyä Laiturissa" -täpälle. Kun tälle listalle/kortille
          asetetaan koti, piilotus tapahtuu automaattisesti (ks. script.js
@@ -1002,6 +1032,14 @@
       <button class="back-btn" id="laituri-back-btn">‹</button>
       <h1>✱ LAITURI ✱</h1>
       <span></span>
+    </div>
+
+    <!-- Kurssikontekstinen materiaalin sisääntulo (2026-08-10, ks.
+         HYTTI_SPEKSI.md §8.3) — näkyy vain kun tänne on tultu kurssin
+         "+ Lisää materiaalia" -napista, ks. avaaLaiturinMateriaalille(). -->
+    <div class="laituri-materiaali-banneri" id="laituri-materiaali-banneri" style="display:none">
+      <span id="laituri-materiaali-banneri-teksti"></span>
+      <button id="laituri-materiaali-banneri-peruuta" class="link-btn">Peruuta</button>
     </div>
 
     <div class="add-item">
