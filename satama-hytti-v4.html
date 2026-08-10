@@ -1,0 +1,527 @@
+<!DOCTYPE html>
+<html lang="fi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Satama — Hytti</title>
+<link href="https://fonts.googleapis.com/css2?family=Courier+Prime:ital,wght@0,400;0,700;1,400&display=swap" rel="stylesheet">
+<style>
+:root{
+  --paperi:#EAE6DC; --muste:#221F1A;
+  --matalikko:#F0C79E; --karikko:#E0A46F;
+  --syvanne:#3F5F53; --messinki:#9C7A43; --sinappi:#C29A2E; --vaara:#B8433A;
+  --hius:rgba(34,31,26,.16); --hius-vahva:rgba(34,31,26,.34); --vaimea:rgba(34,31,26,.55);
+  --r-luettava:3px; --r-kosketettava:13px;
+  --kelluu:cubic-bezier(.24,.72,.30,1); --hidas:820ms; --keski:520ms;
+}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{background:var(--paperi);color:var(--muste);
+  font-family:'Courier Prime',ui-monospace,monospace;font-size:16px;line-height:1.5;
+  -webkit-font-smoothing:antialiased}
+body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:0;
+  background-image:radial-gradient(rgba(34,31,26,.045) .5px,transparent .5px);background-size:3px 3px}
+@media (prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition-duration:.01ms!important}}
+.sivu{position:relative;z-index:1;max-width:480px;margin:0 auto;padding:26px 18px 60px}
+
+.pieni{font-size:12.5px;color:var(--vaimea)}
+.osio{margin:0 0 32px}
+.osio-nimi{font-size:11px;letter-spacing:.28em;text-transform:uppercase;color:var(--vaimea);
+  margin:0 0 12px;display:flex;align-items:center;gap:10px}
+.osio-nimi::after{content:'';flex:1;height:1px;background:var(--hius)}
+
+/* ---------- otsake ja välilehdet ---------- */
+.hytti-otsake{display:flex;align-items:baseline;justify-content:space-between;margin-bottom:12px}
+.hytti-otsake h1{margin:0;font-size:27px;font-weight:700;letter-spacing:-.02em}
+.valilehdet{display:flex;gap:2px;border-bottom:1px solid var(--hius-vahva);margin-bottom:20px}
+.vl{font-family:inherit;font-size:13px;letter-spacing:.1em;text-transform:uppercase;
+  background:none;border:0;border-bottom:2px solid transparent;padding:9px 14px;margin-bottom:-1px;
+  color:var(--vaimea);cursor:pointer;
+  transition:color var(--keski) var(--kelluu),border-color var(--keski) var(--kelluu)}
+.vl[aria-selected=true]{color:var(--muste);font-weight:700;border-bottom-color:var(--muste)}
+.vl:focus-visible{outline:2px solid var(--messinki);outline-offset:2px;border-radius:3px}
+.paneeli[hidden]{display:none}
+.nouse{animation:nouse var(--hidas) var(--kelluu) both}
+@keyframes nouse{from{opacity:0;transform:translateY(15px)}to{opacity:1;transform:none}}
+
+/* ---------- mockupin säätimet (ei tule tuotantoon) ---------- */
+.demo{display:flex;align-items:center;gap:7px;flex-wrap:wrap;margin-bottom:18px;
+  padding:9px 11px;border:1px dashed var(--hius-vahva);border-radius:var(--r-luettava);
+  font-size:11px;color:var(--vaimea)}
+.demo .kello{margin-left:auto;font-size:15px;font-weight:700;color:var(--muste)}
+
+.saadin{font-family:inherit;font-size:11.5px;letter-spacing:.12em;text-transform:uppercase;
+  padding:8px 13px;border-radius:var(--r-kosketettava);cursor:pointer;color:var(--muste);
+  border:1px solid rgba(156,122,67,.5);
+  background:linear-gradient(165deg,rgba(255,252,244,.72),rgba(234,230,220,.28));
+  backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.65);
+  transition:all var(--keski) var(--kelluu)}
+.saadin:hover{transform:translateY(-2px)}
+.saadin:focus-visible{outline:2px solid var(--messinki);outline-offset:2px}
+.saadin.levea{width:100%;margin-top:12px}
+
+/* ---------- deadline-rivi 1–2 pv ennen ---------- */
+.dl-rivi{display:flex;gap:10px;align-items:center;padding:11px 14px;margin-bottom:13px;
+  background:var(--karikko);border-radius:var(--r-luettava);font-size:13.5px}
+.dl-rivi b{font-weight:700}
+.dl-rivi .pv{margin-left:auto;font-size:11px;letter-spacing:.16em;text-transform:uppercase;font-weight:700}
+
+/* ---------- Nyt-kortti ----------
+   Generaattorin tehtävä = kosketettava pinta, sitä oikeasti painetaan.
+   Luento tai meno = luettava pinta. */
+.nyt{display:block;width:100%;text-align:left;font-family:inherit;color:inherit;cursor:pointer;
+  position:relative;overflow:hidden;padding:16px 18px 15px 21px;
+  transition:transform var(--keski) var(--kelluu),box-shadow var(--keski) var(--kelluu)}
+.nyt.tehtava{background:linear-gradient(165deg,rgba(255,252,244,.72),rgba(234,230,220,.28));
+  backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);
+  border:1px solid rgba(156,122,67,.5);border-radius:var(--r-kosketettava);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.65)}
+.nyt.luettava{background:rgba(255,253,248,.5);border:1px solid var(--hius-vahva);
+  border-radius:var(--r-luettava)}
+.nyt::before{content:'';position:absolute;left:0;top:0;bottom:0;width:3px;background:var(--messinki)}
+.nyt.luettava::before{background:var(--hius-vahva)}
+.nyt:hover{transform:translateY(-2px);box-shadow:0 6px 18px rgba(34,31,26,.11)}
+.nyt:active{transform:translateY(0) scale(.995)}
+.nyt:focus-visible{outline:2px solid var(--messinki);outline-offset:3px}
+.nyt-yla{display:flex;align-items:flex-start;gap:14px}
+.nyt-teksti{flex:1;min-width:0}
+.nyt-kurssi{font-size:12.5px;color:var(--vaimea);margin-bottom:2px}
+.nyt-solmu{font-size:20px;font-weight:700;letter-spacing:-.01em;line-height:1.25}
+.nyt-aika{font-size:30px;font-weight:700;letter-spacing:-.03em;line-height:1;flex:none}
+.nyt-ala{display:flex;align-items:center;gap:10px;margin-top:12px;padding-top:11px;
+  border-top:1px dotted var(--hius-vahva)}
+.vaihe{font-size:11px;letter-spacing:.2em;text-transform:uppercase;color:var(--messinki);font-weight:700}
+.vaihe.hallussa{color:var(--syvanne)}
+.nyt-ala .pieni{margin-left:auto}
+/* ei laskuria, ei edistymisviivaa — vain hiljainen tila */
+.kaynnissa{margin-top:11px;padding-top:10px;border-top:1px dotted var(--hius-vahva);
+  font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--messinki);font-weight:700}
+
+.peruste{display:flex;gap:11px;margin-top:12px}
+.peruste .luotain{flex:none;width:1px;background:var(--hius-vahva);margin:3px 0}
+.peruste p{margin:0;font-size:13px;line-height:1.6;color:var(--vaimea)}
+
+/* ---------- kalenteririvi ---------- */
+.kal{border-top:1px solid var(--hius)}
+.kal-rivi{display:flex;gap:12px;padding:11px 2px;border-bottom:1px solid var(--hius);align-items:baseline}
+.kal-aika{font-size:15px;font-weight:700;flex:none;width:46px;letter-spacing:-.02em}
+.kal-teksti{flex:1;min-width:0}
+.kal-teksti b{font-weight:700;font-size:15px}
+.kal-teksti .pieni{display:block;margin-top:1px}
+.merkki{flex:none;width:9px;height:9px;margin-top:5px;border-radius:50%}
+.merkki.live{background:var(--muste)}
+.merkki.oma{border:1.5px solid var(--messinki);background:transparent}
+.merkki.kertaus{border:1.5px solid var(--syvanne);background:transparent}
+.luentolippu{display:inline-flex;align-items:center;gap:6px;margin-bottom:3px}
+.hehku{width:6px;height:6px;border-radius:50%;background:var(--vaara);flex:none;
+  animation:hehku 3.4s var(--kelluu) infinite}
+@keyframes hehku{0%,100%{opacity:1}50%{opacity:.35}}
+.luentolippu span{font-size:10px;letter-spacing:.2em;text-transform:uppercase;color:var(--vaara);font-weight:700}
+.matka{font-size:11px;color:var(--vaimea);padding-left:58px;padding-bottom:9px;margin-top:-4px}
+.matka .lahde{color:var(--messinki)}
+
+/* ---------- boost ---------- */
+.boost{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+.min{border:1px solid var(--hius-vahva);border-radius:var(--r-kosketettava);
+  background:linear-gradient(165deg,rgba(255,252,244,.7),rgba(234,230,220,.25));
+  backdrop-filter:blur(7px);-webkit-backdrop-filter:blur(7px);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.6);
+  padding:13px 4px 10px;cursor:pointer;font-family:inherit;color:var(--muste);
+  transition:transform var(--keski) var(--kelluu),box-shadow var(--keski) var(--kelluu),border-color var(--keski) var(--kelluu)}
+.min b{display:block;font-size:25px;font-weight:700;letter-spacing:-.04em;line-height:1}
+.min span{display:block;font-size:10px;letter-spacing:.16em;color:var(--vaimea);margin-top:4px}
+.min:hover{transform:translateY(-3px);box-shadow:inset 0 1px 0 rgba(255,255,255,.7),0 6px 16px rgba(34,31,26,.13)}
+.min:active{transform:translateY(-1px) scale(.97)}
+.min[aria-pressed=true]{border-color:var(--messinki);box-shadow:inset 0 1px 0 rgba(255,255,255,.7),0 0 0 3px rgba(156,122,67,.15)}
+.rullak{margin-top:11px;max-height:0;opacity:0;overflow:hidden;
+  transition:max-height var(--hidas) var(--kelluu),opacity var(--keski) var(--kelluu)}
+.rullak.auki{max-height:180px;opacity:1}
+.rulla{position:relative;height:132px;overflow:hidden;
+  border:1px solid rgba(156,122,67,.42);border-radius:var(--r-kosketettava);
+  background:linear-gradient(180deg,rgba(234,230,220,.9),rgba(255,252,244,.55) 50%,rgba(234,230,220,.9));
+  backdrop-filter:blur(11px);-webkit-backdrop-filter:blur(11px);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.7)}
+.rullal{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center}
+.rrivi{height:33px;line-height:33px;font-size:17px;color:var(--vaimea);width:100%;text-align:center;
+  background:none;border:0;font-family:inherit;cursor:pointer;transition:all var(--keski) var(--kelluu)}
+.rrivi.valittu{font-size:22px;font-weight:700;color:var(--muste)}
+.rrivi.kauko{opacity:.32;font-size:15px}
+.rikkuna{position:absolute;left:9px;right:9px;top:50%;height:36px;transform:translateY(-50%);
+  border-top:1px solid rgba(156,122,67,.5);border-bottom:1px solid rgba(156,122,67,.5);
+  background:rgba(156,122,67,.07);pointer-events:none;border-radius:var(--r-luettava)}
+
+/* ---------- viikko: päivät pystysarakkeina ---------- */
+.viikko{display:grid;grid-template-columns:repeat(7,1fr);gap:1px;background:var(--hius);
+  border:1px solid var(--hius);border-radius:var(--r-luettava);overflow:hidden}
+.pv{background:var(--paperi);min-height:150px;position:relative;padding:6px 4px}
+.pv[data-k=matalikko]{background:var(--matalikko)}
+.pv[data-k=karikko]{background:var(--karikko)}
+.pv .nro{font-size:10px;color:var(--vaimea)}
+.pv .vkp{font-size:9px;letter-spacing:.14em;text-transform:uppercase;color:var(--vaimea);display:block}
+.jana{position:absolute;width:5px;border-radius:2.5px}
+.legenda-vk{display:flex;gap:14px;margin-top:9px;flex-wrap:wrap;font-size:11px;color:var(--vaimea)}
+.legenda-vk .leg{display:flex;align-items:center;gap:6px}
+.legenda-vk .lastu{width:16px;height:5px;border-radius:2.5px}
+
+/* ---------- kurssit ---------- */
+.kurssi{border:1px solid var(--hius);border-radius:var(--r-luettava);
+  background:rgba(255,253,248,.5);margin-bottom:10px;overflow:hidden}
+.kurssi-otsikko{display:flex;align-items:center;gap:11px;width:100%;text-align:left;
+  font-family:inherit;color:inherit;background:none;border:0;padding:14px 15px;cursor:pointer;
+  transition:background var(--keski) var(--kelluu)}
+.kurssi-otsikko:hover{background:rgba(255,253,248,.85)}
+.kurssi-nimi{flex:1;min-width:0}
+.kurssi-nimi b{display:block;font-size:15px;font-weight:700;line-height:1.3}
+.kurssi-vaihe{font-size:11px;letter-spacing:.18em;text-transform:uppercase;color:var(--messinki);font-weight:700}
+.jaljella-jana{height:4px;border-radius:1px;background:rgba(34,31,26,.1);overflow:hidden;margin-top:8px}
+.jaljella-jana i{display:block;height:100%;background:rgba(34,31,26,.42)}
+.nuoli{flex:none;width:9px;height:9px;border-right:1.5px solid var(--vaimea);border-bottom:1.5px solid var(--vaimea);
+  transform:rotate(45deg) translateY(-2px);transition:transform var(--keski) var(--kelluu)}
+.kurssi.auki .nuoli{transform:rotate(-135deg) translateY(-2px)}
+.kurssi-sisalto{max-height:0;overflow:hidden;transition:max-height var(--hidas) var(--kelluu)}
+.kurssi.auki .kurssi-sisalto{max-height:900px}
+.kurssi-runko{padding:0 15px 15px}
+.ala-nimi{font-size:10px;letter-spacing:.24em;text-transform:uppercase;color:var(--vaimea);
+  margin:15px 0 7px;display:block}
+.tehtava{display:flex;gap:11px;align-items:baseline;padding:9px 0;border-top:1px dotted var(--hius-vahva)}
+.tehtava-pvm{flex:none;width:52px;font-size:12px;font-weight:700}
+.tehtava-teksti{flex:1;min-width:0;font-size:13.5px;line-height:1.4}
+.jaljella{flex:none;font-size:10px;letter-spacing:.12em;text-transform:uppercase;
+  padding:2px 7px;border-radius:2px;border:1px solid var(--hius-vahva);color:var(--vaimea)}
+.jaljella.lahella{background:var(--matalikko);border-color:rgba(34,31,26,.14);color:var(--muste)}
+.jaljella.nyt{background:var(--karikko);border-color:rgba(34,31,26,.14);color:var(--muste);font-weight:700}
+/* solmu kurssin sisällä + ylläpitotäppä */
+.k-solmu{display:flex;gap:11px;align-items:center;padding:9px 0;border-top:1px dotted var(--hius-vahva)}
+.k-solmu-nimi{flex:1;min-width:0;font-size:13.5px}
+.k-solmu-nimi span{display:block;font-size:11px;color:var(--vaimea)}
+.tappa{display:flex;align-items:center;gap:7px;flex:none;font-size:10.5px;
+  letter-spacing:.1em;text-transform:uppercase;color:var(--vaimea);cursor:pointer}
+.tappa input{width:15px;height:15px;accent-color:var(--syvanne);cursor:pointer}
+.tappa.paalla{color:var(--syvanne);font-weight:700}
+
+/* ---------- kartta ---------- */
+.kartta-kehys{position:relative;border:1px solid var(--hius-vahva);border-radius:var(--r-luettava);
+  overflow:hidden;background:var(--paperi)}
+#verkko{display:block;width:100%;height:auto}
+.legenda{display:flex;gap:14px;margin-top:10px;flex-wrap:wrap;font-size:11px;color:var(--vaimea);align-items:center}
+.liuku{width:70px;height:9px;border-radius:1px;border:1px solid var(--hius);
+  background:linear-gradient(90deg,#EAE6DC,#3F5F53)}
+.kartta-paneeli{margin-top:12px;padding:15px;background:rgba(255,253,248,.62);
+  border:1px solid var(--hius);border-radius:var(--r-luettava);animation:nouse 700ms var(--kelluu) both}
+.kartta-paneeli h3{margin:0 0 3px;font-size:16px;font-weight:700}
+.rivi{display:flex;gap:9px;align-items:baseline;padding:3px 0;font-size:13px}
+</style>
+</head>
+<body>
+<div class="sivu">
+
+  <div class="hytti-otsake"><h1>Hytti</h1><span class="pieni" id="pvm">su 9.8.</span></div>
+  <div class="valilehdet" role="tablist" id="valilehdet"></div>
+
+  <!-- ================= NYT ================= -->
+  <section class="paneeli" id="p-nyt" role="tabpanel">
+    <div class="demo">
+      <button class="saadin" id="demo-paiva">Päivä jossa on luento</button>
+      <button class="saadin" id="kello-taakse">− 15 min</button>
+      <button class="saadin" id="kello-eteen">+ 15 min</button>
+      <span class="kello" id="kello-naytto">10:15</span>
+    </div>
+
+    <div id="dl-rivi"></div>
+
+    <section class="osio">
+      <button class="nyt nouse" id="nyt-kortti"></button>
+      <div class="peruste"><div class="luotain"></div><p id="peruste-teksti"></p></div>
+    </section>
+
+    <section class="osio">
+      <p class="osio-nimi">Loput päivästä</p>
+      <div class="kal" id="kal-loput"></div>
+    </section>
+
+    <section class="osio">
+      <p class="osio-nimi">Boost</p>
+      <div class="boost">
+        <button class="min" data-min="15"><b>15</b><span>MIN</span></button>
+        <button class="min" data-min="30"><b>30</b><span>MIN</span></button>
+        <button class="min" data-min="60"><b>60</b><span>MIN</span></button>
+        <button class="min" data-min="muu"><b>··</b><span>MUU</span></button>
+      </div>
+      <div class="rullak" id="rullak">
+        <div class="rulla"><div class="rikkuna"></div><div class="rullal" id="rullal"></div></div>
+      </div>
+    </section>
+  </section>
+
+  <!-- ================= REITTI ================= -->
+  <section class="paneeli" id="p-reitti" role="tabpanel" hidden>
+    <section class="osio">
+      <p class="osio-nimi">Viikko</p>
+      <div class="viikko" id="viikko"></div>
+      <div class="legenda-vk">
+        <div class="leg"><span class="lastu" style="background:var(--muste)"></span> luento</div>
+        <div class="leg"><span class="lastu" style="background:var(--messinki)"></span> opiskelu</div>
+        <div class="leg"><span class="lastu" style="background:var(--vaimea)"></span> muu meno</div>
+      </div>
+    </section>
+
+    <section class="osio">
+      <p class="osio-nimi">Seuraavat palautukset</p>
+      <div class="kal" id="dl-lista"></div>
+    </section>
+
+    <section class="osio">
+      <p class="osio-nimi">Kurssit</p>
+      <div id="kurssilista"></div>
+      <button class="saadin levea">+ Lisää kurssi</button>
+    </section>
+  </section>
+
+  <!-- ================= KARTTA ================= -->
+  <section class="paneeli" id="p-kartta" role="tabpanel" hidden>
+    <div class="kartta-kehys">
+      <svg id="verkko" viewBox="0 0 380 400" role="img" aria-label="Opiskelukartta">
+        <defs><filter id="peh" x="-45%" y="-45%" width="190%" height="190%"><feGaussianBlur stdDeviation="26"/></filter></defs>
+        <rect width="380" height="400" fill="#EAE6DC"/>
+        <g id="g-syv" filter="url(#peh)"></g>
+        <g id="g-mesh" fill="none" stroke="#3F5F53" stroke-linecap="round"></g>
+        <g id="g-mer"></g><g id="g-tek"></g>
+      </svg>
+    </div>
+    <div class="legenda"><span class="liuku"></span> tyhjä vesi → syvänne · katkoviivarengas = ylläpidossa</div>
+    <div id="kartta-paneeli"></div>
+  </section>
+
+</div>
+
+<script>
+const $=id=>document.getElementById(id);
+/* Haptiikka sinne mitä Satama haluaa käyttäjän tekevän. Ei navigaatiossa. */
+const naps=(ms=8)=>{if(navigator.vibrate)navigator.vibrate(ms)};
+const mins=t=>{const[h,m]=t.split(':').map(Number);return h*60+m};
+const kello=m=>String(Math.floor(m/60)).padStart(2,'0')+':'+String(m%60).padStart(2,'0');
+
+/* ---------- välilehdet listasta ---------- */
+const lehdet=[{n:'Nyt',p:'p-nyt'},{n:'Reitti',p:'p-reitti'},{n:'Kartta',p:'p-kartta'}];
+$('valilehdet').innerHTML=lehdet.map((l,i)=>
+  `<button class="vl" role="tab" data-p="${l.p}" aria-selected="${i===0}">${l.n}</button>`).join('');
+$('valilehdet').querySelectorAll('.vl').forEach(b=>b.addEventListener('click',()=>{
+  $('valilehdet').querySelectorAll('.vl').forEach(x=>x.setAttribute('aria-selected',x===b));
+  lehdet.forEach(l=>{const p=$(l.p),nak=l.p===b.dataset.p;p.hidden=!nak;
+    if(nak){p.classList.remove('nouse');void p.offsetWidth;p.classList.add('nouse')}});
+}));
+
+/* ==========================================================================
+   PÄIVÄ
+   Opiskeluaika oletuksena 09:00–15:30 ellei asetuksissa muuta.
+   Suljettuja ikkunoita ei renderöidä lainkaan — niiden kohdalla ei vain lue mitään.
+   ========================================================================== */
+const paivat={
+  vapaa:{pvm:'su 9.8.',alku:615,dl:null,
+    e:[
+      {a:'10:40',l:'11:10',t:'opiskelu',o:'Symmetrinen salaus',k:'Tietoverkot ja tietoturva',v:'Priming'},
+      {a:'11:15',l:'11:45',t:'kertaus',o:'Vektorien pistetulo',k:'Matematiikka',v:'Kertaus'},
+      {a:'11:50',l:'12:20',t:'ruoka',o:'Lounas'},
+      {a:'13:00',l:'14:15',t:'muu',o:'Kauppareissu',x:'Kaarina',
+       m:{lh:'12:30',ke:'24 min',li:'linja 220 · Kauppatori'}},
+      {a:'14:30',l:'15:00',t:'opiskelu',o:'Ehtolauseet',k:'Introduction to Programming',v:'Encoding'},
+      {a:'15:00',l:'15:30',t:'opiskelu',o:'Rekursio',k:'Introduction to Programming',v:'Retrieval'}
+    ]},
+  luento:{pvm:'ma 10.8.',alku:485,dl:{n:'Osa 4 — tehtävät 1–12',p:2},
+    e:[
+      {a:'09:00',l:'10:30',t:'luento',o:'Tietoverkot ja tietoturva',x:'Karaportti 2, sali B248',
+       m:{lh:'08:20',ke:'38 min',li:'linja 42 · Kauppatori'}},
+      {a:'10:40',l:'11:10',t:'opiskelu',o:'Symmetrinen salaus',k:'Tietoverkot ja tietoturva',v:'Priming'},
+      {a:'11:15',l:'11:45',t:'ruoka',o:'Lounas'},
+      {a:'12:00',l:'12:30',t:'opiskelu',o:'Rekursio',k:'Introduction to Programming',v:'Retrieval'},
+      {a:'12:35',l:'13:05',t:'opiskelu',o:'Matriisit',k:'Matematiikka',v:'Encoding'},
+      {a:'14:00',l:'14:45',t:'muu',o:'Rebekan hammaslääkäri',x:'Yliopistonkatu 30',
+       m:{lh:'13:31',ke:'21 min',li:'linja 18 · Nummenpuisto'}},
+      {a:'15:15',l:'15:30',t:'kertaus',o:'Vektorien pistetulo',k:'Matematiikka',v:'Kertaus'}
+    ]}
+};
+const perusteet={
+  'Symmetrinen salaus':'Silta — Tietoverkot tarvitsee tätä ensi viikolla.',
+  'Vektorien pistetulo':'Unohtuu kolmessa päivässä.',
+  'Ehtolauseet':'Palautus maanantaina, tämä on esitieto.',
+  'Rekursio':'Edellinen pätkä oli matematiikkaa — vaihdetaan kurssia.',
+  'Matriisit':'Välikoe yhdeksän päivän päässä.',
+  'Lounas':'Ruoka varattiin ennen opiskelua.',
+  'Tietoverkot ja tietoturva':'Luento ei siirry.',
+  'Kauppareissu':'Kiinteä meno.',
+  'Rebekan hammaslääkäri':'Kiinteä meno.'
+};
+let paiva='vapaa', nyt=paivat.vapaa.alku, auki=false;
+
+function piirraPaiva(){
+  const p=paivat[paiva];
+  $('pvm').textContent=p.pvm;
+  $('kello-naytto').textContent=kello(nyt);
+  $('demo-paiva').textContent=paiva==='vapaa'?'Päivä jossa on luento':'Päivä ilman luentoa';
+  $('dl-rivi').innerHTML=p.dl?`<div class="dl-rivi"><b>${p.dl.n}</b><span class="pv">${p.dl.p} pv</span></div>`:'';
+
+  const jaljella=p.e.filter(e=>mins(e.l)>nyt);
+  const k=jaljella[0], loput=jaljella.slice(1);
+  const K=$('nyt-kortti');
+
+  if(!k){
+    K.className='nyt luettava';
+    K.innerHTML='<div class="nyt-yla"><div class="nyt-teksti"><div class="nyt-kurssi">Päivä on ajettu</div><div class="nyt-solmu">Ei enää suunniteltua</div></div></div>';
+    $('peruste-teksti').textContent='';
+  }else{
+    const tehtava=k.t==='opiskelu'||k.t==='kertaus';
+    K.className='nyt '+(tehtava?'tehtava':'luettava');
+    const leima={luento:'Kiintopiste',muu:'Meno',ruoka:'Lounas'}[k.t];
+    K.innerHTML=`<div class="nyt-yla"><div class="nyt-teksti">
+        ${k.t==='luento'?'<span class="luentolippu"><span class="hehku"></span><span>Liveluento</span></span>':''}
+        <div class="nyt-kurssi">${k.k||k.x||''}</div>
+        <div class="nyt-solmu">${k.o}</div></div>
+      <div class="nyt-aika">${k.a}</div></div>
+      <div class="nyt-ala"><span class="vaihe${k.t==='kertaus'?' hallussa':''}">${leima||k.v}</span>
+        <span class="pieni">${mins(k.l)-mins(k.a)} min</span></div>
+      ${auki&&tehtava?'<div class="kaynnissa">Avattu '+kello(nyt)+' · ajanotto käynnissä</div>':''}`;
+    $('peruste-teksti').textContent=perusteet[k.o]||'';
+    K.onclick=()=>{if(tehtava){naps(12);auki=!auki;piirraPaiva()}};
+  }
+
+  $('kal-loput').innerHTML=loput.map(e=>{
+    const mk=e.t==='kertaus'?'kertaus':e.t==='opiskelu'?'oma':'live';
+    return `<div class="kal-rivi"><div class="kal-aika">${e.a}</div><div class="merkki ${mk}"></div>
+      <div class="kal-teksti">${e.t==='luento'?'<span class="luentolippu"><span class="hehku"></span><span>Liveluento</span></span>':''}
+        <b>${e.o}</b><span class="pieni">${e.k?e.k+' · '+e.v:(e.x||'')}</span></div></div>`+
+      (e.m?`<div class="matka">↑ lähtö ${e.m.lh} · ${e.m.ke} · ${e.m.li} <span class="lahde">· Föli</span></div>`:'');
+  }).join('')||'<p class="pieni" style="padding:11px 2px">Ei muuta suunniteltua.</p>';
+}
+$('demo-paiva').onclick=()=>{paiva=paiva==='vapaa'?'luento':'vapaa';nyt=paivat[paiva].alku;auki=false;piirraPaiva()};
+$('kello-eteen').onclick=()=>{nyt=Math.min(1439,nyt+15);auki=false;piirraPaiva()};
+$('kello-taakse').onclick=()=>{nyt=Math.max(0,nyt-15);auki=false;piirraPaiva()};
+piirraPaiva();
+
+/* ---------- boost ---------- */
+const RA=[10,20,25,35,40,45,50,55,70,80,90,100,110,120];
+let rv=45;
+function rulla(){
+  const i=RA.indexOf(rv);
+  $('rullal').innerHTML=[i-2,i-1,i,i+1,i+2].map(k=>
+    (k<0||k>=RA.length)?'<div class="rrivi" style="opacity:0">·</div>'
+    :`<button class="rrivi ${k===i?'valittu':Math.abs(k-i)===2?'kauko':''}" data-v="${RA[k]}">${RA[k]}</button>`).join('');
+  $('rullal').querySelectorAll('[data-v]').forEach(b=>b.onclick=()=>{rv=+b.dataset.v;naps();rulla()});
+}
+rulla();
+document.querySelectorAll('.min').forEach(b=>b.onclick=()=>{
+  naps();
+  if(b.dataset.min==='muu'){b.setAttribute('aria-pressed',$('rullak').classList.toggle('auki'));return}
+  document.querySelectorAll('.min').forEach(x=>x.setAttribute('aria-pressed',x===b));
+  $('rullak').classList.remove('auki');
+});
+
+/* ==========================================================================
+   REITTI
+   ========================================================================== */
+const VK=[
+  {n:10,d:'ma',k:'karikko',t:[[9,1.5,'var(--muste)'],[10.7,.5,'var(--messinki)'],[14,.75,'var(--vaimea)']]},
+  {n:11,d:'ti',k:'matalikko',t:[[10,1.5,'var(--muste)'],[13,.75,'var(--messinki)']]},
+  {n:12,d:'ke',k:'karikko',t:[[8,2,'var(--muste)'],[12,1,'var(--vaimea)'],[15,1.5,'var(--vaimea)']]},
+  {n:13,d:'to',k:'',t:[[11,.5,'var(--messinki)']]},
+  {n:14,d:'pe',k:'matalikko',t:[[9,1.5,'var(--muste)'],[14,.5,'var(--messinki)']]},
+  {n:15,d:'la',k:'',t:[]},
+  {n:16,d:'su',k:'',t:[[17,2,'var(--vaimea)']]}
+];
+$('viikko').innerHTML=VK.map(p=>`<div class="pv" data-k="${p.k}">
+  <span class="nro">${p.n}</span><span class="vkp">${p.d}</span>`+
+  p.t.map((e,i)=>`<div class="jana" style="left:${9+i*9}px;top:${(28+(e[0]-7)/16*112).toFixed(0)}px;
+    height:${Math.max(5,e[1]/16*112).toFixed(0)}px;background:${e[2]}"></div>`).join('')+`</div>`).join('');
+
+$('dl-lista').innerHTML=[
+  ['ti 11.8.','Harjoitustyö 2 — uhkamallinnus','2 pv','nyt'],
+  ['ke 12.8.','Viikkotehtävät 3','3 pv','lahella'],
+  ['pe 14.8.','Osa 5 — tehtävät 1–9','5 pv','lahella']
+].map(d=>`<div class="kal-rivi"><div class="kal-aika" style="width:58px;font-size:12px">${d[0]}</div>
+  <div class="kal-teksti"><b>${d[1]}</b></div><span class="jaljella ${d[3]}">${d[2]}</span></div>`).join('');
+
+const kurssit=[
+  {nimi:'Introduction to Programming',vaihe:'Encoding',osioita:7,tehty:4,
+   dl:[['ma 10.8.','Osa 4 — tehtävät 1–12',1,'nyt'],['pe 14.8.','Osa 5 — tehtävät 1–9',5,'lahella'],['to 28.8.','Osat 1–7 · koe',19,'']],
+   solmut:[['Ehtolauseet','Retrieval · 3/3',true],['Silmukat','Encoding',false],['Rekursio','Retrieval · 1/3',false]]},
+  {nimi:'Tietoverkot ja tietoturva',vaihe:'Priming',osioita:5,tehty:1,
+   dl:[['ti 11.8.','Harjoitustyö 2 — uhkamallinnus',2,'nyt'],['pe 21.8.','Essee: salausmenetelmät',12,'']],
+   solmut:[['Symmetrinen salaus','Priming',false],['Uhkamallinnus','Priming',false]]},
+  {nimi:'Matematiikka',vaihe:'Retrieval',osioita:6,tehty:2,
+   dl:[['ke 12.8.','Viikkotehtävät 3',3,'lahella'],['ti 18.8.','Välikoe 1',9,'']],
+   solmut:[['Vektorien pistetulo','Ylläpidossa · 12 pv',true],['Matriisit','Encoding',false]]}
+];
+$('kurssilista').innerHTML=kurssit.map((k,i)=>`
+  <div class="kurssi" data-i="${i}">
+    <button class="kurssi-otsikko">
+      <div class="kurssi-nimi"><b>${k.nimi}</b><span class="kurssi-vaihe">${k.vaihe}</span>
+        <div class="jaljella-jana"><i style="width:${(k.tehty/k.osioita*100).toFixed(0)}%"></i></div>
+      </div><span class="nuoli"></span>
+    </button>
+    <div class="kurssi-sisalto"><div class="kurssi-runko">
+      <span class="ala-nimi">Palautukset</span>
+      ${k.dl.map(d=>`<div class="tehtava"><div class="tehtava-pvm">${d[0]}</div>
+        <div class="tehtava-teksti">${d[1]}</div><span class="jaljella ${d[3]}">${d[2]} pv</span></div>`).join('')}
+      <span class="ala-nimi">Solmut</span>
+      ${k.solmut.map(s=>`<div class="k-solmu">
+        <div class="k-solmu-nimi">${s[0]}<span>${s[1]}</span></div>
+        <label class="tappa${s[2]?' paalla':''}"><input type="checkbox" ${s[2]?'checked':''}> jää ylläpitoon</label>
+      </div>`).join('')}
+      <button class="saadin levea">+ Lisää kurssimateriaalia</button>
+    </div></div>
+  </div>`).join('');
+$('kurssilista').querySelectorAll('.kurssi-otsikko').forEach(b=>
+  b.onclick=()=>b.closest('.kurssi').classList.toggle('auki'));
+$('kurssilista').querySelectorAll('.tappa input').forEach(c=>
+  c.onchange=()=>c.closest('.tappa').classList.toggle('paalla',c.checked));
+
+/* ==========================================================================
+   KARTTA — yksi liukuväri: tyhjä vesi → syvänne
+   ========================================================================== */
+const S=[
+  {n:['Ehtolauseet'],x:96,y:74,v:.84,yp:1},
+  {n:['Silmukat'],x:178,y:52,v:.70},
+  {n:['Rekursio'],x:152,y:142,v:.60},
+  {n:['Vektorien','pistetulo'],x:84,y:252,v:.58,yp:1},
+  {n:['Matriisit'],x:158,y:326,v:.28},
+  {n:['Symmetrinen','salaus'],x:300,y:110,v:.46},
+  {n:['Uhka-','mallinnus'],x:302,y:212,v:.32},
+  {n:['Palomuurit'],x:288,y:322,v:.16}
+];
+const OT=[['Introduction to Programming',138,18],['Matematiikka',96,378],['Tietoverkot ja tietoturva',300,380]];
+const SX=27,SY=24,RW=17,CL=16;
+const tih=(px,py)=>Math.min(S.reduce((t,s)=>t+Math.max(s.v,.15)*Math.exp(-(((px-s.x)**2+(py-s.y)**2))/(2*58*58)),0),1.2);
+function pt(i,j){
+  let x=i*SX-14+(j%2)*SX/2,y=j*SY-10;
+  for(const s of S){const dx=s.x-x,dy=s.y-y,d=Math.hypot(dx,dy)||1;
+    const ve=s.v*34*Math.exp(-(d*d)/(2*58*58));x+=dx/d*ve;y+=dy/d*ve;}
+  return{x,y};
+}
+$('g-syv').innerHTML=S.map(s=>
+  `<circle cx="${s.x}" cy="${s.y}" r="${(38+s.v*58).toFixed(0)}" fill="#3F5F53" opacity="${(s.v*.52).toFixed(3)}"/>`).join('');
+const P2=[];for(let j=0;j<RW;j++){P2[j]=[];for(let i=0;i<CL;i++)P2[j][i]=pt(i,j)}
+let M='';
+const vi=(a,b)=>{const t=tih((a.x+b.x)/2,(a.y+b.y)/2);
+  M+=`<line x1="${a.x.toFixed(1)}" y1="${a.y.toFixed(1)}" x2="${b.x.toFixed(1)}" y2="${b.y.toFixed(1)}" stroke-opacity="${(.12+t*.45).toFixed(3)}" stroke-width="${(.5+t).toFixed(2)}"/>`};
+for(let j=0;j<RW;j++)for(let i=0;i<CL;i++){const a=P2[j][i];
+  if(i<CL-1)vi(a,P2[j][i+1]);
+  if(j<RW-1){vi(a,P2[j+1][i]);const k=j%2?i+1:i-1;if(k>=0&&k<CL)vi(a,P2[j+1][k])}}
+$('g-mesh').innerHTML=M;
+$('g-mer').innerHTML=S.filter(s=>s.yp).map(s=>
+  `<circle cx="${s.x}" cy="${s.y}" r="26" fill="none" stroke="#9C7A43" stroke-width="1.1" stroke-opacity=".8" stroke-dasharray="3 4"/>`).join('');
+$('g-tek').innerHTML=OT.map(o=>
+  `<text x="${o[1]}" y="${o[2]}" text-anchor="middle" font-family="'Courier Prime',monospace" font-size="9" fill="#221F1A" opacity=".42" letter-spacing=".22em">${o[0].toUpperCase()}</text>`).join('')
+ +S.map((s,ix)=>{const kz=(9.5+s.v*6.5).toFixed(1),col=s.v>=.62?'#EAE6DC':'#221F1A';
+  return `<g style="cursor:pointer" data-i="${ix}"><circle cx="${s.x}" cy="${s.y}" r="30" fill="transparent"/>`+
+    s.n.map((r,k)=>`<text x="${s.x}" y="${(s.y+(k-(s.n.length-1)/2)*kz*1.2).toFixed(1)}" text-anchor="middle" dominant-baseline="middle" font-family="'Courier Prime',monospace" font-size="${kz}" font-weight="${s.v>.5?700:400}" fill="${col}" letter-spacing=".04em">${r}</text>`).join('')+`</g>`}).join('');
+const sana=v=>v>=.68?'vahva':v>=.45?'kehittyy':'matalikossa';
+$('g-tek').querySelectorAll('g[data-i]').forEach(g=>g.onclick=()=>{
+  const s=S[+g.dataset.i];
+  $('kartta-paneeli').innerHTML=`<div class="kartta-paneeli"><h3>${s.n.join(' ')}</h3>
+    <span class="pieni">${sana(s.v)}</span>
+    <div class="rivi" style="margin-top:9px;border-top:1px dotted var(--hius-vahva);padding-top:9px">
+      <span>${s.yp?'Ylläpidossa · seuraava kertaus 12 pv':'Retrieval-kierroksia jäljellä 2'}</span></div></div>`;
+});
+</script>
+</body>
+</html>
