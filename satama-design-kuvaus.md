@@ -200,3 +200,12 @@ sisällöllisesti samaa riippuvuustietoa mitä Mirossa käsitellään.
 - Ei kahta väripintaa samalle roolille (esim. messinki JA sinappi
   kosketukselle) — jokainen väri palvelee tarkasti yhtä tarkoitusta.
 - Ei haptiikkaa joka paikkaan vain koska se on "kiva lisä."
+
+**Poikkeus (2026-08-11, Ruori-speksi §5.3):** alapalkin navigointikuvakkeet
+(Ruori/Laituri/Kalenteri/Hytti/Muistilaput/Varasto/Asetukset) ovat
+tarkoituksella värikkäitä, kukin omalla värillään, jotta ne eivät näytä
+samalta. Tämä ei riko yllä olevaa sääntöä — ikonit ovat esineitä
+maailmassa (ruori, pelastusrengas, ovi), ei tilan merkkejä, joten niiden
+väri ei kilpaile tilaväreillä (--vaara, --messinki-kosketus, --sinappi)
+samasta tulkinnasta. Poikkeus koskee VAIN alapalkkia, ei yleisty
+mihinkään muuhun.

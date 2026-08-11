@@ -97,6 +97,9 @@ body {
   justify-content: center;
   padding: 48px 20px;
 }
+/* Tilaa kiinteälle alapalkille (2026-08-11) niissä seitsemässä näkymässä
+   joissa se näkyy — toggle script.js:stä (naytaAlapalkki/piilotaAlapalkki). */
+body.has-alapalkki { padding-bottom: 84px; }
 
 .container {
   width: 100%;
@@ -1673,6 +1676,13 @@ h1 {
   opacity: 1;
 }
 
+/* Ankkuri-SVG (2026-08-11, Ruori-speksi §4.1) korvasi kaikkialla sovelluksessa
+   ⚓-emojin, joka oli alustan omassa emoji-fontissa värihallinnan
+   ulkopuolella (esim. Windowsin Segoe UI Emoji piirtää sen sinertävänä eikä
+   noudata color-ominaisuutta ollenkaan) — SVG:n stroke="currentColor"
+   noudattaa aina .anchor-btn:n color-arvoa (§0: koko ala täytettävä). */
+.anchor-btn svg { width: 20px; height: 20px; display: block; }
+
 /* BUGIKORJAUS ("Laiturin ⚓-tilan näkyvyys", ks. muistiinpanot.md): pelkkä
    väri/opacity-ero (kulta vs. himmeä) ei erottunut vilkaisulla — sama
    glyfi, vain sävy vaihtui. Nyt aktiivinen tila saa oman TÄYTETYN
@@ -1811,6 +1821,13 @@ h1 {
 .row-menu-item-danger {
   color: #e24b4a;
 }
+
+/* Kuvakkeelliset valikkokohdat (2026-08-11, Ruori-speksi §4.4) — valinnainen
+   lisä, ei vaikuta muihin ⋯-valikon käyttöpaikkoihin joilla ei ole icon:ia. */
+.row-menu-item-icon {
+  display: flex; align-items: center; gap: 10px;
+}
+.row-menu-item-icon svg { flex: none; }
 
 .muistutus-aika {
   font-size: 11px;
@@ -3291,44 +3308,44 @@ h1 {
 }
 .ruori .pieni { font-size: 12.5px; color: var(--vaimea); }
 
-.ruori .otsake { display: flex; justify-content: space-between; align-items: flex-start; padding: 2px 2px 22px; }
+/* Otsake (2026-08-11 visuaalinen uudistus, ks. Ruori-speksi §1/§3) —
+   kuormitustila on nyt pelkkä kytkin (ei tekstiä/laatikkoa), SATAMA sen
+   oikealla puolella samalla rivillä, päivämäärä siirtyi alapalkin
+   kalenterikuvakkeeseen (§5.3). */
+.ruori .otsake { display: flex; justify-content: space-between; align-items: center; padding: 2px 2px 22px; }
 .ruori .otsake-vas { flex: 1; min-width: 0; }
-.ruori .tunnus { font-size: 15px; letter-spacing: .3em; color: var(--vaimea); margin: 0 0 12px; }
+.ruori .otsake-ylarivi { display: flex; align-items: center; gap: 12px; }
+.ruori .tunnus { font-size: 22px; letter-spacing: .34em; color: var(--muste); font-weight: 700; margin: 0; }
 
+/* Kuormitustila-kytkin — itse painettava pinta (--r-kosketettava), ei
+   erillistä laatikkoa/tekstiä. Pois päältä: lämmin lasi + messinkikehys.
+   Päällä: koko kytkin --vaara, nuppi vaalea. */
 .ruori .kuormakytkin {
-  display: flex; align-items: center; gap: 9px; margin-bottom: 12px; cursor: pointer;
-  background: none; border: 0; padding: 0; font-family: inherit;
-}
-.ruori .kytkin {
-  width: 34px; height: 19px; border-radius: 5px; border: 1px solid var(--hius-vahva);
-  background: var(--paperi); position: relative; flex: none; transition: all var(--keski) var(--kelluu);
-}
-.ruori .kytkin i {
-  position: absolute; top: 2px; left: 2px; width: 13px; height: 13px; border-radius: 3px;
-  background: var(--muste); transition: transform var(--keski) var(--kelluu);
-}
-.ruori .kuormakytkin.paalla .kytkin { border-color: var(--vaara); }
-.ruori .kuormakytkin.paalla .kytkin i { background: var(--vaara); transform: translateX(15px); }
-.ruori .kytkin-teksti {
-  font-size: 11px; letter-spacing: .14em; text-transform: uppercase; color: var(--vaara);
-  opacity: 0; transition: opacity var(--keski) var(--kelluu);
-}
-.ruori .kuormakytkin.paalla .kytkin-teksti { opacity: 1; }
-
-.ruori .paivamaara { display: flex; align-items: baseline; gap: 9px; }
-.ruori .paivamaara b { font-size: 44px; font-weight: 700; letter-spacing: -.035em; line-height: .85; }
-.ruori .paivapino { display: flex; flex-direction: column; line-height: 1.15; }
-.ruori .paivapino .vk { font-size: 19px; font-weight: 700; }
-.ruori .paivapino .kk { font-size: 10.5px; letter-spacing: .16em; color: var(--vaimea); text-transform: uppercase; }
-
-.ruori .kello-kehys {
-  flex: none; width: 150px; height: 150px; border-radius: 20px;
-  border: 1px solid rgba(156, 122, 67, .42);
-  background: linear-gradient(160deg, rgba(255, 252, 244, .7), rgba(234, 230,220, .3));
-  backdrop-filter: blur(9px); -webkit-backdrop-filter: blur(9px);
+  flex: none; width: 52px; height: 30px; border-radius: 13px; padding: 3px;
+  cursor: pointer; font-family: inherit; position: relative;
+  border: 1px solid rgba(156, 122, 67, .5);
+  background: linear-gradient(165deg, rgba(255, 252, 244, .72), rgba(234, 230, 220, .28));
+  backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, .65);
-  display: grid; place-items: center;
+  transition: all var(--keski) var(--kelluu);
 }
+.ruori .kuormakytkin::after {
+  content: ''; position: absolute; top: 3px; left: 3px; width: 22px; height: 22px;
+  border-radius: 50%; background: var(--muste);
+  transition: transform var(--keski) var(--kelluu), background var(--keski) var(--kelluu);
+}
+.ruori .kuormakytkin.paalla {
+  border-color: var(--vaara); background: var(--vaara);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .25);
+}
+.ruori .kuormakytkin.paalla::after { background: #FBF9F3; transform: translateX(22px); }
+
+/* Kello — pelkkä ympyrä, ei kehystä. Täyttää sille varatun tilan kokonaan
+   (§0/§3): SVG:llä ei width/height-attribuuttia, vain viewBox + CSS
+   width:100%;height:auto — kehys oli olemassa vain koska ympyrä oli
+   pienempi kuin sille varattu tila, joten kehys poistuu kokonaan. */
+.ruori .kello-kehys { flex: none; width: 150px; height: 150px; }
+.ruori .kello-kehys svg { width: 100%; height: auto; display: block; cursor: default; }
 
 .ruori .segmentti {
   display: block; width: 100%; text-align: left; font-family: inherit; color: inherit; cursor: pointer;
@@ -3363,8 +3380,69 @@ h1 {
 .ruori .tagi-raskas.tagi-ristiriita { background: var(--vaara); color: #FDFBF6; }
 .ruori .kal-lippu-syy { font-size: 12px; color: var(--vaara); margin-top: 2px; }
 
-/* --- Ankkurit (vain kortti, rivit = sovelluksen jaettu tyyli) --- */
+/* --- Sää (2026-08-11, Ruori-speksi §2) --- */
+.ruori .segmentti.saa { padding: 15px 16px 13px; }
+.ruori .saa-yla { display: flex; align-items: flex-start; gap: 12px; }
+.ruori .saa-lampo { font-size: 52px; font-weight: 700; line-height: 1; letter-spacing: -.02em; color: var(--muste); flex: none; }
+.ruori .saa-tagit { display: flex; flex-wrap: wrap; gap: 6px 5px; padding-top: 6px; }
+/* "Leima"-tagit (§2.4) — epätasainen ink-stamp-reuna feTurbulence/feDisplacementMap-
+   suodattimella (ks. <defs> body:n alussa), kevyt jos suodatin lagaa iOS Safarilla (§7). */
+.ruori .saa-tagi {
+  font-size: 11px; font-weight: 700; letter-spacing: .16em; text-transform: uppercase;
+  color: var(--vaara); border: 1.8px solid var(--vaara); border-radius: 2px;
+  padding: 3px 7px; filter: url(#leimasin);
+}
+.ruori .saa-tunnit { display: flex; gap: 14px; margin-top: 14px; padding-top: 12px; border-top: 1px dotted var(--hius-vahva); overflow-x: auto; }
+.ruori .saa-tunti { display: flex; flex-direction: column; align-items: center; gap: 4px; flex: none; min-width: 30px; }
+.ruori .saa-tunti-aika { font-size: 10.5px; color: var(--vaimea); }
+.ruori .saa-tunti-ikoni { display: flex; align-items: center; gap: 1px; }
+.ruori .saa-tunti-ikoni svg { width: 15px; height: 15px; display: block; }
+.ruori .saa-tunti-sade { font-size: 10px; color: var(--syvanne); }
+.ruori .saa-tunti-sade:empty::before { content: '\00b7'; color: var(--hius-vahva); }
+
+/* --- Ankkurit --- */
 .ruori .segmentti.ankkurit .otsikkorivi { margin-bottom: 10px; }
+
+/* Rivin ⚓/⋯-pino (2026-08-11, Ruori-speksi §4.2/§4.3) — allekkain oikeassa
+   reunassa, molemmat painettavan muotokieltä (lämmin lasi + messinkikehys).
+   Muu rivi (täppä, teksti, muistutusmerkki) käyttää edelleen sovelluksen
+   jaettua tyyliä — vain nämä kaksi nappia poikkeavat, ne ovat KOSKETETTAVIA
+   toimintoja tässä uudessa kielessä siinä missä muu rivi on LUETTAVA sisältö. */
+.ruori .segmentti.ankkurit .ankkuri-toiminnot { display: flex; flex-direction: column; gap: 6px; flex: none; margin-top: 1px; }
+.ruori .segmentti.ankkurit .anchor-btn,
+.ruori .segmentti.ankkurit .overflow-btn {
+  position: relative; min-width: 0; min-height: 0; width: 30px; height: 30px; flex: none;
+  border-radius: var(--r-kosketettava); opacity: 1;
+  border: 1px solid rgba(156, 122, 67, .5);
+  background: linear-gradient(165deg, rgba(255, 252, 244, .72), rgba(234, 230, 220, .28));
+  backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .65);
+  color: var(--vaimea);
+  transition: background var(--keski) var(--kelluu);
+}
+/* Näkyvä pinta pieni (~3-4px marginaali merkin ympärillä), kosketusalue
+   silti 44px läpinäkyvällä ::after-kerroksella (§4.2). */
+.ruori .segmentti.ankkurit .anchor-btn::after,
+.ruori .segmentti.ankkurit .overflow-btn::after {
+  content: ''; position: absolute; top: 50%; left: 50%; width: 44px; height: 44px;
+  transform: translate(-50%, -50%);
+}
+.ruori .segmentti.ankkurit .anchor-btn svg { width: 21px; height: 21px; display: block; }
+/* Tila näkyy VAIN taustasta (§4.3) — merkki (color: currentColor sisällä)
+   pysyy aina samana harmaana, ei vaihdu .active-tilassa. */
+.ruori .segmentti.ankkurit .anchor-btn.active { background: var(--messinki); border-color: var(--messinki); }
+.ruori .segmentti.ankkurit .anchor-btn:disabled { opacity: .4; cursor: default; }
+.ruori .segmentti.ankkurit .anchor-btn:disabled::after { display: none; }
+
+/* Ehdokaskortin ⚓-hyväksyntä (§4.6) — sama anchor-btn-kieli, mutta
+   ihmislähtöiselle ehdotukselle leventyy tekstilabelin verran (ks.
+   loadAnchorCandidates()-kommentti script.js:ssä). */
+.ruori .segmentti.ankkurit .anchor-btn-labeled {
+  width: auto; height: 30px; padding: 0 10px; flex-direction: row; gap: 6px;
+  display: inline-flex; align-items: center;
+}
+.ruori .segmentti.ankkurit .anchor-btn-labeled svg { width: 15px; height: 15px; }
+.ruori .segmentti.ankkurit .anchor-btn-labeled span { font-size: 12px; font-weight: 700; color: var(--muste); white-space: nowrap; }
 
 /* --- Hytti --- */
 .ruori .hytti-luento { display: flex; align-items: center; gap: 6px; margin-bottom: 6px; }
@@ -3415,3 +3493,50 @@ h1 {
 .hytti-ikkuna-lisays select,
 .hytti-ikkuna-lisays input[type="time"] { width: auto; }
 .hytti-ikkuna-lisays input[type="text"] { flex: 1; min-width: 100px; }
+
+/* ==========================================================================
+   ALAPALKKI (2026-08-11, Ruori-speksi §5) — kiinteä, identtinen seitsemässä
+   päänäkymässä. Kuvakkeet ovat värillisiä TARKOITUKSELLA — poikkeus
+   satama-design-kuvaus.md:n "yksi väri, yksi tehtävä" -sääntöön, koska
+   navigaatiokuvakkeet ovat esineitä maailmassa (ruori, pelastusrengas, ovi)
+   eikä niiden väri kerro tilaa. Poikkeus on dokumentoitu satama-design-
+   kuvaus.md:ssä, ei yleistetä muualle. Symbolit niin isoja kuin kehykseen
+   mahtuu (§0) — ei tyhjää kehystä pienen symbolin ympärillä.
+   ========================================================================== */
+.alapalkki {
+  position: fixed; left: 0; right: 0; bottom: 0; z-index: 40;
+  display: flex; align-items: stretch;
+  padding: 6px 4px calc(6px + env(safe-area-inset-bottom, 0px));
+  background: rgba(234, 230, 220, .92);
+  backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
+  border-top: 1px solid rgba(34, 31, 26, .34);
+}
+.alapalkki-kiinnitetyt { display: flex; flex: 1; justify-content: space-around; }
+.alapalkki-tabi {
+  background: none; border: 0; padding: 5px 4px 3px; display: flex; flex-direction: column;
+  align-items: center; gap: 4px; cursor: pointer; font-family: inherit; flex: 1; max-width: 64px;
+}
+.alapalkki-tabi svg { width: 30px; height: 30px; display: block; margin: 0 auto; }
+.alapalkki-tabi.alapalkki-lisaa svg { width: 22px; height: 22px; }
+.alapalkki-alleviiva { width: 16px; height: 2.5px; border-radius: 2px; background: transparent; }
+.alapalkki-tabi.aktiivinen .alapalkki-alleviiva { background: var(--muste); }
+
+/* Kalenterikuvakkeen elävä päivämäärä (§5.3) — vain kun kuvake on renderöity. */
+.alapalkki-kal-numero { font-family: 'Courier Prime', 'Courier New', monospace; font-weight: 700; }
+.alapalkki-kal-vk { font-family: 'Courier Prime', 'Courier New', monospace; }
+
+/* Järjestysarkki (§5.2) */
+.alapalkki-arkki { max-width: 360px; }
+.alapalkki-arkki-selite { font-size: 12.5px; color: var(--muted); margin: 2px 0 12px; }
+.alapalkki-arkki-lista { list-style: none; margin: 0 0 6px; padding: 0; }
+.alapalkki-arkki-lista li {
+  display: flex; align-items: center; gap: 10px; padding: 10px 6px;
+  border-bottom: 1px solid var(--border); background: var(--ground);
+  touch-action: none; user-select: none;
+}
+.alapalkki-arkki-lista li:last-child { border-bottom: 0; }
+.alapalkki-arkki-lista li.alapalkki-raja-jalkeen { border-bottom: 2px dashed var(--accent); }
+.alapalkki-arkki-lista li svg { width: 24px; height: 24px; flex: none; }
+.alapalkki-arkki-lista li .alapalkki-arkki-nimi { flex: 1; font-size: 15px; }
+.alapalkki-arkki-lista li .alapalkki-arkki-kahva { color: var(--muted); font-size: 18px; cursor: grab; padding: 4px 6px; }
+.alapalkki-arkki-lista li.dragging { opacity: .35; }

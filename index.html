@@ -17,6 +17,18 @@
 </head>
 <body>
 
+  <svg width="0" height="0" style="position:absolute" aria-hidden="true">
+    <defs>
+      <!-- Leimasin-efekti (Ruori-speksi §2.4) — epätasainen mustereunus
+           sään tagi-tikattien ympärille. Raskas suodatin, testattava
+           iOS Safarilla (§7); kevyempi valmis-rosoinen reuna tarvittaessa. -->
+      <filter id="leimasin">
+        <feTurbulence type="fractalNoise" baseFrequency="0.55" numOctaves="2" result="n"/>
+        <feDisplacementMap in="SourceGraphic" in2="n" scale="1.3" xChannelSelector="R" yChannelSelector="G"/>
+      </filter>
+    </defs>
+  </svg>
+
   <div id="login-view" style="display:none">
     <h1>✱ SATAMA ✱</h1>
     <hr class="divider" style="width:100%">
@@ -36,27 +48,34 @@
 
     <div class="otsake">
       <div class="otsake-vas">
-        <p class="tunnus">S A T A M A</p>
-        <button class="kuormakytkin" id="kuormanappi">
-          <span class="kytkin"><i></i></span>
-          <span class="kytkin-teksti">Kuormitustila</span>
-        </button>
-        <div class="paivamaara">
-          <b id="ruori-paiva-numero"></b>
-          <div class="paivapino"><span class="vk" id="ruori-viikonpaiva"></span><span class="kk" id="ruori-kuukausi"></span></div>
+        <div class="otsake-ylarivi">
+          <button class="kuormakytkin" id="kuormanappi" title="Kuormitustila" aria-label="Kuormitustila"></button>
+          <p class="tunnus">S A T A M A</p>
         </div>
       </div>
       <div class="kello-kehys">
-        <svg width="150" height="150" viewBox="0 0 110 110">
-          <circle cx="55" cy="55" r="52" fill="none" stroke="#221F1A" stroke-width="1"/>
+        <svg viewBox="0 0 110 110">
+          <circle cx="55" cy="55" r="54" fill="#FBF9F3"/>
           <g id="ruori-kello-viivat"></g>
-          <g id="ruori-kello-numerot" font-family="'Courier Prime',monospace" font-size="10" font-weight="700" fill="#221F1A" text-anchor="middle" dominant-baseline="middle"></g>
-          <line id="ruori-tuntiviisari" x1="55" y1="55" stroke="#221F1A" stroke-width="3" stroke-linecap="round"/>
-          <line id="ruori-minuuttiviisari" x1="55" y1="55" stroke="#221F1A" stroke-width="1.6" stroke-linecap="round"/>
-          <circle cx="55" cy="55" r="2.4" fill="#221F1A"/>
+          <g id="ruori-kello-numerot" font-family="'Courier Prime',monospace" font-size="12.5" font-weight="700" fill="#221F1A" text-anchor="middle" dominant-baseline="middle"></g>
+          <line id="ruori-tuntiviisari" x1="55" y1="55" stroke="#221F1A" stroke-width="3.2" stroke-linecap="round"/>
+          <line id="ruori-minuuttiviisari" x1="55" y1="55" stroke="#221F1A" stroke-width="1.8" stroke-linecap="round"/>
+          <circle cx="55" cy="55" r="2.6" fill="#221F1A"/>
         </svg>
       </div>
     </div>
+
+    <!-- SÄÄ (2026-08-11, Ruori-speksi §2) — Open-Meteo api/saa.js:n kautta,
+         30 min välimuisti. Piilossa kokonaan jos haku epäonnistuu eikä
+         välimuistia ole: "vanhan datan näyttäminen tuoreena on pahempi
+         virhe kuin sään puuttuminen" (§2.2). -->
+    <a class="segmentti saa" id="ruori-saa-segmentti" href="https://open-meteo.com/" target="_blank" rel="noopener" style="display:none">
+      <div class="saa-yla">
+        <span class="saa-lampo" id="ruori-saa-lampo"></span>
+        <div class="saa-tagit" id="ruori-saa-tagit"></div>
+      </div>
+      <div class="saa-tunnit" id="ruori-saa-tunnit"></div>
+    </a>
 
     <!-- KALENTERI -->
     <button class="segmentti kalenteri" id="ruori-kalenteri-segmentti" style="display:none">
@@ -1374,6 +1393,27 @@
 
       <div class="dialog-buttons">
         <button class="dialog-btn dialog-btn-cancel" id="luote-sulje">Sulje</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Alapalkki (2026-08-11, Ruori-speksi §5) — kiinteä, identtinen
+       seitsemässä päänäkymässä (Ruori/Laituri/Kalenteri/Hytti/Muistilaput/
+       Varasto/Asetukset), EI syvissä alanäkymissä (niissä on jo oma
+       takaisin-nuoli). Neljä kiinnitettyä + ⋯, joka avaa raahattavan
+       järjestysarkin (kaikki seitsemän). Sisältö renderöidään JS:llä
+       (piirraAlapalkki()), tyhjä täällä. -->
+  <nav class="alapalkki" id="alapalkki" style="display:none">
+    <div class="alapalkki-kiinnitetyt" id="alapalkki-kiinnitetyt"></div>
+  </nav>
+
+  <div class="dialog-overlay" id="alapalkki-arkki-overlay" style="display:none">
+    <div class="dialog-box alapalkki-arkki">
+      <p class="dialog-title">Alapalkin järjestys</p>
+      <p class="alapalkki-arkki-selite">Neljä ylintä ovat palkissa, loput ⋯:n takana. Raahaa järjestykseen.</p>
+      <ul class="alapalkki-arkki-lista" id="alapalkki-arkki-lista"></ul>
+      <div class="dialog-buttons">
+        <button class="dialog-btn" id="alapalkki-arkki-sulje">Valmis</button>
       </div>
     </div>
   </div>

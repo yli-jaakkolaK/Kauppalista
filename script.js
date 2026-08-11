@@ -22,6 +22,7 @@ function piilotaKaikkiNakymat() {
   document.getElementById('opinto-kartta-view').style.display = 'none';
   document.getElementById('taitosolmu-view').style.display = 'none';
   document.getElementById('lapsi-view').style.display = 'none';
+  piilotaAlapalkki();
 }
 
 function showLoginView() {
@@ -32,6 +33,7 @@ function showLoginView() {
 function showHomeView() {
   piilotaKaikkiNakymat();
   document.getElementById('home-view').style.display = 'block';
+  naytaAlapalkki('ruori');
 }
 
 function showAppView() {
@@ -42,37 +44,213 @@ function showAppView() {
 function showLaituriView() {
   piilotaKaikkiNakymat();
   document.getElementById('laituri-view').style.display = 'block';
+  naytaAlapalkki('laituri');
 }
 
 function showMuistilaputView() {
   piilotaKaikkiNakymat();
   document.getElementById('muistilaput-view').style.display = 'block';
+  naytaAlapalkki('muistilaput');
 }
 
 function showVarastoView() {
   piilotaKaikkiNakymat();
   document.getElementById('varasto-view').style.display = 'block';
+  naytaAlapalkki('varasto');
 }
 
 function showKalenteriView() {
   piilotaKaikkiNakymat();
   document.getElementById('kalenteri-view').style.display = 'block';
+  naytaAlapalkki('kalenteri');
 }
 
 function showAsetuksetView() {
   piilotaKaikkiNakymat();
   document.getElementById('asetukset-view').style.display = 'block';
+  naytaAlapalkki('asetukset');
 }
 
 function showHyttiView() {
   piilotaKaikkiNakymat();
   document.getElementById('hytti-view').style.display = 'block';
+  naytaAlapalkki('hytti');
 }
 
 function showHyttiKorttiView() {
   piilotaKaikkiNakymat();
   document.getElementById('hytti-kortti-view').style.display = 'block';
 }
+
+// === ALAPALKKI (2026-08-11, Ruori-speksi §5) === kiinteä, identtinen
+// seitsemässä päänäkymässä (Ruori/Laituri/Kalenteri/Hytti/Muistilaput/
+// Varasto/Asetukset) — EI syvissä alanäkymissä, niissä on jo oma takaisin-
+// nuoli. Neljä ylintä alapalkkiJarjestys-taulukosta ovat kiinnitettyjä,
+// loput kolme ⋯:n takana järjestysarkissa (§5.2). Kuvakkeet ovat
+// TARKOITUKSELLA värillisiä (poikkeus design-kuvaukseen, ks.
+// satama-design-kuvaus.md "Alapalkin poikkeus").
+const ALAPALKKI_IKONIT = {
+  ruori: '<svg viewBox="0 0 28 28" fill="none"><circle cx="14" cy="14" r="8.5" stroke="var(--messinki)" stroke-width="2.4"/><circle cx="14" cy="14" r="2" fill="var(--messinki)"/><path d="M22.5 14L26 14M20 20L22.5 22.5M14 22.5L14 26M8 20L5.5 22.5M5.5 14L2 14M8 8L5.5 5.5M14 5.5L14 2M20 8L22.5 5.5" stroke="var(--messinki)" stroke-width="2.4" stroke-linecap="round"/></svg>',
+  laituri: '<svg viewBox="0 0 28 28" fill="none"><circle cx="14" cy="14" r="8" stroke="var(--vaara)" stroke-width="4.2"/><path d="M8.6 8.6l3.1 3.1M19.4 8.6l-3.1 3.1M19.4 19.4l-3.1-3.1M8.6 19.4l3.1-3.1" stroke="#fff" stroke-width="3.6"/></svg>',
+  kalenteri: '<svg viewBox="0 0 28 28" fill="none"><rect x="4" y="7" width="20" height="17" rx="2" fill="var(--paperi)" stroke="var(--muste)" stroke-width="1.5"/><path d="M9 3.5v5M19 3.5v5" stroke="var(--muste)" stroke-width="1.5" stroke-linecap="round"/><text x="14" y="17.5" font-family="\'Courier Prime\',monospace" font-weight="700" font-size="8.5" text-anchor="middle" fill="var(--muste)" data-role="kal-numero"></text><text x="14" y="22.7" font-family="\'Courier Prime\',monospace" font-size="5" letter-spacing="0.04em" text-anchor="middle" fill="var(--muste)" data-role="kal-vk"></text></svg>',
+  hytti: '<svg viewBox="0 0 28 28" fill="none"><path d="M8 25V13c0-3.3 2.7-6 6-6s6 2.7 6 6v12z" fill="var(--karikko)" stroke="var(--muste)" stroke-width="1.4" stroke-linejoin="round"/><path d="M8 16.5h12M8 20.5h12" stroke="var(--muste)" stroke-width="1" opacity=".5"/><circle cx="14" cy="11" r="2.6" fill="var(--messinki)" stroke="var(--muste)" stroke-width="1"/><circle cx="19" cy="19" r="1" fill="var(--messinki)"/></svg>',
+  muistilaput: '<svg viewBox="0 0 28 28" fill="none"><rect x="5" y="4" width="18" height="20" rx="2" fill="var(--paperi)" stroke="var(--muste)" stroke-width="1.5"/><rect x="8.3" y="8.3" width="3.6" height="3.6" rx="0.6" fill="var(--messinki)"/><path d="M9.1 10.2l0.8 0.9 1.7-1.9" stroke="#fff" stroke-width="0.9" stroke-linecap="round" stroke-linejoin="round"/><path d="M14 10.1h6" stroke="var(--muste)" stroke-width="1.3" stroke-linecap="round"/><rect x="8.3" y="14.3" width="3.6" height="3.6" rx="0.6" fill="none" stroke="var(--muste)" stroke-width="1.2"/><path d="M14 16.1h6" stroke="var(--muste)" stroke-width="1.3" stroke-linecap="round"/><rect x="8.3" y="20.3" width="3.6" height="3.6" rx="0.6" fill="none" stroke="var(--muste)" stroke-width="1.2"/><path d="M14 22.1h6" stroke="var(--muste)" stroke-width="1.3" stroke-linecap="round"/></svg>',
+  varasto: '<svg viewBox="0 0 28 28" fill="none"><rect x="4.5" y="8" width="19" height="16" rx="1.5" fill="var(--matalikko)" stroke="var(--muste)" stroke-width="1.4"/><path d="M4.5 14h19M14 8v16" stroke="var(--muste)" stroke-width="1.1" opacity=".5"/><path d="M4.5 8l4-4h11l4 4" fill="none" stroke="var(--muste)" stroke-width="1.3" stroke-linejoin="round"/></svg>',
+  asetukset: '<svg viewBox="0 0 28 28" fill="none"><circle cx="14" cy="14" r="5" stroke="#8a8580" stroke-width="2.2"/><path d="M14 4.5v3M14 20.5v3M23.5 14h-3M7.5 14h-3M20.6 7.4l-2.1 2.1M9.5 18.5l-2.1 2.1M20.6 20.6l-2.1-2.1M9.5 9.5l-2.1-2.1" stroke="#8a8580" stroke-width="2.2" stroke-linecap="round"/></svg>',
+  lisaa: '<svg viewBox="0 0 28 28" fill="none"><circle cx="8" cy="14" r="2" fill="var(--vaimea)"/><circle cx="14" cy="14" r="2" fill="var(--vaimea)"/><circle cx="20" cy="14" r="2" fill="var(--vaimea)"/></svg>',
+};
+const ALAPALKKI_NIMET = { ruori: 'Ruori', laituri: 'Laituri', kalenteri: 'Kalenteri', hytti: 'Hytti', muistilaput: 'Muistilaput', varasto: 'Varasto', asetukset: 'Asetukset' };
+const ALAPALKKI_OLETUS_JARJESTYS = ['ruori', 'laituri', 'kalenteri', 'hytti', 'muistilaput', 'varasto', 'asetukset'];
+let alapalkkiJarjestys = ALAPALKKI_OLETUS_JARJESTYS.slice();
+let alapalkkiAktiivinen = 'ruori';
+
+function alapalkkiSiirry(id) {
+  if (id === 'ruori') { showHomeView(); lataaKotinakyma(); } else if (id === 'laituri') avaaOsio({ route: 'laituri' });
+  else if (id === 'kalenteri') avaaOsio({ route: 'kalenteri' });
+  else if (id === 'hytti') avaaOsio({ route: 'hytti' });
+  else if (id === 'muistilaput') { showMuistilaputView(); lataaMuistilaput(); }
+  else if (id === 'varasto') { showVarastoView(); lataaVarasto(); }
+  else if (id === 'asetukset') avaaOsio({ route: 'asetukset' });
+}
+
+// Asetukset-taulun key-value-rivi, sama kaava kuin muuallakin (esim.
+// paivan_menoraja) — JSON-taulukko seitsemästä id:stä järjestyksessä.
+async function lataaAlapalkkiJarjestys() {
+  const { data, error } = await db.from('asetukset').select('value').eq('key', 'alapalkki_jarjestys').maybeSingle();
+  if (error) { console.error('Alapalkin järjestyksen haku epäonnistui:', error); return; }
+  if (data && data.value) {
+    try {
+      const jarjestys = JSON.parse(data.value);
+      if (Array.isArray(jarjestys) && jarjestys.length === ALAPALKKI_OLETUS_JARJESTYS.length && ALAPALKKI_OLETUS_JARJESTYS.every(function(id) { return jarjestys.indexOf(id) !== -1; })) {
+        alapalkkiJarjestys = jarjestys;
+      }
+    } catch (e) { /* virheellinen tallennettu JSON — pysytään oletusjärjestyksessä */ }
+  }
+}
+
+async function tallennaAlapalkkiJarjestys() {
+  const { error } = await db.from('asetukset').upsert({ key: 'alapalkki_jarjestys', value: JSON.stringify(alapalkkiJarjestys) }, { onConflict: 'key' });
+  if (error) console.error('Alapalkin järjestyksen tallennus epäonnistui:', error);
+}
+
+function luoAlapalkkiNappi(id) {
+  const nappi = document.createElement('button');
+  nappi.className = 'alapalkki-tabi' + (id === alapalkkiAktiivinen ? ' aktiivinen' : '');
+  nappi.title = ALAPALKKI_NIMET[id];
+  nappi.setAttribute('aria-label', ALAPALKKI_NIMET[id]);
+  nappi.innerHTML = (ALAPALKKI_IKONIT[id] || '') + '<span class="alapalkki-alleviiva"></span>';
+  nappi.addEventListener('click', function() { alapalkkiSiirry(id); });
+  return nappi;
+}
+
+function paivitaAlapalkkiKalenteriPaiva() {
+  const numeroEl = document.querySelector('#alapalkki-kiinnitetyt [data-role="kal-numero"]');
+  const vkEl = document.querySelector('#alapalkki-kiinnitetyt [data-role="kal-vk"]');
+  if (!numeroEl || !vkEl) return;
+  const paivat = ['SU', 'MA', 'TI', 'KE', 'TO', 'PE', 'LA'];
+  const nyt = new Date();
+  numeroEl.textContent = nyt.getDate();
+  vkEl.textContent = paivat[nyt.getDay()];
+}
+
+function piirraAlapalkki() {
+  const kontti = document.getElementById('alapalkki-kiinnitetyt');
+  if (!kontti) return;
+  kontti.innerHTML = '';
+  alapalkkiJarjestys.slice(0, 4).forEach(function(id) { kontti.appendChild(luoAlapalkkiNappi(id)); });
+  const lisaaNappi = document.createElement('button');
+  lisaaNappi.className = 'alapalkki-tabi alapalkki-lisaa';
+  lisaaNappi.title = 'Lisää';
+  lisaaNappi.setAttribute('aria-label', 'Lisää');
+  lisaaNappi.innerHTML = ALAPALKKI_IKONIT.lisaa + '<span class="alapalkki-alleviiva"></span>';
+  lisaaNappi.addEventListener('click', avaaAlapalkkiArkki);
+  kontti.appendChild(lisaaNappi);
+  paivitaAlapalkkiKalenteriPaiva();
+}
+
+function naytaAlapalkki(aktiivinenId) {
+  alapalkkiAktiivinen = aktiivinenId;
+  document.body.classList.add('has-alapalkki');
+  const el = document.getElementById('alapalkki');
+  if (el) el.style.display = 'flex';
+  piirraAlapalkki();
+}
+
+function piilotaAlapalkki() {
+  document.body.classList.remove('has-alapalkki');
+  const el = document.getElementById('alapalkki');
+  if (el) el.style.display = 'none';
+}
+
+// --- Järjestysarkki (§5.2) — raahattava lista kaikista seitsemästä,
+// raja neljännen ja viidennen rivin välissä näyttää mikä jää kiinnitetyksi.
+// Kevyt oma pointer-event-pohjainen raahaus (ei jaettu alustaRaahaus()-
+// apuri, koska tämä ei ole Supabase-taulu-rivilista vaan yhden asetuksen
+// paikallinen taulukko — ks. tallennaAlapalkkiJarjestys). ---
+function avaaAlapalkkiArkki() {
+  piirraAlapalkkiArkki();
+  document.getElementById('alapalkki-arkki-overlay').style.display = 'flex';
+}
+
+function piirraAlapalkkiArkki() {
+  const lista = document.getElementById('alapalkki-arkki-lista');
+  lista.innerHTML = '';
+  alapalkkiJarjestys.forEach(function(id, index) {
+    const li = document.createElement('li');
+    li.dataset.id = id;
+    li.className = index === 3 ? 'alapalkki-raja-jalkeen' : '';
+    const kuvake = document.createElement('span');
+    kuvake.innerHTML = ALAPALKKI_IKONIT[id];
+    li.appendChild(kuvake);
+    const nimi = document.createElement('span');
+    nimi.className = 'alapalkki-arkki-nimi';
+    nimi.textContent = ALAPALKKI_NIMET[id];
+    li.appendChild(nimi);
+    const kahva = document.createElement('span');
+    kahva.className = 'alapalkki-arkki-kahva';
+    kahva.textContent = '≡';
+    li.appendChild(kahva);
+    alustaAlapalkkiRaahaus(li, kahva);
+    lista.appendChild(li);
+  });
+}
+
+let alapalkkiRaahattava = null;
+function alustaAlapalkkiRaahaus(li, kahva) {
+  kahva.addEventListener('pointerdown', function(e) {
+    e.preventDefault();
+    alapalkkiRaahattava = li;
+    li.classList.add('dragging');
+    kahva.setPointerCapture(e.pointerId);
+  });
+  kahva.addEventListener('pointermove', function(e) {
+    if (alapalkkiRaahattava !== li) return;
+    const lista = document.getElementById('alapalkki-arkki-lista');
+    const rivit = Array.from(lista.children).filter(function(el) { return el !== li; });
+    const y = e.clientY;
+    let kohde = null;
+    for (const rivi of rivit) {
+      const rect = rivi.getBoundingClientRect();
+      if (y < rect.top + rect.height / 2) { kohde = rivi; break; }
+    }
+    if (kohde) lista.insertBefore(li, kohde); else lista.appendChild(li);
+    Array.from(lista.children).forEach(function(el, i) { el.className = i === 3 ? 'alapalkki-raja-jalkeen' : ''; });
+  });
+  function lopetaRaahaus() {
+    if (alapalkkiRaahattava !== li) return;
+    alapalkkiRaahattava = null;
+    li.classList.remove('dragging');
+    alapalkkiJarjestys = Array.from(document.getElementById('alapalkki-arkki-lista').children).map(function(el) { return el.dataset.id; });
+    tallennaAlapalkkiJarjestys();
+    piirraAlapalkki();
+  }
+  kahva.addEventListener('pointerup', lopetaRaahaus);
+  kahva.addEventListener('pointercancel', lopetaRaahaus);
+}
+
+document.getElementById('alapalkki-arkki-sulje').addEventListener('click', function() {
+  document.getElementById('alapalkki-arkki-overlay').style.display = 'none';
+});
 
 // Muistaa mistä näkymästä (kategoriasta) nykyinen lista avattiin, jotta
 // listanäkymän takaisin-nuoli palaa oikeaan paikkaan (Muistilaput vs. Varasto)
@@ -312,10 +490,11 @@ async function lataaKotinakyma() {
   lataaAnkkurit();
   loadAnchorCandidates();
   paivitaRistiriitaPallura();
-  paivitaPaivamaara();
   lataaRuoriKalenteri();
   lataaRuoriHytti();
+  lataaRuoriSaa();
   paivitaRuoriNakyvyys();
+  lataaAlapalkkiJarjestys().then(piirraAlapalkki);
 }
 
 // Hakee kategorian listat ja piirtää ne annettuun säiliöön. Käytetään sekä
@@ -3957,7 +4136,7 @@ function piirraKalenteriRivi(rivi) {
     li.appendChild(teksti);
 
     const ankkurointiNappi = document.createElement('button');
-    ankkurointiNappi.textContent = '⚓';
+    ankkurointiNappi.innerHTML = ANKKURI_SVG;
     ankkurointiNappi.className = 'anchor-btn' + (ankkuroidutAvaimet.has('hytti:' + rivi.id) ? ' active' : '');
     ankkurointiNappi.addEventListener('click', async function() {
       await vaihdaAnkkurointiYleinen('hytti', rivi.id, rivi.title, function() {});
@@ -3990,7 +4169,7 @@ function piirraKalenteriRivi(rivi) {
     li.appendChild(teksti);
 
     const irrotaNappi = document.createElement('button');
-    irrotaNappi.textContent = '⚓';
+    irrotaNappi.innerHTML = ANKKURI_SVG;
     irrotaNappi.className = 'anchor-btn active';
     irrotaNappi.addEventListener('click', async function() {
       await vaihdaAnkkurointiYleinen(rivi._source, rivi._sourceRef, rivi.title, function() {});
@@ -4062,7 +4241,7 @@ function piirraKalenteriRivi(rivi) {
   if (muistutusAika) li.appendChild(muistutusAika);
 
   const ankkurointiNappi = document.createElement('button');
-  ankkurointiNappi.textContent = '⚓';
+  ankkurointiNappi.innerHTML = ANKKURI_SVG;
   ankkurointiNappi.className = 'anchor-btn' + (ankkuroidutAvaimet.has('kalenteri:' + rivi.id) ? ' active' : '');
   ankkurointiNappi.addEventListener('click', async function() {
     await vaihdaAnkkurointiYleinen('kalenteri', rivi.id, rivi.title, function() {});
@@ -5146,7 +5325,7 @@ function piirraHyttiTehtavaRivi(rivi) {
   li.appendChild(kortti);
 
   const ankkurointiNappi = document.createElement('button');
-  ankkurointiNappi.textContent = '⚓';
+  ankkurointiNappi.innerHTML = ANKKURI_SVG;
   ankkurointiNappi.className = 'anchor-btn' + (ankkuroidutAvaimet.has('hytti:' + rivi.id) ? ' active' : '');
   ankkurointiNappi.addEventListener('click', async function() {
     await vaihdaAnkkurointiYleinen('hytti', rivi.id, rivi.content, function() {});
@@ -5704,22 +5883,11 @@ document.getElementById('hytti-arkisto-sulje').addEventListener('click', functio
   document.getElementById('hytti-arkisto-overlay').style.display = 'none';
 });
 
-// Näyttää tämänpäiväisen päivämäärän Ruorin otsakkeessa — iso numero +
-// viikonpäivä/kuukausi-pino (2026-08-08, ks. satama-ruori.html-mockup;
-// korvasi aiemman yksirivisen "torstai 7. elokuuta" -tekstin #home-datessa).
-function paivitaPaivamaara() {
-  const paivat = ['sunnuntai', 'maanantai', 'tiistai', 'keskiviikko', 'torstai', 'perjantai', 'lauantai'];
-  const kuukaudet = ['tammikuuta', 'helmikuuta', 'maaliskuuta', 'huhtikuuta', 'toukokuuta', 'kesäkuuta', 'heinäkuuta', 'elokuuta', 'syyskuuta', 'lokakuuta', 'marraskuuta', 'joulukuuta'];
-  const nyt = new Date();
-  document.getElementById('ruori-paiva-numero').textContent = nyt.getDate();
-  document.getElementById('ruori-viikonpaiva').textContent = paivat[nyt.getDay()].slice(0, 2);
-  document.getElementById('ruori-kuukausi').textContent = kuukaudet[nyt.getMonth()];
-}
-
-// === RUORI-KELLO (2026-08-08) === analoginen kello otsakkeen messinki-
-// kehyksessä, ks. satama-ruori.html. Tick-viivat/numerot piirretään kerran
-// (eivät muutu), viisarit päivittyvät 15s välein — kello ei ole eikä
-// tarvitse olla sekuntitarkka tässä käyttötarkoituksessa.
+// === RUORI-KELLO (2026-08-08, uudistettu 2026-08-11 — ks. Ruori-speksi
+// §0/§3) === pelkkä ympyrä, ei kehystä (ks. index.html/style.css), täyttää
+// koko sille varatun tilan — pohjaympyrä r=54 lähes koko 110-yksikköisestä
+// viewBoxista. Tick-viivat/numerot piirretään kerran (eivät muutu),
+// viisarit päivittyvät 15s välein — kello ei tarvitse olla sekuntitarkka.
 function alustaRuoriKello() {
   const viivat = document.getElementById('ruori-kello-viivat');
   const numerot = document.getElementById('ruori-kello-numerot');
@@ -5727,25 +5895,27 @@ function alustaRuoriKello() {
   const svgNs = 'http://www.w3.org/2000/svg';
   for (let i = 0; i < 60; i++) {
     const kulma = i * 6 * Math.PI / 180, iso = i % 5 === 0;
-    const r1 = iso ? 42 : 47, r2 = 52;
+    const r1 = iso ? 44 : 48, r2 = 52.5;
     const viiva = document.createElementNS(svgNs, 'line');
     viiva.setAttribute('x1', 55 + r1 * Math.sin(kulma));
     viiva.setAttribute('y1', 55 - r1 * Math.cos(kulma));
     viiva.setAttribute('x2', 55 + r2 * Math.sin(kulma));
     viiva.setAttribute('y2', 55 - r2 * Math.cos(kulma));
     viiva.setAttribute('stroke', '#221F1A');
-    viiva.setAttribute('stroke-width', iso ? 1.3 : .6);
-    viiva.setAttribute('opacity', iso ? 0.85 : 0.35);
+    viiva.setAttribute('stroke-width', iso ? 1.4 : .7);
+    viiva.setAttribute('opacity', iso ? 0.9 : 0.4);
     viivat.appendChild(viiva);
   }
   // Kaikki 12 tuntinumeroa samalla painolla/koolla (2026-08-08, Katrin
   // korjaus alkuperäiseen "vain 12/3/6/9" -versioon) — ei himmennettyjä
-  // välinumeroita, kello luettava yhdellä vilkaisulla.
+  // välinumeroita, kello luettava yhdellä vilkaisulla. Säde 38 (2026-08-11,
+  // suurennettu ympyrän r=54:n mukana) pitää numerot selvästi tick-viivojen
+  // sisäpuolella mutta silti isoina.
   [12, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11].forEach(function(h) {
     const kulma = (h % 12) * 30 * Math.PI / 180;
     const teksti = document.createElementNS(svgNs, 'text');
-    teksti.setAttribute('x', 55 + 36 * Math.sin(kulma));
-    teksti.setAttribute('y', 55 - 36 * Math.cos(kulma));
+    teksti.setAttribute('x', 55 + 38 * Math.sin(kulma));
+    teksti.setAttribute('y', 55 - 38 * Math.cos(kulma));
     teksti.textContent = h;
     numerot.appendChild(teksti);
   });
@@ -5757,10 +5927,10 @@ function paivitaRuoriKello() {
   if (!tuntiviisari || !minuuttiviisari) return;
   const nyt = new Date(), h = nyt.getHours() % 12, m = nyt.getMinutes();
   const ha = (h + m / 60) * 30 * Math.PI / 180, ma = m * 6 * Math.PI / 180;
-  tuntiviisari.setAttribute('x2', 55 + 26 * Math.sin(ha));
-  tuntiviisari.setAttribute('y2', 55 - 26 * Math.cos(ha));
-  minuuttiviisari.setAttribute('x2', 55 + 38 * Math.sin(ma));
-  minuuttiviisari.setAttribute('y2', 55 - 38 * Math.cos(ma));
+  tuntiviisari.setAttribute('x2', 55 + 27 * Math.sin(ha));
+  tuntiviisari.setAttribute('y2', 55 - 27 * Math.cos(ha));
+  minuuttiviisari.setAttribute('x2', 55 + 40 * Math.sin(ma));
+  minuuttiviisari.setAttribute('y2', 55 - 40 * Math.cos(ma));
 }
 
 alustaRuoriKello();
@@ -5797,6 +5967,100 @@ document.getElementById('kuormanappi').addEventListener('click', function() {
   localStorage.setItem(RUORI_KUORMITUSTILA_AVAIN, ruoriKuormitustilaPaalla() ? '0' : '1');
   paivitaRuoriNakyvyys();
 });
+
+// === RUORI: SÄÄ-SEGMENTTI (2026-08-11, Ruori-speksi §2) === Open-Meteo
+// api/saa.js:n kautta (palvelin välimuistittaa 30 min, ei suoraa selainkutsua
+// — ks. api/saa.js:n kommentti). Piilottaa koko segmentin virhetilanteessa:
+// "vanhan datan näyttäminen tuoreena on pahempi virhe kuin sään puuttuminen"
+// (§2.2) — paketin mahdollista vanha_data-varakenttää ei koskaan renderöidä
+// täältä tuoreena datana.
+const SAA_IKONIT = {
+  sun: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.2 4.2l1.4 1.4M18.4 18.4l1.4 1.4M2 12h2M20 12h2M4.2 19.8l1.4-1.4M18.4 5.6l1.4-1.4"/></svg>',
+  cloud: '<svg viewBox="0 0 24 24"><path fill="currentColor" d="M7 18a4.5 4.5 0 0 1-.4-8.98A5.5 5.5 0 0 1 17.3 8.1 4 4 0 0 1 17 18H7z"/></svg>',
+  drop: '<svg viewBox="0 0 24 24"><path fill="currentColor" d="M12 2s6 7.2 6 11.5A6 6 0 0 1 6 13.5C6 9.2 12 2 12 2z"/></svg>',
+  snow: '<svg viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" stroke-linecap="round" fill="none"><path d="M12 2v20M4 7l16 10M20 7L4 17"/></svg>',
+  lightning: '<svg viewBox="0 0 24 24"><path fill="currentColor" d="M13 2 4 14h6l-1 8 9-12h-6l1-8z"/></svg>',
+  fog: '<svg viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" stroke-linecap="round" fill="none"><path d="M3 8h18M3 12h18M3 16h12"/></svg>',
+};
+
+// WMO-säätunnus -> kuvakeyhdistelmä (Ruori-speksi §2.3). Sääntö: jos kuvassa
+// on aurinko, pilvi JA pisara, kaikki kolme näytetään erikseen — sävytys ei
+// saa syödä silmäiltävyyttä (koskee erityisesti 80-82).
+function saaIkonitKoodille(koodi) {
+  if (koodi === 0) return ['sun'];
+  if (koodi === 1 || koodi === 2) return ['sun', 'cloud'];
+  if (koodi === 3) return ['cloud'];
+  if (koodi === 45 || koodi === 48) return ['cloud', 'fog'];
+  if (koodi >= 51 && koodi <= 57) return ['cloud', 'drop'];
+  if (koodi >= 61 && koodi <= 67) return ['cloud', 'drop', 'drop'];
+  if ((koodi >= 71 && koodi <= 77) || (koodi >= 85 && koodi <= 86)) return ['cloud', 'snow'];
+  if (koodi >= 80 && koodi <= 82) return ['sun', 'cloud', 'drop'];
+  if (koodi >= 95 && koodi <= 99) return ['cloud', 'lightning'];
+  return ['cloud'];
+}
+function saaIkoniHtml(koodi) {
+  return saaIkonitKoodille(koodi).map(function(k) { return SAA_IKONIT[k]; }).join('');
+}
+function pyoristaKymmeneen(n) { return Math.round(n / 10) * 10; }
+
+async function lataaRuoriSaa() {
+  const segmentti = document.getElementById('ruori-saa-segmentti');
+  try {
+    const { data: sessioData } = await db.auth.getSession();
+    const token = sessioData.session ? sessioData.session.access_token : null;
+    if (!token) throw new Error('Ei kirjautunut');
+    const vastaus = await fetch('/api/saa', { headers: { Authorization: 'Bearer ' + token } });
+    const paketti = await vastaus.json();
+    if (!vastaus.ok || !paketti.data) throw new Error(paketti.error || 'Säädatan haku epäonnistui');
+
+    const saa = paketti.data;
+    const nyt = new Date();
+    const tunnit = saa.hourly.time;
+    let alkuIdx = tunnit.findIndex(function(t) { return new Date(t) > nyt; });
+    if (alkuIdx === -1) alkuIdx = 0;
+    const nakyvat = [];
+    for (let i = alkuIdx; i < tunnit.length && nakyvat.length < 8; i++) nakyvat.push(i);
+    if (nakyvat.length === 0) throw new Error('Ei tunteja näytettäväksi');
+
+    const nykyinenLampo = saa.current && typeof saa.current.apparent_temperature === 'number'
+      ? saa.current.apparent_temperature
+      : saa.hourly.apparent_temperature[nakyvat[0]];
+    document.getElementById('ruori-saa-lampo').textContent = Math.round(nykyinenLampo) + '°';
+
+    const maxSadeTod = nakyvat.slice(0, 4).reduce(function(max, i) {
+      return Math.max(max, saa.hourly.precipitation_probability[i] || 0);
+    }, 0);
+    const tagit = [];
+    if (maxSadeTod >= 40) tagit.push('Sateenvarjo');
+    if (nykyinenLampo <= 0) tagit.push('Hattu');
+    if (nykyinenLampo >= 25) tagit.push('Aurinkolasit');
+    const tagitEl = document.getElementById('ruori-saa-tagit');
+    tagitEl.innerHTML = '';
+    tagit.forEach(function(teksti, i) {
+      const span = document.createElement('span');
+      span.className = 'saa-tagi';
+      span.textContent = teksti;
+      span.style.transform = 'rotate(' + (-4 + i * 3.5) + 'deg)';
+      tagitEl.appendChild(span);
+    });
+
+    const tunnitEl = document.getElementById('ruori-saa-tunnit');
+    tunnitEl.innerHTML = nakyvat.map(function(i) {
+      const aika = new Date(tunnit[i]);
+      const sade = saa.hourly.precipitation_probability[i];
+      return '<div class="saa-tunti">'
+        + '<span class="saa-tunti-aika">' + String(aika.getHours()).padStart(2, '0') + '</span>'
+        + '<span class="saa-tunti-ikoni">' + saaIkoniHtml(saa.hourly.weather_code[i]) + '</span>'
+        + '<span class="saa-tunti-sade">' + (sade >= 10 ? pyoristaKymmeneen(sade) + '%' : '') + '</span>'
+        + '</div>';
+    }).join('');
+
+    segmentti.style.display = 'block';
+  } catch (e) {
+    console.error('Ruorin säädatan haku epäonnistui:', e.message);
+    segmentti.style.display = 'none';
+  }
+}
 
 // === RUORI: KALENTERI-SEGMENTTI (2026-08-08) === tämän päivän ensimmäinen
 // tapahtuma + ristiriita/huolilippu-tila, ks. satama-ruori.html. Käyttää
@@ -5919,6 +6183,21 @@ async function lataaRuoriHytti() {
 
 let cachedAnkkurit = [];
 let ankkuritKaikkiNakyvissa = false;
+
+// Ankkurikuvake SVG:nä (2026-08-11, Ruori-speksi §4.1) — sama kuvio kuin
+// aiempi ⚓-emoji, mutta väri hallinnassa (currentColor) eikä alustan
+// emoji-fontin varassa (eri alustoilla ⚓ renderöityi eri väreissä).
+// Merkki pysyy AINA samana harmaana (color: var(--vaimea), ks. style.css)
+// — tila näkyy vain napin taustasta, ei merkistä (§4.3).
+const ANKKURI_SVG = '<svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="4.4" r="2" stroke="currentColor" stroke-width="1.7"/><path d="M12 6.4V19M8.2 9.8h7.6M4.5 13.5a7.5 7.5 0 0 0 7.5 7.5 7.5 7.5 0 0 0 7.5-7.5" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+
+// Ankkurin ⋯-valikon kuvakkeet (§4.4) — Sataman sävyissä (muste/messinki/
+// paperi), ei alustan emoji-fontin varassa.
+const ANKKURI_MENU_IKONIT = {
+  halytys: '<svg viewBox="0 0 20 20" width="18" height="18" fill="none"><circle cx="10" cy="11" r="6" stroke="var(--muste)" stroke-width="1.4"/><path d="M10 8v3l2 1.6" stroke="var(--muste)" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/><path d="M5.3 5.3L3.3 3.3M14.7 5.3l2-2" stroke="var(--muste)" stroke-width="1.3" stroke-linecap="round"/></svg>',
+  siirra: '<svg viewBox="0 0 20 20" width="18" height="18" fill="none"><path d="M2.5 4.5v11l6-5.5z" fill="var(--muste)"/><path d="M10.5 4.5v11l6-5.5z" fill="var(--muste)"/></svg>',
+  ehdota: '<svg viewBox="0 0 20 20" width="18" height="18" fill="none"><path d="M3 4.5h14a1 1 0 0 1 1 1V13a1 1 0 0 1-1 1H9.5l-4 3.2V14H3a1 1 0 0 1-1-1V5.5a1 1 0 0 1 1-1z" fill="#fff" stroke="var(--muste)" stroke-width="1.3" stroke-linejoin="round"/></svg>',
+};
 
 // Hakee päivän tärkeimmät tekemättömät ankkurit järjestyksessä — VAIN
 // kirjautuneen OMAT (ankkurit henkilökohtaisiksi 2026-07-11, ks.
@@ -6065,74 +6344,19 @@ async function lataaAnkkurit() {
     const muistutusBadge = reminderTimeBadge('ankkuri', ankkuri.id);
     if (muistutusBadge) li.appendChild(muistutusBadge);
 
-    // BUGIKORJAUS (2026-07-14, "Ankkurien hätäkorjaus"): kolme käsin luotua
-    // ankkuria katosi vahinkopainalluksista jäljettömiin — käsin luotu ankkuri
-    // ON sisältö (ei vain osoitin lähteeseen, ks. "Ankkuriarkkitehtuuri"-
-    // suunnitelma), joten sen poisto oli lopullinen data-menetysriski.
-    // Poisto EI TAPAHDU heti — 5s kumottava toast ensin, todellinen poisto
-    // vasta jos ei kumota. Rivi vain himmenee tänä aikana, ei katoa DOM:ista.
-    const irrotaNappi = document.createElement('button');
-    irrotaNappi.textContent = '⚓';
-    irrotaNappi.className = 'anchor-btn active';
-    irrotaNappi.addEventListener('click', function() {
-      li.style.opacity = '0.3';
-      irrotaNappi.disabled = true;
-      const kotiNimi = ANKKURI_KOTI_NIMI[ankkuri.source];
-      naytaKumottavaIlmoitus(
-        kotiNimi ? ('Ankkuri laskettu — löytyy ' + kotiNimi) : 'Ankkuri laskettu',
-        async function() {
-          const { error } = await db.from('ankkurit').delete().eq('id', ankkuri.id);
-          // Kumottava toasti on jo näytetty/kadonnut tähän mennessä — pysäytys
-          // (return) estää seuraavan, RIIPPUVAN muistutus-siirron ajautumasta
-          // ankkurin ollessa yhä olemassa, ja uusi toast kertoo epäonnistumisesta.
-          if (ilmoitaKirjoitusvirheesta(error, 'Ankkurin irrotus')) return;
-          // BUGIKORJAUS ("Ankkuriarkkitehtuuri: jokaisella ankkurilla on
-          // koti"): LASKU POISTAA VAIN NOSTON — muistutukset kuuluvat
-          // sisällölle, eivät nostolle, joten ne SIIRRETÄÄN kotiin sen
-          // sijaan että poistettaisiin. Vanha migroimaton 'manual'-ankkuri
-          // (ei kotia) JA hyväksytty ihmislähtöinen ehdotus ('ehdotus' — koti
-          // on LÄHETTÄJÄN oma Laituri, ei jotain jonne vastaanottaja pääsisi)
-          // putoavat varasuunnitelmaan (poisto).
-          let muistutusVirhe;
-          if (ankkuri.source && ankkuri.source !== 'manual' && ankkuri.source !== 'ehdotus' && ankkuri.source_ref) {
-            const kotiLahde = ankkurinKotiMuistutusLahde(ankkuri);
-            const tulos = await db.from('muistutukset')
-              .update({ source: kotiLahde, source_ref: String(ankkuri.source_ref) })
-              .eq('source', 'ankkuri').eq('source_ref', String(ankkuri.id));
-            muistutusVirhe = tulos.error;
-          } else {
-            const tulos = await db.from('muistutukset').delete().eq('source', 'ankkuri').eq('source_ref', String(ankkuri.id));
-            muistutusVirhe = tulos.error;
-          }
-          // Ankkuri on jo poistettu onnistuneesti — muistutuksen siirto/poisto
-          // on toissijainen siivous, ei enää perumiskelpoinen tässä vaiheessa,
-          // joten vain lokitetaan (ei toista tointa käyttäjälle).
-          if (muistutusVirhe) console.error('Muistutuksen siirto/poisto ankkurin irrotuksessa epäonnistui:', muistutusVirhe);
-          lataaAnkkurit();
-        },
-        function() {
-          li.style.opacity = '';
-          irrotaNappi.disabled = false;
-        }
-      );
-    });
-    li.appendChild(irrotaNappi);
-
-    // ⋯-valikko (2026-08-08, Ruori-uudistus, Katrin pyyntö): Siirrä/Muistutus/
-    // Ehdota olivat aiemmin kolme erillistä ikonia rivin lopussa (yhdessä ⚓:n
-    // kanssa neljä-viisi ikonia) — nyt saman "⋯"-valikon takana, sama
-    // createOverflowButton/openRowMenu-koneisto kuin muualla sovelluksessa
-    // (esim. Varasto/elävät rivit). ⚓ pysyy omana, aina näkyvänä nappina
-    // rivin oikeassa reunassa. Jokaisen kohdan TOIMINNALLISUUS on täsmälleen
-    // sama kuin ennen (siirraNappi/luoMuistutusNappi/"Ehdota X:lle" -logiikat
-    // sellaisenaan) — vain napautusreitti muuttui.
+    // ⋯-valikko (2026-08-08, Ruori-uudistus; ikonisoitu 2026-08-11, Ruori-
+    // speksi §4.4) — Siirrä/Muistutus/Ehdota kootaan yhden "⋯"-napin taakse,
+    // sama createOverflowButton/openRowMenu-koneisto kuin muualla sovelluksessa
+    // (esim. Varasto/elävät rivit), nyt Sataman sävyisillä ikoneilla tekstin
+    // lisäksi. Jokaisen kohdan TOIMINNALLISUUS on täsmälleen sama kuin ennen
+    // (siirraNappi/luoMuistutusNappi/"Ehdota X:lle" -logiikat sellaisenaan).
     const ankkuriValikko = [
       {
-        label: 'Muistutus',
+        label: 'Muistutus', icon: ANKKURI_MENU_IKONIT.halytys,
         onClick: function() { avaaMuistutusPaneeli('ankkuri', ankkuri.id, ankkuri.content, null, ankkuri.event_time, lataaAnkkurit); },
       },
       {
-        label: 'Siirrä myöhemmäksi',
+        label: 'Siirrä myöhemmäksi', icon: ANKKURI_MENU_IKONIT.siirra,
         onClick: function() {
           const vastaus = prompt('Nouse uudelleen kuinka monen tunnin päästä?', '24');
           if (vastaus === null) return;
@@ -6156,7 +6380,7 @@ async function lataaAnkkurit() {
     if (toinenKayttaja) {
       const ankkuriAvain = 'ankkuri:' + ankkuri.id;
       ankkuriValikko.push({
-        label: 'Ehdota ' + henkiloAllatiivi(toinenKayttaja.henkilo),
+        label: 'Ehdota ' + henkiloAllatiivi(toinenKayttaja.henkilo), icon: ANKKURI_MENU_IKONIT.ehdota,
         onClick: async function() {
           if (ehdotetutTassaIstunnossa.has(ankkuriAvain)) {
             naytaIlmoitus('Jo ehdotettu ' + henkiloAllatiivi(toinenKayttaja.henkilo));
@@ -6168,7 +6392,77 @@ async function lataaAnkkurit() {
         },
       });
     }
-    li.appendChild(createOverflowButton(li, ankkuriValikko));
+
+    // BUGIKORJAUS (2026-07-14, "Ankkurien hätäkorjaus"): kolme käsin luotua
+    // ankkuria katosi vahinkopainalluksista jäljettömiin — käsin luotu ankkuri
+    // ON sisältö (ei vain osoitin lähteeseen, ks. "Ankkuriarkkitehtuuri"-
+    // suunnitelma), joten sen poisto oli lopullinen data-menetysriski.
+    // Poisto EI TAPAHDU heti — 5s kumottava toast ensin, todellinen poisto
+    // vasta jos ei kumota. Rivi vain himmenee tänä aikana, ei katoa DOM:ista.
+    //
+    // KORJATTU 2026-08-11 (Ruori-speksi §4.5): source='etusivu' (käsin
+    // kirjoitettu, ei enää Laituri-kotia, ks. ankkurit-add-btn-käsittelijä
+    // yllä) EI voi laskeutua mihinkään ennen kuin Hytin Loki-välilehti on
+    // olemassa (§6b, Vaihe 5) — nappi on siis POIS KÄYTÖSTÄ tälle lähteelle,
+    // ei koska sisältöä ei voisi turvata vaan koska kohdetta ei vielä ole.
+    const irrotaNappi = document.createElement('button');
+    irrotaNappi.innerHTML = ANKKURI_SVG;
+    irrotaNappi.className = 'anchor-btn active';
+    if (ankkuri.source === 'etusivu') {
+      irrotaNappi.disabled = true;
+      irrotaNappi.title = 'Odottaa Hytin Loki-välilehteä (ei vielä olemassa) — sisältö pysyy täällä sitä asti';
+    } else {
+      irrotaNappi.addEventListener('click', function() {
+        li.style.opacity = '0.3';
+        irrotaNappi.disabled = true;
+        const kotiNimi = ANKKURI_KOTI_NIMI[ankkuri.source];
+        naytaKumottavaIlmoitus(
+          kotiNimi ? ('Ankkuri laskettu — löytyy ' + kotiNimi) : 'Ankkuri laskettu',
+          async function() {
+            const { error } = await db.from('ankkurit').delete().eq('id', ankkuri.id);
+            // Kumottava toasti on jo näytetty/kadonnut tähän mennessä — pysäytys
+            // (return) estää seuraavan, RIIPPUVAN muistutus-siirron ajautumasta
+            // ankkurin ollessa yhä olemassa, ja uusi toast kertoo epäonnistumisesta.
+            if (ilmoitaKirjoitusvirheesta(error, 'Ankkurin irrotus')) return;
+            // BUGIKORJAUS ("Ankkuriarkkitehtuuri: jokaisella ankkurilla on
+            // koti"): LASKU POISTAA VAIN NOSTON — muistutukset kuuluvat
+            // sisällölle, eivät nostolle, joten ne SIIRRETÄÄN kotiin sen
+            // sijaan että poistettaisiin. Hyväksytty ihmislähtöinen ehdotus
+            // ('ehdotus' — koti on LÄHETTÄJÄN oma Laituri, ei jotain jonne
+            // vastaanottaja pääsisi) putoaa varasuunnitelmaan (poisto).
+            // source='etusivu' ei koskaan päädy tänne (nappi pois käytöstä yllä).
+            let muistutusVirhe;
+            if (ankkuri.source && ankkuri.source !== 'etusivu' && ankkuri.source !== 'ehdotus' && ankkuri.source_ref) {
+              const kotiLahde = ankkurinKotiMuistutusLahde(ankkuri);
+              const tulos = await db.from('muistutukset')
+                .update({ source: kotiLahde, source_ref: String(ankkuri.source_ref) })
+                .eq('source', 'ankkuri').eq('source_ref', String(ankkuri.id));
+              muistutusVirhe = tulos.error;
+            } else {
+              const tulos = await db.from('muistutukset').delete().eq('source', 'ankkuri').eq('source_ref', String(ankkuri.id));
+              muistutusVirhe = tulos.error;
+            }
+            // Ankkuri on jo poistettu onnistuneesti — muistutuksen siirto/poisto
+            // on toissijainen siivous, ei enää perumiskelpoinen tässä vaiheessa,
+            // joten vain lokitetaan (ei toista tointa käyttäjälle).
+            if (muistutusVirhe) console.error('Muistutuksen siirto/poisto ankkurin irrotuksessa epäonnistui:', muistutusVirhe);
+            lataaAnkkurit();
+          },
+          function() {
+            li.style.opacity = '';
+            irrotaNappi.disabled = false;
+          }
+        );
+      });
+    }
+
+    // Pino oikeassa reunassa (§4.2): ⚓ ja ⋯ allekkain, eivät vierekkäin —
+    // tekstit ovat usein monisanaisia ja niiden pitää näkyä kokonaan.
+    const toiminnot = document.createElement('div');
+    toiminnot.className = 'ankkuri-toiminnot';
+    toiminnot.appendChild(irrotaNappi);
+    toiminnot.appendChild(createOverflowButton(li, ankkuriValikko));
+    li.appendChild(toiminnot);
 
     listEl.appendChild(li);
   });
@@ -6483,9 +6777,19 @@ async function loadAnchorCandidates() {
     // nappiin. Ihmislähtöiselle ehdotukselle napit saavat nyt selkeän
     // tekstilabelin ikonin lisäksi; ✨-koneehdokas pysyy ennallaan (tuttu,
     // ei valitusta).
+    // §4.6 (Ruori-speksi, 2026-08-11): ehdokkaan hyväksymisnappi käyttää SAMAA
+    // ⚓-SVG:tä ja anchor-btn-tyyliä kuin oma ankkuri, ei erillistä muotoilua —
+    // vain ihmislähtöiselle ehdotukselle ('ehdotus') säilyy tekstilabeli
+    // (2026-07-17-bugikorjaus, uudelle 💬-ehdotukselle pelkkä merkki oli
+    // epäselvä), jolloin nappi levenee tekstin verran (.anchor-btn-labeled).
     const acceptButton = document.createElement('button');
-    acceptButton.textContent = candidate.source === 'ehdotus' ? '⚓ Hyväksy' : '⚓';
     acceptButton.className = 'anchor-btn';
+    if (candidate.source === 'ehdotus') {
+      acceptButton.classList.add('anchor-btn-labeled');
+      acceptButton.innerHTML = ANKKURI_SVG + '<span>Hyväksy</span>';
+    } else {
+      acceptButton.innerHTML = ANKKURI_SVG;
+    }
     acceptButton.title = 'Ota omaksi ankkuriksi';
     acceptButton.addEventListener('click', async function() {
       const { error } = await db.from('ankkurit').update({ is_candidate: false }).eq('id', candidate.id);
@@ -7212,7 +7516,7 @@ async function lataaLaituri(hakusana) {
       // ja sijoitus ovat eri kysymyksiä, sama periaate kuin Muistilapuilla).
       const ankkuriNappi = document.createElement('button');
       ankkuriNappi.className = 'anchor-btn' + (onAnkkuroitu ? ' active' : '');
-      ankkuriNappi.textContent = '⚓';
+      ankkuriNappi.innerHTML = ANKKURI_SVG;
       ankkuriNappi.title = onAnkkuroitu ? 'Ankkurissa — napauta laskeaksesi' : 'Nosta tälle päivälle ankkuriksi';
       ankkuriNappi.addEventListener('click', function() {
         vaihdaAnkkurointiYleinen('laituri', rivi.id, rivi.content, function() {
@@ -9465,8 +9769,15 @@ function openRowMenu(li, items) {
   items.forEach(function(kohta) {
     const nappi = document.createElement('button');
     nappi.type = 'button';
-    nappi.className = 'row-menu-item' + (kohta.danger ? ' row-menu-item-danger' : '');
-    nappi.textContent = kohta.label;
+    nappi.className = 'row-menu-item' + (kohta.danger ? ' row-menu-item-danger' : '') + (kohta.icon ? ' row-menu-item-icon' : '');
+    // kohta.icon (2026-08-11, Ruori-speksi §4.4) — valinnainen SVG-kuvake
+    // ennen tekstiä. Muut kutsupaikat eivät aseta sitä, joten niiden ulkoasu
+    // ei muutu (pelkkä textContent kuten ennen).
+    if (kohta.icon) {
+      nappi.innerHTML = kohta.icon + '<span>' + kohta.label + '</span>';
+    } else {
+      nappi.textContent = kohta.label;
+    }
     nappi.addEventListener('click', function(e) {
       e.stopPropagation();
       closeRowMenu();
@@ -9675,7 +9986,7 @@ function paivitaNaytto(tuotteet) {
     // impulsiivisin ele arkikäytössä (ei Varastossa, ks. yllä).
     if (!isVarasto) {
       const ankkuriNappi = document.createElement('button');
-      ankkuriNappi.textContent = '⚓';
+      ankkuriNappi.innerHTML = ANKKURI_SVG;
       ankkuriNappi.className = 'anchor-btn' + (ankkuroidutAvaimet.has('muistilaput:' + tuote.id) ? ' active' : '');
       ankkuriNappi.addEventListener('click', function() { vaihdaAnkkurointi(tuote); });
       item.appendChild(ankkuriNappi);
@@ -9983,35 +10294,24 @@ document.getElementById('visibility-toggle').addEventListener('change', async fu
 // itselle (nolla valintaa), delegointi hoituu jälkikäteen ⋯-valikon
 // "Ehdota [Nimi]:lle" -toiminnolla (ks. alempana lataaAnkkurit()-listauksessa).
 //
-// BUGIKORJAUS (2026-07-14, "Ankkuriarkkitehtuuri: jokaisella ankkurilla on
-// koti"): käsin kirjoitettu ankkuri EI enää OLE itse sisältö (jonka lasku
-// tuhoaisi) — se luo taustalla murun Laituriin ja nostaa SEN, täsmälleen
-// sama polku kuin Muistilapuilta/Kalenterista/Hytistä/älyltä nostetulla
-// ankkurilla. Käyttöliittymä ei muutu, mutta "lasku" ei voi enää koskaan
-// hävittää sisältöä — se palaa aina Laituriin.
+// KORJATTU 2026-08-11 (Ruori-speksi §4.5, Katrin yksityisyyshavainto): 2026-
+// 07-14 "jokaisella ankkurilla on koti" -korjaus loi taustalla Laituri-
+// murun — mutta Laituri on JAETTU näkymä (lataaLaituri() ei suodata
+// user_id:n mukaan), joten etusivulla kirjoitettu teksti tuli NÄKYVIIN
+// JUHALLE HETI kirjoitushetkellä, ei vasta laskiessa. Käsin kirjoitettu
+// ankkuri EI enää luo Laituri-riviä ollenkaan — source='etusivu' erottaa
+// sen laituri-lähtöisistä (source='laituri'), sisältö asuu VAIN ankkurit-
+// taulussa (henkilökohtainen, RLS user_id-rajattu). Turvainvariantti
+// säilyy toisella tavalla: lasku on POIS KÄYTÖSTÄ source='etusivu'-
+// ankkureille kunnes Hytin Loki-välilehti on olemassa (§4.5, Vaihe 5) —
+// sisältö ei voi kadota koska sitä ei voi laskea, ei koska sillä on koti.
 document.getElementById('ankkurit-add-btn').addEventListener('click', async function() {
   const ankkuriInput = document.getElementById('ankkurit-input');
   const teksti = ankkuriInput.value.trim();
   if (teksti === '') { ankkuriInput.focus(); return; }
 
-  const { data: muru, error: muruError } = await db.from('laituri')
-    .insert({ content: teksti, user_id: currentUserId, status: 'uusi' })
-    .select().single();
-  if (muruError) {
-    console.error('Murun luonti epäonnistui:', muruError);
-    naytaIlmoitus('Ankkurin luonti epäonnistui');
-    return;
-  }
-
-  const { error } = await db.from('ankkurit').insert({ content: teksti, source: 'laituri', source_ref: String(muru.id), user_id: currentUserId });
-  // Muru on jo turvassa Laiturissa tässä vaiheessa ("koti"-invariantti) —
-  // jos VAIN ankkuri-nosto epäonnistuu, sisältö ei ole kadonnut, mutta
-  // käyttäjä ei näe sitä Ankkureissa ilman selitystä (ks. muistiinpanot.md
-  // "Kirjoituspolkujen auditointi").
-  if (error) {
-    console.error('Ankkurin lisäys epäonnistui:', error);
-    naytaIlmoitus('Tallennettu Laituriin, mutta ei noussut Ankkureihin — tarkista Laituri');
-  }
+  const { error } = await db.from('ankkurit').insert({ content: teksti, source: 'etusivu', user_id: currentUserId });
+  if (ilmoitaKirjoitusvirheesta(error, 'Ankkurin luonti')) return;
   await paivitaAnkkuroidutAvaimet();
   ankkuriInput.value = '';
   lataaAnkkurit();
