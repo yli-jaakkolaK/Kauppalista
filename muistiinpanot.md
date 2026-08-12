@@ -3498,3 +3498,13 @@ Katri toimitti laajan "Ruori — korjaukset ja jatkomuutokset elävästä testau
 **§2 Kuvakkeet:** (1) Ankkuri-⚓: Katrin oma diagnoosi (alkuperäinen emoji oli "Sataman sielu", SVG-korvike muutti muodon) ja pyytämä korjausjärjestys seurattiin — `ANKKURI_SVG` piirtää nyt natiivin ⚓-emojin SVG `<text>`-elementtinä (ei käsinpiirrettyjä polkuja) `filter: grayscale(1)`:llä väriä varten. Sama `<svg>`-ulkokehys kuin ennen, joten kaikki ~10 kutsupaikan olemassa olevat kokosäännöt (esim. `.anchor-btn svg { width/height }`) toimivat koskematta niihin. EI VIELÄ TESTATTU oikealla iOS Safarilla/Androidilla — jos grayscale(1) ei riitä, seuraava askel on contrast()/brightness()-lisäys SAMAAN filter-arvoon, ei paluu käsinpiirrettyyn muotoon. (2) Alapalkin pelastusrengas: aiempi versio piirsi 4 vinoa VIIVAA renkaan päälle ("joku ihme"), korvattu 4:llä säteittäisellä valkoisella suorakulmiolla renkaan paksuuden mittaisina — pelastusrenkaan tunnistettava perusmuoto.
 
 sw.js v108 → v109.
+
+### Ruori-uudistus: haptiikka + tekstinvalintabugi kaikissa raahauksissa (2026-08-11)
+
+Katri: haptinen palaute pitäisi olla joka paikassa missä raahataan, ja raahatessa tulee usein maalanneeksi koko sivun kuin valittu. Tarkistus: haptiikka (`navigator.vibrate(15)`) oli jo olemassa sekä alapalkin uudessa raahauksessa että jaetussa `alustaRaahaus()`-apurissa (käytössä Muistilaput/Varasto/kauppalista/Hytti-kortit/Hytti-rivit/Ankkurit/Ruorin osiot) — ei vaatinut muutosta, jo kunnossa kaikkialla missä raahausta on.
+
+Tekstinvalintabugi sen sijaan oli oikea: `.list li.dragging` lisäsi `user-select:none`:in vasta KUN raahaus oli JO tunnistettu käynnissä olevaksi — sama ~450ms pitkä painallus joka käynnistää oman raahauksen on MYÖS iOS Safarin sisäänrakennettu tekstinvalinta/suurennuslasi-eleen kynnys, ja se ehti voittaa ennen kuin oma suoja ehti päälle. Korjaus keskitetty yhteen paikkaan: `alustaRaahaus()` lisää nyt `.raahattava`-luokan riville heti kun se rekisteröidään raahattavaksi (ei vasta raahauksen alkaessa), ja `.raahattava` (style.css) asettaa `user-select:none`/`-webkit-user-select:none`/`-webkit-touch-callout:none` pysyvästi. `touch-action` jätetty TARKOITUKSELLA pois tästä yleisestä säännöstä — nämä ovat usein pitkiä, vieritettäviä listoja joita käyttäjä vierittää koskettamalla suoraan riviä, ja touch-action:none olisi rikkonut sen (ero alapalkin järjestysarkkiin, joka on lyhyt eikä tarvitse rivin kautta vieritystä, ks. edellinen osio — siellä touch-action:none on turvallinen).
+
+Yksi keskitetty muutos (`alustaRaahaus()`-funktioon + yksi uusi CSS-luokka) korjaa siis kaikki sen käyttöpaikat kerralla, ei tarvinnut koskea jokaista listaa erikseen.
+
+sw.js v109 → v110.

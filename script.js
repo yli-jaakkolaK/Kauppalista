@@ -9688,6 +9688,20 @@ let raahattavaRivi = null;
 // asetukset = { container, cache, taulu, jalkeenPaivitys } — samaa raahauslogiikkaa
 // käytetään sekä listan tuoteriveille että Ankkureille, vain kohdetaulu/säiliö vaihtuu
 function alustaRaahaus(li, kohde, asetukset) {
+  // Tekstinvalinta pitkän painalluksen aikana korjattu (2026-08-11, elävä
+  // testaus: "raahatessa maalautuu koko sivu"). .dragging-luokka lisäsi
+  // user-select:none:in vasta KUN raahaus oli jo tunnistettu käynnissä
+  // olevaksi — liian myöhään, koska sama ~450ms pitkä painallus joka
+  // käynnistää raahauksemme on MYÖS iOS Safarin oma tekstinvalinta/
+  // suurennuslasi-eleen kynnys, ja se ehti voittaa. .raahattava-luokka
+  // laittaa suojan päälle heti kun rivi rekisteröidään raahattavaksi, ei
+  // vasta raahauksen alkaessa. touch-action EI ole mukana tarkoituksella:
+  // nämä listat voivat olla pitkiä ja käyttäjä vierittää niitä usein
+  // koskettamalla suoraan riviä — touch-action:none estäisi senkin, ei
+  // vain tekstinvalinnan (ero alapalkin järjestysarkkiin, joka on lyhyt,
+  // oma raahaukseen keskittyvä näkymä eikä tarvitse rivin kautta vieritystä).
+  li.classList.add('raahattava');
+
   let ajastin = null;
   let alkuY = 0;
   let alkuX = 0;
