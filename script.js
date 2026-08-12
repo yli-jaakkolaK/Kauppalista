@@ -140,7 +140,13 @@ const ALAPALKKI_IKONIT = {
   // y=22.7/koko 5 ulottui 20.2-25.2). Rungon leveys 20->16 (kapeampi
   // kalenterikehys), numero+viikonpäivä siirretty erilleen ilman
   // päällekkäisyyttä.
-  kalenteri: '<svg viewBox="0 0 28 28" fill="none"><rect x="6" y="7" width="16" height="17" rx="2" fill="var(--paperi)" stroke="var(--muste)" stroke-width="1.5"/><path d="M10 3.5v5M18 3.5v5" stroke="var(--muste)" stroke-width="1.5" stroke-linecap="round"/><text x="14" y="15.5" font-family="\'Courier Prime\',monospace" font-weight="700" font-size="7.5" text-anchor="middle" fill="var(--muste)" data-role="kal-numero"></text><text x="14" y="21.3" font-family="\'Courier Prime\',monospace" font-size="4.5" letter-spacing="0.04em" text-anchor="middle" fill="var(--muste)" data-role="kal-vk"></text></svg>',
+  // fill vaihdettu var(--paperi) -> #FDFBF6 (2026-08-11, elävä testaus:
+  // "en näe kalenterikuvaketta alapalkissa") — --paperi (#EAE6DC) on lähes
+  // sama sävy kuin alapalkin OMA tausta (rgba(234,230,220,.92)) JA uusi
+  // lasipinta-kehys, joten "sivu" hukkui näkymättömiin omaan taustaansa,
+  // jäljellä vain ohut muste-ääriviiva. Kirkkaampi, selvästi kontrastoiva
+  // paperinvalkoinen erottuu sekä alapalkista että lasista.
+  kalenteri: '<svg viewBox="0 0 28 28" fill="none"><rect x="6" y="7" width="16" height="17" rx="2" fill="#FDFBF6" stroke="var(--muste)" stroke-width="1.5"/><path d="M10 3.5v5M18 3.5v5" stroke="var(--muste)" stroke-width="1.5" stroke-linecap="round"/><text x="14" y="15.5" font-family="\'Courier Prime\',monospace" font-weight="700" font-size="7.5" text-anchor="middle" fill="var(--muste)" data-role="kal-numero"></text><text x="14" y="21.3" font-family="\'Courier Prime\',monospace" font-size="4.5" letter-spacing="0.04em" text-anchor="middle" fill="var(--muste)" data-role="kal-vk"></text></svg>',
   hytti: '<span class="alapalkki-emoji">🚪</span>',
   muistilaput: '<span class="alapalkki-emoji">🗒️</span>',
   varasto: '<span class="alapalkki-emoji">📦</span>',
@@ -170,7 +176,10 @@ async function lataaAlapalkkiJarjestys() {
     try {
       const jarjestys = JSON.parse(data.value);
       if (Array.isArray(jarjestys) && jarjestys.length === ALAPALKKI_OLETUS_JARJESTYS.length && ALAPALKKI_OLETUS_JARJESTYS.every(function(id) { return jarjestys.indexOf(id) !== -1; })) {
-        alapalkkiJarjestys = jarjestys;
+        // Ruori on aina kiinnitetty ensimmäiseksi (ks. piirraAlapalkki-kommentti)
+        // — myös silloin kun aiemmin tallennettu järjestys (ennen tätä korjausta)
+        // oli raahannut sen pois kiinnitetyistä.
+        alapalkkiJarjestys = ['ruori'].concat(jarjestys.filter(function(id) { return id !== 'ruori'; }));
       }
     } catch (e) { /* virheellinen tallennettu JSON — pysytään oletusjärjestyksessä */ }
   }
@@ -204,11 +213,17 @@ function paivitaAlapalkkiKalenteriPaiva() {
   vkEl.textContent = paivat[nyt.getDay()];
 }
 
+// Ruori on koko sovelluksen "koti" ja siksi AINA näkyvissä alapalkissa
+// riippumatta käyttäjän raahaamasta järjestyksestä (2026-08-12, Katrin
+// löydös: raahasi Ruorin vahingossa ⋯-arkin taakse eikä päässyt enää
+// suoraan kotiin) — kiinnitetty ensimmäiseksi tässä, loput kolme
+// kiinnitettyä paikkaa täyttyvät alapalkkiJarjestys-taulukon muista kuudesta.
 function piirraAlapalkki() {
   const kontti = document.getElementById('alapalkki-kiinnitetyt');
   if (!kontti) return;
   kontti.innerHTML = '';
-  alapalkkiJarjestys.slice(0, 4).forEach(function(id) { kontti.appendChild(luoAlapalkkiNappi(id)); });
+  kontti.appendChild(luoAlapalkkiNappi('ruori'));
+  alapalkkiJarjestys.filter(function(id) { return id !== 'ruori'; }).slice(0, 3).forEach(function(id) { kontti.appendChild(luoAlapalkkiNappi(id)); });
   const lisaaNappi = document.createElement('button');
   lisaaNappi.className = 'alapalkki-tabi alapalkki-lisaa';
   lisaaNappi.title = 'Lisää';
@@ -250,6 +265,10 @@ function piirraAlapalkkiArkki() {
     const li = document.createElement('li');
     li.dataset.id = id;
     li.className = index === 3 ? 'alapalkki-raja-jalkeen' : '';
+    // Ruori on kiinnitetty (ks. piirraAlapalkki) — näytetään silti täällä
+    // täyden järjestyksen hahmottamiseksi, mutta ei raahattavissa pois
+    // ensimmäiseltä paikalta.
+    if (id === 'ruori') li.classList.add('alapalkki-kiinnitetty');
     const kuvake = document.createElement('span');
     kuvake.innerHTML = ALAPALKKI_IKONIT[id];
     li.appendChild(kuvake);
@@ -259,9 +278,16 @@ function piirraAlapalkkiArkki() {
     li.appendChild(nimi);
     const kahva = document.createElement('span');
     kahva.className = 'alapalkki-arkki-kahva';
-    kahva.textContent = '≡';
+    kahva.textContent = id === 'ruori' ? '' : '≡';
     li.appendChild(kahva);
-    alustaAlapalkkiRaahaus(li);
+    if (id === 'ruori') {
+      li.addEventListener('click', function() {
+        document.getElementById('alapalkki-arkki-overlay').style.display = 'none';
+        alapalkkiSiirry('ruori');
+      });
+    } else {
+      alustaAlapalkkiRaahaus(li);
+    }
     lista.appendChild(li);
   });
 }
@@ -330,9 +356,13 @@ function alustaAlapalkkiRaahaus(li) {
     if (raahausKaynnissa) {
       raahausKaynnissa = false;
       li.classList.remove('dragging');
-      alapalkkiJarjestys = Array.from(document.getElementById('alapalkki-arkki-lista').children).map(function(el) { return el.dataset.id; });
+      const domJarjestys = Array.from(document.getElementById('alapalkki-arkki-lista').children).map(function(el) { return el.dataset.id; });
+      // Ruori pakotetaan takaisin ensimmäiseksi tallennuksessa, vaikka raahaus
+      // olisi siirtänyt sen DOM:ssa hetkellisesti muualle (ks. piirraAlapalkki).
+      alapalkkiJarjestys = ['ruori'].concat(domJarjestys.filter(function(id) { return id !== 'ruori'; }));
       tallennaAlapalkkiJarjestys();
       piirraAlapalkki();
+      piirraAlapalkkiArkki();
     }
   }
 
@@ -6188,8 +6218,19 @@ function saaIkonitKoodille(koodi) {
   if (koodi >= 95 && koodi <= 99) return ['cloud', 'lightning'];
   return ['cloud'];
 }
-function saaIkoniHtml(koodi) {
-  return saaIkonitKoodille(koodi).map(function(k) { return SAA_IKONIT[k]; }).join('');
+// Sadetodennäköisyys < 19% -> ei näytetä pisara-/lumi-/salamakuvaketta
+// vaikka WMO-koodi periaatteessa sitä vaatisi (2026-08-11, elävä testaus:
+// koodi voi teknisesti tarkoittaa "tihkua" mutta jos todennäköisyys on
+// silti pieni tälle nimenomaiselle tunnille, pisara harhaanjohtaa).
+// Ei koskaan jätä ikonia tyhjäksi — putoaa 'cloud':iin jos kaikki
+// sadeosat suodattuvat pois.
+function saaIkoniHtml(koodi, sade) {
+  let avaimet = saaIkonitKoodille(koodi);
+  if (typeof sade === 'number' && sade < 19) {
+    avaimet = avaimet.filter(function(k) { return k !== 'drop' && k !== 'snow' && k !== 'lightning'; });
+    if (avaimet.length === 0) avaimet = ['cloud'];
+  }
+  return avaimet.map(function(k) { return SAA_IKONIT[k]; }).join('');
 }
 function pyoristaKymmeneen(n) { return Math.round(n / 10) * 10; }
 
@@ -6256,7 +6297,7 @@ async function lataaRuoriSaa() {
       const tuuli = saa.hourly.wind_speed_10m ? saa.hourly.wind_speed_10m[i] : undefined;
       return '<div class="saa-tunti' + (idx === nykyIdx ? ' saa-tunti-nyt' : '') + '">'
         + '<span class="saa-tunti-aika">' + tunnit[i].slice(11, 13) + '</span>'
-        + '<span class="saa-tunti-ikoni">' + saaIkoniHtml(saa.hourly.weather_code[i]) + saaTuuliIkoni(tuuli) + '</span>'
+        + '<span class="saa-tunti-ikoni">' + saaIkoniHtml(saa.hourly.weather_code[i], sade) + saaTuuliIkoni(tuuli) + '</span>'
         + '<span class="saa-tunti-sade">' + (sade >= 10 ? pyoristaKymmeneen(sade) + '%' : '') + '</span>'
         + '</div>';
     }).join('');

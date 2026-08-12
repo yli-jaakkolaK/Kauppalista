@@ -3665,9 +3665,33 @@ sw.js v121 → v122.
 
 ---
 
-## Nykytila ja seuraavat askeleet (päivitetty 2026-08-11, COPILOT.md-sääntö 4)
+### Elävän testauksen jälkikorjaukset II + Ruori kiinnitetty alapalkkiin (2026-08-12)
 
-**Viimeksi tehty** (tämä istunto, kaikki commitoitu ja pushattu mainiin, `sw.js` nyt v122): koko "Ruori — visuaalinen uudistus" -speksi rakennettu ja Katrin kahdella puhelimella elävästi testattu, siitä noussut iso korjauskierros. **`CODE_vaihe1b.md` (Hytti-vaihe 1b, Laiturin sisääntulo) KOKONAAN RAKENNETTU** (§7, §8b, §2, §1b, §4, §5, §3). Sen jälkeen vielä kaksi jälkikorjausta: alapalkin kuvakekoko/lasipinta ja Ruorin ankkuri-napin messinki/kosketusaluepäällekkäisyys (jälkimmäinen oli oikea bugi, ei vain makuasia).
+Uusi kierros Katrin puhelimella löydettyjä asioita Vaihe 1b:n jälkeen, kaikki tässä samassa erässä:
+
+**Kuormakytkimen pinkki väri (todellinen bugi):** `.paalla`-tila ja ~8 muuta `.ruori`/editori-sääntöä käyttivät sovelluksen VANHAA, teemaa seuraavaa `--vaara`-muuttujaa, joka OS:n tummassa tilassa palautuu lohenpunaisena (`#E88484`) eikä tiiliruskeana. Uusi kiinteä `--loki-vaara: #B8433A` lisätty `:root`-tokeneihin (vanha koodikommentti oli ennustanut juuri tämän tarpeen etukäteen) ja kaikki 9 kohtaa osoitettu siihen.
+
+**Alapalkin kuvakkeet vieläkin liian pienet:** `.alapalkki-emoji` 34px→52px — fonttikoko ei skaalaudu kehyksen mukana kuten SVG:n width:84%, joten kiinteä arvo piti kasvattaa vielä kerran vastaamaan SVG-kuvakkeiden visuaalista painoa.
+
+**Haptiikka raahatessa "puuttuu":** koodi on olemassa ja oikein (`navigator.vibrate(15)` alapalkin raahauksessa) — tämä on kuitenkin iOS Safarin kova alustarajoitus, Vibration API ei ole toteutettu Safarissa MILLÄÄN iOS-versiolla. Ei korjattavissa koodilla, ei tehty enempää.
+
+**Kalenterikuvake "ei näy" alapalkissa:** kuvakkeen "sivun" tausta oli `var(--paperi)`, lähes identtinen sekä palkin omaan taustaan että uuteen lasipintaan — hukkui näkymättömiin. Vaihdettu kirkkaampaan `#FDFBF6`:aan.
+
+**Reitti (Hytti) rakennettu "vanhalla muotokielellä":** §4:n alkuperäinen toteutus reskinnasi vain kurssilistan kortit, muttei speksin myös vaatimaa "+ Lisää materiaalia" -nappia eikä kurssin sisäistä aihelistaa — puuttui kokonaan ensimmäisestä läpikäynnistä. Lisätty kosketettavan pinnan tyyli `#opinto-lisaa-materiaalia-btn`:lle (koko leveys, lämmin lasi, messinkikehys) ja luettavan-pinnan kortti `#opinto-aihe-lista li`:lle — PACER/PERO-pudotusvalikon toiminta koskematta.
+
+**Sääkuvakkeet alle 19% sateella:** `saaIkoniHtml(koodi, sade)` saa nyt toisen parametrin, suodattaa pois sade/lumi/ukkos-symbolit kun todennäköisyys < 19%, putoaa pilveen jos taulukko tyhjenisi kokonaan.
+
+**Ruorin ankkuri-/⋯-napin messinki:** tarkistettu — `.anchor-btn.active` käyttää jo pelkkää reunaväriä + sisähehkua, ei täyttöä, lasitausta näkyy koko ajan. Tämä oli jo korjattu saman erän aiemmassa vaiheessa eikä vaatinut lisämuutosta.
+
+**UUSI: Ruori kiinnitetty pysyvästi alapalkkiin.** Katri oli raahannut järjestysarkissa Ruorin (koti-näkymän) pois neljästä kiinnitetystä paikasta ⋯-napin taakse eikä päässyt enää suoraan kotiin. Ruori on nyt aina ensimmäinen kiinnitetty kuvake riippumatta raahausjärjestyksestä — `piirraAlapalkki()` lisää sen erikseen ennen `alapalkkiJarjestys`-taulukon kolmea ensimmäistä muuta, `piirraAlapalkkiArkki()` näyttää sen yhä täyden järjestyksen hahmottamiseksi mutta ilman raahauskahvaa (oma napautus-kuuntelija), ja sekä tallennuksen jälkeinen uudelleenpiirto että aiemmin tietokantaan tallennettu (mahdollisesti jo vino) järjestys pakotetaan Ruori-ensin-muotoon lataus- ja tallennushetkellä.
+
+sw.js v123 → v124.
+
+---
+
+## Nykytila ja seuraavat askeleet (päivitetty 2026-08-12, COPILOT.md-sääntö 4)
+
+**Viimeksi tehty** (tämä istunto, kaikki commitoitu ja pushattu mainiin, `sw.js` nyt v124): koko "Ruori — visuaalinen uudistus" -speksi ja `CODE_vaihe1b.md` (Hytti-vaihe 1b) rakennettu kokonaan, sen jälkeen kolme jälkikorjauskierrosta elävästä testauksesta: (1) alapalkin kuvakekoko/lasipinta + ankkurinapin kosketusaluebugi, (2) kuormakytkimen pinkki-väribugi (`--loki-vaara`), alapalkin kuvakekoko vielä kerran, Kalenterikuvakkeen kontrasti, Reitti-välilehden puuttunut kosketettavan pinnan tyyli, sadekuvakkeiden <19%-suodatus, (3) Ruori kiinnitetty pysyvästi alapalkin ensimmäiseksi kuvakkeeksi.
 
 **⚠️ KOLME AJAMATONTA MIGRAATIOTA ennen kuin kaikki tässä istunnossa rakennettu toimii täysin:**
 - `sql/114_parisuhde_kalenteri_nahty.sql` (parisuhdeajan kalenterisilta)
@@ -3679,4 +3703,6 @@ sw.js v121 → v122.
 2. Varasto/"vahdittu" — Katri haluaa listan sijaan otsikko+aikaleimattu-lokimalli (esim. bussikortin saldohistoria). Ei skoopattu.
 3. Laiturin jatkosäie — nykyinen `valutaVanhatSegmentitKotiin()` vaatii AINA manuaalisesti asetetun kodin ennen kuin mikään valuu Varastoon; Katrin kuvaus ("säie tulee → muru menee automaattisesti Varastoon") viittaa siihen että hän odottaa automaattista laukaisua. Kysytty, ei vielä vastausta.
 
-**Testaamatta koko istunnon ajalta** (ei mitään tässä istunnossa rakennetusta ole testattu oikealla laitteella/kirjautumisella — kaikki rakenteellisesti/syntaktisesti validoitu, ei elävästi): koko Ruori-korjauskierros, Vaihe 1b kokonaisuudessaan (välilehdet, editori, tiedostojen tuonti), parisuhdeajan muokkaus, alapalkin/ankkurinapin jälkikorjaukset. **Seuraava luonnollinen askel on siis elävä testaus + kolmen migraation ajaminen**, ei uusi rakentaminen, ellei Katri anna uutta työtä.
+**Tunnettu, ei korjattavissa koodilla:** haptiikka (`navigator.vibrate`) ei toimi iOS Safarissa, alustarajoitus — koodi on oikein, laite ei vain tue APIa.
+
+**Testaamatta koko istunnon ajalta** (ei mitään tässä istunnossa rakennetusta ole testattu oikealla laitteella/kirjautumisella — kaikki rakenteellisesti/syntaktisesti validoitu, ei elävästi): koko Ruori-korjauskierros, Vaihe 1b kokonaisuudessaan (välilehdet, editori, tiedostojen tuonti), parisuhdeajan muokkaus, alapalkin/ankkurinapin jälkikorjaukset, tämän erän kuusi korjausta + Ruorin kiinnitys. **Seuraava luonnollinen askel on siis elävä testaus + kolmen migraation ajaminen**, ei uusi rakentaminen, ellei Katri anna uutta työtä.

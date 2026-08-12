@@ -62,13 +62,19 @@
    näkymä kerrallaan -migraatio, ei tehty tässä erässä. EI omaa tumma
    teema -varianttia (design-systemissä ei ollut yhtä) — jos/kun
    tarvitaan, se on oma, myöhempi päätös, ei arvattava nyt.
-   --vaara TARKOITUKSELLA JÄTETTY POIS tästä globaalista :root-lohkosta,
-   vaikka se ON osa design-systemiä (arvo #B8433A, ks. satama-design-
-   system.css) — se törmäisi sovelluksen jo olemassa olevaan, laajasti
-   käytettyyn, tumma/vaalea-teemalliseen --vaara-muuttujaan (kalenterin
-   ristiriitamerkintä ym.), eikä hiljaista törmäystä haluta. Kun Hytin
-   uusi kuori joskus tarvitsee "vaara"-väriä oikeasti, se on oma päätös
-   miten nimetä (esim. --loki-vaara), ei ratkaista tässä. */
+   --vaara TARKOITUKSELLA JÄTETTIIN AIKANAAN POIS tästä globaalista
+   :root-lohkosta, vaikka se ON osa design-systemiä (arvo #B8433A, ks.
+   satama-design-system.css) — se törmäisi sovelluksen jo olemassa
+   olevaan, laajasti käytettyyn, tumma/vaalea-teemalliseen --vaara-
+   muuttujaan (kalenterin ristiriitamerkintä ym.).
+   --loki-vaara LISÄTTY 2026-08-11 (elävä testaus): Kuormitustila-kytkimen
+   "päällä"-tila (ja muut Ruorin --vaara-käytöt: sään leimat, hytti-luento,
+   ristiriitalippu) käyttivät vahingossa tuota SAMAA tumma/vaalea-
+   muuttujaa — tumman tilan laitteella `--vaara` on `#E88484` (vaaleanpunertava
+   liukuväri), ei suinkaan Sataman oma tiilenpunainen. Katri näki kytkimen
+   pinkkinä. Tämä on juuri se erillinen, kiinteä token jota yllä oleva
+   kommentti ennakoi tarvittavan — kiinteä kuten --muste/--paperi, ei
+   seuraa laitteen tummaa tilaa. */
 :root {
   --paperi: #EAE6DC;
   --muste: #221F1A;
@@ -77,6 +83,7 @@
   --syvanne: #3F5F53;
   --messinki: #9C7A43;
   --sinappi: #C29A2E;
+  --loki-vaara: #B8433A;
   --hius: rgba(34, 31, 26, .16);
   --hius-vahva: rgba(34, 31, 26, .34);
   --vaimea: rgba(34, 31, 26, .55);
@@ -2921,6 +2928,32 @@ h1 {
 }
 .opinto-kurssi-kortti-palkki { height: 100%; background: var(--vaimea); }
 
+/* Kurssin sisällä (2026-08-11, elävä testaus: "miksi Reitti vanhalla
+   muotokielellä" — §4 kattaa myös TÄMÄN, ei vain kurssilistaa, oli jäänyt
+   tekemättä ensimmäisellä kierroksella). "+ Lisää materiaalia":
+   kosketettavan pinnan muotokieli (13px = --r-kosketettava, lämmin lasi,
+   messinkikehys), koko leveydeltä — spekin oma sanamuoto. Solmulista
+   (#opinto-aihe-lista): luettavan pinnan kortit kuten kurssilistalla,
+   VAIN säiliön ulkoasu — sisäiset PACER/PERO-valikot ja merkit koskematta,
+   ne ovat olemassa olevaa, toimivaa toiminnallisuutta jota spekin oma
+   yksinkertaistettu kuvaus ("solmun nimi, tila") ei tuntenut vielä
+   kirjoitushetkellä. */
+#opinto-lisaa-materiaalia-btn {
+  display: block; width: 100%; text-align: center;
+  border-radius: var(--r-kosketettava);
+  background: linear-gradient(165deg, rgba(255, 252, 244, .72), rgba(234, 230, 220, .28));
+  border: 1px solid rgba(156, 122, 67, .5);
+  backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .65);
+  color: var(--muste); font-family: var(--fontti-loki); padding: 12px;
+}
+#opinto-aihe-lista.list li {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 8px;
+  background: var(--paperi); border: 1px solid var(--hius); border-radius: var(--r-luettava);
+  padding: 10px 12px; margin-bottom: 8px;
+}
+#opinto-aihe-lista.list li span:first-child { font-family: var(--fontti-loki); color: var(--muste); flex: 1; min-width: 0; }
+
 /* Siltatunnistuksen esikatselu (2026-08-05, ks. muistiinpanot.md
    "Siltasolmut") — rivi kerrallaan hyväksyntä, sama dialog-box/list-runko
    kuin muualla mutta omat pienet tekstitasot perustelulle/viittauksille. */
@@ -3487,7 +3520,7 @@ h1 {
   transition: transform var(--keski) var(--kelluu), background var(--keski) var(--kelluu);
 }
 .ruori .kuormakytkin.paalla {
-  border-color: var(--vaara); background: var(--vaara);
+  border-color: var(--loki-vaara); background: var(--loki-vaara);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, .25);
 }
 .ruori .kuormakytkin.paalla::after { background: #FBF9F3; transform: translateX(22px); }
@@ -3516,7 +3549,7 @@ h1 {
 .ruori .otsikkorivi { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
 .ruori .otsikkorivi .luotaus { flex: 1; }
 .ruori .luotaus { font-size: 10.5px; letter-spacing: .24em; text-transform: uppercase; color: var(--vaimea); }
-.ruori .piste { width: 5px; height: 5px; border-radius: 50%; background: var(--vaara); flex: none; }
+.ruori .piste { width: 5px; height: 5px; border-radius: 50%; background: var(--loki-vaara); flex: none; }
 
 /* --- Kalenteri --- */
 .ruori .kalenteri { padding: 15px 16px 13px; }
@@ -3529,8 +3562,8 @@ h1 {
   font-size: 10px; letter-spacing: .16em; text-transform: uppercase; font-weight: 700;
   padding: 2px 7px; border-radius: 2px; background: var(--matalikko); color: var(--muste);
 }
-.ruori .tagi-raskas.tagi-ristiriita { background: var(--vaara); color: #FDFBF6; }
-.ruori .kal-lippu-syy { font-size: 12px; color: var(--vaara); margin-top: 2px; }
+.ruori .tagi-raskas.tagi-ristiriita { background: var(--loki-vaara); color: #FDFBF6; }
+.ruori .kal-lippu-syy { font-size: 12px; color: var(--loki-vaara); margin-top: 2px; }
 
 /* --- Sää (2026-08-11 korjattu, Katrin layout-pyyntö) — pois "laatikosta":
    ei taustaa/reunaa/varjoa/nostoa, kelluu suoraan paperin päällä kuten
@@ -3548,7 +3581,7 @@ h1 {
    suodattimella (ks. <defs> body:n alussa), kevyt jos suodatin lagaa iOS Safarilla (§7). */
 .ruori .saa-tagi {
   font-size: 11px; font-weight: 700; letter-spacing: .16em; text-transform: uppercase;
-  color: var(--vaara); border: 1.8px solid var(--vaara); border-radius: 2px;
+  color: var(--loki-vaara); border: 1.8px solid var(--loki-vaara); border-radius: 2px;
   padding: 3px 7px; filter: url(#leimasin);
 }
 .ruori .saa-tunnit { display: flex; gap: 10px; margin-top: 14px; padding-top: 12px; border-top: 1px dotted var(--hius-vahva); overflow-x: auto; scroll-padding: 6px; }
@@ -3653,8 +3686,8 @@ h1 {
 
 /* --- Hytti --- */
 .ruori .hytti-luento { display: flex; align-items: center; gap: 6px; margin-bottom: 6px; }
-.ruori .hytti-luento .piste { background: var(--vaara); }
-.ruori .hytti-luento span:not(.piste) { font-size: 11px; letter-spacing: .1em; text-transform: uppercase; color: var(--vaara); font-weight: 700; }
+.ruori .hytti-luento .piste { background: var(--loki-vaara); }
+.ruori .hytti-luento span:not(.piste) { font-size: 11px; letter-spacing: .1em; text-transform: uppercase; color: var(--loki-vaara); font-weight: 700; }
 .ruori .hytti-ylarivi { display: flex; align-items: flex-start; gap: 14px; }
 .ruori .hytti-teksti { flex: 1; min-width: 0; }
 .ruori .hytti-kurssi { font-size: 12.5px; color: var(--vaimea); }
@@ -3666,7 +3699,7 @@ h1 {
 
 /* --- Kuormitustila päällä --- */
 .ruori .rauha { padding: 22px 18px; text-align: center; border: 1px dashed var(--hius-vahva); border-radius: var(--r-luettava); margin-bottom: 12px; }
-.ruori .rauha b { display: block; font-size: 11px; letter-spacing: .2em; text-transform: uppercase; color: var(--vaara); margin-bottom: 8px; }
+.ruori .rauha b { display: block; font-size: 11px; letter-spacing: .2em; text-transform: uppercase; color: var(--loki-vaara); margin-bottom: 8px; }
 .ruori .rauha p { margin: 0; font-size: 14.5px; line-height: 1.6; color: var(--vaimea); max-width: 30ch; margin-inline: auto; }
 
 /* Vanha navigointiruudukko (Laituri/Muistilaput/Varasto/Asetukset ym.) —
@@ -3705,7 +3738,7 @@ h1 {
 .editori-pinta::placeholder { color: var(--vaimea); }
 #editori-tiedosto-btn { margin-top: 10px; }
 .editori-tiedosto-tila { font-size: 13px; color: var(--muted); margin-top: 6px; }
-.editori-tiedosto-tila.editori-tiedosto-virhe { color: var(--vaara); }
+.editori-tiedosto-tila.editori-tiedosto-virhe { color: var(--loki-vaara); }
 /* #laituri-input on nyt pelkkä avauslaukaisin (readonly), ei kirjoituskenttä
    — osoitin kertoo sen olevan silti kosketettava. */
 #laituri-input[readonly] { cursor: pointer; }
@@ -3767,7 +3800,13 @@ h1 {
    samat merkit kuin sql/008_home_sections.sql:n icon-sarakkeessa, ei
    kokosääntöä svg:lle koska emoji ei ole svg — fonttikoolla vastaava
    visuaalinen paino kuin ison kuvakkeen kehyksellä. */
-.alapalkki-emoji { font-size: 34px; line-height: 1; display: block; }
+/* 34px -> 52px (2026-08-11, elävä testaus: "edelleen liian pieniä") — 34px
+   täytti vain n. puolet .alapalkki-tabi-pinta:n n. 64px kehyksestä, paljon
+   vähemmän kuin SVG-kuvakkeiden 84%. Fonttikoko ei skaalaudu kehyksen
+   mukana kuten SVG:n width:84% tekee, joten kiinteä arvo on valittu
+   vastaamaan tyypillistä puhelinleveyttä (iPhone SE...Pro Max, tabi n.
+   64-78px) — sama "täytä kehys" -periaate (§0) kuin muillakin kuvakkeilla. */
+.alapalkki-emoji { font-size: 52px; line-height: 1; display: block; }
 .alapalkki-arkki-lista li .alapalkki-emoji { font-size: 22px; }
 .alapalkki-alleviiva { width: 16px; height: 2.5px; border-radius: 2px; background: transparent; }
 .alapalkki-tabi.aktiivinen .alapalkki-alleviiva { background: var(--muste); }
@@ -3791,6 +3830,9 @@ h1 {
 .alapalkki-arkki-lista li svg { width: 24px; height: 24px; flex: none; }
 .alapalkki-arkki-lista li .alapalkki-arkki-nimi { flex: 1; font-size: 15px; }
 .alapalkki-arkki-lista li .alapalkki-arkki-kahva { color: var(--muted); font-size: 18px; cursor: grab; padding: 4px 6px; }
+/* Ruori-rivi on kiinnitetty, ei raahattavissa (ks. piirraAlapalkkiArkki) —
+   ei raahauskahvaa eikä grab-kursoria, tavallinen napautettava rivi. */
+.alapalkki-arkki-lista li.alapalkki-kiinnitetty { cursor: pointer; touch-action: auto; }
 /* Raahattavan rivin korostus (2026-08-11, Katrin pyyntö: "liquid glass/iOS
    muotokielellä niin että siirrettävä erottuu helposti") — sama lämmin
    lasi + messinkikehys + sisävalo -resepti kuin kuormakytkimessä ja
