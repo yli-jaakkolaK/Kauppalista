@@ -1181,28 +1181,126 @@
       <div id="muistutus-lomake">
         <div id="muistutus-lista"></div>
 
-        <!-- Toistuva muistutus (2026-07-19, ks. muistiinpanot.md "Toistuva
-             muistutus") — täppä ENSIN koska se muuttaa koko lomakkeen
-             muotoa: toistuvalla ei valita yhtä remind_at-hetkeä (Pika/
-             Kellonaika), vaan sääntö joka laskee sen itse. -->
-        <label class="muistutus-toistuva-check-rivi">
-          <input type="checkbox" id="muistutus-toistuva-check">
-          <span>🔁 Toistuva</span>
-        </label>
+        <!-- Kolme selkeää osiota (2026-08-11 uudistus, Katrin pyyntö) —
+             Milloin / Miten / Valmistautuminen. Kaikki id:t ja luokat
+             SÄILYTETTY ennallaan, vain rakenne/ulkoasu uudistettu, ettei
+             script.js:n olemassa oleva tila-/tapahtumakäsittely muutu
+             mihinkään. Tyyli seuraa nyt merikartta/loki-design-systemiä
+             (paperi/muste/messinki/kosketettava-säde) kuten satama-design-
+             kuvaus.md määrittää koko sovellukselle. -->
+        <div class="muistutus-osio">
+          <p class="muistutus-osio-otsikko">Milloin</p>
 
-        <div id="muistutus-normaali-osiot">
-          <div class="muistutus-tila-valinta">
-            <button class="kalenteri-tila-btn muistutus-tila-btn active" data-tila="pika">Pika</button>
-            <button class="kalenteri-tila-btn muistutus-tila-btn" data-tila="kellonaika">Kellonaika</button>
+          <!-- Toistuva muistutus (2026-07-19) — täppä ENSIN koska se muuttaa
+               koko lomakkeen muotoa: toistuvalla ei valita yhtä remind_at-
+               hetkeä (Pika/Kellonaika), vaan sääntö joka laskee sen itse. -->
+          <label class="muistutus-toistuva-check-rivi">
+            <input type="checkbox" id="muistutus-toistuva-check">
+            <span>🔁 Toistuva</span>
+          </label>
+
+          <div id="muistutus-normaali-osiot">
+            <div class="muistutus-tila-valinta">
+              <button class="kalenteri-tila-btn muistutus-tila-btn active" data-tila="pika">Pika</button>
+              <button class="kalenteri-tila-btn muistutus-tila-btn" data-tila="kellonaika">Kellonaika</button>
+            </div>
+
+            <div id="muistutus-pika-tila">
+              <div class="muistutus-pikanapit" id="muistutus-pikanapit" style="display:none">
+                <button class="dialog-btn dialog-btn-cancel" data-min="15">15 min ennen</button>
+                <button class="dialog-btn dialog-btn-cancel" data-min="60">1 h ennen</button>
+                <button class="dialog-btn dialog-btn-cancel" data-min="1440">1 vrk ennen</button>
+              </div>
+
+              <div class="muistutus-rulla-rivi">
+                <select id="muistutus-paivaa"></select><span class="muistutus-rulla-yksikko">pv</span>
+                <select id="muistutus-tuntia"></select><span class="muistutus-rulla-yksikko">h</span>
+                <select id="muistutus-minuuttia"></select><span class="muistutus-rulla-yksikko">min</span>
+                <button class="dialog-btn" id="muistutus-lisaa-btn">Aseta</button>
+              </div>
+            </div>
+
+            <div id="muistutus-kellonaika-tila" style="display:none">
+              <div class="muistutus-pikanapit">
+                <button class="dialog-btn dialog-btn-cancel" id="muistutus-pvm-tanaan">Tänään</button>
+                <button class="dialog-btn dialog-btn-cancel" id="muistutus-pvm-huomenna">Huomenna</button>
+              </div>
+
+              <!-- Yksi datetime-local-kenttä kahden erillisen (date+time) sijaan —
+                   iOS näyttää tämän yhtenä yhtenäisenä rullana (sama ele kuin
+                   natiivissa Muistutukset/Kalenteri-sovelluksessa), toisin kuin
+                   kaksi vierekkäistä pientä inputtia. Pystysuunta (oma rivi
+                   kentälle ja napille) koska datetime-local tarvitsee riittävän
+                   leveyden näyttääkseen sekä päivän että kellonajan leikkautumatta
+                   — kapealla dialogilla vierekkäin ei olisi tilaa. -->
+              <div class="muistutus-rulla-rivi muistutus-rulla-rivi--pysty">
+                <input type="datetime-local" id="muistutus-hetki-input">
+                <button class="dialog-btn" id="muistutus-kellonaika-lisaa-btn">Aseta</button>
+              </div>
+            </div>
           </div>
 
-          <!-- Sinnikäs muistutus / "tärähdyssarja" (2026-07-19, ks.
-               muistiinpanot.md "Sinnikäs muistutus") — valinnainen, sama koskee
-               kumpaakin välilehteä. remind_at toimii KOHDEHETKENÄ (ei
-               ensimmäisen tärähdyksen aikana) kun tämä on päällä — ks.
-               api/muistutukset-laheta.js. EI yhdistettävissä Toistuvaan
-               tässä erässä (tietoinen rajaus, ks. muistiinpanot.md) —
-               piilotetaan kun Toistuva on päällä. -->
+          <!-- Toistuvan oma lomake (2026-07-19) — korvaa Pika/Kellonaika-valinnan
+               kokonaan kun "🔁 Toistuva" on päällä: ensimmäinen ajankohta
+               LASKETAAN säännöstä, ei valita käsin. -->
+          <div id="muistutus-toistuva-lomake" style="display:none">
+            <div class="muistutus-tila-valinta">
+              <button class="kalenteri-tila-btn muistutus-toistuva-tyyppi-btn active" data-tyyppi="weekday">Viikonpäivät</button>
+              <button class="kalenteri-tila-btn muistutus-toistuva-tyyppi-btn" data-tyyppi="interval">Väliajoin</button>
+            </div>
+
+            <div id="muistutus-toistuva-viikonpaivat">
+              <div class="muistutus-viikonpaiva-valinta">
+                <button type="button" class="muistutus-viikonpaiva-btn" data-pv="1">Ma</button>
+                <button type="button" class="muistutus-viikonpaiva-btn" data-pv="2">Ti</button>
+                <button type="button" class="muistutus-viikonpaiva-btn" data-pv="3">Ke</button>
+                <button type="button" class="muistutus-viikonpaiva-btn" data-pv="4">To</button>
+                <button type="button" class="muistutus-viikonpaiva-btn" data-pv="5">Pe</button>
+                <button type="button" class="muistutus-viikonpaiva-btn" data-pv="6">La</button>
+                <button type="button" class="muistutus-viikonpaiva-btn" data-pv="7">Su</button>
+              </div>
+              <div class="muistutus-toistuva-aika-rivi">
+                <span>Kellonaika</span>
+                <input type="time" id="muistutus-toistuva-viikko-aika" value="08:00">
+              </div>
+            </div>
+
+            <div id="muistutus-toistuva-intervalli" style="display:none">
+              <div class="muistutus-toistuva-aika-rivi">
+                <span>Joka</span>
+                <select id="muistutus-toistuva-n"></select>
+                <select id="muistutus-toistuva-yksikko">
+                  <option value="hour">tuntia</option>
+                  <option value="day" selected>päivää</option>
+                  <option value="week">viikkoa</option>
+                  <option value="month">kuukautta</option>
+                  <option value="year">vuotta</option>
+                </select>
+              </div>
+              <div class="muistutus-toistuva-aika-rivi" id="muistutus-toistuva-intervalli-aika-rivi">
+                <span>Kellonaika</span>
+                <input type="time" id="muistutus-toistuva-intervalli-aika" value="08:00">
+              </div>
+            </div>
+
+            <label class="muistutus-toistuva-loppu-rivi">
+              <input type="checkbox" id="muistutus-toistuva-loppuu-check">
+              <span>Loppuu</span>
+              <input type="date" id="muistutus-toistuva-loppuu-pvm" disabled>
+            </label>
+
+            <button class="dialog-btn" id="muistutus-toistuva-aseta-btn">Aseta toistuva muistutus</button>
+          </div>
+        </div>
+
+        <div class="muistutus-osio">
+          <p class="muistutus-osio-otsikko">Miten muistutetaan</p>
+          <!-- Sinnikäs muistutus / "tärähdyssarja" (2026-07-19) — valinnainen,
+               sama koskee sekä Pikaa että Kellonaikaa. remind_at toimii
+               KOHDEHETKENÄ (ei ensimmäisen tärähdyksen aikana) kun tämä on
+               päällä — ks. api/muistutukset-laheta.js. EI yhdistettävissä
+               Toistuvaan tässä erässä (tietoinen rajaus, ks.
+               muistiinpanot.md) — piilotetaan kun Toistuva on päällä. -->
           <label class="muistutus-sinnikas-rivi">
             <input type="checkbox" id="muistutus-sinnikas-check">
             <span>🔁 Sinnikäs</span>
@@ -1221,110 +1319,27 @@
               <option value="8">8×</option>
             </select>
           </label>
-
-          <div id="muistutus-pika-tila">
-            <div class="muistutus-pikanapit" id="muistutus-pikanapit" style="display:none">
-              <button class="dialog-btn dialog-btn-cancel" data-min="15">15 min ennen</button>
-              <button class="dialog-btn dialog-btn-cancel" data-min="60">1 h ennen</button>
-              <button class="dialog-btn dialog-btn-cancel" data-min="1440">1 vrk ennen</button>
-            </div>
-
-            <div class="muistutus-rulla-rivi">
-              <select id="muistutus-paivaa"></select><span class="muistutus-rulla-yksikko">pv</span>
-              <select id="muistutus-tuntia"></select><span class="muistutus-rulla-yksikko">h</span>
-              <select id="muistutus-minuuttia"></select><span class="muistutus-rulla-yksikko">min</span>
-              <button class="dialog-btn" id="muistutus-lisaa-btn">Aseta</button>
-            </div>
-          </div>
-
-          <div id="muistutus-kellonaika-tila" style="display:none">
-            <div class="muistutus-pikanapit">
-              <button class="dialog-btn dialog-btn-cancel" id="muistutus-pvm-tanaan">Tänään</button>
-              <button class="dialog-btn dialog-btn-cancel" id="muistutus-pvm-huomenna">Huomenna</button>
-            </div>
-
-            <!-- Yksi datetime-local-kenttä kahden erillisen (date+time) sijaan —
-                 iOS näyttää tämän yhtenä yhtenäisenä rullana (sama ele kuin
-                 natiivissa Muistutukset/Kalenteri-sovelluksessa), toisin kuin
-                 kaksi vierekkäistä pientä inputtia. Pystysuunta (oma rivi
-                 kentälle ja napille) koska datetime-local tarvitsee riittävän
-                 leveyden näyttääkseen sekä päivän että kellonajan leikkautumatta
-                 — kapealla dialogilla vierekkäin ei olisi tilaa. -->
-            <div class="muistutus-rulla-rivi muistutus-rulla-rivi--pysty">
-              <input type="datetime-local" id="muistutus-hetki-input">
-              <button class="dialog-btn" id="muistutus-kellonaika-lisaa-btn">Aseta</button>
-            </div>
-          </div>
         </div>
 
-        <!-- Valmistautumisvaihe (2026-07-18, ks. muistiinpanot.md) — valinnainen
-             toinen, aikaisempi tönäisy joka syntyy/poistuu päämuistutuksen
-             mukana. AINA näkyvissä (myös Toistuva-tilassa, ks. muistiinpanot.md
-             "Toistuva muistutus" — yhdistelmä sallittu, jokainen kerta saa
-             oman esitönäisynsä). -->
-        <label class="muistutus-valmistaudu-rivi">
-          <input type="checkbox" id="muistutus-valmistaudu-check">
-          <span>🎒 Valmistaudu</span>
-          <select id="muistutus-valmistaudu-min" disabled>
-            <option value="15">15 min</option>
-            <option value="30" selected>30 min</option>
-            <option value="45">45 min</option>
-            <option value="60">1 h</option>
-            <option value="90">1,5 h</option>
-          </select>
-          <span>ennen</span>
-        </label>
-
-        <!-- Toistuvan oma lomake (2026-07-19) — korvaa Pika/Kellonaika-valinnan
-             kokonaan kun "🔁 Toistuva" on päällä: ensimmäinen ajankohta
-             LASKETAAN säännöstä, ei valita käsin. -->
-        <div id="muistutus-toistuva-lomake" style="display:none">
-          <div class="muistutus-tila-valinta">
-            <button class="kalenteri-tila-btn muistutus-toistuva-tyyppi-btn active" data-tyyppi="weekday">Viikonpäivät</button>
-            <button class="kalenteri-tila-btn muistutus-toistuva-tyyppi-btn" data-tyyppi="interval">Väliajoin</button>
-          </div>
-
-          <div id="muistutus-toistuva-viikonpaivat">
-            <div class="muistutus-viikonpaiva-valinta">
-              <button type="button" class="muistutus-viikonpaiva-btn" data-pv="1">Ma</button>
-              <button type="button" class="muistutus-viikonpaiva-btn" data-pv="2">Ti</button>
-              <button type="button" class="muistutus-viikonpaiva-btn" data-pv="3">Ke</button>
-              <button type="button" class="muistutus-viikonpaiva-btn" data-pv="4">To</button>
-              <button type="button" class="muistutus-viikonpaiva-btn" data-pv="5">Pe</button>
-              <button type="button" class="muistutus-viikonpaiva-btn" data-pv="6">La</button>
-              <button type="button" class="muistutus-viikonpaiva-btn" data-pv="7">Su</button>
-            </div>
-            <div class="muistutus-toistuva-aika-rivi">
-              <span>Kellonaika</span>
-              <input type="time" id="muistutus-toistuva-viikko-aika" value="08:00">
-            </div>
-          </div>
-
-          <div id="muistutus-toistuva-intervalli" style="display:none">
-            <div class="muistutus-toistuva-aika-rivi">
-              <span>Joka</span>
-              <select id="muistutus-toistuva-n"></select>
-              <select id="muistutus-toistuva-yksikko">
-                <option value="hour">tuntia</option>
-                <option value="day" selected>päivää</option>
-                <option value="week">viikkoa</option>
-                <option value="month">kuukautta</option>
-                <option value="year">vuotta</option>
-              </select>
-            </div>
-            <div class="muistutus-toistuva-aika-rivi" id="muistutus-toistuva-intervalli-aika-rivi">
-              <span>Kellonaika</span>
-              <input type="time" id="muistutus-toistuva-intervalli-aika" value="08:00">
-            </div>
-          </div>
-
-          <label class="muistutus-toistuva-loppu-rivi">
-            <input type="checkbox" id="muistutus-toistuva-loppuu-check">
-            <span>Loppuu</span>
-            <input type="date" id="muistutus-toistuva-loppuu-pvm" disabled>
+        <div class="muistutus-osio">
+          <p class="muistutus-osio-otsikko">Valmistautuminen</p>
+          <!-- Valmistautumisvaihe (2026-07-18) — valinnainen toinen,
+               aikaisempi tönäisy joka syntyy/poistuu päämuistutuksen mukana.
+               AINA näkyvissä (myös Toistuva-tilassa, ks. muistiinpanot.md
+               "Toistuva muistutus" — yhdistelmä sallittu, jokainen kerta
+               saa oman esitönäisynsä). -->
+          <label class="muistutus-valmistaudu-rivi">
+            <input type="checkbox" id="muistutus-valmistaudu-check">
+            <span>🎒 Valmistaudu</span>
+            <select id="muistutus-valmistaudu-min" disabled>
+              <option value="15">15 min</option>
+              <option value="30" selected>30 min</option>
+              <option value="45">45 min</option>
+              <option value="60">1 h</option>
+              <option value="90">1,5 h</option>
+            </select>
+            <span>ennen</span>
           </label>
-
-          <button class="dialog-btn" id="muistutus-toistuva-aseta-btn">Aseta toistuva muistutus</button>
         </div>
       </div>
 

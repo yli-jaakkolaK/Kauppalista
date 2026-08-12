@@ -10990,6 +10990,20 @@ document.getElementById('suljettu-ikkuna-lisaa-btn').addEventListener('click', a
   }
 })();
 
+// Kevyt haptiikka rullien pykälille (2026-08-11, Katrin pyyntö: "liquid
+// glass & haptiikkaa... ei överisti mut siellä mihin se sopii", ks. myös
+// satama-design-kuvaus.md:n oma maininta "iOS-natiivi rullavalitsin...
+// kevyt naps jokaisella pykälän kohdalla"). Natiivi <select> ei anna JS:lle
+// tapahtumaa JOKAISESTA pykälästä avoinna ollessaan (se on käyttöjärjestelmän
+// oma, JS:n ulottumattomissa) — 'change' on ainoa saatavilla oleva koukku,
+// eli haptiikka laukeaa kun valinta VAIHTUU, ei jokaisella visuaalisella
+// pyörähdyksellä. Lähin mitä web-alustalla saa aikaan.
+['muistutus-paivaa', 'muistutus-tuntia', 'muistutus-minuuttia'].forEach(function(id) {
+  document.getElementById(id).addEventListener('change', function() {
+    if (navigator.vibrate) navigator.vibrate(8);
+  });
+});
+
 document.getElementById('muistutus-lisaa-btn').addEventListener('click', function() {
   const paivia = parseInt(document.getElementById('muistutus-paivaa').value, 10) || 0;
   const tunteja = parseInt(document.getElementById('muistutus-tuntia').value, 10) || 0;
@@ -10999,6 +11013,7 @@ document.getElementById('muistutus-lisaa-btn').addEventListener('click', functio
     naytaIlmoitus('Valitse ainakin yksi arvo (päivä/tunti/minuutti)');
     return;
   }
+  tuntopalauteValmis();
   lisaaMuistutus(new Date(Date.now() + ms));
 });
 
@@ -11017,6 +11032,7 @@ document.querySelectorAll('#muistutus-pikanapit button').forEach(function(btn) {
 // sitä. Välilehtivaihto piilottaa/näyttää sisällön, ei vaadi muuta tilaa.
 document.querySelectorAll('.muistutus-tila-btn').forEach(function(btn) {
   btn.addEventListener('click', function() {
+    if (navigator.vibrate) navigator.vibrate(8);
     document.querySelectorAll('.muistutus-tila-btn').forEach(function(b) { b.classList.toggle('active', b === btn); });
     document.getElementById('muistutus-pika-tila').style.display = btn.dataset.tila === 'pika' ? 'block' : 'none';
     document.getElementById('muistutus-kellonaika-tila').style.display = btn.dataset.tila === 'kellonaika' ? 'block' : 'none';
@@ -11044,6 +11060,7 @@ document.getElementById('muistutus-sinnikas-check').addEventListener('change', f
 // estämään toistuva+sinnikäs-yhdistelmän (tietoinen rajaus tässä erässä) —
 // ei tarvita erillistä poissulkevaa disable-logiikkaa.
 document.getElementById('muistutus-toistuva-check').addEventListener('change', function(e) {
+  if (navigator.vibrate) navigator.vibrate(8);
   const toistuva = e.target.checked;
   document.getElementById('muistutus-normaali-osiot').style.display = toistuva ? 'none' : 'block';
   document.getElementById('muistutus-toistuva-lomake').style.display = toistuva ? 'block' : 'none';
@@ -11051,6 +11068,7 @@ document.getElementById('muistutus-toistuva-check').addEventListener('change', f
 
 document.querySelectorAll('.muistutus-toistuva-tyyppi-btn').forEach(function(btn) {
   btn.addEventListener('click', function() {
+    if (navigator.vibrate) navigator.vibrate(8);
     document.querySelectorAll('.muistutus-toistuva-tyyppi-btn').forEach(function(b) { b.classList.toggle('active', b === btn); });
     document.getElementById('muistutus-toistuva-viikonpaivat').style.display = btn.dataset.tyyppi === 'weekday' ? 'block' : 'none';
     document.getElementById('muistutus-toistuva-intervalli').style.display = btn.dataset.tyyppi === 'interval' ? 'block' : 'none';
@@ -11059,6 +11077,7 @@ document.querySelectorAll('.muistutus-toistuva-tyyppi-btn').forEach(function(btn
 
 document.querySelectorAll('.muistutus-viikonpaiva-btn').forEach(function(btn) {
   btn.addEventListener('click', function() {
+    if (navigator.vibrate) navigator.vibrate(8);
     btn.classList.toggle('active');
   });
 });
@@ -11096,6 +11115,7 @@ document.getElementById('muistutus-kellonaika-lisaa-btn').addEventListener('clic
     naytaIlmoitus('Valitse sekä päivä että kellonaika');
     return;
   }
+  tuntopalauteValmis();
   lisaaMuistutus(new Date(hetki));
 });
 
@@ -11682,6 +11702,7 @@ function ensimmainenIntervalliHetki(n, yksikko, aikaStr) {
 }
 
 document.getElementById('muistutus-toistuva-aseta-btn').addEventListener('click', function() {
+  tuntopalauteValmis();
   lisaaToistuvaMuistutus();
 });
 

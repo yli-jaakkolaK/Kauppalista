@@ -3564,3 +3564,15 @@ Kaksi asiaa samassa istunnossa löytyneessä ominaisuudessa.
 **HUOM migraatio ei ole vielä ajettu** — `sql/114` pitää ajaa Supabasen SQL Editorissa ennen kuin `parisuhde_kalenteri_nahty`-sarake on olemassa (muuten sekä hyväksy- että muokkaa-reitti kaatuvat "column does not exist" -virheeseen).
 
 sw.js v114 → v115.
+
+### Muistutus-dialogi: kolme osiota, merikartta-tyyli, kevyt haptiikka (2026-08-11)
+
+Katri: kellosta avautuva muistutus-valinta pitäisi jakaa kolmeen selkeään osioon, olla intuitiivinen iOS-käyttäjälle, noudattaa Sataman nykyistä design systemiä, ja rullavalitsimien pitäisi olla tiiviimpiä. Liquid glass/haptiikka siellä missä järkevää, ei överisti.
+
+Rakenne jaettu kolmeen `.muistutus-osio`-lohkoon (Milloin / Miten muistutetaan / Valmistautuminen) — KAIKKI olemassa olevat id:t ja luokat säilytetty ennallaan, vain sijoittelu muuttui, joten mikään script.js:n tila-/tapahtumakäsittely ei muuttunut. Sinnikäs-rivi siirrettiin pois Pika/Kellonaika-välilehtien sisältä omaksi "Miten"-osiokseen (koski jo ennestään molempia välilehtiä, vain visuaalinen sijainti muuttui).
+
+Tyyli siirretty merikartta/loki-tokeneihin (paperi/muste/hius/r-luettava/r-kosketettava) sovelluksen jaetun tumma/vaalea-teeman sijaan — tietoinen poikkeus aiemmasta "jaettua infraa ei uudelleenteemoiteta" -linjasta, koska Katri pyysi sitä nyt eksplisiittisesti juuri tälle dialogille. Päivä/tunti/minuutti-rullat kavennettu (52px → 38px, padding 8px 4px → 4px 2px) "numeron lisäksi ei tarvitse olla ku muutama milli tilaa" -pyynnön mukaisesti. Kolme "Aseta"-päänappia (pika/kellonaika/toistuva) saivat lämmin lasi -korostuksen samalla reseptillä kuin muualla Ruorissa — ei koko dialogia, vain sitovat päätoiminnot.
+
+Haptiikka: kevyt `vibrate(8)` välilehtien vaihdossa (Pika/Kellonaika, Viikonpäivät/Väliajoin), Toistuva-täpän kytkennässä, viikonpäivänapeissa ja rullien `change`-tapahtumassa (natiivi `<select>` ei anna JS:lle tapahtumaa jokaisesta visuaalisesta pykälästä avoinna ollessaan, koska se on käyttöjärjestelmän oma UI — `change` on lähin saatavilla oleva koukku). Kolme "Aseta"-nappia saivat vahvemman kolmoispulssin (`tuntopalauteValmis()`, jo olemassa oleva sovelluksen jaettu vahvistushaptiikka).
+
+sw.js v115 → v116.
