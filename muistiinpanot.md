@@ -3653,13 +3653,23 @@ Tiedoston lisäys luo OMAN riippumattoman `laituri`-murunsa heti valinnan jälke
 
 sw.js v120 → v121.
 
+### Alapalkin ja Ruorin ankkuri-kuvakkeen jälkikorjaukset (2026-08-11)
+
+Kaksi jonossa ollutta korjausta Vaihe 1b:n valmistuttua.
+
+**Alapalkki:** kuvakkeet olivat yhä liian pieniä eläväSSä testauksessa vaikka niitä oli jo kerran suurennettu. Nyt SVG/emoji täyttää 84%/34px kehyksestään (oli 30px/26px), padding pudotettu minimiin. Jokainen `.alapalkki-tabi` sai oman "lämmin lasi" -pinnan (`.alapalkki-tabi-pinta`) — puuttui aiemmin kokonaan, palkki näytti litteältä vaikka jokainen kuvake ON kosketettava toiminto. Ruorin kuvake siirretty hieman vasemmalle (`transform: translateX(-6%)` sen omassa kehyksessä). Kalenterin numero+viikonpäivä menivät päällekkäin (numero y=17.5/koko 8.5 ulottui 13-22, viikonpäivä y=22.7/koko 5 ulottui 20.2-25.2 — todellinen limittymä, ei vain "näyttää ahtaalta") — kalenterikehys kavennettu (20→16) ja molemmat tekstit siirretty erilleen.
+
+**Ruorin ankkuri-/⋯-napit (§4.2/§4.3):** kaksi todellista löydöstä. (1) `.active`-tila (aina päällä Ankkurit-listassa, koska jokainen siellä näkyvä rivi ON jo nostettu ankkuri) käytti TÄYTTÄ messinki-taustaa, joka hukkasi koko lasi-pinnan alleen — litteä pronssi, ei enää painettavan näköinen. Vaihdettu varjostukseksi (sisähehku + reunaväri), lasi-tausta pysyy näkyvissä koko ajan, Katrin oman sanamuodon mukaisesti ("messinkiä voi käyttää varjostuksessa"). (2) TODELLINEN kosketusaluebugi: kaksi 44px näkymätöntä kosketusvyöhykettä (⚓ ja ⋯, pinottuna) olivat vain 36px päässä toisistaan keskipisteiltä (30px nappi + 6px väli) — 44px-vyöhykkeet limittyivät 8px:n verran. Väli kasvatettu 6px→16px (keskipisteet nyt 46px päässä, ei enää päällekkäin) — Katrin oma vaatimus ("painamisalue voi olla isompi, mutta ei päällekkäin") olisi muuten rikkoutunut käytännössä vaikka näytti oikealta CSS:ää lukemalla.
+
+sw.js v121 → v122.
+
 ---
 
 ## Nykytila ja seuraavat askeleet (päivitetty 2026-08-11, COPILOT.md-sääntö 4)
 
-**Viimeksi tehty** (tämä istunto, kaikki commitoitu ja pushattu mainiin, `sw.js` nyt v121): koko "Ruori — visuaalinen uudistus" -speksi rakennettu ja Katrin kahdella puhelimella elävästi testattu, siitä noussut iso korjauskierros. **`CODE_vaihe1b.md` (Hytti-vaihe 1b, Laiturin sisääntulo) NYT KOKONAAN RAKENNETTU** — §7 (kaksi selvitystä), §8b (Lokin yksityinen tietokohde), §2 (jaettu täysinäytön editori), §1b (välilehtirakenne), §4 (kurssikortin muotokieli), §5 (kurssikonteksti, todettu jo toimivaksi olemassa olevan putken kautta) ja §3 (tiedostojen tuonti) kaikki rakennettu ja pushattu.
+**Viimeksi tehty** (tämä istunto, kaikki commitoitu ja pushattu mainiin, `sw.js` nyt v122): koko "Ruori — visuaalinen uudistus" -speksi rakennettu ja Katrin kahdella puhelimella elävästi testattu, siitä noussut iso korjauskierros. **`CODE_vaihe1b.md` (Hytti-vaihe 1b, Laiturin sisääntulo) KOKONAAN RAKENNETTU** (§7, §8b, §2, §1b, §4, §5, §3). Sen jälkeen vielä kaksi jälkikorjausta: alapalkin kuvakekoko/lasipinta ja Ruorin ankkuri-napin messinki/kosketusaluepäällekkäisyys (jälkimmäinen oli oikea bugi, ei vain makuasia).
 
-**⚠️ KOLME AJAMATONTA MIGRAATIOTA ennen kuin Vaihe 1b toimii täysin:**
+**⚠️ KOLME AJAMATONTA MIGRAATIOTA ennen kuin kaikki tässä istunnossa rakennettu toimii täysin:**
 - `sql/114_parisuhde_kalenteri_nahty.sql` (parisuhdeajan kalenterisilta)
 - `sql/115_loki_merkinnat.sql` (etusivu-ankkurien lasku)
 - `sql/116_laituri_tiedostot.sql` (tiedostoliitteet + Storage-bucket "materiaali")
@@ -3669,8 +3679,4 @@ sw.js v120 → v121.
 2. Varasto/"vahdittu" — Katri haluaa listan sijaan otsikko+aikaleimattu-lokimalli (esim. bussikortin saldohistoria). Ei skoopattu.
 3. Laiturin jatkosäie — nykyinen `valutaVanhatSegmentitKotiin()` vaatii AINA manuaalisesti asetetun kodin ennen kuin mikään valuu Varastoon; Katrin kuvaus ("säie tulee → muru menee automaattisesti Varastoon") viittaa siihen että hän odottaa automaattista laukaisua. Kysytty, ei vielä vastausta.
 
-**Seuraavaksi (Vaihe 1b:n JÄLKEEN, Katrin pyynnöstä automaattisesti):**
-4. Alapalkin kuvakkeet — kaikki paitsi Kalenteri siirtyivät oikein alkuperäisiin emojeihin; Kalenteri kavennettava jotta numeron alle mahtuu viikonpäivän lyhenne (seuraa oikeaa viikonpäivää kuten numerokin); Ruorin kuvake hieman vasemmalle; kaikki kuvakkeet PALJON isommiksi (lähes reunasta reunaan, muutama milli marginaalia); painettavan muotokieli (lämmin lasi) puuttuu vielä tabeista kokonaan.
-5. Ruorin ankkuri-kuvake — väri on väärä (messinki, pitäisi olla harmaa kuten muualla — messinki sallittu vain varjostuksena), painettavan muotokieli puuttunee, näkyvä tausta liian iso (pitäisi olla vain muutama milli kuvakkeen ympärillä, sama koskee ⋯:tä) — kosketusalue voi olla isompi mutta ei mene päällekkäin viereisen napin kanssa.
-
-**Testaamatta koko istunnon ajalta** (ei mitään tässä istunnossa rakennetusta ole testattu oikealla laitteella/kirjautumisella — kaikki rakenteellisesti/syntaktisesti validoitu, ei elävästi): koko Ruori-korjauskierros, Vaihe 1b kokonaisuudessaan (välilehdet, editori, tiedostojen tuonti), parisuhdeajan muokkaus.
+**Testaamatta koko istunnon ajalta** (ei mitään tässä istunnossa rakennetusta ole testattu oikealla laitteella/kirjautumisella — kaikki rakenteellisesti/syntaktisesti validoitu, ei elävästi): koko Ruori-korjauskierros, Vaihe 1b kokonaisuudessaan (välilehdet, editori, tiedostojen tuonti), parisuhdeajan muokkaus, alapalkin/ankkurinapin jälkikorjaukset. **Seuraava luonnollinen askel on siis elävä testaus + kolmen migraation ajaminen**, ei uusi rakentaminen, ellei Katri anna uutta työtä.

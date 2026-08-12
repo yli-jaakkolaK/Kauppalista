@@ -135,7 +135,12 @@ const ALAPALKKI_IKONIT = {
   // toimivaksi, Kalenterilla on jo sama elävä päivä-käytös kuin
   // ruudukossakin (ei pelkkä 🗓️-emoji siellä sen enempää).
   laituri: '<span class="alapalkki-emoji">🛟</span>',
-  kalenteri: '<svg viewBox="0 0 28 28" fill="none"><rect x="4" y="7" width="20" height="17" rx="2" fill="var(--paperi)" stroke="var(--muste)" stroke-width="1.5"/><path d="M9 3.5v5M19 3.5v5" stroke="var(--muste)" stroke-width="1.5" stroke-linecap="round"/><text x="14" y="17.5" font-family="\'Courier Prime\',monospace" font-weight="700" font-size="8.5" text-anchor="middle" fill="var(--muste)" data-role="kal-numero"></text><text x="14" y="22.7" font-family="\'Courier Prime\',monospace" font-size="5" letter-spacing="0.04em" text-anchor="middle" fill="var(--muste)" data-role="kal-vk"></text></svg>',
+  // Kavennettu (2026-08-11, elävä testaus) — numero ja viikonpäivä
+  // menivät päällekkäin (numero y=17.5/koko 8.5 ulottui 13-22, viikonpäivä
+  // y=22.7/koko 5 ulottui 20.2-25.2). Rungon leveys 20->16 (kapeampi
+  // kalenterikehys), numero+viikonpäivä siirretty erilleen ilman
+  // päällekkäisyyttä.
+  kalenteri: '<svg viewBox="0 0 28 28" fill="none"><rect x="6" y="7" width="16" height="17" rx="2" fill="var(--paperi)" stroke="var(--muste)" stroke-width="1.5"/><path d="M10 3.5v5M18 3.5v5" stroke="var(--muste)" stroke-width="1.5" stroke-linecap="round"/><text x="14" y="15.5" font-family="\'Courier Prime\',monospace" font-weight="700" font-size="7.5" text-anchor="middle" fill="var(--muste)" data-role="kal-numero"></text><text x="14" y="21.3" font-family="\'Courier Prime\',monospace" font-size="4.5" letter-spacing="0.04em" text-anchor="middle" fill="var(--muste)" data-role="kal-vk"></text></svg>',
   hytti: '<span class="alapalkki-emoji">🚪</span>',
   muistilaput: '<span class="alapalkki-emoji">🗒️</span>',
   varasto: '<span class="alapalkki-emoji">📦</span>',
@@ -179,9 +184,12 @@ async function tallennaAlapalkkiJarjestys() {
 function luoAlapalkkiNappi(id) {
   const nappi = document.createElement('button');
   nappi.className = 'alapalkki-tabi' + (id === alapalkkiAktiivinen ? ' aktiivinen' : '');
+  nappi.dataset.id = id;
   nappi.title = ALAPALKKI_NIMET[id];
   nappi.setAttribute('aria-label', ALAPALKKI_NIMET[id]);
-  nappi.innerHTML = (ALAPALKKI_IKONIT[id] || '') + '<span class="alapalkki-alleviiva"></span>';
+  // Painettavan pinnan säilö (2026-08-11, elävä testaus) — kuvake ISTUU
+  // lämpimällä lasilla, se ei ole vain palkin tausta koko rivin verran.
+  nappi.innerHTML = '<span class="alapalkki-tabi-pinta">' + (ALAPALKKI_IKONIT[id] || '') + '</span><span class="alapalkki-alleviiva"></span>';
   nappi.addEventListener('click', function() { alapalkkiSiirry(id); });
   return nappi;
 }
