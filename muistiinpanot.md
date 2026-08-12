@@ -3617,11 +3617,21 @@ Hytti sai kolme välilehteä (Nyt/Reitti/Kartta), renderöitynä listasta (`HYTT
 
 sw.js v118 → v119.
 
+### Hytti-vaihe 1b, §4: kurssikortin muotokieli Reitti-välilehdellä (2026-08-11)
+
+`lataaOpintoKurssit()`:n rivit (pelkkä nimi + × ennen tätä) muutettu luettavan pinnan korteiksi: `--r-luettava`, paperi-tausta, hiusviiva. Otsikkorivillä kurssin nimi + PERO-vaihe messingillä versaalina (uusi `kurssinPeroVaihe()` — aikaisin vaihe joka löytyy vielä työn alla olevista aiheista, kertoo kurssin "pullonkaulan"; tyhjä jos ei aiheita). Jäljellä-palkki (ei-hallussa-osuus, yksivärinen neutraali muste — TARKOITUKSELLA eri kuin Kartan 3-väripalkki, koska spekin oma sana: "ei prosentteja eikä pistemääriä osaamiselle").
+
+**Sivuhuomio:** löysin kesken kirjoituksen että `PERO_VAIHE_JARJESTYS`-vakio oli jo olemassa (Vaihe 1a:sta, rivi ~1000) — ensimmäinen luonnokseni uudelleenmääritteli saman nimen (JS heitti `SyntaxError: already declared`, syntaksitarkistus nappasi ennen committia). Korjattu käyttämään olemassa olevaa vakiota + olemassa olevaa `OPINTO_VAIHE_NIMET`-nimistöä oman uuden sijaan — parempi, jo vakiintunut suomenkielinen nimistö ("Aloittamatta"/"Opiskelussa"/"Kertauksessa") eikä kahta rinnakkaista lähdettä samalle tiedolle.
+
+Muu Hytti (aikaikkuna, huoli, taitosolmut, tehtävät, kortit) TARKOITUKSELLA koskematta — spekin oma rajaus ("Tämä on ainoa osa jonka muotokieli uusitaan tässä erässä").
+
+sw.js v119 → v120.
+
 ---
 
 ## Nykytila ja seuraavat askeleet (päivitetty 2026-08-11, COPILOT.md-sääntö 4)
 
-**Viimeksi tehty** (tämä istunto, kaikki commitoitu ja pushattu mainiin, `sw.js` nyt v119): koko "Ruori — visuaalinen uudistus" -speksi rakennettu ja Katrin kahdella puhelimella elävästi testattu, siitä noussut iso korjauskierros. **Nyt käynnissä: `CODE_vaihe1b.md` (Hytti-vaihe 1b, Laiturin sisääntulo)** — §7 (kaksi selvitystä), §8b (Lokin yksityinen tietokohde, **HUOM `sql/115` ei ajettu**), §2 (jaettu täysinäytön editori) ja §1b (välilehtirakenne Nyt/Reitti/Kartta) rakennettu. Kesken: §4-5 kurssiosio+konteksti, §3 tiedostojen tuonti.
+**Viimeksi tehty** (tämä istunto, kaikki commitoitu ja pushattu mainiin, `sw.js` nyt v120): koko "Ruori — visuaalinen uudistus" -speksi rakennettu ja Katrin kahdella puhelimella elävästi testattu, siitä noussut iso korjauskierros. **Nyt käynnissä: `CODE_vaihe1b.md` (Hytti-vaihe 1b, Laiturin sisääntulo)** — §7 (kaksi selvitystä), §8b (Lokin yksityinen tietokohde, **HUOM `sql/115` ei ajettu**), §2 (jaettu täysinäytön editori), §1b (välilehtirakenne) ja §4 (kurssikortin muotokieli) rakennettu. Kesken: §5 kurssikontekstin päästä-päähän-testaus/viimeistely, §3 tiedostojen tuonti.
 
 **Auki jäänyt, odottaa Katrin vastausta ennen rakentamista** (ei koodattu, koska väärä arvaus olisi tässä pahempi kuin kysyminen):
 1. Kalenterin kuittaus omille lisäyksille — todennäköisesti `kalenteri_tekijat`-taulun puuttuva/väärä organizer-kartoitus perhekalenterille, ei koodibugi. Katrin pitää tarkistaa taulun sisältö Supabasen Table Editorista.

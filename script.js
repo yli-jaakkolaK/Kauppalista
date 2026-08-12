@@ -1031,6 +1031,28 @@ const PACER_TYYPPI_NIMET = {
 };
 const PACER_TYYPPI_V1 = ['procedural', 'analogous', 'conceptual'];
 
+// Kurssikortin oma PERO-vaihe (2026-08-11, CODE_vaihe1b.md §4): aikaisin
+// vaihe (PERO_VAIHE_JARJESTYS/OPINTO_VAIHE_NIMET, jo olemassa yllä) joka
+// löytyy edelleen työn alla (ei hallussa) olevista aiheista — kertoo missä
+// kurssin "pullonkaula" on juuri nyt. Jos kaikki on hallussa, "Hallussa".
+// Jos ei yhtään aihetta, tyhjä (ei näytetä badgea ollenkaan). Ei sama asia
+// kuin opintoVaiheRyhma():n kolme väriryhmää (hallussa/työn-alla/edessä),
+// joka on Kartan oma, karkeampi jako.
+function kurssinPeroVaihe(aiheet) {
+  if (!aiheet || aiheet.length === 0) return null;
+  const tyonAlla = aiheet.filter(function(a) { return opintoVaiheRyhma(a.pero_vaihe, a.kertausjonossa) !== 'hallussa'; });
+  if (tyonAlla.length === 0) return OPINTO_VAIHE_NIMET.reference;
+  for (const vaihe of PERO_VAIHE_JARJESTYS) {
+    if (tyonAlla.some(function(a) { return a.pero_vaihe === vaihe; })) return OPINTO_VAIHE_NIMET[vaihe];
+  }
+  return null;
+}
+
+// Kurssiosion muotokieli uusittu (2026-08-11, CODE_vaihe1b.md §4) —
+// luettavan pinnan kortti (--r-luettava, paperi, hiusviiva), PERO-vaihe
+// messingillä versaalina, jäljellä-palkki. EI prosentteja/pistemääriä —
+// palkki näyttää PALJONKO ON JÄLJELLÄ (ei-hallussa-olevien aiheiden osuus),
+// ei osaamistasoa, siksi neutraali muste eikä Kartan värikoodattu 3-palkki.
 async function lataaOpintoKurssit() {
   const { data, error } = await db.from('opinto_kurssit').select().order('sort_order');
   if (error) {
@@ -1043,13 +1065,26 @@ async function lataaOpintoKurssit() {
   document.getElementById('opinto-tyhja').style.display = kurssit.length === 0 ? 'block' : 'none';
 
   for (const kurssi of kurssit) {
+    const { data: aiheet, error: aiheError } = await db.from('opinto_aiheet').select('pero_vaihe, kertausjonossa').eq('kurssi_id', kurssi.id);
+    if (aiheError) console.error('Kurssin aiheiden haku epäonnistui (kurssikortti):', aiheError);
+
     const li = document.createElement('li');
+    li.className = 'opinto-kurssi-kortti';
     li.addEventListener('click', function() { avaaOpintoKurssi(kurssi); });
 
-    const teksti = document.createElement('span');
-    teksti.textContent = kurssi.name + (kurssi.status === 'arkistoitu' ? ' (arkistoitu)' : '');
-    li.appendChild(teksti);
-
+    const ylarivi = document.createElement('div');
+    ylarivi.className = 'opinto-kurssi-kortti-ylarivi';
+    const nimi = document.createElement('span');
+    nimi.className = 'opinto-kurssi-kortti-nimi';
+    nimi.textContent = kurssi.name + (kurssi.status === 'arkistoitu' ? ' (arkistoitu)' : '');
+    ylarivi.appendChild(nimi);
+    const vaihe = kurssinPeroVaihe(aiheet);
+    if (vaihe) {
+      const vaiheEl = document.createElement('span');
+      vaiheEl.className = 'opinto-kurssi-kortti-vaihe';
+      vaiheEl.textContent = vaihe;
+      ylarivi.appendChild(vaiheEl);
+    }
     const poisto = document.createElement('button');
     poisto.className = 'delete-btn';
     poisto.textContent = '×';
@@ -1061,7 +1096,20 @@ async function lataaOpintoKurssit() {
       if (ilmoitaKirjoitusvirheesta(poistoError, 'Kurssin poisto')) return;
       lataaOpintoKurssit();
     });
-    li.appendChild(poisto);
+    ylarivi.appendChild(poisto);
+    li.appendChild(ylarivi);
+
+    const maara = (aiheet || []).length;
+    if (maara > 0) {
+      const jaljellaMaara = aiheet.filter(function(a) { return opintoVaiheRyhma(a.pero_vaihe, a.kertausjonossa) !== 'hallussa'; }).length;
+      const palkkiKehys = document.createElement('div');
+      palkkiKehys.className = 'opinto-kurssi-kortti-palkki-kehys';
+      const palkki = document.createElement('div');
+      palkki.className = 'opinto-kurssi-kortti-palkki';
+      palkki.style.width = Math.round((jaljellaMaara / maara) * 100) + '%';
+      palkkiKehys.appendChild(palkki);
+      li.appendChild(palkkiKehys);
+    }
 
     listEl.appendChild(li);
   }
