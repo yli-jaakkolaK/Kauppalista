@@ -3689,9 +3689,25 @@ sw.js v123 → v124.
 
 ---
 
+### Deploy-pipeline korjattu: Vercelin 12-funktiokatto esti kaiken tuotantoon menon (2026-08-12)
+
+Katri huomasi elävässä testauksessa etteivät päivän muutokset näkyneet — tarkistus paljasti että TUOTANTO (`kauppalista-nine.vercel.app`, myös tavallinen Safari-välilehti, ei vain PWA) oli jumissa `sw.js` v120:ssa jo commitista `63d3ac3` asti, siis KOLME pushia (koko Vaihe 1b:n §3-osa, alapalkin/ankkurinapin jälkikorjaukset, ja tämän päivän koko korjauserä) eivät olleet oikeasti deployautuneet ollenkaan.
+
+**Kaksi todellista syytä, molemmat korjattu:**
+1. `package-lock.json` ei sisältänyt `jszip`-riippuvuutta vaikka `package.json` sisälsi — Vercelin `npm ci` vaatii lockfilen ja package.jsonin täsmäävän, joten build kaatui heti asennusvaiheeseen. Korjattu `npm install --package-lock-only`:lla.
+2. TODELLINEN este: Vercelin Hobby-tason raja on 12 Serverless Functionia per deployment, ja `api/laituri-tiedosto-poiminta.js` (Vaihe 1b §3) nosti reittitason funktiot 13:een — Vercel hylkää deploymentin tähän jo ENNEN build-vaihetta, joten lockfile-korjaus yksin ei riittänyt. Katrin valinnalla (ei Pro-tilausta) kolme lähisukuista endpointtia (`api/parisuhdeaika-hyvaksy.js`/`-hylkaa.js`/`-muokkaa.js`) yhdistettiin yhdeksi `api/parisuhdeaika.js`:ksi, joka haarautuu `action`-kentän mukaan (`hyvaksy`/`hylkaa`/`muokkaa`) — toiminnallisuus koskematon kopio kolmesta alkuperäisestä, vain reititys muuttui. Funktiomäärä nyt 11, jättää tilaa tuleville.
+
+Kolmen clientin fetch-kutsupaikan (script.js: hyväksy/hylkää/muokkaa-parisuhdeaika) osoite vaihdettu `/api/parisuhdeaika`:an + `action`-kenttä bodyyn.
+
+sw.js v124 → v125 (script.js muuttui).
+
+---
+
 ## Nykytila ja seuraavat askeleet (päivitetty 2026-08-12, COPILOT.md-sääntö 4)
 
-**Viimeksi tehty** (tämä istunto, kaikki commitoitu ja pushattu mainiin, `sw.js` nyt v124): koko "Ruori — visuaalinen uudistus" -speksi ja `CODE_vaihe1b.md` (Hytti-vaihe 1b) rakennettu kokonaan, sen jälkeen kolme jälkikorjauskierrosta elävästä testauksesta: (1) alapalkin kuvakekoko/lasipinta + ankkurinapin kosketusaluebugi, (2) kuormakytkimen pinkki-väribugi (`--loki-vaara`), alapalkin kuvakekoko vielä kerran, Kalenterikuvakkeen kontrasti, Reitti-välilehden puuttunut kosketettavan pinnan tyyli, sadekuvakkeiden <19%-suodatus, (3) Ruori kiinnitetty pysyvästi alapalkin ensimmäiseksi kuvakkeeksi.
+**Viimeksi tehty** (tämä istunto, kaikki commitoitu ja pushattu mainiin, `sw.js` nyt v125): koko "Ruori — visuaalinen uudistus" -speksi ja `CODE_vaihe1b.md` (Hytti-vaihe 1b) rakennettu kokonaan, kolme jälkikorjauskierrosta elävästä testauksesta (alapalkki/ankkurinappi, kuormakytkin/Kalenteri/Reitti/sade, Ruorin kiinnitys), ja lopuksi **deploy-pipeline korjattu** (ks. yllä) — tuotanto oli ollut jumissa yli vuorokauden.
+
+**⚠️ Tarkista Vercelin deploy-status seuraavan pushin jälkeen** (`curl -s https://api.github.com/repos/yli-jaakkolaK/Kauppalista/commits/<sha>/status`) ennen kuin oletat että muutokset ovat oikeasti tuotannossa — tämä ei ollut aiemmin osa vakiotarkistuksia ja aiheutti sen että kolme pushia näytti onnistuneelta paikallisesti mutta ei koskaan tavoittanut käyttäjää.
 
 **⚠️ KOLME AJAMATONTA MIGRAATIOTA ennen kuin kaikki tässä istunnossa rakennettu toimii täysin:**
 - `sql/114_parisuhde_kalenteri_nahty.sql` (parisuhdeajan kalenterisilta)

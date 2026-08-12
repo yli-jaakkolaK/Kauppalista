@@ -645,7 +645,7 @@ async function lataaKotinakyma() {
 // aiemmin VAIN sille jonka hyväksyntä sattui olemaan jälkimmäinen — se joka
 // hyväksyi ENSIN ei koskaan nähnyt "vie kalenteriin" -korttia, koska hänen
 // rivinsä suljettiin heti eikä se enää tullut ehdokaslistassa vastaan. Ks.
-// sql/114 (parisuhde_kalenteri_nahty) + api/parisuhdeaika-hyvaksy.js (joka
+// sql/114 (parisuhde_kalenteri_nahty) + api/parisuhdeaika.js:n hyvaksy() (joka
 // merkitsee hyväksyjän oman rivin heti nähdyksi — kumppanin rivi jää
 // false:ksi tätä hakua varten). Tämä on käyttäjän OMA rivi, RLS sallii
 // suoran haun/kirjoituksen ilman palvelinreittiä.
@@ -7218,7 +7218,7 @@ async function loadAnchorCandidates() {
 }
 
 // Couple time proposal — accept (2026-08-04, ks. muistiinpanot.md
-// "Parisuhdeaika-ehdotus"). Calls the server (api/parisuhdeaika-hyvaksy.js)
+// "Parisuhdeaika-ehdotus"). Calls the server (api/parisuhdeaika.js, action:hyvaksy)
 // because RLS blocks reading/writing the partner's own row from here — the
 // server is the only place that can tell whether both sides have said yes.
 async function acceptCoupleTimeProposal(candidate) {
@@ -7226,10 +7226,10 @@ async function acceptCoupleTimeProposal(candidate) {
   const token = sessionData.session ? sessionData.session.access_token : null;
   let result = null;
   try {
-    const response = await fetch('/api/parisuhdeaika-hyvaksy', {
+    const response = await fetch('/api/parisuhdeaika', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
-      body: JSON.stringify({ ankkuri_id: candidate.id }),
+      body: JSON.stringify({ action: 'hyvaksy', ankkuri_id: candidate.id }),
     });
     result = await response.json();
     if (!response.ok) throw new Error(result.error || 'Hyväksyntä epäonnistui');
@@ -7258,10 +7258,10 @@ async function rejectCoupleTimeProposal(candidate) {
   const { data: sessionData } = await db.auth.getSession();
   const token = sessionData.session ? sessionData.session.access_token : null;
   try {
-    const response = await fetch('/api/parisuhdeaika-hylkaa', {
+    const response = await fetch('/api/parisuhdeaika', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
-      body: JSON.stringify({ ankkuri_id: candidate.id }),
+      body: JSON.stringify({ action: 'hylkaa', ankkuri_id: candidate.id }),
     });
     const result = await response.json();
     if (!response.ok) throw new Error(result.error || 'Hylkäys epäonnistui');
@@ -7274,7 +7274,7 @@ async function rejectCoupleTimeProposal(candidate) {
 }
 
 // Couple time proposal — muokkaa kellonaikaa (2026-08-11, Katrin pyyntö,
-// ks. api/parisuhdeaika-muokkaa.js). Muokkaus on toiminnallisesti "hylkää
+// ks. api/parisuhdeaika.js:n muokkaa()). Muokkaus on toiminnallisesti "hylkää
 // vanha aika, ehdota uutta": kumppanin hyväksyntä nollataan palvelimella
 // (hänen pitää nähdä ja hyväksyä UUSI aika), muokkaajan oma hyväksyntä
 // asetetaan todeksi samalla (Katrin oma päätös — muokkaus + tallennus on
@@ -7283,10 +7283,10 @@ async function editCoupleTimeProposal(candidate, eventDate, eventTime) {
   const { data: sessionData } = await db.auth.getSession();
   const token = sessionData.session ? sessionData.session.access_token : null;
   try {
-    const response = await fetch('/api/parisuhdeaika-muokkaa', {
+    const response = await fetch('/api/parisuhdeaika', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
-      body: JSON.stringify({ ankkuri_id: candidate.id, event_date: eventDate, event_time: eventTime }),
+      body: JSON.stringify({ action: 'muokkaa', ankkuri_id: candidate.id, event_date: eventDate, event_time: eventTime }),
     });
     const result = await response.json();
     if (!response.ok) throw new Error(result.error || 'Muokkaus epäonnistui');
@@ -7301,7 +7301,7 @@ async function editCoupleTimeProposal(candidate, eventDate, eventTime) {
 // Shows the "both accepted" confirmation with the real Kalenterisilta link
 // (kalenterisiltaUrl(), same mechanism as reminders' calendar bridge) — the
 // underlying ankkuri row is already resolved server-side at this point (ks.
-// api/parisuhdeaika-hyvaksy.js), so it will disappear from the normal
+// api/parisuhdeaika.js:n hyvaksy()), so it will disappear from the normal
 // candidate list on the next reload; this card is the only remaining place
 // the person can tap the link, so it stays until manually dismissed.
 function showCoupleTimeCalendarCard(calendar) {
