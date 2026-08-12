@@ -1086,6 +1086,15 @@
       <button id="editori-materiaali-banneri-peruuta" class="link-btn">Peruuta</button>
     </div>
     <textarea class="editori-pinta" id="editori-pinta" placeholder="kirjoita..."></textarea>
+
+    <!-- Tiedostoliite (2026-08-11, CODE_vaihe1b.md §3) — koko alue on
+         PAINIKE joka avaa laitteen oman valitsimen (Tiedostot/Kuvat/Kamera
+         puhelimella), EI "raahaa tähän" -aluetta joka ei toimisi
+         kosketuksella (§3.2, spekin oma nimenomainen varoitus). Piilotettu
+         natiivi file-input, oma nappi päällä tyylin hallitsemiseksi. -->
+    <input type="file" id="editori-tiedosto-input" style="display:none">
+    <button class="dialog-btn dialog-btn-cancel" id="editori-tiedosto-btn">📎 Liitä tiedosto</button>
+    <p class="editori-tiedosto-tila" id="editori-tiedosto-tila" style="display:none"></p>
   </div>
 
   <div class="container" id="laituri-view" style="display:none">

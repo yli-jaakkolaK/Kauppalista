@@ -3627,19 +3627,50 @@ Muu Hytti (aikaikkuna, huoli, taitosolmut, tehtävät, kortit) TARKOITUKSELLA ko
 
 sw.js v119 → v120.
 
+### Hytti-vaihe 1b, §3: tiedostojen tuonti — VAIHE 1B VALMIS (2026-08-11)
+
+Viimeinen §-kohta, koko `CODE_vaihe1b.md` nyt rakennettu.
+
+**Arkkitehtuurin ydinoivallus:** raakatiedosto EI kulje tämän palvelimen kautta — Vercelin serverless-funktioiden oletuspyyntökoko (~4.5MB) olisi liian pieni Anthropicin 32MB:n pdf-rajalle. Selain lataa tiedoston SUORAAN Supabase Storageen (`db.storage.from('materiaali').upload(...)`, samat kirjautumisoikeudet kuin muillakin kirjoituksilla), ja uusi `api/laituri-tiedosto-poiminta.js` saa vain PIENEN JSON-pyynnön (`storage_polku`+`mime_tyyppi`), lataa tiedoston service_rolella palvelimen puolella ja palauttaa vain poimitun TEKSTIN (pieni vastaus).
+
+Toteutettu tyypeittäin (§3.1):
+- **pdf:** Anthropicin Messages API, `document`-lohko, pyydetään koko teksti verbaatim (ei tiivistelmä — poimittu teksti syötetään myöhemmin olemassa olevaan AI-luokitteluun joka tarvitsee täyden sisällön). Rajat tarkistettu virallisesta dokumentaatiosta ennen koodausta (ei arvattu): 32MB/pyyntö, 100 sivua meidän tasollamme. Kokoraja tarkistetaan itse ennen lähetystä; sivuraja luetaan Anthropicin omasta virheestä ja käännetään selkeäksi suomenkieliseksi viestiksi (§3.4:n vaatimus "älä epäonnistu hiljaa").
+- **pptx:** uusi `jszip`-riippuvuus (`package.json`, palvelinpuolen `api/`-koodille, ei kosketa selainpuolta joka on yhä täysin npm-vapaa). Puretaan zip, poimitaan `<a:t>`-tekstisolmut jokaisesta `ppt/slides/slideN.xml`:stä dian numeron mukaan järjestettynä.
+- **koodi/teksti (tuntematonkin pääte):** EI purkua, EI Storage-tallennusta ollenkaan — luetaan suoraan selaimessa `file.text()`:llä, sama polku kuin liitetty teksti. U+FFFD-korvausmerkin tarkistus karkeana UTF-8-kelvollisuuden merkkinä (binääritiedosto hylätään selkeällä viestillä sen sijaan että se päätyisi muruksi korruptoituneena).
+- **kuvat (jpg/png/heic):** tallennetaan Storageen, EI tekstinpoimintaa tässä erässä (multimodaalinen AI-luokittelu suoraan kuvasta on looginen jatkoaskel mutta ei rakennettu nyt — rajattu tietoisesti, ei unohdettu).
+- **doc/docx/zip/ipynb:** hylätään heti selkeällä viestillä, ei yritetä käsitellä millään tavalla (spekin oma rajaus, §3.1:n AUKOT eivät olleet Katrin hyväksymiä oletuksia).
+
+**Tietokanta/Storage (sql/116, EI VIELÄ AJETTU):** uusi `laituri_tiedostot`-taulu (metatieto + poimittu teksti) ja Storage-bucket "materiaali". RLS TARKOITUKSELLA sama avoimuus kuin itse `laituri`-taulussa (`auth.uid() is not null`, EI owner_id-rajoitusta) — spekin oma vaatimus §3.3: "tiedostot noudattavat samaa piilota_laiturista-mekanismia kuin tekstimurut", eli sama jaettu näkyvyys ennen luokittelua. Migraation oma kommentti varoittaa: jos bucketin luonti SQL Editorista ei onnistu jossain Supabase-projektikonfiguraatiossa, bucket pitää luoda käsin Dashboardista (Storage → New bucket, Public OFF) ja ajaa migraatiosta vain policy-osuus.
+
+Tiedoston lisäys luo OMAN riippumattoman `laituri`-murunsa heti valinnan jälkeen (ei odota editorin sulkemista) — sama `materiaaliKohdeKurssi`-lippu koskee sitä kuin editorin tekstiäkin kurssikontekstissa, sama olemassa oleva luokittelu-/hyväksyntäputki poimii sen automaattisesti (ei rinnakkaista putkea, spekin oma vaatimus).
+
+**HUOM ennen käyttöä:**
+1. `sql/116_laituri_tiedostot.sql` pitää ajaa Supabasen SQL Editorissa.
+2. `package.json`:iin lisätty `jszip` — Vercelin oma buildi asentaa sen automaattisesti seuraavassa deployssa, ei vaadi Katrilta erillistä toimenpidettä (sama kuin muutkin `api/`-riippuvuudet).
+3. Storage-bucket "materiaali" pitää olla olemassa (sql/116 yrittää luoda sen, ks. varoitus yllä).
+
+**Ei testattu oikealla laitteella** (kuten koko Vaihe 1b): tiedoston valinta iPhonella (Tiedostot/Kuvat/Kamera), iso pdf, pptx-purku oikealla tiedostolla, koodi-tiedoston UTF-8-tarkistus, koko putki päästä päähän kirjautuneena.
+
+sw.js v120 → v121.
+
 ---
 
 ## Nykytila ja seuraavat askeleet (päivitetty 2026-08-11, COPILOT.md-sääntö 4)
 
-**Viimeksi tehty** (tämä istunto, kaikki commitoitu ja pushattu mainiin, `sw.js` nyt v120): koko "Ruori — visuaalinen uudistus" -speksi rakennettu ja Katrin kahdella puhelimella elävästi testattu, siitä noussut iso korjauskierros. **Nyt käynnissä: `CODE_vaihe1b.md` (Hytti-vaihe 1b, Laiturin sisääntulo)** — §7 (kaksi selvitystä), §8b (Lokin yksityinen tietokohde, **HUOM `sql/115` ei ajettu**), §2 (jaettu täysinäytön editori), §1b (välilehtirakenne) ja §4 (kurssikortin muotokieli) rakennettu. Kesken: §5 kurssikontekstin päästä-päähän-testaus/viimeistely, §3 tiedostojen tuonti.
+**Viimeksi tehty** (tämä istunto, kaikki commitoitu ja pushattu mainiin, `sw.js` nyt v121): koko "Ruori — visuaalinen uudistus" -speksi rakennettu ja Katrin kahdella puhelimella elävästi testattu, siitä noussut iso korjauskierros. **`CODE_vaihe1b.md` (Hytti-vaihe 1b, Laiturin sisääntulo) NYT KOKONAAN RAKENNETTU** — §7 (kaksi selvitystä), §8b (Lokin yksityinen tietokohde), §2 (jaettu täysinäytön editori), §1b (välilehtirakenne), §4 (kurssikortin muotokieli), §5 (kurssikonteksti, todettu jo toimivaksi olemassa olevan putken kautta) ja §3 (tiedostojen tuonti) kaikki rakennettu ja pushattu.
+
+**⚠️ KOLME AJAMATONTA MIGRAATIOTA ennen kuin Vaihe 1b toimii täysin:**
+- `sql/114_parisuhde_kalenteri_nahty.sql` (parisuhdeajan kalenterisilta)
+- `sql/115_loki_merkinnat.sql` (etusivu-ankkurien lasku)
+- `sql/116_laituri_tiedostot.sql` (tiedostoliitteet + Storage-bucket "materiaali")
 
 **Auki jäänyt, odottaa Katrin vastausta ennen rakentamista** (ei koodattu, koska väärä arvaus olisi tässä pahempi kuin kysyminen):
 1. Kalenterin kuittaus omille lisäyksille — todennäköisesti `kalenteri_tekijat`-taulun puuttuva/väärä organizer-kartoitus perhekalenterille, ei koodibugi. Katrin pitää tarkistaa taulun sisältö Supabasen Table Editorista.
 2. Varasto/"vahdittu" — Katri haluaa listan sijaan otsikko+aikaleimattu-lokimalli (esim. bussikortin saldohistoria). Ei skoopattu.
 3. Laiturin jatkosäie — nykyinen `valutaVanhatSegmentitKotiin()` vaatii AINA manuaalisesti asetetun kodin ennen kuin mikään valuu Varastoon; Katrin kuvaus ("säie tulee → muru menee automaattisesti Varastoon") viittaa siihen että hän odottaa automaattista laukaisua. Kysytty, ei vielä vastausta.
 
-**Jonossa, Katrin pyynnöstä tehdään Vaihe 1b:n ison rakennuserän JÄLKEEN automaattisesti** (ei vielä aloitettu):
+**Seuraavaksi (Vaihe 1b:n JÄLKEEN, Katrin pyynnöstä automaattisesti):**
 4. Alapalkin kuvakkeet — kaikki paitsi Kalenteri siirtyivät oikein alkuperäisiin emojeihin; Kalenteri kavennettava jotta numeron alle mahtuu viikonpäivän lyhenne (seuraa oikeaa viikonpäivää kuten numerokin); Ruorin kuvake hieman vasemmalle; kaikki kuvakkeet PALJON isommiksi (lähes reunasta reunaan, muutama milli marginaalia); painettavan muotokieli (lämmin lasi) puuttuu vielä tabeista kokonaan.
 5. Ruorin ankkuri-kuvake — väri on väärä (messinki, pitäisi olla harmaa kuten muualla — messinki sallittu vain varjostuksena), painettavan muotokieli puuttunee, näkyvä tausta liian iso (pitäisi olla vain muutama milli kuvakkeen ympärillä, sama koskee ⋯:tä) — kosketusalue voi olla isompi mutta ei mene päällekkäin viereisen napin kanssa.
 
-**Seuraava iso työerä (Vaihe 1b jatkuu):** §4 (kurssiosion visuaalinen uudistus Reitti-välilehdellä — luettavan pinnan kortit, PERO-vaihe messingillä, jäljellä-palkki) + §5 (kurssikonteksti "+ Lisää materiaalia" päästä päähän, laajentaa olemassa olevaa editoria), sitten §3 (tiedostojen tuonti: pdf/kuva/pptx/koodi Supabase Storageen).
+**Testaamatta koko istunnon ajalta** (ei mitään tässä istunnossa rakennetusta ole testattu oikealla laitteella/kirjautumisella — kaikki rakenteellisesti/syntaktisesti validoitu, ei elävästi): koko Ruori-korjauskierros, Vaihe 1b kokonaisuudessaan (välilehdet, editori, tiedostojen tuonti), parisuhdeajan muokkaus.

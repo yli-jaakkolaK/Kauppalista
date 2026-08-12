@@ -5,6 +5,7 @@
   "dependencies": {
     "tsdav": "^2.3.0",
     "ical.js": "^2.2.1",
-    "web-push": "^3.6.7"
+    "web-push": "^3.6.7",
+    "jszip": "^3.10.1"
   }
 }

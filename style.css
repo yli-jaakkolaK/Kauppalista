@@ -3692,6 +3692,9 @@ h1 {
 }
 .editori-pinta:focus { border-color: var(--hius-vahva); }
 .editori-pinta::placeholder { color: var(--vaimea); }
+#editori-tiedosto-btn { margin-top: 10px; }
+.editori-tiedosto-tila { font-size: 13px; color: var(--muted); margin-top: 6px; }
+.editori-tiedosto-tila.editori-tiedosto-virhe { color: var(--vaara); }
 /* #laituri-input on nyt pelkkä avauslaukaisin (readonly), ei kirjoituskenttä
    — osoitin kertoo sen olevan silti kosketettava. */
 #laituri-input[readonly] { cursor: pointer; }

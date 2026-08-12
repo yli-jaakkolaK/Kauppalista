@@ -10808,6 +10808,146 @@ function tyhjennaEditoriLuonnos() {
   localStorage.removeItem(EDITORI_LUONNOS_KEY);
 }
 
+// Tiedostoliitteet (2026-08-11, CODE_vaihe1b.md §3) — koko alue on nappi
+// joka avaa laitteen oman valitsimen, ei "raahaa tähän" -aluetta (§3.2).
+// Jokainen liite luo OMAN riippumattoman laituri-murunsa heti valinnan
+// jälkeen (ei odota editorin sulkemista) — sama materiaaliKohdeKurssi-
+// lippu koskee sitä kuin editorin omaa tekstiäkin, jos kurssikontekstissa.
+const TIEDOSTO_HYLATYT_PAATTEET = ['doc', 'docx', 'zip', 'rar', '7z', 'tar', 'gz', 'ipynb'];
+const TIEDOSTO_KUVA_PAATTEET = ['jpg', 'jpeg', 'png', 'heic'];
+const TIEDOSTO_PDF_KOKORAJA = 32 * 1024 * 1024;
+const TIEDOSTO_MUU_KOKORAJA = 20 * 1024 * 1024;
+
+function tiedostonPaate(nimi) {
+  const osat = nimi.split('.');
+  return osat.length > 1 ? osat.pop().toLowerCase() : '';
+}
+
+// §3.1: pdf/kuva/pptx tunnetuilla tunnisteilla, doc/zip/ipynb hylätään
+// eksplisiittisesti, KAIKKI MUU (koodi, tuntematon pääte) yritetään
+// tekstinä — "hyväksy mikä tahansa tunnistamaton pääte tekstinä jos
+// sisältö on validia UTF-8:aa" (tarkistetaan erikseen luvun yhteydessä).
+function tiedostonTyyppi(file) {
+  const paate = tiedostonPaate(file.name);
+  if (TIEDOSTO_HYLATYT_PAATTEET.indexOf(paate) !== -1) return 'hylatty';
+  if (paate === 'pdf' || file.type === 'application/pdf') return 'pdf';
+  if (TIEDOSTO_KUVA_PAATTEET.indexOf(paate) !== -1 || /^image\//.test(file.type)) return 'kuva';
+  if (paate === 'pptx' || paate === 'ppt' || file.type === 'application/vnd.openxmlformats-officedocument.presentationml.presentation') return 'pptx';
+  return 'teksti';
+}
+
+document.getElementById('editori-tiedosto-btn').addEventListener('click', function() {
+  document.getElementById('editori-tiedosto-input').click();
+});
+
+document.getElementById('editori-tiedosto-input').addEventListener('change', async function(e) {
+  const file = e.target.files[0];
+  e.target.value = '';
+  if (!file) return;
+  await kasitteleEditoriTiedosto(file);
+});
+
+function naytaEditoriTiedostoTila(teksti, onVirhe) {
+  const tilaEl = document.getElementById('editori-tiedosto-tila');
+  tilaEl.textContent = teksti;
+  tilaEl.classList.toggle('editori-tiedosto-virhe', !!onVirhe);
+  tilaEl.style.display = 'block';
+}
+
+async function kasitteleEditoriTiedosto(file) {
+  const tyyppi = tiedostonTyyppi(file);
+
+  if (tyyppi === 'hylatty') {
+    naytaEditoriTiedostoTila('Tiedostotyyppiä ei tueta (.' + tiedostonPaate(file.name) + ') — liitä sisältö tekstinä.', true);
+    return;
+  }
+
+  const kokoraja = tyyppi === 'pdf' ? TIEDOSTO_PDF_KOKORAJA : TIEDOSTO_MUU_KOKORAJA;
+  if (file.size > kokoraja) {
+    naytaEditoriTiedostoTila('Tiedosto on liian iso (' + Math.round(file.size / 1024 / 1024) + ' MB, raja ' + Math.round(kokoraja / 1024 / 1024) + ' MB).', true);
+    return;
+  }
+
+  naytaEditoriTiedostoTila('Ladataan "' + file.name + '"...', false);
+
+  try {
+    if (tyyppi === 'teksti') {
+      // Koodi/tuntematon teksti: EI purkua, EI Storage-tallennusta — sama
+      // polku kuin liitetty teksti (§3.1). U+FFFD-tarkistus karkeana
+      // UTF-8-kelvollisuuden merkkinä: binääritiedosto dekoodautuisi
+      // korvausmerkeiksi, ei pitäisi päätyä muruksi sellaisenaan.
+      const teksti = await file.text();
+      if (teksti.indexOf('�') !== -1) {
+        naytaEditoriTiedostoTila('Tiedosto ei näytä olevan tekstiä (binääridataa?) — ei lisätty.', true);
+        return;
+      }
+      const { data: uusiRivi, error } = await db.from('laituri').insert({ user_id: currentUserId, content: teksti }).select().single();
+      if (ilmoitaKirjoitusvirheesta(error, 'Tiedoston lisäys')) return;
+      if (materiaaliKohdeKurssi && uusiRivi) materiaaliKohdeUudetRivit.add(uusiRivi.id);
+      naytaEditoriTiedostoTila('"' + file.name + '" lisätty.', false);
+      return;
+    }
+
+    // pdf/kuva/pptx: ladataan Storageen SUORAAN selaimesta (ei tämän
+    // palvelimen kautta — pyyntökoko olisi liian pieni isolle pdf:lle,
+    // ks. api/laituri-tiedosto-poiminta.js:n oma kommentti).
+    const polku = currentUserId + '/' + Date.now() + '_' + file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
+    const { error: uploadError } = await db.storage.from('materiaali').upload(polku, file, { contentType: file.type || 'application/octet-stream' });
+    if (uploadError) {
+      console.error('Tiedoston tallennus Storageen epäonnistui:', uploadError);
+      naytaEditoriTiedostoTila('Tallennus epäonnistui — yritä uudelleen.', true);
+      return;
+    }
+
+    let poimittuTeksti = null;
+    if (tyyppi === 'pdf' || tyyppi === 'pptx') {
+      const { data: sessionData } = await db.auth.getSession();
+      const token = sessionData.session ? sessionData.session.access_token : null;
+      const mime = tyyppi === 'pdf' ? 'application/pdf' : 'application/vnd.openxmlformats-officedocument.presentationml.presentation';
+      try {
+        const vastaus = await fetch('/api/laituri-tiedosto-poiminta', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
+          body: JSON.stringify({ storage_polku: polku, mime_tyyppi: mime }),
+        });
+        const tulos = await vastaus.json();
+        if (!vastaus.ok) {
+          // Tiedosto ON jo tallessa Storagessa vaikka poiminta epäonnistuisi
+          // (esim. liikaa sivuja) — ei hukata koko latausta, jatketaan
+          // murun luontiin ilman poimittua tekstiä ja kerrotaan syy.
+          console.error('Tekstin poiminta epäonnistui:', tulos.error);
+          naytaEditoriTiedostoTila((tulos.error || 'Tekstin poiminta epäonnistui') + ' — tiedosto silti tallennettu.', true);
+        } else {
+          poimittuTeksti = tulos.teksti;
+        }
+      } catch (poimintaVirhe) {
+        console.error('Poimintapyyntö epäonnistui (verkko?):', poimintaVirhe.message);
+        naytaEditoriTiedostoTila('Tekstin poiminta epäonnistui — tiedosto silti tallennettu.', true);
+      }
+    }
+
+    const muruSisalto = tyyppi === 'kuva' ? '📷 ' + file.name : (poimittuTeksti || '📎 ' + file.name);
+    const { data: uusiRivi, error: muruError } = await db.from('laituri').insert({ user_id: currentUserId, content: muruSisalto }).select().single();
+    if (ilmoitaKirjoitusvirheesta(muruError, 'Tiedoston lisäys')) return;
+    if (materiaaliKohdeKurssi && uusiRivi) materiaaliKohdeUudetRivit.add(uusiRivi.id);
+
+    const { error: tiedostoError } = await db.from('laituri_tiedostot').insert({
+      muru_id: uusiRivi.id,
+      tiedostonimi: file.name,
+      storage_polku: polku,
+      mime_tyyppi: file.type || 'application/octet-stream',
+      koko_tavua: file.size,
+      poimittu_teksti: poimittuTeksti,
+    });
+    if (tiedostoError) console.error('Tiedoston metatiedon tallennus epäonnistui (tiedosto silti Storagessa ja murussa):', tiedostoError);
+
+    naytaEditoriTiedostoTila('"' + file.name + '" lisätty' + (poimittuTeksti ? ' ja teksti poimittu' : '') + '.', false);
+  } catch (e) {
+    console.error('Tiedoston käsittely epäonnistui:', e.message);
+    naytaEditoriTiedostoTila('Tiedoston käsittely epäonnistui — yritä uudelleen.', true);
+  }
+}
+
 let laituriHakuAjastin = null;
 document.getElementById('laituri-search').addEventListener('input', function(e) {
   clearTimeout(laituriHakuAjastin);
