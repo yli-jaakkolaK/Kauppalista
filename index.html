@@ -299,6 +299,16 @@
       <span></span>
     </div>
 
+    <!-- Välilehdet (2026-08-11, CODE_vaihe1b.md §1b) — renderöidään listasta
+         (ks. HYTTI_VALILEHDET/piirraHyttiValilehdet script.js:ssä), ei
+         kolmena kovakoodattuna nappina. Nyt/Kartta saavat nykyisen
+         sisältönsä sellaisenaan (siirto, ei uutta rakentamista); Reitti on
+         uusi koti "📚 Opinnot"-sisällölle (aiemmin samalla litteällä sivulla
+         kuin päivän ehdotus). -->
+    <div class="hytti-valilehdet" id="hytti-valilehdet"></div>
+
+    <div id="hytti-tabi-nyt">
+
     <div class="settings-row">
       <span id="hytti-tyo-vapaa-label">Opiskelu näkyvissä</span>
       <label class="toggle">
@@ -397,20 +407,32 @@
 
     <p class="section-link" id="hytti-arkisto-linkki" style="display:none">Arkisto</p>
 
-    <hr class="divider">
+    </div> <!-- /hytti-tabi-nyt -->
 
     <!-- Opintopolku VAIHE 1 (2026-07-21, ks. muistiinpanot.md "Opintopolku" /
          KONSEPTIKIRJA.md 4.11) — yksityinen opiskelumoduuli Hytin sisällä,
          sama "vain omistaja näkee" -periaate kuin muukin Hytti. VAIHE 1:
-         perusta ilman kolmen voiman moottoria/spaced repetitionia (Vaihe 2). -->
-    <div class="section-title">📚 Opinnot <span class="opinto-kartta-linkki" id="opinto-kartta-linkki">🗺️ Kartta</span></div>
-    <ul class="list" id="opinto-kurssi-lista"></ul>
-    <p class="section-empty" id="opinto-tyhja" style="display:none">Ei vielä kursseja. Lisää ensimmäinen alta.</p>
+         perusta ilman kolmen voiman moottoria/spaced repetitionia (Vaihe 2).
+         Muotokieli uusitaan omana erikseen tehtävänä (§4) — tässä vain
+         siirretty pois "Nyt"-välilehdeltä, sisältö koskematta. -->
+    <div id="hytti-tabi-reitti" style="display:none">
+      <div class="section-title">📚 Opinnot</div>
+      <ul class="list" id="opinto-kurssi-lista"></ul>
+      <p class="section-empty" id="opinto-tyhja" style="display:none">Ei vielä kursseja. Lisää ensimmäinen alta.</p>
 
-    <div class="add-item">
-      <span class="prefix">›</span>
-      <input type="text" id="opinto-uusi-kurssi-input" placeholder="uuden kurssin nimi...">
-      <button id="opinto-uusi-kurssi-btn">+</button>
+      <div class="add-item">
+        <span class="prefix">›</span>
+        <input type="text" id="opinto-uusi-kurssi-input" placeholder="uuden kurssin nimi...">
+        <button id="opinto-uusi-kurssi-btn">+</button>
+      </div>
+    </div>
+
+    <!-- Kokonaiskartta ("näkymä 2") — LUETTAVA vilkaisu, EI ohjaava. Oli oma
+         #opinto-kartta-view, nyt kolmas välilehti (§1b) — oma list-header
+         poistettu, Hytin yhteinen otsake+välilehdet riittävät. -->
+    <div id="hytti-tabi-kartta" style="display:none">
+      <p class="section-empty">Missä menen — vilkaisu, ei tehtävälista.</p>
+      <div id="opinto-kartta-sisalto"></div>
     </div>
   </div>
 
@@ -501,16 +523,6 @@
   <!-- Opintopolku VAIHE 1 — kokonaiskartta ("näkymä 2"): kaikki kurssit
        palkkeina, väri = vaihe, deadline näkyvissä. LUETTAVA vilkaisu, EI
        ohjaava (ei toimintonappeja tässä näkymässä). -->
-  <div class="container" id="opinto-kartta-view" style="display:none">
-    <div class="list-header">
-      <button class="back-btn" id="opinto-kartta-back-btn">‹</button>
-      <h1>✱ KOKONAISKARTTA ✱</h1>
-      <span></span>
-    </div>
-    <p class="section-empty">Missä menen — vilkaisu, ei tehtävälista.</p>
-    <div id="opinto-kartta-sisalto"></div>
-  </div>
-
   <!-- Taitosolmut (2026-08-04, ks. muistiinpanot.md "Taitosolmut") — yhden
        solmun näkymä: PACER-vaihe, lähde/linkki/tavoiteikkuna, vapaa
        muistiinpanot-kenttä, kaaret (tarvitsee-portti + liittyy-kartta),

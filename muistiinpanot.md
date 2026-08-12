@@ -3605,11 +3605,23 @@ Korvasi Laiturin pienen `#laituri-input`-kentän (yksirivinen `<input>`) yhdell�
 
 sw.js v117 → v118.
 
+### Hytti-vaihe 1b, §1b: välilehtirakenne (2026-08-11)
+
+Hytti sai kolme välilehteä (Nyt/Reitti/Kartta), renderöitynä listasta (`HYTTI_VALILEHDET`/`piirraHyttiValilehdet()`) — ei kolmea kovakoodattua nappia. Nyt = kaikki entinen `#hytti-view`-sisältö PAITSI "📚 Opinnot" (aikaikkuna, huoli, taitosolmut, tänään, tehtävät, kortit — koskematta). Reitti = uusi koti "📚 Opinnot"-sisällölle, siirretty sellaisenaan (muotokieli uusitaan omana seuraavana tehtävänä, §4). Kartta = entinen erillinen `#opinto-kartta-view` (oma `.list-header`+takaisin-nappi poistettu, tarpeeton kun sisältö on välilehti eikä oma näkymä).
+
+`showHyttiView(valilehti)` sai valinnaisen parametrin — oletus `'nyt'`. Kaksi kutsupaikkaa jotka palaavat kurssikontekstista (`opinto-kurssi-back-btn`, kurssin poisto) siirretty käyttämään `showHyttiView('reitti')`, koska ne kuuluvat loogisesti Reittiin, eivät Nyt-välilehdelle. Kaikki MUUT n. 8 `showHyttiView()`-kutsupaikkaa (Ruorin Hytti-kortti, alapalkki, vanha navigointiruudukko, taitosolmu/hytti-kortti-takaisinnapit) käyttävät oletusta ('nyt') koskematta — kaikki nämä varmistettu kulkevan saman `avaaOsio({route:'hytti'})`-reitin kautta paitsi taitosolmu/kortti-paluut jotka menevät suoraan.
+
+**Kriittinen bugi löytyi ja korjattiin ITSE ennen committia:** `piilotaKaikkiNakymat()` (JOKA näkymänvaihdon yhteydessä kutsuttava perusfunktio) viittasi yhä poistettuun `#opinto-kartta-view`-elementtiin — olisi heittänyt `Cannot set properties of null`-virheen JOKA IKISESSÄ näkymänvaihdossa koko sovelluksessa, ei vain Hytissä. Löytyi systemaattisella grep-tarkistuksella ennen validointia, ei käyttäjän raportoimana — tämä on juuri se syy miksi jokainen erä tässä istunnossa validoidaan (syntaksi + CSS-tasapaino + id-ristiinviittaukset) ennen committia, ei vasta jos joku huomaa livenä.
+
+**Ei vielä testattu oikealla laitteella** (spekin oma eksplisiittinen vaatimus, §1b: "Testaa nämä erikseen"): Ruorin Hytti-kortin avaus, alapalkin Hytti-kuvake, vanha navigointiruudukon Hytti-ruutu, kurssin/taitosolmun/kortin takaisin-napit, välilehtien vaihto itse laitteella.
+
+sw.js v118 → v119.
+
 ---
 
 ## Nykytila ja seuraavat askeleet (päivitetty 2026-08-11, COPILOT.md-sääntö 4)
 
-**Viimeksi tehty** (tämä istunto, kaikki commitoitu ja pushattu mainiin, `sw.js` nyt v118): koko "Ruori — visuaalinen uudistus" -speksi rakennettu ja Katrin kahdella puhelimella elävästi testattu, siitä noussut iso korjauskierros. **Nyt käynnissä: `CODE_vaihe1b.md` (Hytti-vaihe 1b, Laiturin sisääntulo)** — §7:n kaksi selvitystä tehty (PDF-rajat 32MB/100 sivua, pptx-purku pieni urakka jszip:llä), §8b (Lokin yksityinen tietokohde + ankkurien koti-auditointi, **HUOM `sql/115` ei ajettu**) ja §2 (jaettu täysinäytön editori, korvaa Laiturin pienen kentän) rakennettu. Kesken: §1b välilehtirakenne (Nyt/Reitti/Kartta), §4-5 kurssiosio+konteksti, §3 tiedostojen tuonti.
+**Viimeksi tehty** (tämä istunto, kaikki commitoitu ja pushattu mainiin, `sw.js` nyt v119): koko "Ruori — visuaalinen uudistus" -speksi rakennettu ja Katrin kahdella puhelimella elävästi testattu, siitä noussut iso korjauskierros. **Nyt käynnissä: `CODE_vaihe1b.md` (Hytti-vaihe 1b, Laiturin sisääntulo)** — §7 (kaksi selvitystä), §8b (Lokin yksityinen tietokohde, **HUOM `sql/115` ei ajettu**), §2 (jaettu täysinäytön editori) ja §1b (välilehtirakenne Nyt/Reitti/Kartta) rakennettu. Kesken: §4-5 kurssiosio+konteksti, §3 tiedostojen tuonti.
 
 **Auki jäänyt, odottaa Katrin vastausta ennen rakentamista** (ei koodattu, koska väärä arvaus olisi tässä pahempi kuin kysyminen):
 1. Kalenterin kuittaus omille lisäyksille — todennäköisesti `kalenteri_tekijat`-taulun puuttuva/väärä organizer-kartoitus perhekalenterille, ei koodibugi. Katrin pitää tarkistaa taulun sisältö Supabasen Table Editorista.
@@ -3620,4 +3632,4 @@ sw.js v117 → v118.
 4. Alapalkin kuvakkeet — kaikki paitsi Kalenteri siirtyivät oikein alkuperäisiin emojeihin; Kalenteri kavennettava jotta numeron alle mahtuu viikonpäivän lyhenne (seuraa oikeaa viikonpäivää kuten numerokin); Ruorin kuvake hieman vasemmalle; kaikki kuvakkeet PALJON isommiksi (lähes reunasta reunaan, muutama milli marginaalia); painettavan muotokieli (lämmin lasi) puuttuu vielä tabeista kokonaan.
 5. Ruorin ankkuri-kuvake — väri on väärä (messinki, pitäisi olla harmaa kuten muualla — messinki sallittu vain varjostuksena), painettavan muotokieli puuttunee, näkyvä tausta liian iso (pitäisi olla vain muutama milli kuvakkeen ympärillä, sama koskee ⋯:tä) — kosketusalue voi olla isompi mutta ei mene päällekkäin viereisen napin kanssa.
 
-**Seuraava iso työerä (Vaihe 1b jatkuu):** §1b (välilehtirakenne, siirto ei uutta rakentamista — Nyt/Kartta sellaisenaan, Reitti uusi kurssiosion kotina), sitten §4 (kurssiosion visuaalinen uudistus) + §5 (kurssikonteksti päästä päähän), sitten §3 (tiedostojen tuonti: pdf/kuva/pptx/koodi Supabase Storageen).
+**Seuraava iso työerä (Vaihe 1b jatkuu):** §4 (kurssiosion visuaalinen uudistus Reitti-välilehdellä — luettavan pinnan kortit, PERO-vaihe messingillä, jäljellä-palkki) + §5 (kurssikonteksti "+ Lisää materiaalia" päästä päähän, laajentaa olemassa olevaa editoria), sitten §3 (tiedostojen tuonti: pdf/kuva/pptx/koodi Supabase Storageen).

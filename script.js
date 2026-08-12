@@ -20,7 +20,6 @@ function piilotaKaikkiNakymat() {
   document.getElementById('teema-view').style.display = 'none';
   document.getElementById('vahdittu-view').style.display = 'none';
   document.getElementById('opinto-kurssi-view').style.display = 'none';
-  document.getElementById('opinto-kartta-view').style.display = 'none';
   document.getElementById('taitosolmu-view').style.display = 'none';
   document.getElementById('lapsi-view').style.display = 'none';
   piilotaAlapalkki();
@@ -72,10 +71,46 @@ function showAsetuksetView() {
   naytaAlapalkki('asetukset');
 }
 
-function showHyttiView() {
+// Hytin välilehdet (2026-08-11, CODE_vaihe1b.md §1b) — renderöidään
+// listasta, ei kolmena kovakoodattuna nappina. Nyt/Kartta ovat siirrettyjä
+// (sisältö koskematta), Reitti on uusi koti kurssiosiolle. Kartta-lataus
+// laukaistaan vasta kun sille tabille SIIRRYTÄÄN (ei jokaisella Hytin
+// avauksella) — sama "ei turhaa työtä piilossa olevalle sisällölle"
+// -periaate kuin muillakin lazy-ladattavilla osioilla.
+const HYTTI_VALILEHDET = [
+  { id: 'nyt', nimi: 'Nyt' },
+  { id: 'reitti', nimi: 'Reitti' },
+  { id: 'kartta', nimi: 'Kartta' },
+];
+let hyttiAktiivinenValilehti = 'nyt';
+
+function piirraHyttiValilehdet() {
+  const kontti = document.getElementById('hytti-valilehdet');
+  kontti.innerHTML = '';
+  HYTTI_VALILEHDET.forEach(function(v) {
+    const nappi = document.createElement('button');
+    nappi.className = 'kalenteri-tila-btn hytti-valilehti-btn' + (v.id === hyttiAktiivinenValilehti ? ' active' : '');
+    nappi.textContent = v.nimi;
+    nappi.addEventListener('click', function() { vaihdaHyttiValilehti(v.id); });
+    kontti.appendChild(nappi);
+  });
+}
+
+function vaihdaHyttiValilehti(id) {
+  hyttiAktiivinenValilehti = id;
+  piirraHyttiValilehdet();
+  document.getElementById('hytti-tabi-nyt').style.display = id === 'nyt' ? 'block' : 'none';
+  document.getElementById('hytti-tabi-reitti').style.display = id === 'reitti' ? 'block' : 'none';
+  document.getElementById('hytti-tabi-kartta').style.display = id === 'kartta' ? 'block' : 'none';
+  if (id === 'reitti') lataaOpintoKurssit();
+  if (id === 'kartta') lataaOpintoKartta();
+}
+
+function showHyttiView(valilehti) {
   piilotaKaikkiNakymat();
   document.getElementById('hytti-view').style.display = 'block';
   naytaAlapalkki('hytti');
+  vaihdaHyttiValilehti(valilehti || 'nyt');
 }
 
 function showHyttiKorttiView() {
@@ -1083,8 +1118,7 @@ function piirraOpintoKurssiTilaLinkki() {
 
 document.getElementById('opinto-kurssi-back-btn').addEventListener('click', function() {
   currentOpintoKurssi = null;
-  showHyttiView();
-  lataaOpintoKurssit();
+  showHyttiView('reitti');
 });
 
 document.getElementById('opinto-kurssi-poista-btn').addEventListener('click', async function() {
@@ -1094,8 +1128,7 @@ document.getElementById('opinto-kurssi-poista-btn').addEventListener('click', as
   const { error } = await db.from('opinto_kurssit').delete().eq('id', currentOpintoKurssi.id);
   if (ilmoitaKirjoitusvirheesta(error, 'Kurssin poisto')) return;
   currentOpintoKurssi = null;
-  showHyttiView();
-  lataaOpintoKurssit();
+  showHyttiView('reitti');
 });
 
 document.getElementById('opinto-lisaa-materiaalia-btn').addEventListener('click', function() {
@@ -1298,12 +1331,9 @@ document.getElementById('opinto-kurssi-deadline-lisaa-btn').addEventListener('cl
 
 // Kokonaiskartta ("näkymä 2", 2c) — LUETTAVA vilkaisu, EI ohjaava: ei
 // toimintonappeja, ei napautettavia rivejä. Väri = aiheiden vaiheiden
-// summa, deadline = lähin tuleva (kurssi- TAI aihetasolta).
-function showOpintoKarttaView() {
-  piilotaKaikkiNakymat();
-  document.getElementById('opinto-kartta-view').style.display = 'block';
-}
-
+// summa, deadline = lähin tuleva (kurssi- TAI aihetasolta). Oli oma
+// showOpintoKarttaView()-näkymä, nyt kolmas Hytti-välilehti (§1b) —
+// vaihdaHyttiValilehti('kartta') hoitaa näyttämisen ja lataamisen.
 async function lataaOpintoKartta() {
   const { data: kurssit, error: kurssiError } = await db.from('opinto_kurssit').select().order('sort_order');
   if (kurssiError) {
@@ -1372,15 +1402,6 @@ async function lataaOpintoKartta() {
     sisalto.appendChild(kortti);
   }
 }
-
-document.getElementById('opinto-kartta-linkki').addEventListener('click', function() {
-  showOpintoKarttaView();
-  lataaOpintoKartta();
-});
-document.getElementById('opinto-kartta-back-btn').addEventListener('click', function() {
-  showHyttiView();
-  lataaOpintoKurssit();
-});
 
 // === OPINTOPOLKU VAIHE 2: KOLMEN VOIMAN MOOTTORI (2026-07-21, ks.
 // muistiinpanot.md "Opintopolku VAIHE 2" — KONSEPTIKIRJA.md 4.11 puuttuu

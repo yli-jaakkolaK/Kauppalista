@@ -1982,6 +1982,15 @@ h1 {
   margin: 10px 0;
 }
 
+/* Hytin välilehdet (2026-08-11, CODE_vaihe1b.md §1b) — sama
+   .kalenteri-tila-btn-tyyli uudelleenkäytettynä (Pika/Kellonaika-tyyppinen
+   välilehtikieli, ei uutta napkieltä), vain otsakkeen alle oma väli. */
+.hytti-valilehdet {
+  display: flex;
+  gap: 8px;
+  margin: 14px 0 10px;
+}
+
 /* Valmistautumisvaihe (2026-07-18, ks. muistiinpanot.md) — kevyt rivi
    päämuistutuksen välilehtien alla, koskee kumpaakin (Pika/Kellonaika).
    Sinnikäs muistutus (2026-07-19, ks. muistiinpanot.md "Sinnikäs muistutus")
