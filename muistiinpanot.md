@@ -3576,3 +3576,17 @@ Tyyli siirretty merikartta/loki-tokeneihin (paperi/muste/hius/r-luettava/r-koske
 Haptiikka: kevyt `vibrate(8)` välilehtien vaihdossa (Pika/Kellonaika, Viikonpäivät/Väliajoin), Toistuva-täpän kytkennässä, viikonpäivänapeissa ja rullien `change`-tapahtumassa (natiivi `<select>` ei anna JS:lle tapahtumaa jokaisesta visuaalisesta pykälästä avoinna ollessaan, koska se on käyttöjärjestelmän oma UI — `change` on lähin saatavilla oleva koukku). Kolme "Aseta"-nappia saivat vahvemman kolmoispulssin (`tuntopalauteValmis()`, jo olemassa oleva sovelluksen jaettu vahvistushaptiikka).
 
 sw.js v115 → v116.
+
+---
+
+## Nykytila ja seuraavat askeleet (päivitetty 2026-08-11, COPILOT.md-sääntö 4)
+
+**Viimeksi tehty** (tämä istunto, kaikki commitoitu ja pushattu mainiin, `sw.js` nyt v116): koko "Ruori — visuaalinen uudistus" -speksi rakennettu ja Katrin kahdella puhelimella elävästi testattu; siitä noussut korjauskierros (raahaus, kontrasti, kuvakkeet, Laiturin tausta, otsakkeen v2, sään laatikoton layout + tuulikuvake, alkuperäiset ruudukkokuvakkeet, ⋯-arkin navigointibugi); Kuormitustilan appikuvake-jäännösbugi; Asetusten siivous (äly-loki kollapsoitu, versio ylös); vaakatilatuki listoille; parisuhdeajan kellonajan muokkaus + kalenterisilta-bugin korjaus (**HUOM: `sql/114` ei ole vielä ajettu Supabasessa**); muistutus-dialogin uudistus kolmeen osioon + merikartta-tyyliin + haptiikkaan.
+
+**Auki jäänyt, odottaa Katrin vastausta ennen rakentamista** (ei koodattu, koska väärä arvaus olisi tässä pahempi kuin kysyminen):
+1. Kalenterin kuittaus omille lisäyksille — todennäköisesti `kalenteri_tekijat`-taulun puuttuva/väärä organizer-kartoitus perhekalenterille, ei koodibugi. Katrin pitää tarkistaa taulun sisältö Supabasen Table Editorista.
+2. Varasto/"vahdittu" — Katri haluaa listan sijaan otsikko+aikaleimattu-lokimalli (esim. bussikortin saldohistoria). Ei skoopattu.
+3. Laiturin jatkosäie — nykyinen `valutaVanhatSegmentitKotiin()` vaatii AINA manuaalisesti asetetun kodin ennen kuin mikään valuu Varastoon; Katrin kuvaus ("säie tulee → muru menee automaattisesti Varastoon") viittaa siihen että hän odottaa automaattista laukaisua. Kysytty, ei vielä vastausta.
+4. `laituri-teema-select` — kuollutta koodia (script.js viittaa, ei ole index.html:ssä), harmiton mutta tarkoitus epäselvä.
+
+**Seuraava iso työerä (ei vielä aloitettu):** `CODE_vaihe1b.md` (Katrin Downloads-kansiossa, avattu IDE:ssä 2026-08-11) — Hytti-vaihe 1b "Laiturin sisääntulo": jaettu koko sovelluksen editorikomponentti, tiedostojen tuonti (pdf/kuva/pptx/koodi, EI docx/zip/ipynb v1:ssä), kurssiosion muotokielen uusinta Reitti-välilehdellä, kurssikonteksti "+ Lisää materiaalia"-napille, sekä §8b: yksityinen `loki_merkinnat`-tietokohde etusivulta-lisättyjen ankkurien laskeutumiselle (yleistää `CODE_ruori.md` §4.5:n "jaettu vs. yksityinen" -sääntöön, vaatii ensin auditoinnin KAIKISTA ankkurin lisäyspaikoista jaettu/yksityinen-luokittelua varten — nimenomaisesti kysytty, ei arvattava). Spekin oma §7 vaatii kaksi selvitystä ENNEN koodausta: pptx-purun laajuus ja Anthropic-API:n PDF-koko/sivurajat — näitä ei ole vielä tehty.
