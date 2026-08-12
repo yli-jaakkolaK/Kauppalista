@@ -135,18 +135,14 @@ const ALAPALKKI_IKONIT = {
   // toimivaksi, Kalenterilla on jo sama elävä päivä-käytös kuin
   // ruudukossakin (ei pelkkä 🗓️-emoji siellä sen enempää).
   laituri: '<span class="alapalkki-emoji">🛟</span>',
-  // Kavennettu (2026-08-11, elävä testaus) — numero ja viikonpäivä
-  // menivät päällekkäin (numero y=17.5/koko 8.5 ulottui 13-22, viikonpäivä
-  // y=22.7/koko 5 ulottui 20.2-25.2). Rungon leveys 20->16 (kapeampi
-  // kalenterikehys), numero+viikonpäivä siirretty erilleen ilman
-  // päällekkäisyyttä.
-  // fill vaihdettu var(--paperi) -> #FDFBF6 (2026-08-11, elävä testaus:
-  // "en näe kalenterikuvaketta alapalkissa") — --paperi (#EAE6DC) on lähes
-  // sama sävy kuin alapalkin OMA tausta (rgba(234,230,220,.92)) JA uusi
-  // lasipinta-kehys, joten "sivu" hukkui näkymättömiin omaan taustaansa,
-  // jäljellä vain ohut muste-ääriviiva. Kirkkaampi, selvästi kontrastoiva
-  // paperinvalkoinen erottuu sekä alapalkista että lasista.
-  kalenteri: '<svg viewBox="0 0 28 28" fill="none"><rect x="6" y="7" width="16" height="17" rx="2" fill="#FDFBF6" stroke="var(--muste)" stroke-width="1.5"/><path d="M10 3.5v5M18 3.5v5" stroke="var(--muste)" stroke-width="1.5" stroke-linecap="round"/><text x="14" y="15.5" font-family="\'Courier Prime\',monospace" font-weight="700" font-size="7.5" text-anchor="middle" fill="var(--muste)" data-role="kal-numero"></text><text x="14" y="21.3" font-family="\'Courier Prime\',monospace" font-size="4.5" letter-spacing="0.04em" text-anchor="middle" fill="var(--muste)" data-role="kal-vk"></text></svg>',
+  // Korvattu (2026-08-12, Katrin pyyntö: "täsmälleen sama kalenterikuvake
+  // kuin ruudukossa") käsinpiirretyllä SVG-versiolla kokeillun sijaan —
+  // sama markup/luokat kuin navigointiruudukon .tile-icon-kalenteri:ssä
+  // (ks. lataaOsiot()): messinki/sinappi-reunus, KUUKAUDEN lyhenne
+  // täyttötaustaisessa yläraidassa (EI viikonpäivä — se oli väärä lukema
+  // tähän kuvakkeeseen alunperin), iso päivänumero alla. Arvot täytetään
+  // paivitaAlapalkkiKalenteriPaiva():ssa data-role-attribuuttien kautta.
+  kalenteri: '<span class="alapalkki-kal-ikoni"><span class="alapalkki-kal-kk" data-role="alapalkki-kal-kk"></span><span class="alapalkki-kal-pv" data-role="alapalkki-kal-pv"></span></span>',
   hytti: '<span class="alapalkki-emoji">🚪</span>',
   muistilaput: '<span class="alapalkki-emoji">🗒️</span>',
   varasto: '<span class="alapalkki-emoji">📦</span>',
@@ -203,14 +199,16 @@ function luoAlapalkkiNappi(id) {
   return nappi;
 }
 
+// Täyttää sekä alapalkin että järjestysarkin kalenterikuvakkeet (kaikki
+// data-role-osumat dokumentissa, ei vain kiinnitetyt) — sama kuukauden
+// lyhenne + päivänumero kuin navigointiruudukon .tile-icon-kalenteri
+// käyttää (lataaOsiot()), KALENTERI_KUUKAUDET on sama jaettu vakio.
 function paivitaAlapalkkiKalenteriPaiva() {
-  const numeroEl = document.querySelector('#alapalkki-kiinnitetyt [data-role="kal-numero"]');
-  const vkEl = document.querySelector('#alapalkki-kiinnitetyt [data-role="kal-vk"]');
-  if (!numeroEl || !vkEl) return;
-  const paivat = ['SU', 'MA', 'TI', 'KE', 'TO', 'PE', 'LA'];
   const nyt = new Date();
-  numeroEl.textContent = nyt.getDate();
-  vkEl.textContent = paivat[nyt.getDay()];
+  const kk = KALENTERI_KUUKAUDET[nyt.getMonth()].slice(0, 3).toUpperCase();
+  const pv = nyt.getDate();
+  document.querySelectorAll('[data-role="alapalkki-kal-kk"]').forEach(function(el) { el.textContent = kk; });
+  document.querySelectorAll('[data-role="alapalkki-kal-pv"]').forEach(function(el) { el.textContent = pv; });
 }
 
 // Ruori on koko sovelluksen "koti" ja siksi AINA näkyvissä alapalkissa
@@ -290,6 +288,7 @@ function piirraAlapalkkiArkki() {
     }
     lista.appendChild(li);
   });
+  paivitaAlapalkkiKalenteriPaiva();
 }
 
 // Raahaus (2026-08-11 korjattu, elävä testaus §1.1) — ALKUPERÄINEN versio
