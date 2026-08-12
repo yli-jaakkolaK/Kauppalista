@@ -6370,11 +6370,16 @@ const ANKKURI_MENU_IKONIT = {
 // tämä kartta kääntää ankkurin kotilähteen sen kotitaulun OMAAN
 // muistutus-sanastoon, jotta ankkurin ⏰:llä asetettu muistutus voidaan
 // siirtää kotiin laskun yhteydessä sen sijaan että se katoaisi.
-const ANKKURI_KOTI_MUISTUTUS_LAHDE = { muistilaput: 'rivi', hytti: 'hytti_rivi', aly: 'laituri' };
+// 'etusivu' lisätty (2026-08-11, CODE_vaihe1b.md §8b) — ks. loki_merkinnat-
+// kirjoitus irrotaNappi-käsittelijässä alempana. Muistutus säilyy tietona
+// tietokannassa vaikka Lokilla ei vielä ole omaa näkymää (Vaihe 5) — se
+// vain ei näytä "löytyy X:stä" -badgea missään ennen kuin Loki rakennetaan,
+// samalla tavalla kuin mikä tahansa muu toistaiseksi näkymätön taulu.
+const ANKKURI_KOTI_MUISTUTUS_LAHDE = { muistilaput: 'rivi', hytti: 'hytti_rivi', aly: 'laituri', etusivu: 'loki_merkinnat' };
 function ankkurinKotiMuistutusLahde(ankkuri) {
   return ANKKURI_KOTI_MUISTUTUS_LAHDE[ankkuri.source] || ankkuri.source;
 }
-const ANKKURI_KOTI_NIMI = { muistilaput: 'Muistilapuista', kalenteri: 'Kalenterista', hytti: 'Hytistä', laituri: 'Laiturista', aly: 'Laiturista' };
+const ANKKURI_KOTI_NIMI = { muistilaput: 'Muistilapuista', kalenteri: 'Kalenterista', hytti: 'Hytistä', laituri: 'Laiturista', aly: 'Laiturista', etusivu: 'Lokista' };
 
 // "Siirrä myöhemmäksi" (2026-07-17, ks. muistiinpanot.md "💬-ehdotuksen
 // elinkaari") — yleinen apufunktio KAIKILLE ankkuri-/ehdokasriveille (aiemmin
@@ -6562,61 +6567,75 @@ async function lataaAnkkurit() {
     // Poisto EI TAPAHDU heti — 5s kumottava toast ensin, todellinen poisto
     // vasta jos ei kumota. Rivi vain himmenee tänä aikana, ei katoa DOM:ista.
     //
-    // KORJATTU 2026-08-11 (Ruori-speksi §4.5): source='etusivu' (käsin
-    // kirjoitettu, ei enää Laituri-kotia, ks. ankkurit-add-btn-käsittelijä
-    // yllä) EI voi laskeutua mihinkään ennen kuin Hytin Loki-välilehti on
-    // olemassa (§6b, Vaihe 5) — nappi on siis POIS KÄYTÖSTÄ tälle lähteelle,
-    // ei koska sisältöä ei voisi turvata vaan koska kohdetta ei vielä ole.
+    // KORJATTU 2026-08-11 (CODE_vaihe1b.md §8b): source='etusivu' (käsin
+    // kirjoitettu, ei Laituri-kotia, ks. ankkurit-add-btn-käsittelijä yllä)
+    // sai nyt oman kotinsa — loki_merkinnat (sql/115), yksityinen taulu Lokin
+    // tulevaa näkymää varten (Vaihe 5, ei vielä rakennettu). Muilla lähteillä
+    // koti on jo olemassa oleva rivi (Laituri/Muistilaput/Hytti/Kalenteri) —
+    // lasku vain poistaa ankkurin, sisältö on jo turvassa alkuperäisellä
+    // rivillä. Etusivulla EI ole olemassa olevaa kotia, joten lasku kirjoittaa
+    // ensin loki_merkinnat-rivin ja vasta SEN onnistuttua poistaa ankkurin —
+    // ei koskaan toisin päin (kirjoituspolkujen sääntö: älä tuhoa ainoaa
+    // kopiota ennen kuin uusi koti on varmasti tallessa).
     const irrotaNappi = document.createElement('button');
     irrotaNappi.innerHTML = ANKKURI_SVG;
     irrotaNappi.className = 'anchor-btn active';
-    if (ankkuri.source === 'etusivu') {
+    irrotaNappi.addEventListener('click', function() {
+      li.style.opacity = '0.3';
       irrotaNappi.disabled = true;
-      irrotaNappi.title = 'Odottaa Hytin Loki-välilehteä (ei vielä olemassa) — sisältö pysyy täällä sitä asti';
-    } else {
-      irrotaNappi.addEventListener('click', function() {
-        li.style.opacity = '0.3';
-        irrotaNappi.disabled = true;
-        const kotiNimi = ANKKURI_KOTI_NIMI[ankkuri.source];
-        naytaKumottavaIlmoitus(
-          kotiNimi ? ('Ankkuri laskettu — löytyy ' + kotiNimi) : 'Ankkuri laskettu',
-          async function() {
-            const { error } = await db.from('ankkurit').delete().eq('id', ankkuri.id);
-            // Kumottava toasti on jo näytetty/kadonnut tähän mennessä — pysäytys
-            // (return) estää seuraavan, RIIPPUVAN muistutus-siirron ajautumasta
-            // ankkurin ollessa yhä olemassa, ja uusi toast kertoo epäonnistumisesta.
-            if (ilmoitaKirjoitusvirheesta(error, 'Ankkurin irrotus')) return;
-            // BUGIKORJAUS ("Ankkuriarkkitehtuuri: jokaisella ankkurilla on
-            // koti"): LASKU POISTAA VAIN NOSTON — muistutukset kuuluvat
-            // sisällölle, eivät nostolle, joten ne SIIRRETÄÄN kotiin sen
-            // sijaan että poistettaisiin. Hyväksytty ihmislähtöinen ehdotus
-            // ('ehdotus' — koti on LÄHETTÄJÄN oma Laituri, ei jotain jonne
-            // vastaanottaja pääsisi) putoaa varasuunnitelmaan (poisto).
-            // source='etusivu' ei koskaan päädy tänne (nappi pois käytöstä yllä).
-            let muistutusVirhe;
-            if (ankkuri.source && ankkuri.source !== 'etusivu' && ankkuri.source !== 'ehdotus' && ankkuri.source_ref) {
-              const kotiLahde = ankkurinKotiMuistutusLahde(ankkuri);
-              const tulos = await db.from('muistutukset')
-                .update({ source: kotiLahde, source_ref: String(ankkuri.source_ref) })
-                .eq('source', 'ankkuri').eq('source_ref', String(ankkuri.id));
-              muistutusVirhe = tulos.error;
-            } else {
-              const tulos = await db.from('muistutukset').delete().eq('source', 'ankkuri').eq('source_ref', String(ankkuri.id));
-              muistutusVirhe = tulos.error;
+      const kotiNimi = ANKKURI_KOTI_NIMI[ankkuri.source];
+      naytaKumottavaIlmoitus(
+        kotiNimi ? ('Ankkuri laskettu — löytyy ' + kotiNimi) : 'Ankkuri laskettu',
+        async function() {
+          let lokiRivi = null;
+          if (ankkuri.source === 'etusivu') {
+            const { data, error: lokiError } = await db.from('loki_merkinnat')
+              .insert({ owner_id: currentUserId, content: ankkuri.content })
+              .select().single();
+            if (ilmoitaKirjoitusvirheesta(lokiError, 'Lokiin kirjoitus')) {
+              li.style.opacity = '';
+              irrotaNappi.disabled = false;
+              return;
             }
-            // Ankkuri on jo poistettu onnistuneesti — muistutuksen siirto/poisto
-            // on toissijainen siivous, ei enää perumiskelpoinen tässä vaiheessa,
-            // joten vain lokitetaan (ei toista tointa käyttäjälle).
-            if (muistutusVirhe) console.error('Muistutuksen siirto/poisto ankkurin irrotuksessa epäonnistui:', muistutusVirhe);
-            lataaAnkkurit();
-          },
-          function() {
-            li.style.opacity = '';
-            irrotaNappi.disabled = false;
+            lokiRivi = data;
           }
-        );
-      });
-    }
+          const { error } = await db.from('ankkurit').delete().eq('id', ankkuri.id);
+          // Kumottava toasti on jo näytetty/kadonnut tähän mennessä — pysäytys
+          // (return) estää seuraavan, RIIPPUVAN muistutus-siirron ajautumasta
+          // ankkurin ollessa yhä olemassa, ja uusi toast kertoo epäonnistumisesta.
+          if (ilmoitaKirjoitusvirheesta(error, 'Ankkurin irrotus')) return;
+          // BUGIKORJAUS ("Ankkuriarkkitehtuuri: jokaisella ankkurilla on
+          // koti"): LASKU POISTAA VAIN NOSTON — muistutukset kuuluvat
+          // sisällölle, eivät nostolle, joten ne SIIRRETÄÄN kotiin sen
+          // sijaan että poistettaisiin. Hyväksytty ihmislähtöinen ehdotus
+          // ('ehdotus' — koti on LÄHETTÄJÄN oma Laituri, ei jotain jonne
+          // vastaanottaja pääsisi) putoaa varasuunnitelmaan (poisto).
+          // etusivu käyttää juuri luotua loki_merkinnat-rivin id:tä
+          // source_ref:nä, koska ankkurilla itsellään ei ollut sellaista.
+          let muistutusVirhe;
+          const kotiSourceRef = ankkuri.source === 'etusivu' ? (lokiRivi ? String(lokiRivi.id) : null) : ankkuri.source_ref;
+          if (ankkuri.source && ankkuri.source !== 'ehdotus' && kotiSourceRef) {
+            const kotiLahde = ankkurinKotiMuistutusLahde(ankkuri);
+            const tulos = await db.from('muistutukset')
+              .update({ source: kotiLahde, source_ref: kotiSourceRef })
+              .eq('source', 'ankkuri').eq('source_ref', String(ankkuri.id));
+            muistutusVirhe = tulos.error;
+          } else {
+            const tulos = await db.from('muistutukset').delete().eq('source', 'ankkuri').eq('source_ref', String(ankkuri.id));
+            muistutusVirhe = tulos.error;
+          }
+          // Ankkuri on jo poistettu onnistuneesti — muistutuksen siirto/poisto
+          // on toissijainen siivous, ei enää perumiskelpoinen tässä vaiheessa,
+          // joten vain lokitetaan (ei toista tointa käyttäjälle).
+          if (muistutusVirhe) console.error('Muistutuksen siirto/poisto ankkurin irrotuksessa epäonnistui:', muistutusVirhe);
+          lataaAnkkurit();
+        },
+        function() {
+          li.style.opacity = '';
+          irrotaNappi.disabled = false;
+        }
+      );
+    });
 
     // Pino oikeassa reunassa (§4.2): ⚓ ja ⋯ allekkain, eivät vierekkäin —
     // tekstit ovat usein monisanaisia ja niiden pitää näkyä kokonaan.
@@ -10571,9 +10590,10 @@ document.getElementById('visibility-toggle').addEventListener('change', async fu
 // ankkuri EI enää luo Laituri-riviä ollenkaan — source='etusivu' erottaa
 // sen laituri-lähtöisistä (source='laituri'), sisältö asuu VAIN ankkurit-
 // taulussa (henkilökohtainen, RLS user_id-rajattu). Turvainvariantti
-// säilyy toisella tavalla: lasku on POIS KÄYTÖSTÄ source='etusivu'-
-// ankkureille kunnes Hytin Loki-välilehti on olemassa (§4.5, Vaihe 5) —
-// sisältö ei voi kadota koska sitä ei voi laskea, ei koska sillä on koti.
+// säilyi toisella tavalla: lasku oli POIS KÄYTÖSTÄ source='etusivu'-
+// ankkureille kunnes niillä oli koti. KORJATTU 2026-08-11 (CODE_vaihe1b.md
+// §8b): loki_merkinnat (sql/115) on nyt se koti — lasku toimii, ks.
+// irrotaNappi-käsittelijä lataaAnkkurit()-listauksessa.
 document.getElementById('ankkurit-add-btn').addEventListener('click', async function() {
   const ankkuriInput = document.getElementById('ankkurit-input');
   const teksti = ankkuriInput.value.trim();
