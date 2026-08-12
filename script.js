@@ -563,6 +563,32 @@ async function lataaKotinakyma() {
   lataaRuoriSaa();
   paivitaRuoriNakyvyys();
   lataaAlapalkkiJarjestys().then(piirraAlapalkki);
+  naytaOdottavatParisuhdeaikaKalenterit();
+}
+
+// BUGIKORJAUS (2026-08-11, Katrin löytämä): kun molemmat hyväksyvät
+// parisuhdeajan, kalenterisilta-kortti (showCoupleTimeCalendarCard) näytettiin
+// aiemmin VAIN sille jonka hyväksyntä sattui olemaan jälkimmäinen — se joka
+// hyväksyi ENSIN ei koskaan nähnyt "vie kalenteriin" -korttia, koska hänen
+// rivinsä suljettiin heti eikä se enää tullut ehdokaslistassa vastaan. Ks.
+// sql/114 (parisuhde_kalenteri_nahty) + api/parisuhdeaika-hyvaksy.js (joka
+// merkitsee hyväksyjän oman rivin heti nähdyksi — kumppanin rivi jää
+// false:ksi tätä hakua varten). Tämä on käyttäjän OMA rivi, RLS sallii
+// suoran haun/kirjoituksen ilman palvelinreittiä.
+async function naytaOdottavatParisuhdeaikaKalenterit() {
+  const { data, error } = await db.from('ankkurit').select()
+    .eq('user_id', currentUserId).eq('source', 'parisuhdeaika')
+    .eq('done', true).eq('parisuhde_hyvaksytty', true).eq('parisuhde_kalenteri_nahty', false)
+    .limit(1);
+  if (error) {
+    console.error('Odottavien parisuhdeaika-kalentereiden haku epäonnistui:', error);
+    return;
+  }
+  const rivi = (data || [])[0];
+  if (!rivi) return;
+  showCoupleTimeCalendarCard({ content: rivi.content, event_date: rivi.event_date, event_time: rivi.event_time });
+  const { error: merkintaError } = await db.from('ankkurit').update({ parisuhde_kalenteri_nahty: true }).eq('id', rivi.id);
+  if (merkintaError) console.error('Parisuhdeaika-kortin nähdyksi merkintä epäonnistui:', merkintaError);
 }
 
 // Hakee kategorian listat ja piirtää ne annettuun säiliöön. Käytetään sekä
@@ -6804,6 +6830,51 @@ async function loadAnchorCandidates() {
       });
       napitRivi.appendChild(rejectButton);
 
+      // Muokkaa aikaa (2026-08-11, Katrin pyyntö) — ei erillistä
+      // kalenterinäkymää, pelkkä muokattava laatikko samassa lapussa.
+      // Tallennus laskee muokkaajan oman hyväksynnäksi (ks.
+      // editCoupleTimeProposal), kumppanin hyväksyntä nollautuu
+      // palvelimella — hän näkee ehdotuksen taas uutena, uudella ajalla.
+      const muokkausLomake = document.createElement('div');
+      muokkausLomake.className = 'parisuhdeaika-muokkaus';
+      muokkausLomake.style.display = 'none';
+      const pvmInput = document.createElement('input');
+      pvmInput.type = 'date';
+      pvmInput.value = candidate.event_date;
+      const aikaInput = document.createElement('input');
+      aikaInput.type = 'time';
+      aikaInput.value = candidate.event_time.slice(0, 5);
+      const tallennaNappi = document.createElement('button');
+      tallennaNappi.textContent = 'Tallenna';
+      tallennaNappi.className = 'dialog-btn';
+      const peruutaNappi = document.createElement('button');
+      peruutaNappi.textContent = 'Peruuta';
+      peruutaNappi.className = 'delete-btn';
+      muokkausLomake.appendChild(pvmInput);
+      muokkausLomake.appendChild(aikaInput);
+      muokkausLomake.appendChild(tallennaNappi);
+      muokkausLomake.appendChild(peruutaNappi);
+      li.appendChild(muokkausLomake);
+
+      const muokkaaNappi = document.createElement('button');
+      muokkaaNappi.textContent = '✎ Muokkaa aikaa';
+      muokkaaNappi.className = 'dialog-btn dialog-btn-cancel';
+      muokkaaNappi.addEventListener('click', function() {
+        napitRivi.style.display = 'none';
+        muokkausLomake.style.display = 'flex';
+      });
+      napitRivi.appendChild(muokkaaNappi);
+
+      peruutaNappi.addEventListener('click', function() {
+        muokkausLomake.style.display = 'none';
+        napitRivi.style.display = '';
+      });
+      tallennaNappi.addEventListener('click', function() {
+        if (!pvmInput.value || !aikaInput.value) return;
+        tallennaNappi.disabled = true;
+        editCoupleTimeProposal(candidate, pvmInput.value, aikaInput.value);
+      });
+
       li.appendChild(napitRivi);
       listEl.appendChild(li);
       return;
@@ -7060,6 +7131,31 @@ async function rejectCoupleTimeProposal(candidate) {
   } catch (e) {
     console.error('Parisuhdeaika-ehdotuksen hylkäys epäonnistui:', e.message);
     naytaIlmoitus('Hylkäys epäonnistui — yritä uudelleen');
+  }
+  loadAnchorCandidates();
+}
+
+// Couple time proposal — muokkaa kellonaikaa (2026-08-11, Katrin pyyntö,
+// ks. api/parisuhdeaika-muokkaa.js). Muokkaus on toiminnallisesti "hylkää
+// vanha aika, ehdota uutta": kumppanin hyväksyntä nollataan palvelimella
+// (hänen pitää nähdä ja hyväksyä UUSI aika), muokkaajan oma hyväksyntä
+// asetetaan todeksi samalla (Katrin oma päätös — muokkaus + tallennus on
+// jo riittävä sitoutuminen, ei vaadi erillistä toista Hyväksy-painallusta).
+async function editCoupleTimeProposal(candidate, eventDate, eventTime) {
+  const { data: sessionData } = await db.auth.getSession();
+  const token = sessionData.session ? sessionData.session.access_token : null;
+  try {
+    const response = await fetch('/api/parisuhdeaika-muokkaa', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
+      body: JSON.stringify({ ankkuri_id: candidate.id, event_date: eventDate, event_time: eventTime }),
+    });
+    const result = await response.json();
+    if (!response.ok) throw new Error(result.error || 'Muokkaus epäonnistui');
+    naytaIlmoitus('Uusi aika tallennettu — odotetaan kumppanin hyväksyntää');
+  } catch (e) {
+    console.error('Parisuhdeajan muokkaus epäonnistui:', e.message);
+    naytaIlmoitus('Muokkaus epäonnistui — yritä uudelleen');
   }
   loadAnchorCandidates();
 }

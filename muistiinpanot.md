@@ -3552,3 +3552,15 @@ Katri: puhelin vaakaan käännettynä listojen pitäisi leventyä (helpompi näh
 **"Tallennus epäonnistui" jos unohtaa merkin ennen +:** kävin läpi KAIKKI listojen lisäyskäsittelijät (kauppalista, vahdittu, hytti-rivit, ankkurit, Laituri, uusi lista Muistilapuille/Varastolle) — jokaisessa on jo `if (teksti.trim() === '') return`-suoja ennen tietokantakutsua, tyhjä lähetys ei missään näistä osu edes tietokantaan asti. En siis löytänyt tätä bugia lukemalla koodia — jos se toistuu yhä, tarvitaan tarkempi kuvaus (mikä lista, mikä merkki/tilanne tarkalleen) ennen kuin osaa korjata oikeaa asiaa.
 
 sw.js v113 → v114.
+
+### Parisuhdeaika: kellonajan muokkaus + kalenterisilta-bugi kummallekin (2026-08-11)
+
+Kaksi asiaa samassa istunnossa löytyneessä ominaisuudessa.
+
+**Uusi: kellonajan muokkaus ilman erillistä kalenterinäkymää.** Jos AI:n ehdottama parisuhdeaika ei sovi jommallekummalle, ⋯-listan lapussa on nyt "✎ Muokkaa aikaa" -nappi joka avaa `<input type=date>`+`<input type=time>`+Tallenna/Peruuta samaan lappuun (Katrin sanoin: "ei tarvii mitään fancyä kalenterinäkymää"). Uusi palvelinreitti `api/parisuhdeaika-muokkaa.js` (RLS estää kumppanin rivin kirjoituksen suoraan selaimesta, sama service_role-kaava kuin hyväksy/hylkää): päivittää AJAN molemmille riveille, nollaa KUMPPANIN hyväksynnän (hänen pitää nähdä ja hyväksyä uusi aika erikseen) ja asettaa MUOKKAAJAN oman hyväksynnän todeksi samalla (Katrin oma päätös — muokkaus+tallennus riittää, ei vaadi erillistä toista Hyväksy-painallusta).
+
+**Bugi: kalenterisilta näkyi vain jälkimmäiselle hyväksyjälle.** `api/parisuhdeaika-hyvaksy.js` palautti "vie kalenteriin" -kortin (`showCoupleTimeCalendarCard`) vain sille jonka hyväksyntä käynnisti mutual=true-tarkistuksen — se joka hyväksyi ENSIN ei koskaan nähnyt korttia, koska hänen rivinsä suljettiin (`is_candidate=false, done=true`) heti eikä se enää tullut ehdokaslistaan. Katri huomasi tämän suoraan: "ei toiminut ainakaan niin päin et mä hyväksyin eka". Korjaus kaksiosainen: (1) `sql/114_parisuhde_kalenteri_nahty.sql` — uusi `parisuhde_kalenteri_nahty`-sarake (puhtaasti lisäävä, ei backfill-tarvetta), (2) `api/parisuhdeaika-hyvaksy.js`:n sulkeva PATCH jaettu kahdeksi erilliseksi kutsuksi (oma rivi + kumppanin rivi) niin että VAIN hyväksyjän oma rivi merkitään heti nähdyksi, (3) uusi `naytaOdottavatParisuhdeaikaKalenterit()` (script.js, kutsutaan `lataaKotinakyma()`:sta) hakee käyttäjän omat `done=true, parisuhde_hyvaksytty=true, parisuhde_kalenteri_nahty=false` -rivit seuraavalla etusivun latauksella ja näyttää kortin silloin — RLS sallii tämän suoraan selaimesta koska kyse on käyttäjän OMASTA rivistä.
+
+**HUOM migraatio ei ole vielä ajettu** — `sql/114` pitää ajaa Supabasen SQL Editorissa ennen kuin `parisuhde_kalenteri_nahty`-sarake on olemassa (muuten sekä hyväksy- että muokkaa-reitti kaatuvat "column does not exist" -virheeseen).
+
+sw.js v114 → v115.

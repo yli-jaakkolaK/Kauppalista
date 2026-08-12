@@ -1635,6 +1635,27 @@ h1 {
   justify-content: flex-end;
 }
 
+/* Parisuhdeajan inline-muokkaus (2026-08-11) — "ei tarvii mitään fancyä
+   kalenterinäkymää, ihan muokattava laatikko" (Katrin sanoin). Sama lapun
+   sisällä, ei erillinen dialogi. */
+.parisuhdeaika-muokkaus {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  margin-top: 4px;
+}
+.parisuhdeaika-muokkaus input {
+  font-family: inherit;
+  font-size: 14px;
+  padding: 4px 6px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--ground);
+  color: var(--text);
+}
+
 .edit-input {
   flex: 1;
   background: none;

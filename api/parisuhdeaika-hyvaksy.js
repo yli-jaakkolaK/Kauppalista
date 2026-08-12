@@ -90,14 +90,31 @@ module.exports = async function handler(req, res) {
   // Both accepted — close out both rows so this proposal stops showing up
   // as an active candidate for either person. Kirjoituspolkujen rule 4:
   // verify the ACTUAL affected count, don't assume the PATCH touched both.
-  const closeRes = await supabaseFetch('ankkurit?parisuhde_ryhma=eq.' + row.parisuhde_ryhma, {
-    method: 'PATCH',
-    headers: { Prefer: 'return=representation' },
-    body: JSON.stringify({ is_candidate: false, done: true, done_at: new Date().toISOString() }),
-  });
-  const closed = await closeRes.json();
-  if (!closeRes.ok || !Array.isArray(closed) || closed.length !== 2) {
-    console.error('[parisuhdeaika-hyvaksy] Closing both rows after mutual acceptance did not affect exactly 2 rows, group=' + row.parisuhde_ryhma, closeRes.status, JSON.stringify(closed));
+  //
+  // BUGIKORJAUS (2026-08-11, ks. sql/114): erilliset PATCHit per rivi, ei
+  // yksi yhteinen — kutsuja (tämä käyttäjä) NÄKEE kalenterisilta-kortin heti
+  // (parisuhde_kalenteri_nahty=true), mutta kumppani EI ole vielä nähnyt
+  // sitä (jää false:ksi) — script.js:n naytaOdottavatParisuhdeaikaKalenterit()
+  // näyttää sen hänelle seuraavalla latauksella. Aiemmin molemmat rivit
+  // suljettiin identtisesti eikä kumppani (jos hän hyväksyi ENSIN) koskaan
+  // nähnyt korttia ollenkaan.
+  const nytIso = new Date().toISOString();
+  const [omaCloseRes, kumppaninCloseRes] = await Promise.all([
+    supabaseFetch('ankkurit?id=eq.' + ankkuri_id, {
+      method: 'PATCH',
+      headers: { Prefer: 'return=representation' },
+      body: JSON.stringify({ is_candidate: false, done: true, done_at: nytIso, parisuhde_kalenteri_nahty: true }),
+    }),
+    supabaseFetch('ankkurit?id=eq.' + partner.id, {
+      method: 'PATCH',
+      headers: { Prefer: 'return=representation' },
+      body: JSON.stringify({ is_candidate: false, done: true, done_at: nytIso }),
+    }),
+  ]);
+  const omaClosed = await omaCloseRes.json();
+  const kumppaninClosed = await kumppaninCloseRes.json();
+  if (!omaCloseRes.ok || !kumppaninCloseRes.ok || !Array.isArray(omaClosed) || omaClosed.length !== 1 || !Array.isArray(kumppaninClosed) || kumppaninClosed.length !== 1) {
+    console.error('[parisuhdeaika-hyvaksy] Closing both rows after mutual acceptance did not affect exactly 1+1 rows, group=' + row.parisuhde_ryhma, omaCloseRes.status, kumppaninCloseRes.status, JSON.stringify(omaClosed), JSON.stringify(kumppaninClosed));
     // The acceptance itself DID succeed and IS mutual — only the cleanup is
     // incomplete, so we still report mutual:true (the caller gets their
     // calendar link either way — a stray still-candidate row is a harmless
