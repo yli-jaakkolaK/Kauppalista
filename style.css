@@ -3642,6 +3642,24 @@ h1 {
   font-size: 13px; color: var(--accent-text);
 }
 
+/* Jaettu editori (2026-08-11, CODE_vaihe1b.md §2) — "iOS-muistiinpanojen
+   kaltainen, Sataman sävyissä": koko näytön kirjoituspinta, luettavan pinnan
+   muotokieli (--r-luettava, paperinsävyinen tausta, hiusviiva), Courier
+   Prime, ei työkalupalkkia. Täyttää koko käytettävissä olevan korkeuden
+   otsakkeen alla, ei pieni kenttä sivun keskellä. */
+.editori-view { display: flex; flex-direction: column; min-height: calc(100vh - 96px); }
+.editori-pinta {
+  flex: 1; width: 100%; margin-top: 4px;
+  font-family: var(--fontti-loki); font-size: 15px; line-height: 1.7; color: var(--muste);
+  background: var(--paperi); border: 1px solid var(--hius); border-radius: var(--r-luettava);
+  padding: 16px; resize: none; outline: none;
+}
+.editori-pinta:focus { border-color: var(--hius-vahva); }
+.editori-pinta::placeholder { color: var(--vaimea); }
+/* #laituri-input on nyt pelkkä avauslaukaisin (readonly), ei kirjoituskenttä
+   — osoitin kertoo sen olevan silti kosketettava. */
+#laituri-input[readonly] { cursor: pointer; }
+
 /* Hytin ikkunat -asetukset (2026-08-10, ks. HYTTI_SPEKSI.md §4.5/§4.5b) */
 .hytti-opiskeluaika-rivi {
   display: grid; grid-template-columns: 1fr auto auto; align-items: center; gap: 8px;

@@ -3593,15 +3593,31 @@ sw.js v116 → v117.
 
 ---
 
+### Hytti-vaihe 1b, §2: jaettu täysinäytön editori (2026-08-11)
+
+Korvasi Laiturin pienen `#laituri-input`-kentän (yksirivinen `<input>`) yhdellä jaetulla, koko sovelluksen editorikomponentilla — "iOS-muistiinpanojen kaltainen": täysinäytön `#editori-view`, `--r-luettava`-pinta, Courier Prime 15px, ei työkalupalkkia. `#laituri-input` on nyt pelkkä `readonly`-avauslaukaisin (napautus avaa editorin), ei enää suoraan kirjoitettava.
+
+**Tärkeä poikkeus "tallennus itsestään" -vaatimukseen, tarkoituksella:** ei jatkuvaa merkki-merkiltä-tallennusta tietokantaan, koska "Laukaisusana"-tunnistus (teksti joka alkaa "Juhalle:"/"laita Juhalle:" ohjataan KOKONAAN partnerille ehdotukseksi tavallisen Laituri-lisäyksen sijaan, ks. `tunnistaEhdotusLaukaisu`) on kertaluoiontoinen päätös joka pitää tehdä VALMIILLE tekstille — jatkuva tallennus lähettäisi partnerille puolikkaan, alati muuttuvan ehdotuksen kesken kirjoituksen. Ratkaisu: localStorage-luonnos (`EDITORI_LUONNOS_KEY`) joka näppäimenpainalluksella turvaverkoksi (sama periaate kuin vanhalla `LAITURI_LUONNOS_KEY`:llä, nyt vain isommalla pinnalla), ja TODELLINEN tallennus (laituri-insert TAI Laukaisusana-ohjaus TAI molemmat + `materiaaliKohdeUudetRivit`-merkintä) vasta kun editori SULJETAAN takaisin-napista — ei erillistä tallennusnappia, sulkeminen ON tallennus.
+
+`avaaLaiturinMateriaalille(kurssi)` (kurssin "+ Lisää materiaalia" -konteksti) avaa nyt editorin suoraan Laiturin sijaan — kirjoittaa täsmälleen samaan paikkaan (`laituri`-taulu + `materiaaliKohdeUudetRivit`-lippu) kuin ennen, ei rinnakkaista putkea (spekin oma vaatimus). Kohde-parametrisoitu (`avaaJaettuEditori(kohde)`) niin että uuden kohteen (esim. solmu, kun sille joskus rakennetaan oma materiaalireititys) lisääminen on yksi rivi — solmu-kohdetta EI kytketty tässä erässä, spekin oma ohje ("älä rakenna Lokia nyt" -tyyppinen rajaus, solmu-materiaalilla ei vielä ole omaa reititystä olemassa).
+
+**Sivuhuomio:** korjasi samalla aiemmin auditoinnissa löydetyn `laituri-teema-select`-kuolleen koodin — vanha käsittelijä laski `teemaId`-muuttujan mutta ei koskaan käyttänyt sitä insertissä; uusi käsittelijä ei enää sisällä tätä käyttämätöntä koodia.
+
+sw.js v117 → v118.
+
+---
+
 ## Nykytila ja seuraavat askeleet (päivitetty 2026-08-11, COPILOT.md-sääntö 4)
 
-**Viimeksi tehty** (tämä istunto, kaikki commitoitu ja pushattu mainiin, `sw.js` nyt v117): koko "Ruori — visuaalinen uudistus" -speksi rakennettu ja Katrin kahdella puhelimella elävästi testattu; siitä noussut korjauskierros; Kuormitustilan appikuvake-jäännösbugi; Asetusten siivous; vaakatilatuki listoille; parisuhdeajan kellonajan muokkaus + kalenterisilta-bugin korjaus (**HUOM: `sql/114` ei ole vielä ajettu Supabasessa**); muistutus-dialogin uudistus. **Nyt käynnissä: `CODE_vaihe1b.md` (Hytti-vaihe 1b, Laiturin sisääntulo)** — §7:n kaksi selvitystä tehty, §8b (Lokin yksityinen tietokohde + ankkurien koti-auditointi) rakennettu (**HUOM: `sql/115` ei ole vielä ajettu Supabasessa**). Kesken: §2 jaettu editori, §1b välilehtirakenne, §4-5 kurssiosio+konteksti, §3 tiedostojen tuonti.
+**Viimeksi tehty** (tämä istunto, kaikki commitoitu ja pushattu mainiin, `sw.js` nyt v118): koko "Ruori — visuaalinen uudistus" -speksi rakennettu ja Katrin kahdella puhelimella elävästi testattu, siitä noussut iso korjauskierros. **Nyt käynnissä: `CODE_vaihe1b.md` (Hytti-vaihe 1b, Laiturin sisääntulo)** — §7:n kaksi selvitystä tehty (PDF-rajat 32MB/100 sivua, pptx-purku pieni urakka jszip:llä), §8b (Lokin yksityinen tietokohde + ankkurien koti-auditointi, **HUOM `sql/115` ei ajettu**) ja §2 (jaettu täysinäytön editori, korvaa Laiturin pienen kentän) rakennettu. Kesken: §1b välilehtirakenne (Nyt/Reitti/Kartta), §4-5 kurssiosio+konteksti, §3 tiedostojen tuonti.
 
 **Auki jäänyt, odottaa Katrin vastausta ennen rakentamista** (ei koodattu, koska väärä arvaus olisi tässä pahempi kuin kysyminen):
 1. Kalenterin kuittaus omille lisäyksille — todennäköisesti `kalenteri_tekijat`-taulun puuttuva/väärä organizer-kartoitus perhekalenterille, ei koodibugi. Katrin pitää tarkistaa taulun sisältö Supabasen Table Editorista.
 2. Varasto/"vahdittu" — Katri haluaa listan sijaan otsikko+aikaleimattu-lokimalli (esim. bussikortin saldohistoria). Ei skoopattu.
 3. Laiturin jatkosäie — nykyinen `valutaVanhatSegmentitKotiin()` vaatii AINA manuaalisesti asetetun kodin ennen kuin mikään valuu Varastoon; Katrin kuvaus ("säie tulee → muru menee automaattisesti Varastoon") viittaa siihen että hän odottaa automaattista laukaisua. Kysytty, ei vielä vastausta.
-4. `laituri-teema-select` — kuollutta koodia (script.js viittaa, ei ole index.html:ssä), harmiton mutta tarkoitus epäselvä.
-5. Alapalkin kuvakkeet (2026-08-11, uusi palaute) — kaikki paitsi Kalenteri siirtyivät oikein alkuperäisiin emojeihin; Kalenteri kavennettava jotta numeron alle mahtuu viikonpäivän lyhenne; Ruorin kuvake hieman vasemmalle; kaikki kuvakkeet PALJON isommiksi (lähes reunasta reunaan, muutama milli marginaalia); painettavan muotokieli (lämmin lasi) puuttuu vielä tabeista kokonaan. Katri pyysi tekemään tämän Vaihe 1b:n "ison rakennuserän" JÄLKEEN, automaattisesti — ei vielä aloitettu, jonossa.
 
-**Seuraava iso työerä (ei vielä aloitettu):** `CODE_vaihe1b.md` (Katrin Downloads-kansiossa, avattu IDE:ssä 2026-08-11) — Hytti-vaihe 1b "Laiturin sisääntulo": jaettu koko sovelluksen editorikomponentti, tiedostojen tuonti (pdf/kuva/pptx/koodi, EI docx/zip/ipynb v1:ssä), kurssiosion muotokielen uusinta Reitti-välilehdellä, kurssikonteksti "+ Lisää materiaalia"-napille, sekä §8b: yksityinen `loki_merkinnat`-tietokohde etusivulta-lisättyjen ankkurien laskeutumiselle (yleistää `CODE_ruori.md` §4.5:n "jaettu vs. yksityinen" -sääntöön, vaatii ensin auditoinnin KAIKISTA ankkurin lisäyspaikoista jaettu/yksityinen-luokittelua varten — nimenomaisesti kysytty, ei arvattava). Spekin oma §7 vaatii kaksi selvitystä ENNEN koodausta: pptx-purun laajuus ja Anthropic-API:n PDF-koko/sivurajat — näitä ei ole vielä tehty.
+**Jonossa, Katrin pyynnöstä tehdään Vaihe 1b:n ison rakennuserän JÄLKEEN automaattisesti** (ei vielä aloitettu):
+4. Alapalkin kuvakkeet — kaikki paitsi Kalenteri siirtyivät oikein alkuperäisiin emojeihin; Kalenteri kavennettava jotta numeron alle mahtuu viikonpäivän lyhenne (seuraa oikeaa viikonpäivää kuten numerokin); Ruorin kuvake hieman vasemmalle; kaikki kuvakkeet PALJON isommiksi (lähes reunasta reunaan, muutama milli marginaalia); painettavan muotokieli (lämmin lasi) puuttuu vielä tabeista kokonaan.
+5. Ruorin ankkuri-kuvake — väri on väärä (messinki, pitäisi olla harmaa kuten muualla — messinki sallittu vain varjostuksena), painettavan muotokieli puuttunee, näkyvä tausta liian iso (pitäisi olla vain muutama milli kuvakkeen ympärillä, sama koskee ⋯:tä) — kosketusalue voi olla isompi mutta ei mene päällekkäin viereisen napin kanssa.
+
+**Seuraava iso työerä (Vaihe 1b jatkuu):** §1b (välilehtirakenne, siirto ei uutta rakentamista — Nyt/Kartta sellaisenaan, Reitti uusi kurssiosion kotina), sitten §4 (kurssiosion visuaalinen uudistus) + §5 (kurssikonteksti päästä päähän), sitten §3 (tiedostojen tuonti: pdf/kuva/pptx/koodi Supabase Storageen).

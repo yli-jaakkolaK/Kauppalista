@@ -10,6 +10,7 @@ function piilotaKaikkiNakymat() {
   document.getElementById('home-view').style.display = 'none';
   document.getElementById('app-view').style.display = 'none';
   document.getElementById('laituri-view').style.display = 'none';
+  document.getElementById('editori-view').style.display = 'none';
   document.getElementById('muistilaput-view').style.display = 'none';
   document.getElementById('varasto-view').style.display = 'none';
   document.getElementById('kalenteri-view').style.display = 'none';
@@ -7280,7 +7281,6 @@ function avaaOsio(osio) {
     peruLaiturinMateriaaliKonteksti();
     showLaituriView();
     lataaLaituri();
-    palautaLaituriLuonnos();
     merkitseLaituriNahdyksi();
   } else if (osio.route === 'muistilaput') {
     showMuistilaputView();
@@ -7491,7 +7491,6 @@ function avaaLaiturinMuru(sisalto) {
   const hakuKentta = document.getElementById('laituri-search');
   if (hakuKentta) hakuKentta.value = sisalto;
   lataaLaituri(sisalto);
-  palautaLaituriLuonnos();
   merkitseLaituriNahdyksi();
 }
 
@@ -9170,12 +9169,7 @@ let materiaaliKohdeUudetRivit = new Set();
 function avaaLaiturinMateriaalille(kurssi) {
   materiaaliKohdeKurssi = { id: kurssi.id, name: kurssi.name };
   materiaaliKohdeUudetRivit = new Set();
-  showLaituriView();
-  lataaLaituri();
-  palautaLaituriLuonnos();
-  merkitseLaituriNahdyksi();
-  paivitaLaiturinMateriaaliBanneri();
-  document.getElementById('laituri-input').focus();
+  avaaJaettuEditori({ tyyppi: 'laituri', otsikko: '✱ MATERIAALI ✱' });
 }
 
 function peruLaiturinMateriaaliKonteksti() {
@@ -9185,11 +9179,11 @@ function peruLaiturinMateriaaliKonteksti() {
 }
 
 function paivitaLaiturinMateriaaliBanneri() {
-  const banneri = document.getElementById('laituri-materiaali-banneri');
+  const banneri = document.getElementById('editori-materiaali-banneri');
   if (!banneri) return;
   if (materiaaliKohdeKurssi) {
     banneri.style.display = 'flex';
-    document.getElementById('laituri-materiaali-banneri-teksti').textContent = 'Materiaalia kurssille: ' + materiaaliKohdeKurssi.name;
+    document.getElementById('editori-materiaali-banneri-teksti').textContent = 'Materiaalia kurssille: ' + materiaaliKohdeKurssi.name;
   } else {
     banneri.style.display = 'none';
   }
@@ -10638,14 +10632,53 @@ document.getElementById('laituri-back-btn').addEventListener('click', function()
   lataaKotinakyma();
 });
 
-document.getElementById('laituri-materiaali-banneri-peruuta').addEventListener('click', function() {
+document.getElementById('editori-materiaali-banneri-peruuta').addEventListener('click', function() {
   peruLaiturinMateriaaliKonteksti();
 });
 
-document.getElementById('laituri-add-btn').addEventListener('click', async function() {
-  const laituriInput = document.getElementById('laituri-input');
-  const teksti = laituriInput.value.trim();
-  if (teksti === '') { laituriInput.focus(); return; }
+// Jaettu editori (2026-08-11, CODE_vaihe1b.md §2) — YKSI täysinäytön
+// kirjoituspinta, korvaa aiemman pienen #laituri-input-kentän. "Tallennus
+// tapahtuu itsestään, ei tallennusnappia": ei silti jatkuvaa merkki
+// merkiltä -tallennusta tietokantaan, koska Laukaisusana-tunnistus
+// ("Juhalle:"-alkuinen teksti ohjataan kokonaan ehdotukseksi partnerille,
+// ks. alla) on YHDEN KERRAN päätös joka pitää tehdä VALMIILLE tekstille —
+// jatkuva tallennus kesken kirjoituksen lähettäisi partnerille puolikkaan,
+// alati muuttuvan ehdotuksen. Sen sijaan: localStorage-luonnos joka
+// näppäimenpainalluksella (sama turvaverkko kuin ennen, nyt vain isommalla
+// pinnalla) + todellinen tallennus kun editori SULJETAAN — ei erillistä
+// nappia, sulkeminen ON tallennus, mikä täyttää spekin vaatimuksen ilman
+// että Laukaisusana-logiikka rikkoutuu.
+let editoriKohde = null;
+
+function avaaJaettuEditori(kohde) {
+  editoriKohde = kohde || { tyyppi: 'laituri' };
+  const pinta = document.getElementById('editori-pinta');
+  pinta.value = '';
+  const luonnos = localStorage.getItem(EDITORI_LUONNOS_KEY);
+  if (luonnos) pinta.value = luonnos;
+  document.getElementById('editori-otsikko').textContent = editoriKohde.otsikko || '✱ UUSI ✱';
+  paivitaLaiturinMateriaaliBanneri();
+  piilotaKaikkiNakymat();
+  document.getElementById('editori-view').style.display = 'block';
+  pinta.focus();
+}
+
+async function tallennaEditoriJaSulje() {
+  const pinta = document.getElementById('editori-pinta');
+  const teksti = pinta.value.trim();
+  const palaaLaituriin = function() {
+    piilotaKaikkiNakymat();
+    document.getElementById('laituri-view').style.display = 'block';
+    naytaAlapalkki('laituri');
+    lataaLaituri(document.getElementById('laituri-search').value.trim());
+    merkitseLaituriNahdyksi();
+  };
+  if (teksti === '') {
+    // Tyhjä editori suljetaan ilman kirjoitusta — ei tyhjää laituri-riviä.
+    peruLaiturinMateriaaliKonteksti();
+    palaaLaituriin();
+    return;
+  }
 
   // Laukaisusana (2026-07-18, ks. muistiinpanot.md "Laukaisusana Laiturissa"):
   // "Juhalle:"/"laita Juhalle:" rivin alussa ohittaa tavallisen lisäyksen
@@ -10655,60 +10688,55 @@ document.getElementById('laituri-add-btn').addEventListener('click', async funct
   if (ehdotusSisalto) {
     const onnistui = await ehdotaSisaltoToiselle(ehdotusSisalto);
     naytaIlmoitus(onnistui ? ('Ehdotettu ' + henkiloAllatiivi(toinenKayttaja.henkilo)) : 'Ehdotuksen lähetys epäonnistui');
-    laituriInput.value = '';
-    tyhjennaLaituriLuonnos();
-    lataaLaituri(document.getElementById('laituri-search').value.trim());
+    tyhjennaEditoriLuonnos();
+    peruLaiturinMateriaaliKonteksti();
+    palaaLaituriin();
     return;
   }
 
-  const teemaSelect = document.getElementById('laituri-teema-select');
-  const teemaId = teemaSelect && teemaSelect.value ? teemaSelect.value : null;
   // .select().single() (2026-08-10, ks. HYTTI_SPEKSI.md §8.3): tarvitaan
   // uuden rivin id materiaaliKohdeUudetRivit-merkintää varten kun ollaan
   // kurssin "+ Lisää materiaalia" -kontekstissa, ks. alla.
   const { data: uusiRivi, error } = await db.from('laituri').insert({ user_id: currentUserId, content: teksti }).select().single();
   // "Ei koskaan kadota ajatusta" -periaate koskee myös epäonnistunutta
-  // kirjoitusta: kenttää/luonnosta EI tyhjennetä jos kirjoitus ei onnistunut,
-  // muuten juuri se turvaverkko (localStorage-luonnos) katoaisi samalla
-  // hetkellä kun sille olisi eniten tarvetta (ks. muistiinpanot.md
-  // "Kirjoituspolkujen auditointi").
+  // kirjoitusta: luonnosta EI tyhjennetä eikä editoria suljeta jos kirjoitus
+  // ei onnistunut, muuten juuri se turvaverkko (localStorage-luonnos)
+  // katoaisi samalla hetkellä kun sille olisi eniten tarvetta (ks.
+  // muistiinpanot.md "Kirjoituspolkujen auditointi").
   if (ilmoitaKirjoitusvirheesta(error, 'Laituri-lisäys')) return;
   if (materiaaliKohdeKurssi && uusiRivi) materiaaliKohdeUudetRivit.add(uusiRivi.id);
-  laituriInput.value = '';
-  tyhjennaLaituriLuonnos();
-  lataaLaituri(document.getElementById('laituri-search').value.trim());
+  tyhjennaEditoriLuonnos();
+  peruLaiturinMateriaaliKonteksti();
+  palaaLaituriin();
+}
+
+document.getElementById('editori-sulje-btn').addEventListener('click', function() {
+  tallennaEditoriJaSulje();
 });
 
-document.getElementById('laituri-input').addEventListener('keydown', function(event) {
-  if (event.key === 'Enter') {
-    document.getElementById('laituri-add-btn').click();
-  }
+document.getElementById('laituri-input').addEventListener('click', function() {
+  avaaJaettuEditori({ tyyppi: 'laituri' });
+});
+document.getElementById('laituri-add-btn').addEventListener('click', function() {
+  avaaJaettuEditori({ tyyppi: 'laituri' });
 });
 
 // Varmuusverkko kesken kirjoituksen tapahtuvaa uudelleenpiirtoa/sivun
 // uudelleenlatausta vastaan (havaittu: näytön kääntö saattoi tyhjentää kentän
 // ennen tallennusta). Luonnos talteen joka näppäimenpainalluksella, palautus
-// kun Laituri-näkymä avataan uudelleen. Laituriin kirjoitettu ei saa KOSKAAN
-// kadota, vaikka juurisyytä uudelleenpiirtoon ei korjattaisikaan.
-const LAITURI_LUONNOS_KEY = 'satama_laituri_luonnos';
-document.getElementById('laituri-input').addEventListener('input', function(e) {
+// kun editori avataan uudelleen (ks. avaaJaettuEditori). Kirjoitettu ei saa
+// KOSKAAN kadota, vaikka juurisyytä uudelleenpiirtoon ei korjattaisikaan.
+const EDITORI_LUONNOS_KEY = 'satama_editori_luonnos';
+document.getElementById('editori-pinta').addEventListener('input', function(e) {
   if (e.target.value) {
-    localStorage.setItem(LAITURI_LUONNOS_KEY, e.target.value);
+    localStorage.setItem(EDITORI_LUONNOS_KEY, e.target.value);
   } else {
-    localStorage.removeItem(LAITURI_LUONNOS_KEY);
+    localStorage.removeItem(EDITORI_LUONNOS_KEY);
   }
 });
 
-function palautaLaituriLuonnos() {
-  const luonnos = localStorage.getItem(LAITURI_LUONNOS_KEY);
-  const laituriInput = document.getElementById('laituri-input');
-  if (luonnos && !laituriInput.value) {
-    laituriInput.value = luonnos;
-  }
-}
-
-function tyhjennaLaituriLuonnos() {
-  localStorage.removeItem(LAITURI_LUONNOS_KEY);
+function tyhjennaEditoriLuonnos() {
+  localStorage.removeItem(EDITORI_LUONNOS_KEY);
 }
 
 let laituriHakuAjastin = null;
