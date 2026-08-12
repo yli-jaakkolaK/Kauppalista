@@ -3530,3 +3530,25 @@ Katri: tuo takaisin ne alkuperäiset kuvakkeet jotka näkyvät (vanhassa) ruuduk
 **Kaksi pientä viilausta samalla:** raahattavan rivin `.dragging`-tila sai saman lämmin lasi + messinkikehys + sisävalo -korostuksen kuin muualla sovelluksessa (oli pelkkä `opacity:.35`, "liquid glass niin että erottuu helposti"), plus kevyt `scale(1.02)`+varjo "poimitun" tuntumaa varten. Arkin selite-teksti lyhennetty Katrin sanamuotoon: "Katkoviivan alla olevat löytyvät ⋯-merkin takaa." (viittaa suoraan näkyvään katkoviivaan listassa, ei erikseen "neljä ylintä").
 
 sw.js v111 → v112.
+
+### Kuormitustila-appikuvakkeen jäännösbugi, ankkuritekstin kasvatus, Asetusten siivous (2026-08-11)
+
+Katri muisteli epämääräisesti bugia jossa Hytin/opiskelun jutut näkyisivät Ankkureissa/etusivulla Kuormitustilan ("vapaapäivä-nappula" hänen sanoin) ollessa päällä. Etusivun itse Ankkurit-segmentti piiloutuu jo oikein kokonaan (`paivitaRuoriNakyvyys`), mutta löysin todellisen jäännösbugin: `loadAnchorCandidates()` laski ehdokasmäärän AINA riippumatta Kuormitustilasta ja syötti sen puhelimen KOTINÄYTÖN APPIKUVAKKEEN numeroon (`navigator.setAppBadge`, Badging API) — opiskeluehdotukset "näkyivät" siis yhä ulkopuolella pomppivana lukuna appikuvakkeessa, vaikka sovelluksen sisällä ne olivat piilossa. Korjattu: `huomioPallurat.ankkurit` pakotetaan nollaan Kuormitustilan aikana.
+
+**Ankkuritekstin pituus:** `-webkit-line-clamp` nostettu 5:stä 8:aan `.list li.ankkuri-rivi`:lle — Ruorin etusivukortin ⚓/⋯-pino vie osan rivin leveydestä, joten sama rivimäärä mahtui vähemmän merkkejä kuin täydessä Ankkurit-listassa.
+
+**"Tehdyksi" merkintä:** tarkistettu, tämä toimii jo oikein — `lataaAnkkurit()`:n kysely suodattaa `done=false`, joten merkintä poistaa rivin listalta heti seuraavassa päivityksessä (`checkNappi`:n klikkauskäsittelijä kutsuu `lataaAnkkurit()`:ää heti `done:true`-päivityksen jälkeen). Ei koodimuutosta tarvittu.
+
+**Asetukset — kaksi siivousta:** (1) "✨ Mitä äly on tehnyt" -loki kollapsoitu Laiturin arkiston kanssa täsmälleen samalla kuviolla ("Näytä loki (N)" -nappi, lista piilossa oletuksena, tila säilyy istunnon ajan) — oli aiemmin aina auki, pitkä lista sekaisin muun asetussivun kanssa. (2) Sovelluksen versio + "Päivitä sovellus" -nappi siirretty sivun aivan yläosaan (heti otsakkeen alle, ennen "👤 Tili"-osiota) — olivat aiemmin "📱 Sovellus"-otsikon alla, suunnilleen keskellä hyvin pitkää asetussivua.
+
+**Kysymysmerkki jäi:** "sama juttu arkistoon" — epäselvää tarkoittiko Katri (a) valmiiksi kollapsoitua Laiturin arkistoa (ei muutosta tarvittu, toimii jo), (b) uutta "tehdyt ankkurit" -arkistonäkymää joka pitäisi rakentaa Asetuksiin ⚓ Ankkurit-osion alle, vai jotain muuta — kysytty Katrilta suoraan ennen rakentamista, ei arvattu.
+
+sw.js v112 → v113.
+
+### Vaakatila listoihin, "tallennus epäonnistui" -tutkinta (2026-08-11)
+
+Katri: puhelin vaakaan käännettynä listojen pitäisi leventyä (helpompi nähdä teksti kokonaan). `#kalenteri-view`:llä oli jo tämä sama `@media (orientation: landscape) { max-width: 900px }` -sääntö entuudestaan (heinäkuulta) — laajennettu samaan mediakyselyyn myös `#app-view` (kauppalista), `#muistilaput-view`, `#varasto-view`, `#laituri-view`.
+
+**"Tallennus epäonnistui" jos unohtaa merkin ennen +:** kävin läpi KAIKKI listojen lisäyskäsittelijät (kauppalista, vahdittu, hytti-rivit, ankkurit, Laituri, uusi lista Muistilapuille/Varastolle) — jokaisessa on jo `if (teksti.trim() === '') return`-suoja ennen tietokantakutsua, tyhjä lähetys ei missään näistä osu edes tietokantaan asti. En siis löytänyt tätä bugia lukemalla koodia — jos se toistuu yhä, tarvitaan tarkempi kuvaus (mikä lista, mikä merkki/tilanne tarkalleen) ennen kuin osaa korjata oikeaa asiaa.
+
+sw.js v113 → v114.

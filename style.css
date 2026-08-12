@@ -337,6 +337,13 @@ h1 {
   #kalenteri-view {
     max-width: 900px;
   }
+  /* Listat vaakaan käännettynä (2026-08-11, Katrin pyyntö) — sama periaate
+     kuin kalenterissa yllä: enemmän leveyttä, pitkä teksti (esim. Laiturin
+     murut, Ankkurit) mahtuu näkymään paremmin ilman että joka sana katkeaa
+     omalle rivilleen. */
+  #app-view, #muistilaput-view, #varasto-view, #laituri-view {
+    max-width: 900px;
+  }
 }
 
 /* === KUUKAUSINÄKYMÄN RUUDUKKO (2026-07-08, palkit-uudistus 2026-08-05) ===
@@ -1529,8 +1536,11 @@ h1 {
   white-space: normal;
   word-break: break-word;
   display: -webkit-box;
-  -webkit-line-clamp: 5;
-  line-clamp: 5;
+  /* Nostettu 5 -> 8 (2026-08-11, Katrin pyyntö: "tekstiä mahtuisi vähän
+     enemmän") — Ruorin etusivukortissa ⚓/⋯-pino vie osan rivin leveydestä,
+     joten sama rivimäärä mahtuu vähemmän merkkejä kuin täydessä listassa. */
+  -webkit-line-clamp: 8;
+  line-clamp: 8;
   -webkit-box-orient: vertical;
   overflow: hidden;
   text-overflow: ellipsis;

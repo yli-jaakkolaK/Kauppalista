@@ -6714,7 +6714,15 @@ async function loadAnchorCandidates() {
   const otsikkoEl = document.getElementById('anchor-candidates-title');
   if (otsikkoEl) otsikkoEl.style.display = naytettavat.length ? 'block' : 'none';
 
-  huomioPallurat.ankkurit = naytettavat.length;
+  // BUGIKORJAUS (2026-08-11, Katrin löydös): Kuormitustila piilottaa koko
+  // Ankkurit-segmentin CSS:llä (ks. paivitaRuoriNakyvyys), mutta tämä
+  // funktio laski ehdokasmäärän AINA riippumatta Kuormitustilasta ja
+  // syötti sen puhelimen kotinäytön appikuvakkeen numeroon
+  // (paivitaSovelluskuvakeBadge, Badging API) — opiskeluun liittyvät
+  // äly-ehdotukset "näkyivät" siis silti pomppivana lukuna kuvakkeessa
+  // vaikka sovelluksen sisällä ne olivat piilossa. Pakotettu nollaan
+  // Kuormitustilan aikana.
+  huomioPallurat.ankkurit = ruoriKuormitustilaPaalla() ? 0 : naytettavat.length;
   const badge = document.getElementById('anchor-candidates-badge');
   if (badge) {
     if (huomioPallurat.ankkurit) {
@@ -7399,13 +7407,23 @@ async function loadAiLog() {
 
   const listEl = document.getElementById('aly-log-list');
   const emptyEl = document.getElementById('aly-log-tyhja');
+  const toggleEl = document.getElementById('aly-log-toggle');
+  // Kollapsoitu osio (2026-08-11, Katrin pyyntö) — sama "otsikko + laske
+  // auki -nappi" -kuvio kuin Laiturin arkistossa (ks. paivitaLaituriArkisto),
+  // säilyttää auki/kiinni-tilan istunnon ajan (oliAuki).
+  const oliAuki = listEl.style.display !== 'none';
   listEl.innerHTML = '';
 
   if (!data || data.length === 0) {
     emptyEl.style.display = 'block';
+    toggleEl.style.display = 'none';
+    listEl.style.display = 'none';
     return;
   }
   emptyEl.style.display = 'none';
+  toggleEl.style.display = 'block';
+  toggleEl.textContent = 'Näytä loki (' + data.length + ')';
+  listEl.style.display = oliAuki ? 'block' : 'none';
 
   // Kaksi kertakyselyä koko listalle (ei per-rivi-kyselyä): ankkurin
   // NYKYINEN tila (tehty/otettu omaksi/yhä odottava) + lähdemurun sisältö
@@ -7477,6 +7495,11 @@ async function loadAiLog() {
     listEl.appendChild(row);
   });
 }
+
+document.getElementById('aly-log-toggle').addEventListener('click', function() {
+  const lista = document.getElementById('aly-log-list');
+  lista.style.display = lista.style.display === 'none' ? 'block' : 'none';
+});
 
 // Näyttää Laituri-näkymän sisällä kuinka monta riviä odottaa yhä sijoittamista
 // (status='uusi') — riippumaton hakusanasuodatuksesta ja etusivun "nähty"-
