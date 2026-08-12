@@ -1026,6 +1026,29 @@ h1 {
   margin-left: 4px;
 }
 
+/* Laituri paperi-tausta (2026-08-11, elävä testaus §1.5) — Katri: Laiturin
+   tausta poikkeaa Ruorista, halutaan sama paperi. Laiturin OMAT komponentit
+   (.laituri-row ym., alla) käyttävät edelleen sovelluksen jaettuja
+   --ground/--text/--muted/--border-tokeneita, jotka SEURAAVAT laitteen
+   tumma/vaalea-tilaa — Ruorin paperi-tausta ei seuraa. Jos taustan olisi
+   vaihtanut vain #laituri-view:n omaan background-sääntöön koskematta
+   näihin tokeneihin, tumman tilan laitteella teksti olisi muuttunut lähes
+   näkymättömäksi valoisan paperin päällä — SAMA bugi joka juuri korjattiin
+   ankkurin kentästä (ks. yllä), mutta nyt koko Laiturin laajuudelta. Sen
+   sijaan tokenit itse skoopataan #laituri-view:n sisällä osoittamaan
+   kiinteisiin paperi-arvoihin — jokainen alla oleva .laituri-*-sääntö saa
+   automaattisesti oikean, teemasta riippumattoman värin ilman että yhtään
+   yksittäistä sääntöä pitää koskea erikseen. */
+#laituri-view {
+  background: var(--paperi);
+  color: var(--muste);
+  --ground: var(--paperi);
+  --text: var(--muste);
+  --muted: var(--vaimea);
+  --border: var(--hius);
+  --border-dash: var(--hius-vahva);
+}
+
 .laituri-tila-teksti {
   font-size: 12px;
   color: var(--muted);
@@ -3403,17 +3426,31 @@ h1 {
 /* --- Ankkurit --- */
 .ruori .segmentti.ankkurit .otsikkorivi { margin-bottom: 10px; }
 
-/* Kirjoituskentän kontrastikorjaus (2026-08-11, elävä testaus) — .add-item
-   input käyttää sovelluksen jaettua, tumma/vaalea-teemaa seuraavaa
-   --text/--muted-tokenia (style.css:2), ja se voittaa .ruori:n
-   color:var(--muste):n (0,1,1 > 0,1,0). Ruorin "paperi"-tausta on
-   TARKOITUKSELLA aina vaalea riippumatta laitteen tummasta tilasta (ks.
-   .ruori-sääntö yllä), joten laite jossa OS on tummassa tilassa sai
-   --text:n lähes valkoisena vaalean paperin päällä = näkymätön muste.
-   Pakotetaan kiinteä muste/vaimea-väri tähän kenttään kuten muuallakin
-   Ruorissa. */
-.ruori .segmentti.ankkurit .add-item input { color: var(--muste); }
-.ruori .segmentti.ankkurit .add-item input::placeholder { color: var(--vaimea); }
+/* Ankkurin pikalisäyskenttä on textarea, ei input (2026-08-11, elävä
+   testaus §1.2/§1.4) — kaksi korjausta samassa paikassa:
+   (1) Kontrasti: jaettu --text/--muted seuraa laitteen tumma/vaalea-tilaa,
+   ja se voitti aiemmin .ruori:n color:var(--muste):n spesifisyydellä
+   (0,1,1 > 0,1,0). Ruorin paperi-tausta on TARKOITUKSELLA aina vaalea
+   riippumatta laitteen tilasta, joten tumman tilan laitteella teksti oli
+   lähes valkoinen vaalean paperin päällä = näkymätön muste. Pakotettu
+   kiinteä muste/vaimea-väri.
+   (2) Rivitys: <input> ei rivity, kapealla näytöllä kenttä täyttyi vaikka
+   ruudulla olisi tilaa — <textarea> + auto-kasvava korkeus (ks.
+   alustaAnkkuriTextareaKasvu script.js:ssä) korjaa tämän. */
+.ruori .segmentti.ankkurit .add-item { align-items: flex-end; }
+.ruori .segmentti.ankkurit .add-item textarea {
+  flex: 1; background: none; border: none; outline: none; resize: none; overflow: hidden;
+  font-family: 'Courier New', Courier, monospace; font-size: 18px; line-height: 1.35;
+  padding: 10px 0; max-height: 220px; color: var(--muste);
+}
+.ruori .segmentti.ankkurit .add-item textarea::placeholder { color: var(--vaimea); }
+
+/* Rivin oma muokkaus-textarea (ks. script.js: ankkuri-rivin klikkauskäsittelijä)
+   käyttää samaa jaettua .edit-input-luokkaa kuin muu sovellus — sama
+   tumma/vaalea-kontrastiongelma koskisi tätäkin, korjattu ennaltaehkäisevästi
+   samalla kiinteällä musteella. resize:none + auto-kasvava korkeus rivitystä
+   varten (§1.3/§1.4). */
+.ruori .segmentti.ankkurit .edit-input { color: var(--muste); resize: none; overflow: hidden; line-height: 1.35; }
 
 /* Rivin ⚓/⋯-pino (2026-08-11, Ruori-speksi §4.2/§4.3) — allekkain oikeassa
    reunassa, molemmat painettavan muotokieltä (lämmin lasi + messinkikehys).
@@ -3544,7 +3581,8 @@ h1 {
 .alapalkki-arkki-lista li {
   display: flex; align-items: center; gap: 10px; padding: 10px 6px;
   border-bottom: 1px solid var(--border); background: var(--ground);
-  touch-action: none; user-select: none;
+  touch-action: none; user-select: none; -webkit-user-select: none;
+  -webkit-touch-callout: none;
 }
 .alapalkki-arkki-lista li:last-child { border-bottom: 0; }
 .alapalkki-arkki-lista li.alapalkki-raja-jalkeen { border-bottom: 2px dashed var(--accent); }

@@ -91,7 +91,13 @@ function showHyttiKorttiView() {
 // satama-design-kuvaus.md "Alapalkin poikkeus").
 const ALAPALKKI_IKONIT = {
   ruori: '<svg viewBox="0 0 28 28" fill="none"><circle cx="14" cy="14" r="8.5" stroke="var(--messinki)" stroke-width="2.4"/><circle cx="14" cy="14" r="2" fill="var(--messinki)"/><path d="M22.5 14L26 14M20 20L22.5 22.5M14 22.5L14 26M8 20L5.5 22.5M5.5 14L2 14M8 8L5.5 5.5M14 5.5L14 2M20 8L22.5 5.5" stroke="var(--messinki)" stroke-width="2.4" stroke-linecap="round"/></svg>',
-  laituri: '<svg viewBox="0 0 28 28" fill="none"><circle cx="14" cy="14" r="8" stroke="var(--vaara)" stroke-width="4.2"/><path d="M8.6 8.6l3.1 3.1M19.4 8.6l-3.1 3.1M19.4 19.4l-3.1-3.1M8.6 19.4l3.1-3.1" stroke="#fff" stroke-width="3.6"/></svg>',
+  // Pelastusrengas korjattu (2026-08-11, elävä testaus §2): aiempi versio
+  // yritti neljää vinoa VIIVAA renkaan päällä ("joku ihme" Katrin sanoin) —
+  // korvattu neljällä säteittäisellä valkoisella SUORAKULMIOLLA renkaan
+  // paksuuden mittaisina, tarkalleen renkaan kohdalla, käännettynä 90°
+  // välein. Tämä on pelastusrenkaan tunnistettava perusmuoto (punainen
+  // rengas + 4 valkoista poikkipalkkia), ei arvailu.
+  laituri: '<svg viewBox="0 0 28 28" fill="none"><circle cx="14" cy="14" r="8" stroke="var(--vaara)" stroke-width="4.2"/><rect x="11.9" y="3.9" width="4.2" height="4.2" fill="#fff"/><rect x="11.9" y="3.9" width="4.2" height="4.2" fill="#fff" transform="rotate(90 14 14)"/><rect x="11.9" y="3.9" width="4.2" height="4.2" fill="#fff" transform="rotate(180 14 14)"/><rect x="11.9" y="3.9" width="4.2" height="4.2" fill="#fff" transform="rotate(270 14 14)"/></svg>',
   kalenteri: '<svg viewBox="0 0 28 28" fill="none"><rect x="4" y="7" width="20" height="17" rx="2" fill="var(--paperi)" stroke="var(--muste)" stroke-width="1.5"/><path d="M9 3.5v5M19 3.5v5" stroke="var(--muste)" stroke-width="1.5" stroke-linecap="round"/><text x="14" y="17.5" font-family="\'Courier Prime\',monospace" font-weight="700" font-size="8.5" text-anchor="middle" fill="var(--muste)" data-role="kal-numero"></text><text x="14" y="22.7" font-family="\'Courier Prime\',monospace" font-size="5" letter-spacing="0.04em" text-anchor="middle" fill="var(--muste)" data-role="kal-vk"></text></svg>',
   hytti: '<svg viewBox="0 0 28 28" fill="none"><path d="M8 25V13c0-3.3 2.7-6 6-6s6 2.7 6 6v12z" fill="var(--karikko)" stroke="var(--muste)" stroke-width="1.4" stroke-linejoin="round"/><path d="M8 16.5h12M8 20.5h12" stroke="var(--muste)" stroke-width="1" opacity=".5"/><circle cx="14" cy="11" r="2.6" fill="var(--messinki)" stroke="var(--muste)" stroke-width="1"/><circle cx="19" cy="19" r="1" fill="var(--messinki)"/></svg>',
   muistilaput: '<svg viewBox="0 0 28 28" fill="none"><rect x="5" y="4" width="18" height="20" rx="2" fill="var(--paperi)" stroke="var(--muste)" stroke-width="1.5"/><rect x="8.3" y="8.3" width="3.6" height="3.6" rx="0.6" fill="var(--messinki)"/><path d="M9.1 10.2l0.8 0.9 1.7-1.9" stroke="#fff" stroke-width="0.9" stroke-linecap="round" stroke-linejoin="round"/><path d="M14 10.1h6" stroke="var(--muste)" stroke-width="1.3" stroke-linecap="round"/><rect x="8.3" y="14.3" width="3.6" height="3.6" rx="0.6" fill="none" stroke="var(--muste)" stroke-width="1.2"/><path d="M14 16.1h6" stroke="var(--muste)" stroke-width="1.3" stroke-linecap="round"/><rect x="8.3" y="20.3" width="3.6" height="3.6" rx="0.6" fill="none" stroke="var(--muste)" stroke-width="1.2"/><path d="M14 22.1h6" stroke="var(--muste)" stroke-width="1.3" stroke-linecap="round"/></svg>',
@@ -210,42 +216,84 @@ function piirraAlapalkkiArkki() {
     kahva.className = 'alapalkki-arkki-kahva';
     kahva.textContent = '≡';
     li.appendChild(kahva);
-    alustaAlapalkkiRaahaus(li, kahva);
+    alustaAlapalkkiRaahaus(li);
     lista.appendChild(li);
   });
 }
 
-let alapalkkiRaahattava = null;
-function alustaAlapalkkiRaahaus(li, kahva) {
-  kahva.addEventListener('pointerdown', function(e) {
-    e.preventDefault();
-    alapalkkiRaahattava = li;
-    li.classList.add('dragging');
-    kahva.setPointerCapture(e.pointerId);
-  });
-  kahva.addEventListener('pointermove', function(e) {
-    if (alapalkkiRaahattava !== li) return;
+// Raahaus (2026-08-11 korjattu, elävä testaus §1.1) — ALKUPERÄINEN versio
+// käytti pelkkää pointerdown/move/up:ia + CSS touch-action:none:ia, mikä ei
+// riittänyt oikealla puhelimella: kosketus valitsi tekstiä raahauksen sijaan.
+// Korvattu samalla kosketus/hiiri-tekniikalla jota loput sovelluksen
+// raahattavat listat käyttävät jo toimivasti (ks. alustaRaahaus() alempana
+// script.js:ssä — pitkä painallus ennen raahauksen alkua, passiivinen
+// touchstart mutta ei-passiivinen touchmove jossa preventDefault() vasta kun
+// raahaus on oikeasti käynnissä). RAAHAUS_VIIVE_MS/RAAHAUS_PERUUTUS_PX ja
+// siirraRaahattavaKohtaan() ovat alustaRaahaus():n omia, geneerisiä apuja,
+// uudelleenkäytetty sellaisenaan koska ne eivät koske Supabasea.
+function alustaAlapalkkiRaahaus(li) {
+  let ajastin = null;
+  let alkuY = 0;
+  let alkuX = 0;
+  let raahausKaynnissa = false;
+
+  function pisteesta(e) { return e.touches ? e.touches[0] : e; }
+
+  function paivitaRajaviiva() {
     const lista = document.getElementById('alapalkki-arkki-lista');
-    const rivit = Array.from(lista.children).filter(function(el) { return el !== li; });
-    const y = e.clientY;
-    let kohde = null;
-    for (const rivi of rivit) {
-      const rect = rivi.getBoundingClientRect();
-      if (y < rect.top + rect.height / 2) { kohde = rivi; break; }
-    }
-    if (kohde) lista.insertBefore(li, kohde); else lista.appendChild(li);
-    Array.from(lista.children).forEach(function(el, i) { el.className = i === 3 ? 'alapalkki-raja-jalkeen' : ''; });
-  });
-  function lopetaRaahaus() {
-    if (alapalkkiRaahattava !== li) return;
-    alapalkkiRaahattava = null;
-    li.classList.remove('dragging');
-    alapalkkiJarjestys = Array.from(document.getElementById('alapalkki-arkki-lista').children).map(function(el) { return el.dataset.id; });
-    tallennaAlapalkkiJarjestys();
-    piirraAlapalkki();
+    Array.from(lista.children).forEach(function(el, i) {
+      el.classList.toggle('alapalkki-raja-jalkeen', i === 3);
+    });
   }
-  kahva.addEventListener('pointerup', lopetaRaahaus);
-  kahva.addEventListener('pointercancel', lopetaRaahaus);
+
+  function alkaa(e) {
+    const piste = pisteesta(e);
+    alkuY = piste.clientY;
+    alkuX = piste.clientX;
+    ajastin = setTimeout(function() {
+      raahausKaynnissa = true;
+      li.classList.add('dragging');
+      if (navigator.vibrate) navigator.vibrate(15);
+    }, RAAHAUS_VIIVE_MS);
+    if (!e.touches) {
+      document.addEventListener('mousemove', liikkuu);
+      document.addEventListener('mouseup', loppuu, { once: true });
+    }
+  }
+
+  function liikkuu(e) {
+    const piste = pisteesta(e);
+    const dx = Math.abs(piste.clientX - alkuX);
+    const dy = Math.abs(piste.clientY - alkuY);
+    if (!raahausKaynnissa && ajastin && (dx > RAAHAUS_PERUUTUS_PX || dy > RAAHAUS_PERUUTUS_PX)) {
+      clearTimeout(ajastin);
+      ajastin = null;
+      return;
+    }
+    if (raahausKaynnissa) {
+      e.preventDefault();
+      siirraRaahattavaKohtaan(li, piste.clientY, document.getElementById('alapalkki-arkki-lista'));
+      paivitaRajaviiva();
+    }
+  }
+
+  function loppuu() {
+    if (ajastin) { clearTimeout(ajastin); ajastin = null; }
+    document.removeEventListener('mousemove', liikkuu);
+    if (raahausKaynnissa) {
+      raahausKaynnissa = false;
+      li.classList.remove('dragging');
+      alapalkkiJarjestys = Array.from(document.getElementById('alapalkki-arkki-lista').children).map(function(el) { return el.dataset.id; });
+      tallennaAlapalkkiJarjestys();
+      piirraAlapalkki();
+    }
+  }
+
+  li.addEventListener('touchstart', alkaa, { passive: true });
+  li.addEventListener('touchmove', liikkuu, { passive: false });
+  li.addEventListener('touchend', loppuu);
+  li.addEventListener('touchcancel', loppuu);
+  li.addEventListener('mousedown', alkaa);
 }
 
 document.getElementById('alapalkki-arkki-sulje').addEventListener('click', function() {
@@ -5544,7 +5592,7 @@ function piirraHyttiRivi(rivi, lukutila) {
       inputti.className = 'edit-input';
       teksti.replaceWith(inputti);
       inputti.focus();
-      inputti.select();
+      inputti.setSelectionRange(inputti.value.length, inputti.value.length);
 
       async function tallenna() {
         const uusi = inputti.value.trim();
@@ -5670,7 +5718,7 @@ function muokkaaHyttiSeuraavaAskel() {
   inputti.className = 'edit-input';
   askelEl.replaceWith(inputti);
   inputti.focus();
-  inputti.select();
+  inputti.setSelectionRange(inputti.value.length, inputti.value.length);
 
   async function tallenna() {
     const uusi = inputti.value.trim();
@@ -6184,12 +6232,37 @@ async function lataaRuoriHytti() {
 let cachedAnkkurit = [];
 let ankkuritKaikkiNakyvissa = false;
 
-// Ankkurikuvake SVG:nä (2026-08-11, Ruori-speksi §4.1) — sama kuvio kuin
-// aiempi ⚓-emoji, mutta väri hallinnassa (currentColor) eikä alustan
-// emoji-fontin varassa (eri alustoilla ⚓ renderöityi eri väreissä).
-// Merkki pysyy AINA samana harmaana (color: var(--vaimea), ks. style.css)
-// — tila näkyy vain napin taustasta, ei merkistä (§4.3).
-const ANKKURI_SVG = '<svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="4.4" r="2" stroke="currentColor" stroke-width="1.7"/><path d="M12 6.4V19M8.2 9.8h7.6M4.5 13.5a7.5 7.5 0 0 0 7.5 7.5 7.5 7.5 0 0 0 7.5-7.5" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+// Ankkurikuvake (2026-08-11 korjattu, elävä testaus §2) — ENSIMMÄINEN
+// versio (Ruori-speksi §4.1, sama päivä) korvasi ⚓-emojin käsinpiirretyllä
+// SVG-polulla, koska emoji-fontti ei noudata CSS:n color/currentColor-
+// ohjausta (eri alustoilla ⚓ renderöityi eri väreissä). Katri havaitsi live-
+// testissä että tämä MYÖS muutti muodon, ei vain väriä — alkuperäinen ⚓ oli
+// hänen mukaansa "Sataman sielu", sama tavalla kuin fontti. Katrin oma
+// diagnoosi ja korjausjärjestys: kokeile ENSIN värin pakottamista natiiviin
+// ⚓-glyfiin CSS-suotimella ennen kuin muoto vaihdetaan mihinkään muuhun.
+// `filter: grayscale(1)` toimii CSS-suotimena myös väri-emoji-fontteihin
+// (se operoi rasteroituun kuvaan, ei tekstin color-ominaisuuteen — eri
+// mekanismi kuin currentColor, joka ei toiminut), joten sama alkuperäinen
+// muoto säilyy JA väri saadaan hallintaan. Toteutettu SVG:n SISÄLLÄ
+// (<text>-elementtinä path:ien sijaan) jotta olemassa olevat kokosäännöt
+// (esim. .anchor-btn svg { width/height }) toimivat edelleen sellaisenaan
+// kaikkialla missä ANKKURI_SVG:tä käytetään (~10 kutsupaikkaa), ei
+// vaadi yhdenkään niistä koskemista.
+// EI VIELÄ TESTATTU oikealla iOS Safarilla/Androidilla (Katrin oma pyyntö,
+// §2) — jos grayscale(1) ei riitä jollain alustalla, seuraava askel on
+// contrast()/brightness() -lisäys tähän samaan filter-arvoon, EI paluu
+// käsinpiirrettyyn SVG-polkuun (se muutti muotoa, mikä oli alkuperäinen
+// valitus).
+const ANKKURI_SVG = '<svg viewBox="0 0 24 24"><text x="12" y="12.5" font-size="19" text-anchor="middle" dominant-baseline="central" style="filter:grayscale(1)">⚓</text></svg>';
+
+// Auto-kasvava korkeus ankkurin textarea-kentille (2026-08-11, elävä
+// testaus §1.4) — nollataan ensin 'auto' jotta scrollHeight mittaa oikean
+// sisällön (muuten se jää edellisen, korkeamman arvon vangiksi kun tekstiä
+// poistetaan).
+function kasvataTextareaaSisallon(el) {
+  el.style.height = 'auto';
+  el.style.height = el.scrollHeight + 'px';
+}
 
 // Ankkurin ⋯-valikon kuvakkeet (§4.4) — Sataman sävyissä (muste/messinki/
 // paperi), ei alustan emoji-fontin varassa.
@@ -6313,13 +6386,18 @@ async function lataaAnkkurit() {
     teksti.textContent = ankkuri.content;
     teksti.title = 'Muokkaus koskee vain tätä ankkuria, ei alkuperäistä riviä';
     teksti.addEventListener('click', function() {
-      const inputti = document.createElement('input');
-      inputti.type = 'text';
+      // Textarea, ei input (2026-08-11, elävä testaus §1.3/§1.4) — pitkä
+      // ankkuriteksti saa nyt rivittyä muokatessa, ei enää tekstin
+      // katoamista kentän reunan taakse.
+      const inputti = document.createElement('textarea');
+      inputti.rows = 1;
       inputti.value = ankkuri.content;
       inputti.className = 'edit-input';
       teksti.replaceWith(inputti);
       inputti.focus();
-      inputti.select();
+      inputti.setSelectionRange(inputti.value.length, inputti.value.length);
+      kasvataTextareaaSisallon(inputti);
+      inputti.addEventListener('input', function() { kasvataTextareaaSisallon(inputti); });
 
       async function tallenna() {
         const uusi = inputti.value.trim();
@@ -6332,7 +6410,7 @@ async function lataaAnkkurit() {
 
       inputti.addEventListener('blur', tallenna);
       inputti.addEventListener('keydown', function(e) {
-        if (e.key === 'Enter') inputti.blur();
+        if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); inputti.blur(); }
         if (e.key === 'Escape') { inputti.value = ankkuri.content; inputti.blur(); }
       });
     });
@@ -6744,7 +6822,7 @@ async function loadAnchorCandidates() {
       inputti.className = 'edit-input';
       text.replaceWith(inputti);
       inputti.focus();
-      inputti.select();
+      inputti.setSelectionRange(inputti.value.length, inputti.value.length);
 
       async function tallenna() {
         if (peruttu) {
@@ -7455,7 +7533,7 @@ async function lataaLaituri(hakusana) {
         inputti.className = 'edit-input';
         teksti.replaceWith(inputti);
         inputti.focus();
-        inputti.select();
+        inputti.setSelectionRange(inputti.value.length, inputti.value.length);
 
         async function tallenna() {
           const uusi = inputti.value.trim();
@@ -9225,7 +9303,7 @@ function aloitaListanMuokkaus(teksti, lista, paivitaNakyma) {
   inputti.className = 'edit-input';
   teksti.replaceWith(inputti);
   inputti.focus();
-  inputti.select();
+  inputti.setSelectionRange(inputti.value.length, inputti.value.length);
   inputti.addEventListener('click', function(e) { e.stopPropagation(); });
 
   async function tallenna() {
@@ -9952,7 +10030,7 @@ function paivitaNaytto(tuotteet) {
       inputti.className = 'edit-input';
       teksti.replaceWith(inputti);
       inputti.focus();
-      inputti.select();
+      inputti.setSelectionRange(inputti.value.length, inputti.value.length);
 
       async function tallenna() {
         const uusi = inputti.value.trim();
@@ -10314,13 +10392,21 @@ document.getElementById('ankkurit-add-btn').addEventListener('click', async func
   if (ilmoitaKirjoitusvirheesta(error, 'Ankkurin luonti')) return;
   await paivitaAnkkuroidutAvaimet();
   ankkuriInput.value = '';
+  kasvataTextareaaSisallon(ankkuriInput);
   lataaAnkkurit();
 });
 
+// Enter lähettää kuten aiemmalla <input>:lla, Shift+Enter jättää rivinvaihdon
+// (2026-08-11, elävä testaus §1.4) — muuten <textarea> lisäisi rivinvaihdon
+// ennen kuin klikkaus ehtii lukea/tyhjentää kentän.
 document.getElementById('ankkurit-input').addEventListener('keydown', function(event) {
-  if (event.key === 'Enter') {
+  if (event.key === 'Enter' && !event.shiftKey) {
+    event.preventDefault();
     document.getElementById('ankkurit-add-btn').click();
   }
+});
+document.getElementById('ankkurit-input').addEventListener('input', function() {
+  kasvataTextareaaSisallon(this);
 });
 
 document.getElementById('ankkurit-laajenna').addEventListener('click', function() {
