@@ -3508,3 +3508,25 @@ Tekstinvalintabugi sen sijaan oli oikea: `.list li.dragging` lisäsi `user-selec
 Yksi keskitetty muutos (`alustaRaahaus()`-funktioon + yksi uusi CSS-luokka) korjaa siis kaikki sen käyttöpaikat kerralla, ei tarvinnut koskea jokaista listaa erikseen.
 
 sw.js v109 → v110.
+
+### Ruori-uudistus: otsakkeen v2 + sään "laatikosta pois" + tuulikuvake (2026-08-11)
+
+Katrin uusi, aiempaa mockup-varausta ("§3 ei lukittu") korvaava suora ohje: kuormakytkin pysyy vasemmassa ylänurkassa (rakenne oli jo tätä), SATAMA sen oikealla puolella sinapilla (`--sinappi`, sama token kuin muualla — ei uusi väri). Toteutettu: `.ruori .tunnus` väri `--muste` → `--sinappi`.
+
+**Sää pois "laatikosta":** `.segmentti.saa` menetti kortin taustan/reunan/varjon/hover-noston (`background:none; border:none; box-shadow:none`), kelluu nyt suoraan paperin päällä kuten otsake — leimasin-tagit säilyivät lämpötilan oikealla puolella (olivat jo siellä).
+
+**Tuntistrippi koko päiväksi:** aiempi versio näytti vain seuraavat 8 tuntia nykyhetkestä — nyt KOKO päivä klo 1-23 (Katrin pyyntö), 23 saraketta, vaakavieritettävä. Nykyinen tunti merkitään liquid glass -korostuksella (`--r-kosketettava`-resepti, sama kuin kuormakytkimessä — Katrin lupa "käytä liquid glassia missä järkevää") ja strippi vierittyy automaattisesti nykyhetkeen `scrollIntoView`:llä ettei sitä tarvitse etsiä käsin. Päivämäärävertailu tehdään merkkijonovertailulla (`t.slice(0,10)`/`slice(11,13)`) EIKÄ `new Date(t)`:llä — Open-Meteon paikallisaikaleimat eivät sisällä aikavyöhykettä, ja Date-jäsennys tulkitsisi ne selaimen omalla ajalla, mikä olisi hauras.
+
+**Tuuli — kaksi kierrosta samassa istunnossa:** ensimmäinen yritys lisäsi "Tuulinen"-tekstileimasimen lämpötilan viereen (samalla mekanismilla kuin Sateenvarjo/Hattu/Aurinkolasit) ja `wind_speed_10m`:n Open-Meteo-kyselyyn. Katri korjasi HETI: ei tekstileimasinta, ei numeroa — pelkkä TUULIKUVAKE sääkuvakkeen vierelle sille tunnille jona tuulee, ja tosi kovalle tuulelle erilainen (ei vain eri väri) kuvake. Toteutettu `saaTuuliIkoni(nopeus)`: ≥30 km/h ohut kaksirivinen tuulikuvake ikonirivin perään, ≥50 km/h paksumpi 3-rivinen versio väritettynä `--vaara`-punaisella (sovelluksen oma kolmiportainen merkkikieli: normaali = neutraali, kova = "vaatii huomion"). `wind_speed_10m` jäi silti Open-Meteo-kyselyyn (tarvitaan per-tunti-arvo edelleen), vain SEN KÄYTTÖTAPA muuttui.
+
+sw.js v110 → v111.
+
+### Ruori-uudistus: alkuperäiset ruudukkokuvakkeet takaisin, ⋯-arkin navigointibugi (2026-08-11)
+
+Katri: tuo takaisin ne alkuperäiset kuvakkeet jotka näkyvät (vanhassa) ruudukossa, ja jos Ruorille löytyy samantyylinen niin saa vaihtaa. Ruudukon oikeat kuvakkeet olivat `sql/008_home_sections.sql`:n `icon`-sarakkeessa, EI mitään omaa käsinpiirrettyä SVG:tä — Laituri 🛟, Muistilaput 🗒️, Varasto 📦, Hytti 🚪, Asetukset ⚙️. Nämä korvasivat vastaavat `ALAPALKKI_IKONIT`-vakion käsinpiirretyt SVG:t (uusi `.alapalkki-emoji`-luokka fonttikoolla, ei SVG-kokosääntöjä). Kalenteri jätetty ennalleen — sillä on jo sama elävä päivä-käytös alapalkissa KUIN ruudukossakin (ruudukko EI käytä 🗓️-emojia Kalenterille sen enempää, se korvaa sen omalla `kal-kk`/`kal-pv`-näytöllä, ks. `lataaOsiot()`). Ruori jätettiin ennalleen — ei ruudukkovastinetta, aiemmin jo hyväksytty.
+
+**Bugi:** ⋯-arkin (alapalkin järjestyslista) rivit vain raahasivat — napautus ei vienyt mihinkään. Koska Muistilaput/Varasto/Asetukset tyypillisesti ELÄVÄT pisteiden takana (positiot 5-7), ne olivat käytännössä tavoittamattomissa alapalkin kautta paitsi jos käyttäjä sattui raahaamaan ne ensin näkyviin. Korjattu: sama "pitkä painallus voittaa napautuksen" -erottelu kuin `alustaRaahaus()`:ssa (`sivuutaSeuraavaKlikkaus`-lippu) lisätty myös `alustaAlapalkkiRaahaus()`:iin — nopea napautus sulkee arkin ja kutsuu `alapalkkiSiirry(id)`:tä, pitkä painallus+raahaus ei navigoi minnekään.
+
+**Kaksi pientä viilausta samalla:** raahattavan rivin `.dragging`-tila sai saman lämmin lasi + messinkikehys + sisävalo -korostuksen kuin muualla sovelluksessa (oli pelkkä `opacity:.35`, "liquid glass niin että erottuu helposti"), plus kevyt `scale(1.02)`+varjo "poimitun" tuntumaa varten. Arkin selite-teksti lyhennetty Katrin sanamuotoon: "Katkoviivan alla olevat löytyvät ⋯-merkin takaa." (viittaa suoraan näkyvään katkoviivaan listassa, ei erikseen "neljä ylintä").
+
+sw.js v111 → v112.

@@ -91,18 +91,19 @@ function showHyttiKorttiView() {
 // satama-design-kuvaus.md "Alapalkin poikkeus").
 const ALAPALKKI_IKONIT = {
   ruori: '<svg viewBox="0 0 28 28" fill="none"><circle cx="14" cy="14" r="8.5" stroke="var(--messinki)" stroke-width="2.4"/><circle cx="14" cy="14" r="2" fill="var(--messinki)"/><path d="M22.5 14L26 14M20 20L22.5 22.5M14 22.5L14 26M8 20L5.5 22.5M5.5 14L2 14M8 8L5.5 5.5M14 5.5L14 2M20 8L22.5 5.5" stroke="var(--messinki)" stroke-width="2.4" stroke-linecap="round"/></svg>',
-  // Pelastusrengas korjattu (2026-08-11, elävä testaus §2): aiempi versio
-  // yritti neljää vinoa VIIVAA renkaan päällä ("joku ihme" Katrin sanoin) —
-  // korvattu neljällä säteittäisellä valkoisella SUORAKULMIOLLA renkaan
-  // paksuuden mittaisina, tarkalleen renkaan kohdalla, käännettynä 90°
-  // välein. Tämä on pelastusrenkaan tunnistettava perusmuoto (punainen
-  // rengas + 4 valkoista poikkipalkkia), ei arvailu.
-  laituri: '<svg viewBox="0 0 28 28" fill="none"><circle cx="14" cy="14" r="8" stroke="var(--vaara)" stroke-width="4.2"/><rect x="11.9" y="3.9" width="4.2" height="4.2" fill="#fff"/><rect x="11.9" y="3.9" width="4.2" height="4.2" fill="#fff" transform="rotate(90 14 14)"/><rect x="11.9" y="3.9" width="4.2" height="4.2" fill="#fff" transform="rotate(180 14 14)"/><rect x="11.9" y="3.9" width="4.2" height="4.2" fill="#fff" transform="rotate(270 14 14)"/></svg>',
+  // Alkuperäiset ikonit palautettu käyttöön (2026-08-11, Katrin pyyntö) —
+  // samat emoji-merkit kuin vanhassa navigointiruudukossa (ks.
+  // sql/008_home_sections.sql:n icon-sarake), ei uusia käsinpiirrettyjä
+  // SVG:itä. Ruori ja Kalenteri jätetty ennalleen: Ruorilla ei ole
+  // ruudukossa vastinetta (ei linkkaa itseensä) ja aiemmin todettu
+  // toimivaksi, Kalenterilla on jo sama elävä päivä-käytös kuin
+  // ruudukossakin (ei pelkkä 🗓️-emoji siellä sen enempää).
+  laituri: '<span class="alapalkki-emoji">🛟</span>',
   kalenteri: '<svg viewBox="0 0 28 28" fill="none"><rect x="4" y="7" width="20" height="17" rx="2" fill="var(--paperi)" stroke="var(--muste)" stroke-width="1.5"/><path d="M9 3.5v5M19 3.5v5" stroke="var(--muste)" stroke-width="1.5" stroke-linecap="round"/><text x="14" y="17.5" font-family="\'Courier Prime\',monospace" font-weight="700" font-size="8.5" text-anchor="middle" fill="var(--muste)" data-role="kal-numero"></text><text x="14" y="22.7" font-family="\'Courier Prime\',monospace" font-size="5" letter-spacing="0.04em" text-anchor="middle" fill="var(--muste)" data-role="kal-vk"></text></svg>',
-  hytti: '<svg viewBox="0 0 28 28" fill="none"><path d="M8 25V13c0-3.3 2.7-6 6-6s6 2.7 6 6v12z" fill="var(--karikko)" stroke="var(--muste)" stroke-width="1.4" stroke-linejoin="round"/><path d="M8 16.5h12M8 20.5h12" stroke="var(--muste)" stroke-width="1" opacity=".5"/><circle cx="14" cy="11" r="2.6" fill="var(--messinki)" stroke="var(--muste)" stroke-width="1"/><circle cx="19" cy="19" r="1" fill="var(--messinki)"/></svg>',
-  muistilaput: '<svg viewBox="0 0 28 28" fill="none"><rect x="5" y="4" width="18" height="20" rx="2" fill="var(--paperi)" stroke="var(--muste)" stroke-width="1.5"/><rect x="8.3" y="8.3" width="3.6" height="3.6" rx="0.6" fill="var(--messinki)"/><path d="M9.1 10.2l0.8 0.9 1.7-1.9" stroke="#fff" stroke-width="0.9" stroke-linecap="round" stroke-linejoin="round"/><path d="M14 10.1h6" stroke="var(--muste)" stroke-width="1.3" stroke-linecap="round"/><rect x="8.3" y="14.3" width="3.6" height="3.6" rx="0.6" fill="none" stroke="var(--muste)" stroke-width="1.2"/><path d="M14 16.1h6" stroke="var(--muste)" stroke-width="1.3" stroke-linecap="round"/><rect x="8.3" y="20.3" width="3.6" height="3.6" rx="0.6" fill="none" stroke="var(--muste)" stroke-width="1.2"/><path d="M14 22.1h6" stroke="var(--muste)" stroke-width="1.3" stroke-linecap="round"/></svg>',
-  varasto: '<svg viewBox="0 0 28 28" fill="none"><rect x="4.5" y="8" width="19" height="16" rx="1.5" fill="var(--matalikko)" stroke="var(--muste)" stroke-width="1.4"/><path d="M4.5 14h19M14 8v16" stroke="var(--muste)" stroke-width="1.1" opacity=".5"/><path d="M4.5 8l4-4h11l4 4" fill="none" stroke="var(--muste)" stroke-width="1.3" stroke-linejoin="round"/></svg>',
-  asetukset: '<svg viewBox="0 0 28 28" fill="none"><circle cx="14" cy="14" r="5" stroke="#8a8580" stroke-width="2.2"/><path d="M14 4.5v3M14 20.5v3M23.5 14h-3M7.5 14h-3M20.6 7.4l-2.1 2.1M9.5 18.5l-2.1 2.1M20.6 20.6l-2.1-2.1M9.5 9.5l-2.1-2.1" stroke="#8a8580" stroke-width="2.2" stroke-linecap="round"/></svg>',
+  hytti: '<span class="alapalkki-emoji">🚪</span>',
+  muistilaput: '<span class="alapalkki-emoji">🗒️</span>',
+  varasto: '<span class="alapalkki-emoji">📦</span>',
+  asetukset: '<span class="alapalkki-emoji">⚙️</span>',
   lisaa: '<svg viewBox="0 0 28 28" fill="none"><circle cx="8" cy="14" r="2" fill="var(--vaimea)"/><circle cx="14" cy="14" r="2" fill="var(--vaimea)"/><circle cx="20" cy="14" r="2" fill="var(--vaimea)"/></svg>',
 };
 const ALAPALKKI_NIMET = { ruori: 'Ruori', laituri: 'Laituri', kalenteri: 'Kalenteri', hytti: 'Hytti', muistilaput: 'Muistilaput', varasto: 'Varasto', asetukset: 'Asetukset' };
@@ -236,6 +237,7 @@ function alustaAlapalkkiRaahaus(li) {
   let alkuY = 0;
   let alkuX = 0;
   let raahausKaynnissa = false;
+  let sivuutaSeuraavaKlikkaus = false;
 
   function pisteesta(e) { return e.touches ? e.touches[0] : e; }
 
@@ -252,6 +254,7 @@ function alustaAlapalkkiRaahaus(li) {
     alkuX = piste.clientX;
     ajastin = setTimeout(function() {
       raahausKaynnissa = true;
+      sivuutaSeuraavaKlikkaus = true;
       li.classList.add('dragging');
       if (navigator.vibrate) navigator.vibrate(15);
     }, RAAHAUS_VIIVE_MS);
@@ -294,6 +297,23 @@ function alustaAlapalkkiRaahaus(li) {
   li.addEventListener('touchend', loppuu);
   li.addEventListener('touchcancel', loppuu);
   li.addEventListener('mousedown', alkaa);
+
+  // BUGIKORJAUS (2026-08-11, Katrin löydös): arkin rivit vain raahasivat,
+  // eivät vieneet mihinkään napautettaessa — Muistilaput/Varasto/Asetukset
+  // olivat siis tavoittamattomissa aina kun ne olivat pisteiden takana eikä
+  // käyttäjä sattunut järjestelemään palkkia. Napautus (ei raahaus) vie nyt
+  // kohteeseen ja sulkee arkin — sama "pitkä painallus voittaa napautuksen"
+  // -erottelu kuin alustaRaahaus():ssa (sivuutaSeuraavaKlikkaus).
+  li.addEventListener('click', function(e) {
+    if (sivuutaSeuraavaKlikkaus) {
+      e.preventDefault();
+      e.stopImmediatePropagation();
+      sivuutaSeuraavaKlikkaus = false;
+      return;
+    }
+    document.getElementById('alapalkki-arkki-overlay').style.display = 'none';
+    alapalkkiSiirry(li.dataset.id);
+  }, true);
 }
 
 document.getElementById('alapalkki-arkki-sulje').addEventListener('click', function() {
@@ -6029,7 +6049,25 @@ const SAA_IKONIT = {
   snow: '<svg viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" stroke-linecap="round" fill="none"><path d="M12 2v20M4 7l16 10M20 7L4 17"/></svg>',
   lightning: '<svg viewBox="0 0 24 24"><path fill="currentColor" d="M13 2 4 14h6l-1 8 9-12h-6l1-8z"/></svg>',
   fog: '<svg viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" stroke-linecap="round" fill="none"><path d="M3 8h18M3 12h18M3 16h12"/></svg>',
+  // Tuuli (2026-08-11, Katrin pyyntö) — ei omaa leimasinta eikä numeroa,
+  // vain kuvake sääkuvakkeen vierellä sinä tuntina kun tuulee. "tuuli" on
+  // ohut kaksirivinen versio, "tuuliKova" paksumpi + väritetty --vaara:lla
+  // (span-wrapperin kautta) jotta tosi kova tuuli erottuu MYÖS muodosta,
+  // ei vain väristä.
+  tuuli: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M3 9h12.5a2.8 2.8 0 1 0-2.3-4.4"/><path d="M3 15h15a2.8 2.8 0 1 1-2.3 4.4"/></svg>',
+  tuuliKova: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M2 7h13a3.2 3.2 0 1 0-2.6-5"/><path d="M2 12.5h18"/><path d="M2 18h14a3.2 3.2 0 1 1-2.6 5"/></svg>',
 };
+const TUULI_KYNNYS = 30;
+const TUULI_KOVA_KYNNYS = 50;
+// Tuulikuvake sääkuvakkeen viereen sille tunnille jona tuulee (ei numero,
+// ei omaa leimasinta) — normaali versio kynnyksen ylittyessä, paksumpi ja
+// --vaara-punainen versio kun tuuli on tosi kova.
+function saaTuuliIkoni(nopeus) {
+  if (typeof nopeus !== 'number') return '';
+  if (nopeus >= TUULI_KOVA_KYNNYS) return '<span style="color:var(--vaara)">' + SAA_IKONIT.tuuliKova + '</span>';
+  if (nopeus >= TUULI_KYNNYS) return SAA_IKONIT.tuuli;
+  return '';
+}
 
 // WMO-säätunnus -> kuvakeyhdistelmä (Ruori-speksi §2.3). Sääntö: jos kuvassa
 // on aurinko, pilvi JA pisara, kaikki kolme näytetään erikseen — sävytys ei
@@ -6062,26 +6100,42 @@ async function lataaRuoriSaa() {
     if (!vastaus.ok || !paketti.data) throw new Error(paketti.error || 'Säädatan haku epäonnistui');
 
     const saa = paketti.data;
-    const nyt = new Date();
     const tunnit = saa.hourly.time;
-    let alkuIdx = tunnit.findIndex(function(t) { return new Date(t) > nyt; });
-    if (alkuIdx === -1) alkuIdx = 0;
+
+    // Koko päivä klo 1-23 (2026-08-11, Katrin pyyntö), ei enää vain
+    // seuraavat muutama tunti. Merkkijonovertailu, ei new Date(t) — Open-
+    // Meteon paikallisaikaleimat ("2026-08-11T14:00") eivät sisällä
+    // aikavyöhykettä, ja new Date() tulkitsisi ne selaimen omalla
+    // paikallisajalla, mikä on hauras jos se joskus poikkeaa Suomen ajasta.
+    const tanaanIso = paivamaaraISO(new Date());
+    const nytTunti = new Date().getHours();
     const nakyvat = [];
-    for (let i = alkuIdx; i < tunnit.length && nakyvat.length < 8; i++) nakyvat.push(i);
+    let nykyIdx = -1;
+    tunnit.forEach(function(t, i) {
+      if (t.slice(0, 10) !== tanaanIso) return;
+      const tunti = parseInt(t.slice(11, 13), 10);
+      if (tunti < 1 || tunti > 23) return;
+      if (tunti === nytTunti) nykyIdx = nakyvat.length;
+      nakyvat.push(i);
+    });
     if (nakyvat.length === 0) throw new Error('Ei tunteja näytettäväksi');
+    const nykyAnkkuri = Math.max(nykyIdx, 0);
 
     const nykyinenLampo = saa.current && typeof saa.current.apparent_temperature === 'number'
       ? saa.current.apparent_temperature
-      : saa.hourly.apparent_temperature[nakyvat[0]];
+      : saa.hourly.apparent_temperature[nakyvat[nykyAnkkuri]];
     document.getElementById('ruori-saa-lampo').textContent = Math.round(nykyinenLampo) + '°';
 
-    const maxSadeTod = nakyvat.slice(0, 4).reduce(function(max, i) {
+    const maxSadeTod = nakyvat.slice(nykyAnkkuri, nykyAnkkuri + 4).reduce(function(max, i) {
       return Math.max(max, saa.hourly.precipitation_probability[i] || 0);
     }, 0);
     const tagit = [];
     if (maxSadeTod >= 40) tagit.push('Sateenvarjo');
     if (nykyinenLampo <= 0) tagit.push('Hattu');
     if (nykyinenLampo >= 25) tagit.push('Aurinkolasit');
+    // Tuuli EI ole tässä leimana eikä numerona (Katrin pyyntö) — ks.
+    // saaTuuliIkoni() tuntirivin renderöinnissä alempana, kuvake sään
+    // vierellä sinä tuntina jona tuulee.
     const tagitEl = document.getElementById('ruori-saa-tagit');
     tagitEl.innerHTML = '';
     tagit.forEach(function(teksti, i) {
@@ -6093,15 +6147,19 @@ async function lataaRuoriSaa() {
     });
 
     const tunnitEl = document.getElementById('ruori-saa-tunnit');
-    tunnitEl.innerHTML = nakyvat.map(function(i) {
-      const aika = new Date(tunnit[i]);
+    tunnitEl.innerHTML = nakyvat.map(function(i, idx) {
       const sade = saa.hourly.precipitation_probability[i];
-      return '<div class="saa-tunti">'
-        + '<span class="saa-tunti-aika">' + String(aika.getHours()).padStart(2, '0') + '</span>'
-        + '<span class="saa-tunti-ikoni">' + saaIkoniHtml(saa.hourly.weather_code[i]) + '</span>'
+      const tuuli = saa.hourly.wind_speed_10m ? saa.hourly.wind_speed_10m[i] : undefined;
+      return '<div class="saa-tunti' + (idx === nykyIdx ? ' saa-tunti-nyt' : '') + '">'
+        + '<span class="saa-tunti-aika">' + tunnit[i].slice(11, 13) + '</span>'
+        + '<span class="saa-tunti-ikoni">' + saaIkoniHtml(saa.hourly.weather_code[i]) + saaTuuliIkoni(tuuli) + '</span>'
         + '<span class="saa-tunti-sade">' + (sade >= 10 ? pyoristaKymmeneen(sade) + '%' : '') + '</span>'
         + '</div>';
     }).join('');
+    if (nykyIdx >= 0) {
+      const nykySolu = tunnitEl.children[nykyIdx];
+      if (nykySolu) nykySolu.scrollIntoView({ inline: 'center', block: 'nearest' });
+    }
 
     segmentti.style.display = 'block';
   } catch (e) {

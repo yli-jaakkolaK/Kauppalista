@@ -53,10 +53,12 @@ async function setSetting(key, value) {
 }
 
 async function haeOpenMeteosta() {
+  // wind_speed_10m lisätty (2026-08-11, Katrin pyyntö) — tuuli-leimaa varten
+  // (§4b-tyyppinen sääntö, "TUULINEN"). Yksikkö on Open-Meteon oletus km/h.
   const url = 'https://api.open-meteo.com/v1/forecast'
     + '?latitude=' + LEVEYSASTE + '&longitude=' + PITUUSASTE
-    + '&hourly=apparent_temperature,precipitation_probability,weather_code'
-    + '&current=apparent_temperature,weather_code'
+    + '&hourly=apparent_temperature,precipitation_probability,weather_code,wind_speed_10m'
+    + '&current=apparent_temperature,weather_code,wind_speed_10m'
     + '&timezone=Europe%2FHelsinki&forecast_days=2';
   const vastaus = await fetch(url);
   if (!vastaus.ok) throw new Error('Open-Meteo vastasi ' + vastaus.status);

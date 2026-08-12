@@ -3351,7 +3351,9 @@ h1 {
 .ruori .otsake { display: flex; justify-content: space-between; align-items: center; padding: 2px 2px 22px; }
 .ruori .otsake-vas { flex: 1; min-width: 0; }
 .ruori .otsake-ylarivi { display: flex; align-items: center; gap: 12px; }
-.ruori .tunnus { font-size: 22px; letter-spacing: .34em; color: var(--muste); font-weight: 700; margin: 0; }
+/* SATAMA sinapilla (2026-08-11, Katrin pyyntö) — sama --sinappi joka on
+   muutenkin käytössä sovelluksessa, ei uusi väri. */
+.ruori .tunnus { font-size: 22px; letter-spacing: .34em; color: var(--sinappi); font-weight: 700; margin: 0; }
 
 /* Kuormitustila-kytkin — itse painettava pinta (--r-kosketettava), ei
    erillistä laatikkoa/tekstiä. Pois päältä: lämmin lasi + messinkikehys.
@@ -3416,8 +3418,15 @@ h1 {
 .ruori .tagi-raskas.tagi-ristiriita { background: var(--vaara); color: #FDFBF6; }
 .ruori .kal-lippu-syy { font-size: 12px; color: var(--vaara); margin-top: 2px; }
 
-/* --- Sää (2026-08-11, Ruori-speksi §2) --- */
-.ruori .segmentti.saa { padding: 15px 16px 13px; }
+/* --- Sää (2026-08-11 korjattu, Katrin layout-pyyntö) — pois "laatikosta":
+   ei taustaa/reunaa/varjoa/nostoa, kelluu suoraan paperin päällä kuten
+   otsake, samalla tavalla kuin --paperi-tausta jo muutenkin näkyy. */
+.ruori .segmentti.saa {
+  padding: 0 2px 18px; background: none; border: none; box-shadow: none; margin-bottom: 4px;
+}
+.ruori .segmentti.saa:hover, .ruori .segmentti.saa:focus-visible {
+  transform: none; background: none; box-shadow: none;
+}
 .ruori .saa-yla { display: flex; align-items: flex-start; gap: 12px; }
 .ruori .saa-lampo { font-size: 52px; font-weight: 700; line-height: 1; letter-spacing: -.02em; color: var(--muste); flex: none; }
 .ruori .saa-tagit { display: flex; flex-wrap: wrap; gap: 6px 5px; padding-top: 6px; }
@@ -3428,9 +3437,20 @@ h1 {
   color: var(--vaara); border: 1.8px solid var(--vaara); border-radius: 2px;
   padding: 3px 7px; filter: url(#leimasin);
 }
-.ruori .saa-tunnit { display: flex; gap: 14px; margin-top: 14px; padding-top: 12px; border-top: 1px dotted var(--hius-vahva); overflow-x: auto; }
-.ruori .saa-tunti { display: flex; flex-direction: column; align-items: center; gap: 4px; flex: none; min-width: 30px; }
+.ruori .saa-tunnit { display: flex; gap: 10px; margin-top: 14px; padding-top: 12px; border-top: 1px dotted var(--hius-vahva); overflow-x: auto; scroll-padding: 6px; }
+.ruori .saa-tunti { display: flex; flex-direction: column; align-items: center; gap: 4px; flex: none; min-width: 30px; padding: 4px 3px; border-radius: var(--r-kosketettava); }
+/* Nykyinen tunti: liquid glass -korostus (2026-08-11, Katrin lupa käyttää
+   sitä laajemmin missä järkevää) — sama lämmin lasi -resepti kuin
+   kuormakytkimessä/ankkuri-napeissa, ei koristeena vaan koska tämä on
+   juuri se "mistä ollaan nyt" -kohta joka ansaitsee korostuksen. */
+.ruori .saa-tunti-nyt {
+  background: linear-gradient(165deg, rgba(255, 252, 244, .72), rgba(234, 230, 220, .28));
+  border: 1px solid rgba(156, 122, 67, .5);
+  backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .65);
+}
 .ruori .saa-tunti-aika { font-size: 10.5px; color: var(--vaimea); }
+.ruori .saa-tunti-nyt .saa-tunti-aika { color: var(--muste); font-weight: 700; }
 .ruori .saa-tunti-ikoni { display: flex; align-items: center; gap: 1px; }
 .ruori .saa-tunti-ikoni svg { width: 15px; height: 15px; display: block; }
 .ruori .saa-tunti-sade { font-size: 10px; color: var(--syvanne); }
@@ -3580,6 +3600,12 @@ h1 {
 }
 .alapalkki-tabi svg { width: 30px; height: 30px; display: block; margin: 0 auto; }
 .alapalkki-tabi.alapalkki-lisaa svg { width: 22px; height: 22px; }
+/* Alkuperäiset ruudukon emoji-kuvakkeet (2026-08-11, Katrin pyyntö) —
+   samat merkit kuin sql/008_home_sections.sql:n icon-sarakkeessa, ei
+   kokosääntöä svg:lle koska emoji ei ole svg — fonttikoolla vastaava
+   visuaalinen paino kuin 30px kuvakkeilla. */
+.alapalkki-emoji { font-size: 26px; line-height: 1; display: block; }
+.alapalkki-arkki-lista li .alapalkki-emoji { font-size: 22px; }
 .alapalkki-alleviiva { width: 16px; height: 2.5px; border-radius: 2px; background: transparent; }
 .alapalkki-tabi.aktiivinen .alapalkki-alleviiva { background: var(--muste); }
 
@@ -3592,7 +3618,7 @@ h1 {
 .alapalkki-arkki-selite { font-size: 12.5px; color: var(--muted); margin: 2px 0 12px; }
 .alapalkki-arkki-lista { list-style: none; margin: 0 0 6px; padding: 0; }
 .alapalkki-arkki-lista li {
-  display: flex; align-items: center; gap: 10px; padding: 10px 6px;
+  display: flex; align-items: center; gap: 10px; padding: 10px 6px; cursor: pointer;
   border-bottom: 1px solid var(--border); background: var(--ground);
   touch-action: none; user-select: none; -webkit-user-select: none;
   -webkit-touch-callout: none;
@@ -3602,4 +3628,17 @@ h1 {
 .alapalkki-arkki-lista li svg { width: 24px; height: 24px; flex: none; }
 .alapalkki-arkki-lista li .alapalkki-arkki-nimi { flex: 1; font-size: 15px; }
 .alapalkki-arkki-lista li .alapalkki-arkki-kahva { color: var(--muted); font-size: 18px; cursor: grab; padding: 4px 6px; }
-.alapalkki-arkki-lista li.dragging { opacity: .35; }
+/* Raahattavan rivin korostus (2026-08-11, Katrin pyyntö: "liquid glass/iOS
+   muotokielellä niin että siirrettävä erottuu helposti") — sama lämmin
+   lasi + messinkikehys + sisävalo -resepti kuin kuormakytkimessä ja
+   tuntistripin nykyisessä tunnissa, plus kevyt nosto (scale+varjo) niin
+   että rivi tuntuu fyysisesti "poimitulta" ruudulta. */
+.alapalkki-arkki-lista li.dragging {
+  background: linear-gradient(165deg, rgba(255, 252, 244, .92), rgba(234, 230, 220, .55));
+  border-color: transparent;
+  backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .75), 0 8px 18px rgba(34, 31, 26, .22);
+  outline: 1px solid rgba(156, 122, 67, .55);
+  transform: scale(1.02);
+  position: relative; z-index: 1;
+}
