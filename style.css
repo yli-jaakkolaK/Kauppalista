@@ -3403,6 +3403,18 @@ h1 {
 /* --- Ankkurit --- */
 .ruori .segmentti.ankkurit .otsikkorivi { margin-bottom: 10px; }
 
+/* Kirjoituskentän kontrastikorjaus (2026-08-11, elävä testaus) — .add-item
+   input käyttää sovelluksen jaettua, tumma/vaalea-teemaa seuraavaa
+   --text/--muted-tokenia (style.css:2), ja se voittaa .ruori:n
+   color:var(--muste):n (0,1,1 > 0,1,0). Ruorin "paperi"-tausta on
+   TARKOITUKSELLA aina vaalea riippumatta laitteen tummasta tilasta (ks.
+   .ruori-sääntö yllä), joten laite jossa OS on tummassa tilassa sai
+   --text:n lähes valkoisena vaalean paperin päällä = näkymätön muste.
+   Pakotetaan kiinteä muste/vaimea-väri tähän kenttään kuten muuallakin
+   Ruorissa. */
+.ruori .segmentti.ankkurit .add-item input { color: var(--muste); }
+.ruori .segmentti.ankkurit .add-item input::placeholder { color: var(--vaimea); }
+
 /* Rivin ⚓/⋯-pino (2026-08-11, Ruori-speksi §4.2/§4.3) — allekkain oikeassa
    reunassa, molemmat painettavan muotokieltä (lämmin lasi + messinkikehys).
    Muu rivi (täppä, teksti, muistutusmerkki) käyttää edelleen sovelluksen
