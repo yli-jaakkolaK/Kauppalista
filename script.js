@@ -1235,7 +1235,10 @@ document.getElementById('opinto-lisaa-materiaalia-btn').addEventListener('click'
 // samalla sivulla).
 async function lataaOpintoKurssiMateriaalit() {
   if (!currentOpintoKurssi) return;
-  const { data, error } = await db.from('laituri').select('id, content, created_at, piilota_laiturista')
+  // materiaali_kasitelty (sql/121, EI piilota_laiturista) — piilota_laiturista
+  // on nyt AINA true heti insertistä lähtien (§16.5c kohta 4), joten se ei
+  // enää kelpaa tämän sivun odottaa/käsitelty-tilaksi.
+  const { data, error } = await db.from('laituri').select('id, content, created_at, materiaali_kasitelty')
     .eq('materiaali_kurssi_id', currentOpintoKurssi.id).order('created_at', { ascending: false });
   if (error) {
     console.error('Kurssin materiaalien haku epäonnistui:', error);
@@ -1266,11 +1269,11 @@ async function lataaOpintoKurssiMateriaalit() {
     li.appendChild(teksti);
 
     const tila = document.createElement('span');
-    tila.className = 'opinto-materiaali-tila' + (rivi.piilota_laiturista ? ' kasitelty' : '');
-    tila.textContent = rivi.piilota_laiturista ? '✓ käsitelty' : '⏳ odottaa';
+    tila.className = 'opinto-materiaali-tila' + (rivi.materiaali_kasitelty ? ' kasitelty' : '');
+    tila.textContent = rivi.materiaali_kasitelty ? '✓ käsitelty' : '⏳ odottaa';
     li.appendChild(tila);
 
-    if (!rivi.piilota_laiturista) {
+    if (!rivi.materiaali_kasitelty) {
       const tarkistaNappi = document.createElement('button');
       tarkistaNappi.className = 'dialog-btn dialog-btn-cancel';
       tarkistaNappi.textContent = 'Tarkista';
@@ -6452,6 +6455,18 @@ function saaIkoniHtml(koodi, sade) {
 }
 function pyoristaKymmeneen(n) { return Math.round(n / 10) * 10; }
 
+// SATAMA_SPEKSI.md §16.5c kohta 4 (2026-08-16): "näytä viimeisin tunnettu
+// arvo yhteyskatkolla, piilota vain jos ei koskaan ollut arvoa TAI
+// edellisenkin hakeminen epäonnistui" — sietää YHDEN ohimenevän
+// verkkokatkon näyttämällä vanhaa dataa tuoreena hetken, mutta kaksi
+// peräkkäistä epäonnistumista piilottaa (data on silloin liian vanhaa
+// luotettavaksi). Ei ristiriidassa Ruori-speksin (§15.2) alkuperäisen
+// "vanhan datan näyttäminen tuoreena on pahempi kuin sään puuttuminen"
+// -periaatteen kanssa, koska KAHDEN peräkkäisen epäonnistumisen jälkeen
+// piilotus tapahtuu edelleen — vain YHDEN katkon sieto on uutta.
+let saaOnKoskaanOnnistunut = false;
+let saaEdellinenOnnistui = true;
+
 async function lataaRuoriSaa() {
   const segmentti = document.getElementById('ruori-saa-segmentti');
   try {
@@ -6525,9 +6540,17 @@ async function lataaRuoriSaa() {
     }
 
     segmentti.style.display = 'block';
+    saaOnKoskaanOnnistunut = true;
+    saaEdellinenOnnistui = true;
   } catch (e) {
     console.error('Ruorin säädatan haku epäonnistui:', e.message);
-    segmentti.style.display = 'none';
+    if (saaOnKoskaanOnnistunut && saaEdellinenOnnistui) {
+      // Ensimmäinen ohimenevä katko onnistuneen datan jälkeen — jätetään
+      // vanha, jo näytössä oleva data näkyviin sellaisenaan, ei piilotusta.
+      saaEdellinenOnnistui = false;
+    } else {
+      segmentti.style.display = 'none';
+    }
   }
 }
 
@@ -7664,7 +7687,6 @@ function avaaOsio(osio) {
       document.getElementById('min-paallekkainen-input').value = haeAsetusNumero('min_paallekkainen_min', 15);
       document.getElementById('yksin-hetkittain-raja-input').value = haeAsetusNumero('yksin_hetkittain_raja_min', 90);
       document.getElementById('aterian-kesto-input').value = haeAsetusNumero('aterian_kesto_min', 30);
-      paivitaLaiturinPiilotusAsetukset();
     });
     lataaHyttiOpiskeluaika();
     lataaHyttiSuljetutIkkunat();
@@ -8138,15 +8160,9 @@ async function lataaLaituri(hakusana) {
         });
       });
       toiminnot.appendChild(ankkuriNappi);
-
-      const sijoitaNappi = document.createElement('button');
-      sijoitaNappi.className = 'place-btn';
-      sijoitaNappi.textContent = '→';
-      sijoitaNappi.title = 'Sijoita listalle tai Hyttiin';
-      sijoitaNappi.addEventListener('click', function() {
-        avaaSijoitaValikko(rivi, li);
-      });
-      toiminnot.appendChild(sijoitaNappi);
+      // Erillinen "→ Sijoita" -nappi poistettu (2026-08-16, §16.5c) — kohteen
+      // valinta yhtenäistetty ⋯-valikon "🏠"-kohtaan (avaaKohdeValikko), ei
+      // enää kahta rinnakkaista mekanismia (sijoitus + koti) samalle asialle.
     } else {
       // "↺ palauta sijoittamattomaksi" (2026-07-17, ks. "Kalenteri-sijoitus
       // ei kirjoita mitään" -bugikorjaus) — sijoitettu-merkintä voi olla
@@ -8209,8 +8225,8 @@ async function lataaLaituri(hakusana) {
     // jatkorivi-tallenna-käsittelijä) — tietoinen poikkeus "ei koskaan
     // pakota" -periaatteesta, perusteltu KONSEPTIKIRJA.md:ssä.
     menuKohdat.push({
-      label: rivi.koti_tyyppi ? '🏠 Vaihda kotia (' + rivi.koti_kohde_nimi + ')' : '🏠 Aseta koti',
-      onClick: function() { avaaKotiValikko(rivi, li); },
+      label: rivi.koti_tyyppi ? '🏠 Vaihda kohdetta (' + rivi.koti_kohde_nimi + ')' : '🏠 Siirrä kohteeseen',
+      onClick: function() { avaaKohdeValikko(rivi, li); },
     });
     // 7c: "ei tarvitse näkyä Laiturissa" — ERI mekanismi kuin arkistointi,
     // ei tulkita käsitellyksi, vain pois aktiivisesta näkymästä. Turvainvariantti:
@@ -8226,31 +8242,9 @@ async function lataaLaituri(hakusana) {
       onClick: function() { arkistoiLaituriRivi(rivi); },
     });
     toiminnot.appendChild(createOverflowButton(li, menuKohdat));
-
-    const poistoNappi = document.createElement('button');
-    poistoNappi.className = 'delete-btn';
-    poistoNappi.textContent = '×';
-    poistoNappi.addEventListener('click', async function() {
-      const vahvistus = await naytaVahvistus('Poistetaanko tämä ajatus?', null, 'Poista');
-      if (!vahvistus) return;
-      const { error } = await db.from('laituri').delete().eq('id', rivi.id);
-      // Jos itse murun poisto epäonnistuu, se on TODELLISUUDESSA yhä
-      // olemassa — ankkurin siivousta (rivi alla) ei saa tehdä silloin,
-      // se jättäisi orvon ankkurin murulle joka ei koskaan poistunutkaan.
-      if (ilmoitaKirjoitusvirheesta(error, 'Laiturin rivin poisto')) return;
-      siivoaMuistutuksetKumottavasti('laituri', rivi.id);
-      const { error: ankkuriError } = await db.from('ankkurit').delete().eq('source', 'laituri').eq('source_ref', String(rivi.id));
-      if (ankkuriError) console.error('Ankkurin siivous murun poiston yhteydessä epäonnistui:', ankkuriError);
-      // Murun säie (2026-07-20/21): itse jatkorivit siivoutuvat automaattisesti
-      // FK-cascadella (sql/079), mutta mahdollinen herätysehdokas ankkurit-
-      // taulussa on ERILLINEN rivi (oma source='jatkorivi') eikä siivoudu
-      // cascadella — siivotaan tässä samalla periaatteella kuin yllä.
-      const { error: jatkoAnkkuriError } = await db.from('ankkurit').delete().eq('source', 'jatkorivi').eq('source_ref', String(rivi.id));
-      if (jatkoAnkkuriError) console.error('Säikeen herätysehdokkaan siivous murun poiston yhteydessä epäonnistui:', jatkoAnkkuriError);
-      lataaLaituri(document.getElementById('laituri-search').value.trim());
-      paivitaLaituriBadge();
-    });
-    toiminnot.appendChild(poistoNappi);
+    // Erillinen "×"-poistonappi poistettu (2026-08-16, §16.5c) — sama toiminto
+    // (poistaLaiturinMuru) siirretty ⋯-valikkoon kohdevalintojen rinnalle,
+    // Katrin oma pyyntö ("ei erilliseksi").
 
     listEl.appendChild(li);
     piirraJatkorivit(rivi, li, nakyvatJatkorivit);
@@ -8552,83 +8546,19 @@ async function hylkaaKauppaEhdotus(rivi) {
 // kirjoita mitään" -bugikorjaus) — ehdotus- ja toteutuskerroksen pitää olla
 // samaa mieltä sovelluksen kyvyistä.
 
-// Kaikki konkreettiset sijoituskohteet dynaamisesti: listat (RLS rajaa jo
-// omiin/jaettuihin) + Hytin AKTIIVISET kortit (arkistoituihin ei sijoiteta).
-// BUGIKORJAUS (2026-08-03, löydetty koti-mekanismin rakentamisen yhteydessä):
-// 'teema'-tyyppinen lista EI säilytä tuotteet-rivejä (ks. sql/081) —
-// suoritaSijoitus() kirjoittaisi sinne NÄKYMÄTTÖMÄN rivin (kirjoitus
-// onnistuisi, muttei näkyisi koskaan missään, sama "success:true joka
-// valehteli" -perhe kuin muistiinpanot.md:n "Kirjoituspolkujen auditointi").
-// Suodatettu pois — koti-mekanismilla (haeKotiKohteet) on teemalle OMA,
-// oikea kirjoitusreittinsä (laituri+teema_id).
-// Hytti_kortit poistettu kohdevaihtoehdoista (2026-08-16, SATAMA_SPEKSI.md
-// §16.5c -valmistelu) — pelkkä Laituri-uudistuksen edellyttämä kohdejoukon
-// kavennus, EI kosketa hytti_kortit-taulua tai hytti-kortti-view-etusivua
-// itseään, jotka pysyvät Hytin aktiivisena etusivuna Loki-välilehteen asti.
-async function haeSijoitusKohteet() {
-  const { data: listat, error: listatError } = await db.from('lists')
-    .select('id, name, category, list_type').in('category', ['muistilaput', 'varasto']);
-  if (listatError) console.error('Listojen haku sijoitusta varten epäonnistui:', listatError);
-  return (listat || [])
-    .filter(function(l) { return l.list_type !== 'teema'; })
-    .map(function(l) { return { tyyppi: 'lista', id: l.id, nimi: l.name, category: l.category }; });
-}
-
 // BUGIKORJAUS (2026-07-16, ks. muistiinpanot.md kohta 10, "✨-promptidiagnoosi"):
 // pelkkä listan/kortin NIMI ei kerro älylle mitään kohteen LUONTEESTA — alkuperäinen
 // oire (kalenteriin-ehdotus aikamäärettömälle ostosmurulle) syntyi juuri tästä
 // signaalin puutteesta. Jokainen kohde saa nyt lyhyen luonnehdinnan nimen lisäksi
 // (vain kuvaus, ei nimeä — nimi lisätään erikseen promptiin ettei se toistu).
+// teema/vahdittu lisätty (2026-08-16, §16.5c) — ✨-ehdotus käyttää nyt samaa
+// yhtenäistä kohdejoukkoa (haeKotiKohteet) kuin käsivalikko, ei enää omaa
+// suppeampaa listaansa.
 function kohteenKuvaus(kohde) {
-  if (kohde.tyyppi === 'hytti') return 'Hytin kortti — oma projekti/kurssi, tehtävät ja työn alla olevat';
+  if (kohde.tyyppi === 'teema') return 'keskusteluteema Varastossa — muruja kootaan yhteen aiheeseen ajan mittaan';
+  if (kohde.tyyppi === 'vahdittu') return 'vahdittu lepo — asia jonka annetaan hoitua itsestään, nousee ehdokkaaksi jos ei kuittausta';
   if (kohde.category === 'varasto') return 'varastopohja — malli/pakkauslista, EI ajankohtainen asia';
   return 'muistilaput/tehtävälista — eläviä muistiinpanoja ja tehtäviä';
-}
-
-// Kirjoittaa murun sisällön OIKEASTI valittuun kohteeseen (tuotteet-rivi
-// listalle, tai hytti_rivit-rivi kortille) ja merkitsee vasta ONNISTUNEEN
-// kirjoituksen JÄLKEEN sijoitetuksi ("Vahvistus seuraa todellisuutta").
-async function suoritaSijoitus(rivi, kohde) {
-  const { error: kirjoitusError } = kohde.tyyppi === 'hytti'
-    ? await db.from('hytti_rivit').insert({ content: rivi.content, kortti_id: kohde.id })
-    : await db.from('tuotteet').insert({ nimi: rivi.content, tehty: false, list_id: kohde.id });
-  if (kirjoitusError) {
-    console.error('Sijoitus epäonnistui:', kirjoitusError);
-    naytaIlmoitus('Sijoitus epäonnistui — yritä uudelleen');
-    return;
-  }
-  const { error } = await db.from('laituri').update({ status: 'sijoitettu', placed_where: kohde.nimi }).eq('id', rivi.id);
-  // Itse sisältö on jo kirjoitettu kohteeseen onnistuneesti tässä vaiheessa —
-  // jos VAIN tämä merkintä epäonnistuu, muru näyttäytyy yhä "sijoittamattomana"
-  // ja saattaisi päätyä sijoitetuksi UUDELLEEN myöhemmin (duplikaattiriski).
-  // "Sijoitettu"-viesti EI SAA valehdella tästä, ks. muistiinpanot.md
-  // "Kirjoituspolkujen auditointi".
-  if (error) {
-    console.error('Sijoitusmerkintä epäonnistui:', error);
-    naytaIlmoitus('Sisältö lisätty, mutta murun merkintä sijoitetuksi epäonnistui — tarkista Laituri');
-  } else {
-    naytaIlmoitus('Sijoitettu: ' + kohde.nimi);
-  }
-  lataaLaituri(document.getElementById('laituri-search').value.trim());
-  paivitaLaituriBadge();
-}
-
-// Avaa käsikohdevalinnan (⋯-tyylinen pudotusvalikko, ks. openRowMenu) —
-// käsipolku on ensisijainen tapa sijoittaa, ✨ on vain oikotie samaan
-// toteutukseen (ks. piirraLaituriEhdotusKortti).
-async function avaaSijoitaValikko(rivi, li) {
-  const kohteet = await haeSijoitusKohteet();
-  if (kohteet.length === 0) {
-    naytaIlmoitus('Ei yhtään sijoituskohdetta löytynyt');
-    return;
-  }
-  const items = kohteet.map(function(kohde) {
-    return {
-      label: kohde.tyyppi === 'hytti' ? '🚪 ' + kohde.nimi : kohde.nimi,
-      onClick: function() { suoritaSijoitus(rivi, kohde); },
-    };
-  });
-  openRowMenu(li, items);
 }
 
 // === LAITURIN KETJUN KOTI (2026-08-03, ks. KONSEPTIKIRJA.md 7b) ===
@@ -8639,76 +8569,130 @@ async function avaaSijoitaValikko(rivi, li) {
 // ks. sql/087), ei välitön siirto. Vanhat, jo teema_id:llä siirretyt murut
 // (ennen 2026-08-03) pysyvät koskemattomina — ei takautuvaa muutosta.
 
-// Samat konkreettiset kohteet kuin käsisijoituksella (haeSijoitusKohteet),
-// mutta 'teema' MUKANA — sijoituskohteista se on tarkoituksella suodatettu
-// pois (teema-tyyppinen lista ei säilytä tuotteet-rivejä, ks. sql/081),
-// koti-mekanismi kirjoittaa sinne oman, eri reittinsä kautta (ks. alla).
-// Hytti_kortit poistettu kohdevaihtoehdoista (2026-08-16, SATAMA_SPEKSI.md
-// §16.5c -valmistelu) — ks. haeSijoitusKohteet()-kommentti yllä.
+// Ainoa kohdehaku Laiturille nyt (2026-08-16, §16.5c) — yhdistää vanhan
+// "sijoitus"-kohdejoukon tähän: 'teema' MUKANA (koti-mekanismilla on sille
+// oma kirjoitusreittinsä, laituri+teema_id, ei tuotteet-rivi, ks. sql/081),
+// hytti_kortit POISSA (oma reittinsä kurssimateriaalille/helmelle/"ehdota
+// Juhalle", ks. §16.5b). category+visibility mukana (§16.5c kohta 3):
+// Varasto/Muistilaput-jaottelu ja näkyvyyden periytyminen tarvitsevat molemmat.
 async function haeKotiKohteet() {
   const { data: listat, error: listatError } = await db.from('lists')
-    .select('id, name, list_type').in('category', ['muistilaput', 'varasto']);
+    .select('id, name, list_type, category, visibility').in('category', ['muistilaput', 'varasto']);
   if (listatError) console.error('Listojen haku kotivalintaa varten epäonnistui:', listatError);
   return (listat || []).map(function(l) {
     const tyyppi = l.list_type === 'teema' ? 'teema' : l.list_type === 'vahdittu' ? 'vahdittu' : 'lista';
-    return { tyyppi: tyyppi, id: l.id, nimi: l.name };
+    return { tyyppi: tyyppi, id: l.id, nimi: l.name, category: l.category, visibility: l.visibility };
   });
 }
 
-async function avaaKotiValikko(rivi, li) {
-  // Tuore asetuskartta ennen kohdekohtaisen piilotusoletuksen tarkistusta —
-  // asetuksetKartta ladataan muuten vain Asetukset-näkymän avatessa, joka ei
-  // takaa tuoreutta jos Laituria käytetään käymättä siellä samassa istunnossa.
-  await paivitaAsetukset();
-  const kohteet = await haeKotiKohteet();
-  if (kohteet.length === 0) {
-    naytaIlmoitus('Ei yhtään kohdetta löytynyt');
-    return;
-  }
-  const ikoni = { teema: '🧵 ', vahdittu: '⏳ ', hytti: '🚪 ', lista: '' };
+// === YHTENÄINEN KOHDEVALIKKO (2026-08-16, SATAMA_SPEKSI.md §16.5c) ===
+// Korvaa VANHAN erillisen "koti"-valikon (avaaKotiValikko) JA erillisen
+// "sijoita"-valikon (avaaSijoitaValikko) yhdellä valikolla — Katrin sana:
+// "kaikella on yksi koti" koskee myös itse valikkoa, ei vain dataa. Kolme
+// riviä: Varasto / Muistilaput / Poista, EI Hytti-kohdetta (kurssimateriaali
+// kulkee omaa reittiään, helmi vain Hytin omasta kontekstista, "ehdota
+// Juhalle" hoitaa loput — ks. §16.5b). Sama paikka kuin ennen: ⋯-rivivalikko
+// (openRowMenu), ei oma nappinsa.
+async function avaaKohdeValikko(rivi, li) {
+  openRowMenu(li, [
+    { label: '📦 Varasto', onClick: function() { avaaKohdeAlivalikko(rivi, li, 'varasto'); } },
+    { label: '🗒️ Muistilaput', onClick: function() { avaaKohdeAlivalikko(rivi, li, 'muistilaput'); } },
+    { label: '🗑 Poista', danger: true, onClick: function() { poistaLaiturinMuru(rivi); } },
+  ]);
+}
+
+// Alivalikko: kategorian omat listat (RLS näyttää jo oikeat — §16.5c kohta
+// 2b, ei erillistä logiikkaa) + "+ Uusi lista" jos yhtään sopivaa ei vielä
+// ole tai käyttäjä haluaa uuden.
+async function avaaKohdeAlivalikko(rivi, li, kategoria) {
+  const kaikki = await haeKotiKohteet();
+  const kohteet = kaikki.filter(function(k) { return k.category === kategoria; });
+  const ikoni = { teema: '🧵 ', vahdittu: '⏳ ', lista: '📓 ' };
   const items = kohteet.map(function(kohde) {
     return {
-      label: ikoni[kohde.tyyppi] + kohde.nimi,
+      label: (ikoni[kohde.tyyppi] || '') + kohde.nimi + (kohde.visibility === 'private' ? ' 🔒' : ''),
       onClick: function() { asetaLaiturinKoti(rivi, kohde); },
     };
   });
+  items.push({ label: '+ Uusi lista', onClick: function() { luoUusiKohdeJaAseta(rivi, li, kategoria); } });
   openRowMenu(li, items);
 }
 
-// 7c-jatko: kohdekohtainen oletus (Asetukset → 🛟 Laituri) — jos valittu
-// koti on käyttäjän merkitsemä "ei koskaan Laiturissa" -kohde, piilotus
-// asetetaan SAMALLA kirjoituksella kuin koti (yksi kirjoitus, ei kahta
-// peräkkäistä — kirjoituspolkujen sääntö 3).
-function kohdeOnOletuksenaPiilotettu(tyyppi, id) {
-  const lista = haeAsetusJSON('laituri_piilota_oletus_kohteet', []);
-  return (lista || []).some(function(k) { return k.tyyppi === tyyppi && String(k.id) === String(id); });
+// Kevyt kaksivaiheinen luonti (§16.5c kohta 3: "jos yksityistä kohdelistaa
+// ei vielä ole, dropdownissa pitää voida luoda uusi suoraan") — natiivi
+// prompt() nimelle (sama malli kuin muualla koodikannassa, esim.
+// aihe.materiaali-linkin muokkaus), näkyvyysvalinta omana rivivalikkonaan
+// koska openRowMenu ei tue tekstikenttää.
+async function luoUusiKohdeJaAseta(rivi, li, kategoria) {
+  const nimi = (prompt('Uuden listan nimi:') || '').trim();
+  if (!nimi) return;
+  openRowMenu(li, [
+    { label: '🔒 Yksityinen', onClick: function() { luoListaJaAsetaKoti(rivi, nimi, kategoria, 'private'); } },
+    { label: '🌍 Jaettu', onClick: function() { luoListaJaAsetaKoti(rivi, nimi, kategoria, 'shared'); } },
+  ]);
 }
 
+async function luoListaJaAsetaKoti(rivi, nimi, kategoria, nakyvyys) {
+  const { data, error } = await db.from('lists').insert({
+    name: nimi, type: 'checklist', owner_id: currentUserId, category: kategoria, visibility: nakyvyys,
+  }).select().single();
+  if (ilmoitaKirjoitusvirheesta(error, 'Uuden listan luonti')) return;
+  await asetaLaiturinKoti(rivi, { tyyppi: 'lista', id: data.id, nimi: data.name, category: kategoria, visibility: nakyvyys });
+}
+
+// Murun poisto siirretty tänne (2026-08-16, §16.5c) — sama toteutus kuin
+// ennen erillisenä "×"-nappina, nyt osa yhtenäistä kohdevalikkoa (Katrin
+// pyyntö: "Poista samaan valikkoon kohdevalintojen rinnalle, ei erilliseksi").
+async function poistaLaiturinMuru(rivi) {
+  const vahvistus = await naytaVahvistus('Poistetaanko tämä ajatus?', null, 'Poista');
+  if (!vahvistus) return;
+  const { error } = await db.from('laituri').delete().eq('id', rivi.id);
+  // Jos itse murun poisto epäonnistuu, se on TODELLISUUDESSA yhä olemassa —
+  // ankkurin siivousta ei saa tehdä silloin, se jättäisi orvon ankkurin
+  // murulle joka ei koskaan poistunutkaan.
+  if (ilmoitaKirjoitusvirheesta(error, 'Laiturin rivin poisto')) return;
+  siivoaMuistutuksetKumottavasti('laituri', rivi.id);
+  const { error: ankkuriError } = await db.from('ankkurit').delete().eq('source', 'laituri').eq('source_ref', String(rivi.id));
+  if (ankkuriError) console.error('Ankkurin siivous murun poiston yhteydessä epäonnistui:', ankkuriError);
+  const { error: jatkoAnkkuriError } = await db.from('ankkurit').delete().eq('source', 'jatkorivi').eq('source_ref', String(rivi.id));
+  if (jatkoAnkkuriError) console.error('Säikeen herätysehdokkaan siivous murun poiston yhteydessä epäonnistui:', jatkoAnkkuriError);
+  lataaLaituri(document.getElementById('laituri-search').value.trim());
+  paivitaLaituriBadge();
+}
+
+// §16.5c kohta 3+4 (2026-08-16): näkyvyys PERIYTYY kohteesta (ei enää
+// kohdekohtaista piilotus-asetusta, ks. poistettu laituri_piilota_oletus_
+// kohteet), ja piilotus on nyt AINA välitön — Katrin sana: "ei tarvitse
+// jäädä edes harmaana kummittelemaan vaan voi kokonaan siirtyä listaan tms."
 async function asetaLaiturinKoti(rivi, kohde) {
-  const piilotaOletuksena = kohdeOnOletuksenaPiilotettu(kohde.tyyppi, kohde.id);
+  const nakyvyys = kohde.visibility === 'private' ? 'private' : 'shared';
   const { error } = await db.from('laituri').update({
     koti_tyyppi: kohde.tyyppi,
     koti_kohde_id: String(kohde.id),
     koti_kohde_nimi: kohde.nimi,
-    piilota_laiturista: piilotaOletuksena,
+    piilota_laiturista: true,
+    visibility: nakyvyys,
   }).eq('id', rivi.id);
   if (ilmoitaKirjoitusvirheesta(error, 'Kodin asetus')) return;
-  naytaIlmoitus('Koti asetettu: ' + kohde.nimi + (piilotaOletuksena ? ' (piilotettu Laiturista)' : ''));
   rivi.koti_tyyppi = kohde.tyyppi;
   rivi.koti_kohde_id = String(kohde.id);
   rivi.koti_kohde_nimi = kohde.nimi;
-  rivi.piilota_laiturista = piilotaOletuksena;
-  // Jos ketjussa on jo useampi segmentti ennen kodin valintaa, kaikki paitsi
-  // uusin valuu heti — sama reitti kuin uuden jatkorivin saapuessa.
-  await valutaVanhatSegmentitKotiin(rivi);
+  rivi.piilota_laiturista = true;
+  rivi.visibility = nakyvyys;
+  // Koko ketju (muru + kaikki vielä valumattomat jatkorivit, myös se joka
+  // muuten jäisi odottamaan seuraavaa jatkoriviä) valuu NYT kotiin kerralla,
+  // koska rivi katoaa Laiturista tässä samassa kirjoituksessa — ei jää
+  // dangling-sisältöä piilotetun rivin taakse.
+  await valutaKokoKetjuKotiin(rivi);
+  naytaIlmoitus('Siirretty: ' + kohde.nimi);
   lataaLaituri(document.getElementById('laituri-search').value.trim());
 }
 
 // Kirjoittaa YHDEN valuvan segmentin sisällön kotiin KOHTEEN OMALLA
 // olemassa olevalla kirjoitusreitillä — sama kaava kuin "Sovittu linja:
-// vanha arvo valuu historiaan" (ks. dokumentoitu yllä KESKUSTELUTEEMA-osiossa)
-// ja suoritaSijoitus(). Alkuperäinen muru/jatkorivi EI KOSKAAN poistu tai
-// muutu tässä — tämä on aina KOPIO, turvainvariantti säilyy.
+// vanha arvo valuu historiaan" (ks. dokumentoitu yllä KESKUSTELUTEEMA-osiossa).
+// Alkuperäinen muru/jatkorivi EI KOSKAAN poistu tai muutu tässä — tämä on
+// aina KOPIO, turvainvariantti säilyy.
 async function kirjoitaSegmenttiKotiin(rivi, teksti) {
   if (rivi.koti_tyyppi === 'teema') {
     return db.from('laituri').insert({ content: teksti, teema_id: rivi.koti_kohde_id, status: 'uusi' });
@@ -8750,7 +8734,40 @@ async function valutaVanhatSegmentitKotiin(rivi) {
     }
   });
 
-  for (const segmentti of vanhemmat) {
+  await suoritaSegmenttienValutus(rivi, vanhemmat);
+}
+
+// Koti-assignoinnin kertaluontoinen TÄYSI valutus (2026-08-16, Katrin sana:
+// "ei tarvitse jäädä edes harmaana kummittelemaan vaan voi kokonaan siirtyä
+// listaan tms") — eri kuin valutaVanhatSegmentitKotiin() joka AINA jättää
+// uusimman segmentin näkyviin ketjun elävän kärjen ylläpitämiseksi (kutsutaan
+// joka jatkorivin saapuessa, rivi pysyy näkyvissä). Tässä KOKO rivi katoaa
+// Laiturista SAMALLA kirjoituksella (piilota_laiturista=true,
+// asetaLaiturinKoti()), joten myös se muuten dangling jäävä uusin segmentti
+// pitää siirtää mukana — muuten sen sisältö jäisi näkymättömäksi kunnes
+// seuraava jatkorivi joskus laukaisisi sen.
+async function valutaKokoKetjuKotiin(rivi) {
+  if (!rivi.koti_tyyppi) return;
+  const { data: jatkorivit, error } = await db.from('laituri_jatkorivit').select()
+    .eq('muru_id', rivi.id).order('created_at', { ascending: true });
+  if (error) {
+    console.error('Valumista varten jatkorivien haku epäonnistui:', error);
+    return;
+  }
+  const segmentit = [];
+  if (!rivi.koti_segmentti_valunut) segmentit.push({ tyyppi: 'muru', teksti: rivi.content });
+  (jatkorivit || []).forEach(function(jr) {
+    if (!jr.valunut_kotiin) segmentit.push({ tyyppi: 'jatkorivi', id: jr.id, teksti: jr.teksti });
+  });
+  await suoritaSegmenttienValutus(rivi, segmentit);
+}
+
+// Jaettu kirjoitus+merkintäsilmukka kahdelle valutusmuodolle yllä — sama
+// "kirjoitus ensin, merkintä vasta onnistuneen kirjoituksen jälkeen"
+// -periaate, pysähtyy ensimmäiseen epäonnistumiseen ettei aikajärjestys
+// mene sekaisin.
+async function suoritaSegmenttienValutus(rivi, segmentit) {
+  for (const segmentti of segmentit) {
     const { error: kirjoitusError } = await kirjoitaSegmenttiKotiin(rivi, segmentti.teksti);
     if (kirjoitusError) {
       console.error('Segmentin valuminen kotiin epäonnistui:', kirjoitusError);
@@ -8830,47 +8847,10 @@ document.getElementById('laituri-piilotetut-toggle').addEventListener('click', f
   lista.style.display = lista.style.display === 'none' ? 'block' : 'none';
 });
 
-// 7c-jatko: kohdekohtainen "ei koskaan Laiturissa" -oletus (Asetukset →
-// 🛟 Laituri). Sama haeKotiKohteet() kuin Laiturin oma koti-valikko — yksi
-// yhteinen kohdelista, ei kahta eri totuutta siitä mitä kohteita on olemassa.
-async function paivitaLaiturinPiilotusAsetukset() {
-  const kohteet = await haeKotiKohteet();
-  const valitut = haeAsetusJSON('laituri_piilota_oletus_kohteet', []) || [];
-  const valitutAvaimet = new Set(valitut.map(function(k) { return k.tyyppi + ':' + k.id; }));
-
-  const ikoni = { teema: '🧵 ', vahdittu: '⏳ ', hytti: '🚪 ', lista: '' };
-  const listaEl = document.getElementById('laituri-piilotus-lista');
-  listaEl.innerHTML = '';
-  kohteet.forEach(function(kohde) {
-    const avain = kohde.tyyppi + ':' + kohde.id;
-    const rivi = document.createElement('label');
-    rivi.className = 'laituri-piilotus-rivi';
-
-    const check = document.createElement('input');
-    check.type = 'checkbox';
-    check.checked = valitutAvaimet.has(avain);
-    check.addEventListener('change', function() {
-      tallennaLaiturinPiilotusAsetus(kohde, check.checked);
-    });
-    rivi.appendChild(check);
-
-    const teksti = document.createElement('span');
-    teksti.textContent = ikoni[kohde.tyyppi] + kohde.nimi;
-    rivi.appendChild(teksti);
-
-    listaEl.appendChild(rivi);
-  });
-}
-
-async function tallennaLaiturinPiilotusAsetus(kohde, paalla) {
-  const nykyinen = haeAsetusJSON('laituri_piilota_oletus_kohteet', []) || [];
-  const avain = kohde.tyyppi + ':' + kohde.id;
-  const ilmanTata = nykyinen.filter(function(k) { return (k.tyyppi + ':' + k.id) !== avain; });
-  const uusi = paalla ? ilmanTata.concat([{ tyyppi: kohde.tyyppi, id: kohde.id }]) : ilmanTata;
-  const { error } = await db.from('asetukset').upsert({ key: 'laituri_piilota_oletus_kohteet', value: JSON.stringify(uusi) }, { onConflict: 'key' });
-  if (ilmoitaKirjoitusvirheesta(error, 'Piilotusasetuksen tallennus')) return;
-  asetuksetKartta['laituri_piilota_oletus_kohteet'] = JSON.stringify(uusi);
-}
+// laituri_piilota_oletus_kohteet -asetus POISTETTU kokonaan (2026-08-16,
+// SATAMA_SPEKSI.md §16.5c kohta 5: "Tarpeeton kun jokainen ei-Laituri-kohde
+// piiloutuu automaattisesti") — piilotus on nyt AINA välitön kun kohde
+// asetetaan (ks. asetaLaiturinKoti), ei jää mitään konfiguroitavaa.
 
 // Merkitsee murun sijoitetuksi VASTA kun muistutus on VARMISTETUSTI
 // tallentunut (kutsutaan avaaMuistutusPaneelin jalkeenPaivitys-callbackina,
@@ -9154,7 +9134,7 @@ function naytaLaituriEhdotusVirhe(li, viesti) {
 const LAITURI_MUISTUTUS_KOHDE = 'muistutus (ajankohtaan sidottu asia)';
 
 // Piirtää äly-ehdotuksen kuittikorttina rivin alle: "→ <ehdotus> · <perustelu>"
-// + Sopii/Ei-napit. "Sopii" kirjoittaa OIKEASTI (ks. suoritaSijoitus) jos
+// + Sopii/Ei-napit. "Sopii" kirjoittaa OIKEASTI (ks. asetaLaiturinKoti) jos
 // ehdotus täsmää tarkalleen johonkin oikeaan kohteeseen (oikotie — säästää
 // käsivalinnan), tai avaa käsikohdevalinnan jos täsmäystä ei löydy (esim.
 // äly kirjoitti kohteen nimen hieman eri asussa) — ei koskaan pelkkä
@@ -9185,9 +9165,9 @@ function piirraLaituriEhdotusKortti(rivi, li, ehdotus, kohteet) {
     }
     const kohde = kohteet.find(function(k) { return k.nimi === ehdotus.ehdotus; });
     if (kohde) {
-      suoritaSijoitus(rivi, kohde);
+      asetaLaiturinKoti(rivi, kohde);
     } else {
-      avaaSijoitaValikko(rivi, li);
+      avaaKohdeValikko(rivi, li);
     }
   });
   napit.appendChild(sopiiNappi);
@@ -9526,6 +9506,11 @@ function materiaaliKohdeInsertKentat() {
     materiaali_kurssi_id: materiaaliKohdeKurssi.id,
     materiaali_kurssi_nimi: materiaaliKohdeKurssi.name,
     visibility: 'private',
+    // SATAMA_SPEKSI.md §16.5c kohta 4 (2026-08-16): piilotus HETI kun kohde
+    // tunnetaan, sama malli kuin muut koti-kohteet — kurssisivun oma
+    // odottaa/käsitelty-tila (materiaali_kasitelty, sql/121) on ERI kenttä,
+    // ei tätä. Rivi katoaa Laiturista heti, käsittely näkyy vain kurssisivulla.
+    piilota_laiturista: true,
   };
 }
 
@@ -9774,12 +9759,17 @@ async function tallennaMateriaaliJasennys(rivi) {
   // Hyväksytty materiaali ei jää näkyville Laituriin — sama tietokantalippu
   // kuin muilla kohdetyypeillä (piilota_laiturista, ks. lataaLaituri:n
   // eq('piilota_laiturista', false)), EI selainkohtainen localStorage-
-  // merkintä joka ei kulkisi laitteiden välillä (HYTTI_SPEKSI.md §8.3,
-  // korjattu 2026-08-10). merkitseMateriaaliOhitetuksi() pysyy käytössä
-  // VAIN "Ei liity" -hylkäykselle (ks. piirraMateriaaliJasennysKortti) —
-  // se on eri asia: ehdotuksen hylkäys, ei sisällön piilotus.
-  const { error: piilotaError } = await db.from('laituri').update({ piilota_laiturista: true }).eq('id', rivi.id);
-  if (piilotaError) console.error('Materiaalin piilotus Laiturista epäonnistui (tallennus onnistui silti):', piilotaError);
+  // merkintä joka ei kulkisi laitteiden välillä. Kurssikontekstissa tämä on
+  // jo true insert-hetkellä (§16.5c kohta 4, materiaaliKohdeInsertKentat) —
+  // kirjoitus tänne on silti turvallinen (idempotentti) ja PAKOLLINEN
+  // Laiturin heuristiikka-löydöille (ei kurssikontekstia), joilla tämä on
+  // ensimmäinen piilotushetki. materiaali_kasitelty (sql/121) on ERI kenttä —
+  // kurssisivun oma "✓ käsitelty" -tila, ei sama asia kuin Laiturista
+  // piiloutuminen. merkitseMateriaaliOhitetuksi() pysyy käytössä VAIN
+  // "Ei liity" -hylkäykselle (ks. piirraMateriaaliJasennysKortti) — se on
+  // eri asia: ehdotuksen hylkäys, ei sisällön piilotus.
+  const { error: piilotaError } = await db.from('laituri').update({ piilota_laiturista: true, materiaali_kasitelty: true }).eq('id', rivi.id);
+  if (piilotaError) console.error('Materiaalin piilotus/käsittelymerkintä epäonnistui (tallennus onnistui silti):', piilotaError);
   document.getElementById('materiaali-jasennys-overlay').style.display = 'none';
   naytaIlmoitus('Tallennettu Opintopolulle (' + kurssiNimi + ').');
   peruLaiturinMateriaaliKonteksti();
@@ -9801,22 +9791,21 @@ async function pyydaLaituriEhdotus(rivi, nappi, li) {
   const alkuperainenTeksti = nappi.textContent;
   nappi.textContent = '…';
 
-  // Kaikki konkreettiset sijoituskohteet (listat + Hytin aktiiviset kortit)
-  // DYNAAMISESTI joka kutsulla — EI kovakoodattua listaa, jottei tarvitse
-  // muistaa päivittää tätä kun listoja/kortteja lisätään/poistetaan/nimetään
-  // uudelleen. RLS rajaa tuloksen jo automaattisesti kirjautuneen näkyviin
-  // listoihin/kortteihin (omat + jaetut).
-  const kohteet = await haeSijoitusKohteet();
+  // Kaikki konkreettiset kohteet (listat, sama yhtenäinen joukko kuin
+  // käsivalikossa) DYNAAMISESTI joka kutsulla — EI kovakoodattua listaa,
+  // jottei tarvitse muistaa päivittää tätä kun listoja lisätään/poistetaan/
+  // nimetään uudelleen. RLS rajaa tuloksen jo automaattisesti kirjautuneen
+  // näkyviin listoihin (omat + jaetut).
+  const kohteet = await haeKotiKohteet();
   // BUGIKORJAUS (2026-07-17): 'kalenteriin' POISTETTU kohdevalikoimasta —
   // Satamalla EI OLE kalenterikirjoituspolkua (ei omaan kalenterinäkymään,
   // ei tietenkään iCloudiin), joten se oli itseilmoituskohteista ainoa joka
   // näytti tuottavan jotain vaikka ei tuottanut mitään. Tilalla aidosti
   // toteutettavissa oleva muistutus (ks. LAITURI_MUISTUTUS_KOHDE ja
   // piirraLaituriEhdotusKortti) — ehdotus- ja toteutuskerroksen pitää olla
-  // samaa mieltä sovelluksen kyvyistä. "hytin kortille" (geneerinen, ei
-  // yksilöity) POISTETTU 2026-07-16 (kohta 10) — Hytin AKTIIVISET kortit
-  // ovat nyt mukana yksilöityinä nimillään kohteet-listassa, ei tarvitse
-  // enää epämääräistä yleisnimikettä.
+  // samaa mieltä sovelluksen kyvyistä. "Hytin kortille" POISTETTU
+  // kokonaan 2026-08-16 (§16.5c) — kurssimateriaalilla/helmellä on omat
+  // reittinsä, eivät kulje tämän ehdotuskerroksen kautta.
   const prompti = 'Tässä on lyhyt muistiinpano perheen "Laituri"-muistilistalta: "' + rivi.content + '"\n\n' +
     'Mahdolliset sijoituskohteet (nimi — luonnehdinta kohteen luonteesta):\n' +
     kohteet.map(function(k) { return '- "' + k.nimi + '" — ' + kohteenKuvaus(k); }).join('\n') + '\n' +

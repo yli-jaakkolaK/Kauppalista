@@ -7,6 +7,8 @@
 
 **16.8.2026 — `HYTTI_SPEKSI.md` yhdistetty tähän kokonaan ja poistettu.** Se oli erillinen, tästä tiedostosta haarautunut versio joka sai oman "Täydennykset Satama-speksiin" -yhdistelynsä eri keskustelussa 16.8. — vain osa sitä yhdistelyä ehti tähän tiedostoon asti. Katrin ohje: satama_speksi on tästä eteenpäin AINOA seurattava tiedosto, hytti_speksi ei enää ole olemassa. Delta tarkistettu kohta kohdalta molemmista tiedostoista ennen poistoa — ks. muutokset §4.1, §7.1, §7.2, §8.1, §8.3b, §11.
 
+**16.8.2026, toinen erä — Cowork-keskustelusta relayattu täydennys yhdistetty.** Suurin osa oli jo tässä tiedostossa (toinen keskustelu oli ehtinyt ennen tätä). Uusi sisältö merkitty **(relay 16.8.)** kohdissaan: §5.1, §5.2, §6.2, §6.3, §9, §10.1, §16.5b, §17, §18, §20 (uusi), §13. Huom: Coden deploy-yhteenveto (`e7b55b0`, materiaalilistan uudistus + sillasolmu-moottorin tiedostoyhteys) on jo kirjattu §7.2:een ja §8.3b:hen aiemmin 16.8. — ei toisteta täällä, RAKENNETTU-tila on jo ajan tasalla. **Katrin ohje 16.8.:** rakennettu-status kuuluu jatkossa `muistiinpanot.md`:hen, ei tähän speksiin — tästä eteenpäin tämä tiedosto pyritään pitämään puhtaana päätöksinä/konsepteina, ei build-lokina, vaikka aiempi RAKENNETTU-merkintäkäytäntö (§0) jää voimaan olemassa olevaan sisältöön koska sen purkaminen nyt olisi iso erillinen työ.
+
 ---
 
 ## 0. Miten tätä dokumenttia luetaan
@@ -67,6 +69,8 @@ Kaksi tilaa jotka erotetaan fyysisesti:
 - **Katsominen** — viikoittaista, tapahtuu virkeänä, on silmäilyä
 
 **Projektin tunnettu epäonnistumistapa:** ensin rakennetaan, sitten mietitään. 95 siltaa rakennettiin 2026-08-04 ja kumottiin seuraavana päivänä. Siksi rakentaminen alkaa auditoinnista.
+
+**Ydinkuvaus (relay 16.8.):** "Kannustava toiminnanohjauksen keskus omille henkilökohtaisille asioille jotka eivät kuulu muun vastuulle tai halutaan pitää omana." Tämä puoltaa sitä että kortit/materiaalit joita ei ole tarkoitus jakaa kuuluvat Hyttiin, ei jaettuihin näkymiin.
 
 ---
 
@@ -264,6 +268,12 @@ Päivät ovat **pystysarakkeita**, kussakin näkyy päivän mahdollinen kuorma.
 - **Kurssien välinen tauko on suunniteltu ikkuna.** Solmut joilla on silta tulevaan kurssiin jäävät kertausjonoon kurssin päätyttyä (esim. syksyn potenssit → tammikuun precalculus, ks. §7.2, §7.5). Tauko on optimaalinen hetki nostaa ne kertaukseen ennen kuin ne tulevat vastaan "uusina".
 - **Satama kysyy tulevat kurssit noin kuukautta ennen kurssin päättymistä**, jotta se tietää mitkä solmut jäävät jonoon.
 
+**Lisäys (relay 16.8.):**
+
+- **Live-tapahtuma (täytetty merkki) vs. oma opiskelu (avoin merkki).** Visuaalinen ero kalenteririvillä sen lisäksi että live huomioi matka-ajat (§8.1).
+- **Opiskeluehdotukset väistävät uusia kalenterimerkintöjä.** Jos käyttäjä lisää uuden menon kalenteriin sen jälkeen kun päivä on jo suunniteltu, aiemmin sijoitettu opiskelupätkä väistyy eikä jää päällekkäin — sama periaate kuin §4.6:n sijoittelujärjestys, mutta koskee jälkikäteen tulevaa muutosta.
+- **AUKKO — idea, ei päätetty:** manuaalinen ohitus kuormaväriin (käyttäjä voisi itse merkitä päivän raskaammaksi/kevyemmäksi kuin laskennallinen kuorma näyttää).
+
 ### 5.2 Kurssit — muotokieli RAKENNETTU (§16.4)
 
 Kurssi avautuu haitarina. Otsikkorivillä nimi, vaihe ja **jäljellä-palkki**.
@@ -295,6 +305,15 @@ Kurssin sisällä:
 **Kevyt hoitotaso käyttää samoja vaiheita, vain vähempää niistä** (priming + yksi retrieval, ei kertausjonoa, ei overlearningia). Ei erillistä moottoria, ei erillistä datamallia.
 
 **Hoitotaso on se vipu jolla kuormaan vastataan**, koska kurssimäärä ei ole vapaasti valittavissa. Muutettavissa kesken lukukauden: kurssi voi pudota kevyeksi siksi viikoksi kun kotona on kaaos ja palata takaisin.
+
+**Lisäys (relay 16.8.):**
+
+- **Solmut kanvaasilla pvm-järjestyksessä**, kukin omalla PACER-vaiheellaan; solmu avaa Miro-taulun solmun omasta kohdasta (jo linjassa §10.1:n kanssa).
+- **Kortit kurssikanvaasilla nojaavat samaan muistiinpanokomponenttiin** kuin muualla sovelluksessa — ei erillistä korttityyliä vain kanvaasille.
+- **"Tämä alkaa unohtua" -nappi (§5.3) opettaa käyttäjän oman henkilökohtaisen harvennustahdin** — ei kiinteää kaavaa, vaan kertyy siitä milloin käyttäjä oikeasti painaa nappia.
+- **AUKKO — migraation/käsin lisätyn datan idempotenssi:** varmistettava ettei kurssidatan uudelleenajo ylikirjoita jo kertynyttä PACER-edistystä.
+- **AUKKO — idea, ei päätetty: subcourse.** Miten käsitellä esim. Khan Academy -harjoittelu vs. varsinainen kurssi samassa rakenteessa — oma alikurssi vai osa samaa?
+- **Katrin oma epävarmuus, ei tekninen kysymys:** soveltuuko Sung-metodi hyvin Low Code/No Code- ja Intro to Programming -tyyppisille kursseille yhtä hyvin kuin käsitteellisemmille (Tietoverkot ja tietoturva vaikuttaa lupaavammalta) — selviää vasta käytössä, ei ratkaista etukäteen.
 
 ### 5.3 Ylläpito
 
@@ -339,9 +358,13 @@ Ajatus: Satama rakentaa Sungin tyylistä käsitekarttaa nimeltä **"Katri IT-ala
 - Sama liukuvärjäys: vahvat taidot tummempana
 - Näkyvissä myös **mistä osataidoista isommat käsitteet koostuvat**
 
+**Lisäys (relay 16.8.):** työelämätaitojen lähteet tarkemmin eriteltynä — kurssi, harjoittelu, ohjaajan palaute, käyttäytymisdata. Visualisoinnissa taitojen nimet **sanapilvenä**, ei listana, kiristyvän verkon + syvenevän meren päällä.
+
 ### 6.3 Helmi
 
 **Ei rakenneta ensimmäisellä kierroksella.** Helmi mietitään tarkemmin yhdessä Työelämä-näkymän kanssa, koska se kiinnittyy siihen.
+
+**Täsmennys (relay 16.8.):** Kartan data on kahta tyyppiä — automaattisesti kertyvä (kurssit, käyttäytyminen) ja **helmi = itse kirjoitettu päiväkirjamerkintä**, käyttäjän oma huomio joka ei synny mistään mittarista.
 
 ---
 
@@ -529,6 +552,18 @@ Kaikki muu on laskentaa. **Suurin osa vaiheensiirtymistä ei tarvitse älyä lai
 
 **Harjoitustehtävien lähteet järjestyksessä:** kurssin omat tehtävät → ulkoiset lähteet (esim. Khan Academy) → Sataman näyttämä valmis prompti jonka käyttäjä kopioi Copilotille. Kolmas ei vaadi API-kutsua eikä maksa mitään. Promptipohja on rivi kannassa per (tyyppi, vaihe), joten automatisointi myöhemmin ei vaadi rakennemuutosta.
 
+### 7.7 Menetelmämateriaali ja Learning Framework Extraction Course (relay 16.8., ei vielä rakennettu, ei vielä konseptoitu loppuun)
+
+**Menetelmämateriaali (PACERin/Sungin oma materiaali) on piilotettu "kurssi" Hytissä**, suodatetaan pois tavallisista kurssilistauksista (§5.2, §7.1). Tekninen syy: sama sisääntuloputki (materiaali → äly poimii → solmuiksi) toimii sille jo, ei tarvita rinnakkaista rakennetta — vain listauksesta piilotus.
+
+**Menetelmä (miten opiskellaan) ja kurssi (mitä opiskellaan) ovat eri asioita eivätkä koskaan sekoitu.** Tehtäväkohtaiset ohjeet (§7.4:n vaihe×tietotyyppi-ristitulo) generoidaan menetelmämateriaalia vasten — menetelmämateriaali on se tietopohja josta ohjeteksti syntyy, ei itse opiskeltavaa ainesta millekään kurssille.
+
+**Tavoite on opettaa käsitekarttamaista ajattelua lineaaristen muistiinpanojen sijaan** — sama periaate kuin §10.1:n "ei kaunis kopio kirjasta, ryhmittely/vertailu/yhteyksien etsintä ON se oppiminen", sovellettuna nyt myös itse menetelmän oppimiseen.
+
+**Idea, laajempi ja EI vielä konseptoitu loppuun — "Learning Framework Extraction Course":** kurssityyppi joka opettaisi menetelmän sekä käyttäjälle että Satamalle itselleen samanaikaisesti; jäisi arkistoon mutta sen tietomalli (vaiheiden välinen riippuvuusverkko) jäisi pysyväksi osaksi Satamaa. Jos rakennetaan, Sataman pitäisi osata: tunnistaa missä vaiheessa käyttäjä on, ehdottaa harjoituksia, arvioida osaamista (ymmärrystä, ei sanamuotojen täsmäystä), ja löytää epäonnistumisten juurisyitä. **Tärkein puuttuva tieto on vaiheiden VÄLINEN riippuvuusverkko**, ei yksittäiset vaihekuvaukset.
+
+**AUKKO — vaihemäärä epäselvä (7 vai 5):** ei rakenneta ennen kuin tämä on konseptoitu loppuun `sung-metodi.md`:n pohjalta. Idea myös auki: kurssin sisältönä voisi olla itse Sung-metodi.
+
 ---
 
 ## 8. Ulkoiset rajapinnat
@@ -573,6 +608,14 @@ Materiaalit **eivät jää näkyville Laituriin** — `piilota_laiturista`-lippu
 
 **Vapaamuotoinen muokkaus ("varaa enemmän aikaa teemaan X") ei ole rakennettu.**
 
+> **RATKAISTU 16.8.2026 (Katrin päätös, täsmennetty) — `piilota_laiturista`-kaksoiskäytön ristiriita.** Katrin oma täsmennys `piilota_laiturista`:n alkuperäisestä, yleisestä tarkoituksesta: se on **yleinen "ei tarvitse näkyä Laiturissa juuri nyt" -täppä**, ei sama asia kuin "valmis/käsitelty" — esimerkki: vahdittu-listalle lisätty "muuta pankkitilin nostorajaa" voidaan täpätä pois Laiturin näkyvistä heti, vaikka se ei ole tehty — se ponnahtaa esiin myöhemmin vahdittu-lepo-mekanismin kautta (§ristiriita eri asia). Sama malli koskee jo teema/lista/hytti-kohteita (`koti_tyyppi`, sql/087): kun kohde tunnetaan, `piilota_laiturista` asetetaan todeksi HETI, ei vasta jonkin erillisen "valmis"-tilan jälkeen.
+>
+> **Juurisyy oli siis se että kurssimateriaali EI noudattanut tätä samaa, jo olemassa olevaa mallia.** `e7b55b0` asetti `piilota_laiturista`:n todeksi vasta AI-jäsennyksen jälkeen (käytti sitä väärin "käsitelty"-statuksena), jolloin odottavat kurssimateriaalit — toisin kuin kaikki muut kontekstuaaliset kohteet — jäivät näkyviin Laiturin yleiseen listaan siihen asti.
+>
+> **Korjaus: yhdenmukaista kurssimateriaali muiden kohdetyyppien kanssa.** `piilota_laiturista` asetetaan todeksi HETI kun materiaali lisätään kurssikontekstista (samalla kirjoituksella kuin `materiaali_kurssi_id`), täsmälleen kuten teema/lista/vahdittu/hytti jo tekevät. Kurssisivun oma "⏳ odottaa / ✓ käsitelty" -tila (§7.2, §11) tarvitsee OMAN erillisen kentän (esim. `kasitelty` boolean tai päätellään siitä onko solmujako tehty) — ei enää lainaa `piilota_laiturista`:a siihen tarkoitukseen. **Ei vielä korjattu koodissa** — relayattava Codelle.
+>
+> **Liittyvä, samalla vahvistettu:** arkistoitu kurssi ei enää laukaise muistutuksia/hälytyksiä (esim. §7.1:n "3 päivän käsittelemättä" -muistutus) — looginen, Katrin vahvistama 16.8. Tämä on ERI asia kuin §10.2:n vika #3 (arkistoitu kurssi poistaa kertausjonon solmut moottorista kokonaan, joka on edelleen ei-toivottu ja korjaamaton) — muistutusten sammuminen on haluttua, kertausjonon katoaminen ei.
+
 ### 8.3b Opittua vaihe 1b:n rakentamisesta ja elävästä testauksesta (12.–13.8.)
 
 - **Kurssikonteksti on vahvistettu oikea prioriteetti**, ei vain oletus. Todellinen käyttö kulkee lähes aina "+ Lisää materiaalia" -napin kautta, kurssikontekstilla. Yleinen Laituri-triage on olemassa mutta harvinaisempi reitti.
@@ -615,6 +658,7 @@ Perustelu: generaattorin tehtävää oikeasti painetaan, luentoa ei. Muotokielen
 - **Messinki/sinappi-erottelu vahvistuu käytännössä:** messinki = kaikki kosketettava, sinappi = pelkkä koriste, ei koskaan tap-kohde. Sääntö ei ole muuttunut, mutta elävä käyttö on osoittanut sen tärkeäksi pitää tiukasti — sekoittuminen näkyy heti käyttäjälle vääränä signaalina.
 - **Uusia, ei-palettiin-kuuluvia värejä on ilmaantunut käytännön ehdotuksiin:** "sininen" (Juhan kalenterin/perhekalenterin merkintä) ja "persikka" eivät ole osa nykyistä `satama-design-kuvaus.md`-palettia. Sama koskee jo aiemmin merkittyä punaista, joka on ristiriidassa `--vaara`:n varauksen kanssa. **Kaikki kolme vaativat erillisen sovituksen `satama-design-kuvaus.md`:n kanssa ennen rakentamista** — ei päätetä hiljaa tässä dokumentissa.
 - **Mockup-tiedostojen (esim. `satama-ruori-header-v2.html`) hex-arvot ja `--font-ui` ovat paikanpitäjiä**, ei lopullisia päätöksiä — Coden ei pidä olettaa niitä sellaisenaan lopullisiksi ilman erillistä vahvistusta, vaikka tiedosto muuten onkin sitova visuaalinen speksi (§0).
+- **Liike (relay 16.8.):** siirtymät "veden alla" -tuntuisia, 500–850ms — hitaampia kuin tavallinen UI-animaatio, tarkoituksella. Haptiikka vain aidosti kosketettavissa kohdissa (jo §9:n sääntö, ei uusi).
 
 ---
 
@@ -641,6 +685,8 @@ Perustelu: generaattorin tehtävää oikeasti painetaan, luentoa ei. Muotokielen
 - **Retrieval-kanvaasi: oma Frame per kierros.** Hytistä nappi → Miro sen solmun recall-Frameen → tallennus näkyy Hytissä. Jokainen kierros alkaa **täysin tyhjältä** — tyhjyys on free recallin pointti. Vanhoja ei poisteta: kierros 1 ja kierros 3 voi asettaa vierekkäin ja nähdä mitä on kertynyt.
 - **Yksityisyys ratkeaa olemassa olevalla rakenteella.** Kohdevalinta ohjaa suoraan omaan hyttiin eikä toisen hyttiin ole näkymää — recall-kartta ei kulje jaetun näkymän kautta missään vaiheessa.
 - **Sisällöllisen vertailun raja:** Miron API palauttaa tekstilaatikoiden sisällön, joten äly näkee mitkä käsitteet muistettiin ja voi verrata materiaaliin. Se **ei näe piirroksia, symboleja eikä kartan rakennetta**. Käytännössä riittää: kattavuus on se mitä siirtymäpäätökseen tarvitaan, ja rakenteen laadun käyttäjä täppää itse.
+
+**Lisäys (relay 16.8.):** yksi jättiboard + Frame per kurssi on kurssidatalle; **helmiboard on oma erillinen taulunsa**, ei sekoiteta kurssien Frameihin. **Arkistointi on aikapohjaista** (§16.3:n "poistoa ei mietitä ennen kuin pari vuotta kurssin päättymisestä" -periaate koskee Miro-tauluja samoin) — ei ajankohtaista ennen kuin ensimmäinen kurssi on ollut valmis ~2 vuotta.
 
 ### 10.2 Korjattavat viat
 
@@ -744,7 +790,15 @@ Sisälsi jaetun editorin, tiedostojen tuonnin (pdf/kuva/pptx/koodi), kurssiosion
 
 **Ruori — visuaalinen uudistus** — **VALMIS** (§15), useampi bugikorjauskierros elävästä testauksesta.
 
+**Konteksti (relay 16.8.):** ~5 h/pv käytettävissä rakentamiseen, kova raja koulun alkaessa elo-syyskuun vaihteessa. Aiemmassa keskustelussa oli tavoite saada Sung-metodi valmiiksi 7–11 päivässä — **tämä aikamääre on todennäköisesti vanhentunut** (ei tiedetä mistä päivästä laskettuna), ei oteta sitovana ilman uutta tarkistusta.
+
+**Priority-muutos 16.8.2026 (Katrin päätös):** Laiturin kontekstuaaliset sisäänmenot (§16.5b) rakennetaan seuraavaksi, ENNEN Vaihe 2:ta — perusteena mm. se että kurssimateriaalin sisääntulo voi sitten kulkea saman, korjatun putken kautta. Vaihe 2 pysyy dokumentoituna, ei poistu jonosta, vain siirtyy myöhemmäksi.
+
+**Jonossa Laiturin jälkeen, ei vielä yksityiskohtia (16.8.):** Nyt-näkymässä (§4) on Katrin mukaan "ylimääräisiä asioita" jotka kaipaavat siivousta — ei täsmennetty mitä, käsitellään omana eränään Laiturin valmistuttua, ei nyt.
+
 **Seuraavana:**
+
+**Laituri-uudistus (§16.5b)** — kontekstuaaliset sisäänmenot, kohdevalinnan laajennus, kaksitasoinen kotivalinta. Ks. myös §8.3:n AUKKO (`piilota_laiturista`-kaksoiskäyttö) joka pitää ratkaista samassa yhteydessä.
 
 **Vaihe 2 — menetelmä**
 
@@ -803,7 +857,9 @@ Sisälsi jaetun editorin, tiedostojen tuonnin (pdf/kuva/pptx/koodi), kurssiosion
 
 ### 15.2 Sää
 
-**Datalähde: Open-Meteo** (`https://api.open-meteo.com/v1/forecast`) — ilmainen, ei API-avainta, antaa suoraan `apparent_temperature`, `precipitation_probability`, `weather_code`. Kutsu palvelimen kautta (`api/saa.js`), **30 min välimuisti**, kiinteät koordinaatit asetuksista (ei selaimen paikannuslupaa). **Virhetilanne: piilota koko sääosio**, älä näytä vanhaa dataa tuoreena.
+**Datalähde: Open-Meteo** (`https://api.open-meteo.com/v1/forecast`) — ilmainen, ei API-avainta, antaa suoraan `apparent_temperature`, `precipitation_probability`, `weather_code`. Kutsu palvelimen kautta (`api/saa.js`), **30 min välimuisti**, kiinteät koordinaatit asetuksista (ei selaimen paikannuslupaa).
+
+**Virhekäsittely — TÄSMENNETTY 16.8.2026 (aiempi sääntö oli epätarkka ja aiheutti todellisen bugin).** Katri näki lämpötilana "0" kun yhteys oli poikki — vanha sääntö ("piilota koko sääosio, älä näytä vanhaa dataa tuoreena") ei estänyt tätä, koska virhe ei näy piilotuksena vaan `0`/`null`-arvon renderöitymisenä kuin se olisi kelvollinen lukema. Korjattu sääntö: **jos haku epäonnistuu tai palauttaa tyhjän, säilytä VIIMEISIN onnistuneesti haettu arvo näkymässä** (mieluiten kuin täysi piilotus) sen sijaan että näytettäisiin nollaa tai muuta oletusarvoa todellisena lukemana. **Piilota koko sääosio vain kahdessa tapauksessa (täsmennetty 16.8.):** (a) edellistä onnistunutta arvoa ei ole koskaan ollut, tai (b) myös aiemman tallennetun lukeman hakeminen epäonnistuu jostain syystä (esim. paikallinen tallennus rikki). Kun yhteys palautuu, tuore arvo korvaa vanhan normaalisti. **Ei vielä korjattu koodissa** — relayattava Codelle.
 
 **Sää-laatikko poistettu kokonaan** — ei kehystä, elementit kelluvat otsakkeen päällä.
 
@@ -1020,6 +1076,63 @@ Kurssikonteksti (§16.5) on **yksi tapaus yleisemmästä periaatteesta**: Laitur
 
 **Ulkopuolelta saapuva materiaali** (tiedostot, jaot, pdf:t) ei kulje Hytin nappien kautta ja käyttää edelleen kohdevalintaa. Reitit ovat täydentäviä: napista tulee se minkä luot itse, kohdevalinnasta se mikä saapuu. Laiturista pitää edelleen voida siirtää eteenpäin, jos oksennushetkellä ei tiedä minne asia menee.
 
+**Lisäys (relay 16.8.):**
+
+- **Kohdevalikko — YKSINKERTAISTETTU TOISEEN KERTAAN 16.8. (Katrin oma jatkoajatus, korvaa edellisen version kokonaan).** "Oma hytti" ja "Juhan hytti" **POISTETTU kohdevalikosta kokonaan** — ei tarvita, koska: kurssimateriaalilla on jo oma erillinen putkensa (kurssisivun "+ Lisää materiaalia" -nappi, ei kulje tämän dropdownin kautta), helmi lisätään aina Hytin omasta kontekstista (ei koskaan redirektoinnilla Laiturista), ja Juhalle suuntaaminen hoituu jo olemassa olevalla "ehdota Juhalle" -reitillä (§16.5b yllä). **Vahvistettu myös: yksityisyys on molemminpuolinen** — Katri ei näe Juhan hyttiä, Juha ei näe Katrin.
+- **Yksityisyys ilman erillistä hytti-kohdetta:** Katrin oma ratkaisu — muru joko (a) **pysyy Laiturissa**, näkyvyys-toggle suoraan rivillä (oletus jaettu, vaihdettavissa "vain minä"), tai (b) siirretään **yksityiseen Varasto- tai Muistilaput-listaan** jonka Katri on itse luonut yksityiseksi. Olemassa oleva `lists.visibility`-mekanismi (jo käytössä teema/vahdittu-tyypeille) piilottaa yksityisen listan KOKONAAN kumppanilta — ei edes otsikko näy — joten se saa saman lopputuloksen kuin oma erillinen "Hytti"-kohde olisi antanut, ilman uutta erikoistapausta.
+- **Kohdevalikko nyt vain kolme riviä:** Varasto / Muistilaput / Poista.
+- **Ei valintaa ollenkaan = pysyy Laiturissa**, oma näkyvyys-toggle suoraan rivillä, ei dropdown-kohtana.
+- Kontekstista avattuna (Hytin napit: kurssimateriaali, helmi, "ehdota Juhalle") kohde on aina jo tiedossa eikä dropdownia näytetä lainkaan.
+
+**RLS-tarkistus tehty 16.8. (Claude, koodista todennettu) — hyvät ja huonot uutiset:**
+
+**Hyvä uutinen: molemmat visibility-kentät ovat jo OIKEASTI RLS-tasolla suojattuja, ei vain client-suodatusta.**
+- `lists.visibility` (sql/003): `lists_select using (owner_id = auth.uid() or visibility = 'shared')` — oletus **'private'** uudelle listalle.
+- `laituri.visibility` (sql/118, ajettu 16.8. juuri tämän löydöksen korjaukseksi): `laituri_select using (auth.uid() is not null and (visibility = 'shared' or user_id = auth.uid()))` — oletus **'shared'**, koska Laiturin ydinluonne on jaettu tulopiste. Eri oletus kuin `lists`, tarkoituksella.
+
+**Huono uutinen — todellinen aukko löytyi, korjattava ennen kuin uusi dropdown rakennetaan:** `asetaLaiturinKoti()` (koti-mekanismi, script.js) asettaa TÄLLÄ HETKELLÄ vain `koti_tyyppi`/`koti_kohde_id`/`piilota_laiturista` — **ei koskaan `laituri.visibility`:tä.** Jos muru ohjataan yksityiseen Varasto/Muistilaput-listaan, kopio kohteessa on RLS-suojattu oikein (periytyy `lists.visibility`:stä), mutta **alkuperäinen `laituri`-rivi jää oletusarvoon `'shared'`** — se on siis edelleen Juhan luettavissa RLS:n läpi, vain piilotettu Katrin omasta näkymästä `piilota_laiturista`:lla. Sama virheluokka kuin 13.8./16.8. kurssimateriaalilöydöksessä, ei vielä korjattu tähän. **Korjaus: kun koti asetetaan kohteeseen jonka `lists.visibility='private'`, `asetaLaiturinKoti()`:n pitää SAMALLA kirjoituksella asettaa myös lähde-rivin `laituri.visibility='private'`.**
+
+**Yksinkertaistus vielä pidemmälle: Varasto/Muistilaput-kohteille ei tarvita erillistä näkyvyys-togglea ollenkaan.** Näkyvyys periytyy KOKONAAN siitä mihin listaan muru ohjataan — sama malli kuin kaikkialla muualla `lists.visibility`:n kanssa, ei uutta rinnakkaista käsitettä. Käyttäjä valitsee/luo listan kerran (yksityinen tai jaettu), sen jälkeen kaikki sinne ohjatut murut noudattavat sitä automaattisesti. Toggle tarvitaan VAIN "pysyy Laiturissa" -tapaukselle, koska Laituri itse ei jakaudu nimettyihin listoihin.
+
+**Käytännön aukko joka pitää huomioida rakentaessa:** jos Katrilla ei vielä ole yksityistä Varasto/Muistilaput-listaa kun hän ensimmäistä kertaa haluaa ohjata murun sellaiseen, dropdownissa pitää voida **luoda uusi lista suoraan siitä** (nimi + yksityinen/jaettu), ei vain valita olemassa olevista — muuten koko yksinkertaistus kaatuu ensimmäiseen käyttökertaan.
+
+### 16.5c Laituri-uudistus — KOKONAISSUUNNITELMA (koottu 16.8., valmis vietäväksi Codelle)
+
+**1. Editori ei muutu.** §16.2:n koko näytön kirjoituspinta pysyy täysin sellaisenaan.
+
+**2. Uusi yhtenäinen valikko, sama paikka kuin nykyinen ⋯ (⚓ pysyy koskemattomana vieressä):** kolme riviä — **Varasto / Muistilaput / Poista.** Ei "Hytti"-kohdetta ollenkaan (kurssimateriaalilla oma putki, helmi vain Hytin omasta kontekstista, "ehdota Juhalle" hoitaa loput). Tämä myös poistaa `hytti_kortit`-pohjaisen vanhan koti/sijoitus-järjestelmän käytöstä Laiturin osalta kokonaan — riippumatta siitä oliko alla kuvattu otsikkovuoto oikeasti aktiivinen bugi vai ei, se lakkaa koskemasta Laituria kun tämä on rakennettu.
+
+**2b. Listavalitsin (Varasto/Muistilaput-alivalinta) näyttää oikeat listat automaattisesti, ei erillistä logiikkaa tarvita:** `lists_select`-policy (`owner_id = auth.uid() or visibility = 'shared'`, sql/003) tekee tämän jo — Katrin valikossa näkyvät hänen omat listansa (yksityiset + jaetut) ja Juhan JAETUT listat, mutta EI Juhan yksityisiä. Sama toisin päin. Vahvistettu 16.8., ei vaadi lisätyötä.
+
+**3. Näkyvyys ilman erillistä kysymystä useimmissa tapauksissa:**
+- Varasto/Muistilaput → näkyvyys periytyy valitusta/luodusta listasta (`lists.visibility`), ei erillistä togglea.
+- Ei valintaa (pysyy Laiturissa) → oma toggle rivillä, oletus jaettu, vaihdettavissa yksityiseksi.
+- Jos yksityistä kohdelistaa ei vielä ole, valikosta voi luoda uuden suoraan (nimi + yksityinen/jaettu) — ei vain valita olemassa olevista.
+
+**4. Korjaukset jotka pitää tehdä samassa yhteydessä (ei valinnaisia, kaikki löydettyjä todellisia aukkoja):**
+- `asetaLaiturinKoti()` asettaa `laituri.visibility='private'` samalla kirjoituksella kun kohdelista on yksityinen — puuttuu tällä hetkellä, jättää lähderivin RLS:n läpi luettavaksi vaikka UI piilottaa sen.
+- `piilota_laiturista` asetetaan HETI kun kohde tunnetaan (sama malli kuin teema/lista/vahdittu/hytti jo tekevät) — kurssimateriaali ei tällä hetkellä tee näin, korjataan yhtenäiseksi. **Täsmennys (Katrin kysymys 16.8.):** tämä tarkoittaa että materiaali katoaa Laiturista HETI kun se lisätään kurssikontekstista — EI vasta kun äly on jakanut sen solmuiksi ja Katri hyväksynyt jaon. Käsittely/hyväksyntä tapahtuu kokonaan kurssisivun omalla materiaalilistalla (⏳/✓), joka on eri asia kuin Laiturista piiloutuminen — sama kuin vahdittu-lepo-esimerkissä alussa: piiloutuminen ja "valmiiksi käsitelty" eivät ole sama hetki.
+- Kurssisivun oma käsitelty/odottaa-tila saa OMAN kentän, ei enää lainaa `piilota_laiturista`:a.
+- Sää: näytä viimeisin tunnettu arvo yhteyskatkolla, piilota vain jos ei koskaan ollut arvoa TAI edellisenkään hakeminen epäonnistuu.
+- Arkistoitu kurssi ei laukaise muistutuksia (vahvistettu haluttuna, jo toimii oikein muuten).
+
+**5. Poistetaan tarpeettomana:** `laituri_piilota_oletus_kohteet`-asetus (Asetukset → 🛟 Laituri) kokonaan. Tarpeeton kun jokainen ei-Laituri-kohde piiloutuu automaattisesti kohdasta 4 mukaisesti — ei jää mitään konfiguroitavaa.
+
+**6. Ei ratkaistu, tarkistettava Coden toimesta ennen kuin käsitellään korjauksena:** Katrin havainto että Hytin projektien otsikot näkyivät koti-valikossa ja Asetuksissa. `haeKotiKohteet()`/`hytti_kortit`-taulun RLS on koodista todennettu oikein (`owner_id = auth.uid()`, sql/016) — juurisyytä ei löytynyt staattisesti. Koden pitäisi tarkistaa onko vanhoilla `hytti_kortit`-riveillä puuttuva/väärä `owner_id`. Muuttuu joka tapauksessa merkityksettömäksi Laiturin osalta kun kohta 2 on rakennettu.
+
+> **VAROITUS 16.8., tärkeä väärinkäsityksen esto:** `hytti_kortit` EI ole vain näiden kahden sijoitusfunktion apu­taulu — se on Hytin **NYKYINEN etusivun kokonaisuus** (kortit, raahausjärjestys, arkistointi, seuraava_askel, kalenterisuodatin — käytössä n. 15 kohdassa script.js:ssä, mm. koko `hytti-kortti-view`). **Sitä EI SAA poistaa/purkaa kokonaan**, koska Loki (§6b) jolle se on tarkoitus jättää paikkansa ei ole vielä rakennettu — Hytin etusivu hajoaisi. **Mitä Katri tarkoitti (täsmennetty):** `hytti_kortit` poistetaan vain KOHDEVAIHTOEHTONA Laiturin ⋯-valikosta (kohta 2, tapahtuu joka tapauksessa) — tämän voi tehdä NYT, ei tarvitse odottaa koko §16.5c-paketin valmistumista, koska se on itsenäinen, pieni muutos kahteen funktioon (`haeSijoitusKohteet`, `haeKotiKohteet`). Itse `hytti_kortit`-taulu ja sen etusivu-UI pysyvät koskemattomina kunnes Loki korvaa ne myöhemmin (§13 Vaihe 5).
+- **UI-sijainti vahvistettu 16.8. (Katri):** kohdevalikko ei ole uusi elementti vaan sama paikka missä murun perässä jo näkyy kaksi ikonia — ⚓ (ankkuri) ja ⋯ (kolme pistettä). Kohdevalikko käyttää olemassa olevaa ⋯-rivivalikkoa (`avaaKotivalikko`/`openRowMenu`, script.js), ei omaa uutta nappiaan.
+- **Lisäys valikkoon (Katrin pyyntö 16.8.):** "Poista"-toiminto puuttuu tästä samasta ⋯-valikosta tällä hetkellä (on olemassa jossain muualla/eri tavalla) — Katri haluaa sen samaan valikkoon kohdevalintojen rinnalle, ei erilliseksi.
+- **AUKKO/UX-korjaus (Katrin havainto 16.8.):** kun murulle asettaa kodin (`asetaLaiturinKoti`), "piilota Laiturista" -kytkin **muuttuu harmaaksi (disabloituu)** kodinasetuksen yhteydessä — nykyinen automaattinen oletus (`kohdeOnOletuksenaPiilotettu`, kohdekohtainen "piilota aina"-asetus) toimii hyvin suurimmassa osassa tapauksia, mutta käyttäjän pitäisi silti VOIDA säätää piilotusta itse manuaalisesti myös sen jälkeen kun koti on asetettu — ei jäädä lukkoon. Koden pitää korjata niin että kytkin pysyy käytettävissä (esitäytettynä automaattioletuksella, mutta ei disabloituna) kodinasetuksen jälkeenkin.
+- **Editori itse ei muutu.** §16.2:n koko näytön kirjoituspinta pysyy sellaisenaan — uudistus koskee vain sitä minne ja miten kohde valitaan editorin ympärillä, ei itse kirjoituspintaa.
+
+> **AUKKO — löydös 16.8., tarkistettava kiireellisesti (samaa perhettä kuin §8.3b:n aiempi yksityisyysvuoto):** Katrin havainto: Hytin projektien (kurssien) OTSIKOT näyttävät olevan näkyvissä kaikille, vaikka Hytin pitäisi olla yksityinen (`opinto_kurssit`:n pitäisi olla `owner_id`+RLS-eristetty, ks. KONSEPTIKIRJA.md 4.11). Ei vahvistettu bugiksi, vain havainto ("I guess all") — Coden pitää tarkistaa `opinto_kurssit`-taulun RLS-policyt ja mistä näkymästä otsikot näkyivät, ennen kuin tätä käsitellään korjauksena.
+- **Kaksitasoinen sisäänmeno:** (1) pakollinen kotivalinta lisäyshetkellä, (2) vapaaehtoinen tarkennuskerros sen jälkeen (esim. mihin solmuun täsmälleen). Koskee myös helmiä, ei vain kurssimateriaalia.
+- **RATKAISTU 16.8.2026 — muistiinpanot eivät kuulu Reittiin.** Katrin vahvistus: muistiinpanot siirrettiin pois Reitti-osiosta juuri siksi että ne eivät oikeastaan kuulu kursseihin — tästä syntyi oma neljäs välilehti Loki (§6b). "Reitti-osiossa näkyvät muistiinpanot" -maininta aiemmassa täydennyksessä oli siis vanhentunut/väärä poluku, ei uusi päätös. Muistiinpanot pysyvät yksinomaan Lokissa.
+- **Editorin toteutustapa — vapaa (Katri 16.8.):** ei väliä toteutetaanko kirjaimellisesti sama jaettu komponentti kaikkialla (Laituri, Loki, kurssimateriaali) vai erilliset mutta samalta näyttävät/käyttäytyvät toteutukset — kumpi on Codelle helpompi. Ainoa vaatimus on että käyttäjälle näkyy ja tuntuu samalta kaikkialla (§16.2:n periaate säilyy, vain toteutustapa on vapaa).
+- **Idea, ei päätetty:** Laiturin oma arkisto siirrettäisiin Asetuksiin, jos sille osoittautuu tarvetta.
+- **Vanhentunut huomio korjattu:** eräässä aiemmassa keskustelussa "kiireellisin rakennuskohde" oli tiedostotyyppien syöttö Laiturista Hyttiin — tämä on jo RAKENNETTU (§16.3), ei enää kiireellisin.
+
 ### 16.6 Lokin tietokohde — minimaalinen
 
 Ks. §6b. `loki_merkinnat`-taulu (tai vastaava, nimeä ei lopullisesti vahvistettu) — ei näkymää, ei editoria, data vain kertyy sinne kun yksityisestä paikasta lisätty ankkuri lasketaan.
@@ -1054,6 +1167,15 @@ Säädettäviä arvoja, kaikki dataa eikä kovakoodattua:
 
 **Uusi UI-elementti — tuntemus-säädin, ei aiemmin speksattu tarkemmin.** Säädintä (käyttäjä arvioi kuinka tuttu aihe on) **ei saa kysyä usein.** Mitä useammin oppijaa pyydetään arvioimaan vaikeutta, sitä epätarkempia vihjeitä hän käyttää ja sitä huonommin suoriutuu. Kerran solmun alussa, ei joka istunnossa eikä joka vaiheessa.
 
+**Lisäys (relay 16.8.):**
+
+- **Vapaapäiväkytkin ≠ kuormitustila.** Kaksi eri kytkintä, molemmat omassa Hytissä — ei sama asia vaikka molemmat vaikuttavat siihen mitä tarjotaan.
+- **Kriittinen: äly ei saa vuotaa tietoa RLS-rajan yli ehdotuksissaan.** Koskee kaikkia älyehdotuksia (sillat, kertaus, tehtävät) — tarkistettava erikseen jokaisen uuden älykutsun yhteydessä, ei kertaluontoinen korjaus.
+- **Kuormitustila ei saa poistaa Juhan ankkureita/Hyttiä.** Kuormitustila piilottaa Katrin oman kortin (§15.5), mutta ei saa vaikuttaa toisen käyttäjän sisältöön.
+- **"En pysty mitään" -päivänä ei nosteta raskasta tehtävää ensin** — sama henki kuin §19:n kuormataulukko, mutta erikseen mainittu ääripää.
+- **AUKKO:** arkistointiin (materiaalin/Miro-taulujen pitkäaikaissäilytys, §16.3, §10.1) tarvitaan tietosuojaselvitys ennen kuin sitä rakennetaan tuotantoon.
+- **Idea, ei päätetty:** laitekohtainen näkyvyys (esim. eri sisältöä koti- vs. työpuhelimella).
+
 ---
 
 ## 18. Data ja logitus (uusi osio, toinen keskustelu 9.8.2026) — ei vielä rakennettu
@@ -1066,6 +1188,12 @@ Tallennettavaa, lisäyksinä aiempaan:
 - Tietotyypin vaihdokset (§7.1)
 - Vaihesiirtymät
 - Kevyet kertaukset erikseen merkittyinä — kevyt kertaus väsyneenä on parempi kuin ei mitään, mutta se ei saa nollata kertausväliä samalla painolla kuin täysi kertaus
+
+**Lisäys (relay 16.8.):**
+
+- **Kurssi on aina tiedossa käynnistyshetkellä** (§4.3, §7.1) — epävarmuutta voi olla vain solmutasolla, ei koskaan siitä mistä kurssista on kyse.
+- **Idea, ei päätetty — kuvaluokittelu:** valokuva paperisesta muistiinpanosta/tehtävästä → äly ehdottaa OCR-tekstin perusteella mihin solmuun se kuuluu, käyttäjä vahvistaa yhdellä napautuksella. Kevennetty versio: yksi kuva koko paperista riittäisi karkeaan kurssitason edistymismerkintään ilman solmutason tarkkuutta.
+- **Epäonnistuminen ja käytetty aika ovat tärkeää dataa siinä missä onnistuminenkin** — molempien pitää tallentua, ei vain "tehty"-merkintöjen.
 
 **Datan talteenotto alkaa heti, näkymä voi tulla myöhemmin.**
 
