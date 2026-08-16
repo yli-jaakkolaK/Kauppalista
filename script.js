@@ -1183,8 +1183,8 @@ async function avaaOpintoKurssi(kurssi) {
   currentOpintoKurssi = kurssi;
   showOpintoKurssiView();
   document.getElementById('opinto-kurssi-title').textContent = '✱ ' + kurssi.name + ' ✱';
-  document.getElementById('opinto-materiaali-teksti').value = kurssi.materiaali || '';
   piirraOpintoKurssiTilaLinkki();
+  await lataaOpintoKurssiMateriaalit();
   await lataaOpintoAiheet();
   await lataaOpintoKurssinDeadlinet();
 }
@@ -1228,13 +1228,62 @@ document.getElementById('opinto-lisaa-materiaalia-btn').addEventListener('click'
   avaaLaiturinMateriaalille(currentOpintoKurssi);
 });
 
-document.getElementById('opinto-materiaali-tallenna-btn').addEventListener('click', async function() {
+// Materiaali-osio uudistettu (2026-08-16, Katrin pyyntö) — status-tietoinen
+// lista vanhan yhden ylikirjoitettavan tekstikentän sijaan. Ei enää erillistä
+// tallennusnappia: rivit tulevat AINA "+ Lisää materiaalia" -editorin kautta,
+// joka jo tallentaa itsensä sulkeutuessaan (ei kahta eri tallennustapaa
+// samalla sivulla).
+async function lataaOpintoKurssiMateriaalit() {
   if (!currentOpintoKurssi) return;
-  const uusi = document.getElementById('opinto-materiaali-teksti').value.trim();
-  const { error } = await db.from('opinto_kurssit').update({ materiaali: uusi || null }).eq('id', currentOpintoKurssi.id);
-  if (ilmoitaKirjoitusvirheesta(error, 'Materiaalin tallennus')) return;
-  currentOpintoKurssi.materiaali = uusi || null;
-  naytaIlmoitus('Materiaali tallennettu');
+  const { data, error } = await db.from('laituri').select('id, content, created_at, piilota_laiturista')
+    .eq('materiaali_kurssi_id', currentOpintoKurssi.id).order('created_at', { ascending: false });
+  if (error) {
+    console.error('Kurssin materiaalien haku epäonnistui:', error);
+    return;
+  }
+  const rivit = data || [];
+  const listEl = document.getElementById('opinto-materiaali-lista');
+  listEl.innerHTML = '';
+  document.getElementById('opinto-materiaali-tyhja').style.display = rivit.length === 0 ? 'block' : 'none';
+  document.getElementById('opinto-kurssi-silta-linkki').style.display = rivit.length === 0 ? 'none' : 'block';
+
+  let tiedostoKartta = {};
+  if (rivit.length > 0) {
+    const { data: tiedostot, error: tiedostoError } = await db.from('laituri_tiedostot').select('muru_id, tiedostonimi')
+      .in('muru_id', rivit.map(function(r) { return r.id; }));
+    if (tiedostoError) {
+      console.error('Materiaalien tiedostonimien haku epäonnistui:', tiedostoError);
+    } else {
+      (tiedostot || []).forEach(function(t) { tiedostoKartta[t.muru_id] = t.tiedostonimi; });
+    }
+  }
+
+  rivit.forEach(function(rivi) {
+    const li = document.createElement('li');
+    const teksti = document.createElement('span');
+    const nimi = tiedostoKartta[rivi.id] || rivi.content;
+    teksti.textContent = nimi.length > 60 ? nimi.slice(0, 60) + '…' : nimi;
+    li.appendChild(teksti);
+
+    const tila = document.createElement('span');
+    tila.className = 'opinto-materiaali-tila' + (rivi.piilota_laiturista ? ' kasitelty' : '');
+    tila.textContent = rivi.piilota_laiturista ? '✓ käsitelty' : '⏳ odottaa';
+    li.appendChild(tila);
+
+    if (!rivi.piilota_laiturista) {
+      const tarkistaNappi = document.createElement('button');
+      tarkistaNappi.className = 'dialog-btn dialog-btn-cancel';
+      tarkistaNappi.textContent = 'Tarkista';
+      tarkistaNappi.addEventListener('click', function() { pyydaMateriaaliJasennys(rivi, tarkistaNappi); });
+      li.appendChild(tarkistaNappi);
+    }
+
+    listEl.appendChild(li);
+  });
+}
+
+document.getElementById('opinto-kurssi-silta-linkki').addEventListener('click', function() {
+  if (currentOpintoKurssi) etsiSiltojaKurssille(currentOpintoKurssi);
 });
 
 async function lataaOpintoAiheet() {
@@ -2500,6 +2549,13 @@ document.getElementById('taitosolmu-uusi-input').addEventListener('keydown', fun
 // olemassa olevaa yleiskäyttöistä /api/aly-putkea (ks. api/aly.js) — ei uutta
 // endpointtia. "Äly ehdottaa, ihminen kuittaa": EI KOSKAAN kirjoita mitään
 // ennen rivikohtaista hyväksyntää esikatseluikkunassa.
+// Materiaalin katkaisu per tuotu rivi (2026-08-16) — poimittu pdf-teksti voi
+// olla kymmeniä tuhansia merkkejä (nähty: ~41 000), ja moni tuotu rivi per
+// kurssi kasvattaisi promptin hallitsemattomaksi. "Materiaali on VIITE, ei
+// nieltävä" (alkuperäinen Opintopolku-periaate, ks. KONSEPTIKIRJA.md 4.11)
+// koskee tätäkin — silta löytyy toistuvasta KÄSITTEESTÄ, ei koko tekstistä.
+const SILTA_MATERIAALI_KATKAISU = 3000;
+
 async function kokoaAktiivistenKurssienMateriaali() {
   const { data: kurssit, error: kurssiError } = await db.from('opinto_kurssit')
     .select('id, name, materiaali').eq('owner_id', currentUserId).eq('status', 'aktiivinen');
@@ -2507,7 +2563,34 @@ async function kokoaAktiivistenKurssienMateriaali() {
     console.error('Aktiivisten kurssien haku epäonnistui:', kurssiError);
     return null;
   }
-  const kelpaavat = (kurssit || []).filter(function(k) { return (k.materiaali || '').trim() !== ''; });
+  const kaikki = kurssit || [];
+  if (kaikki.length === 0) return { kurssit: [], aiheet: [] };
+
+  // Yhdistetty materiaali (2026-08-16, Katrin elävä testi paljasti aukon):
+  // vanha käsin täytetty materiaali-kenttä JA "+ Lisää materiaalia" -kautta
+  // tuodut, tähän kurssiin merkityt laituri-rivit (materiaali_kurssi_id,
+  // sql/117) — kumpikaan ei syrjäytä toista, molemmat ovat tämän kurssin
+  // materiaalia siltahaulle. Ennen tätä siltahaku luki VAIN vanhaa kenttää,
+  // joten koko tiedostontuontiputki oli irrallaan siltasolmumoottorista.
+  const { data: tuodut, error: tuotuError } = await db.from('laituri')
+    .select('materiaali_kurssi_id, content').in('materiaali_kurssi_id', kaikki.map(function(k) { return k.id; }));
+  if (tuotuError) {
+    console.error('Tuotujen materiaalien haku epäonnistui:', tuotuError);
+    return null;
+  }
+  const tuodutPerKurssi = {};
+  (tuodut || []).forEach(function(r) {
+    if (!r.materiaali_kurssi_id) return;
+    const katkaistu = (r.content || '').slice(0, SILTA_MATERIAALI_KATKAISU);
+    (tuodutPerKurssi[r.materiaali_kurssi_id] = tuodutPerKurssi[r.materiaali_kurssi_id] || []).push(katkaistu);
+  });
+
+  const kelpaavat = kaikki
+    .map(function(k) {
+      const yhdistetty = [k.materiaali || ''].concat(tuodutPerKurssi[k.id] || []).filter(function(t) { return t.trim() !== ''; }).join('\n\n');
+      return Object.assign({}, k, { materiaali: yhdistetty });
+    })
+    .filter(function(k) { return k.materiaali.trim() !== ''; });
   if (kelpaavat.length < 2) return { kurssit: kelpaavat, aiheet: [] };
 
   const { data: aiheet, error: aiheError } = await db.from('opinto_aiheet')
@@ -2541,22 +2624,53 @@ function rakennaSiltaPrompti(kurssit, aiheet) {
     'Jos et löydä yhtään aitoa siltaa, palauta {"sillat": []}.';
 }
 
-async function etsiSiltoja() {
-  const linkki = document.getElementById('silta-etsi-linkki');
-  const alkuperainenTeksti = linkki.textContent;
-  linkki.textContent = 'Etsitään...';
+// Per-kurssi-seuranta (2026-08-16, ks. sql/120, Katrin täsmennys): EI
+// toistuva viikkokello vaan "kerran per kurssin lisäys" -eskalaatio. Jokainen
+// ONNISTUNUT haku (käsin Nyt-välilehdeltä, kurssisivulta, tai palvelimen
+// auto-eskalaatio api/aly-nightly.js:ssä) kattaa AINA kaikki aktiiviset
+// kurssit yhtä aikaa — merkitään siis KAIKKI aktiiviset silta_katsottu_at:iin,
+// ei vain kutsujan omaa kurssia.
+async function merkitseSillatTarkistetuiksi() {
+  const nyt = new Date().toISOString();
+  const { error } = await db.from('opinto_kurssit').update({ silta_katsottu_at: nyt }).eq('owner_id', currentUserId).eq('status', 'aktiivinen');
+  if (error) console.error('Sillat-tarkistusmerkinnän tallennus epäonnistui:', error);
+  piilotaSiltaOdotusIlmoitus();
+}
 
+function piilotaSiltaOdotusIlmoitus() {
+  const el = document.getElementById('silta-odottaa-ilmoitus');
+  if (el) el.style.display = 'none';
+}
+
+// Kevyt, ILMAINEN muistutus (EI AI-kutsua) — Katrin oma sanamuoto: "ask
+// always as new course is added... other times should be just reminders, no
+// AI needed". Näytetään aina kun jokin aktiivinen kurssi ei ole vielä ollut
+// mukana yhdessäkään siltahaussa, riippumatta 7 päivän eskalaatiorajasta
+// (se koskee VAIN palvelimen automaattista AI-kutsua, ks. api/aly-nightly.js).
+async function paivitaSiltaOdotusIlmoitus() {
+  const el = document.getElementById('silta-odottaa-ilmoitus');
+  if (!el) return;
+  const { data, error } = await db.from('opinto_kurssit').select('id')
+    .eq('owner_id', currentUserId).eq('status', 'aktiivinen').is('silta_katsottu_at', null).limit(1);
+  if (error || !data || data.length === 0) {
+    el.style.display = 'none';
+    return;
+  }
+  el.textContent = 'Uusi kurssi odottaa siltatarkistusta — kannattaisiko tarkistaa sillat?';
+  el.style.display = 'block';
+}
+
+// Ydinhaku eriytetty (2026-08-16) kahdelle kutsujalle: etsiSiltoja() (Nyt-
+// välilehden globaali haku, näyttää KAIKKI ehdotukset) ja
+// etsiSiltojaKurssille() (kurssisivun kontekstinen "Tarkista sillat (tämä
+// kurssi)" — SAMA haku KAIKISTA aktiivisista kursseista, koska silta on
+// määritelmällisesti kahden+ kurssin yhteinen käsite eikä yhdestä kurssista
+// löydettävissä, mutta tulos SUODATETAAN näytettäväksi vain kutsujan
+// kurssiin liittyvät). Ei UI-tekstinvaihtoa täällä — kutsuja hoitaa sen.
+async function suoritaSiltaHaku() {
   const koottu = await kokoaAktiivistenKurssienMateriaali();
-  if (!koottu) {
-    linkki.textContent = alkuperainenTeksti;
-    naytaIlmoitus('Kurssien haku epäonnistui — yritä uudelleen');
-    return;
-  }
-  if (koottu.kurssit.length < 2) {
-    linkki.textContent = alkuperainenTeksti;
-    naytaIlmoitus('Tarvitaan vähintään 2 aktiivista kurssia joilla on materiaalikenttä täytetty');
-    return;
-  }
+  if (!koottu) return { virhe: 'Kurssien haku epäonnistui — yritä uudelleen' };
+  if (koottu.kurssit.length < 2) return { virhe: 'Tarvitaan vähintään 2 aktiivista kurssia joilla on materiaalia' };
 
   const prompti = rakennaSiltaPrompti(koottu.kurssit, koottu.aiheet);
   let tulos = null;
@@ -2574,18 +2688,10 @@ async function etsiSiltoja() {
   } catch (e) {
     virhe = 'Äly ei osannut tätä, kokeile myöhemmin';
   }
-
-  linkki.textContent = alkuperainenTeksti;
-  if (virhe) {
-    naytaIlmoitus('Siltatunnistus epäonnistui: ' + virhe);
-    return;
-  }
+  if (virhe) return { virhe: virhe };
 
   const jasennetty = jasennaAlyJSON(tulos.text);
-  if (!jasennetty || !Array.isArray(jasennetty.sillat)) {
-    naytaIlmoitus('Äly ei osannut tätä, kokeile myöhemmin');
-    return;
-  }
+  if (!jasennetty || !Array.isArray(jasennetty.sillat)) return { virhe: 'Äly ei osannut tätä, kokeile myöhemmin' };
 
   const aiheKartta = {};
   koottu.aiheet.forEach(function(a) { aiheKartta[a.id] = a; });
@@ -2601,7 +2707,90 @@ async function etsiSiltoja() {
     return kurssitJoihinViittaa.size >= 2;
   });
 
-  naytaSiltaEhdotukset(kelvolliset, aiheKartta, kurssiKartta);
+  merkitseSillatTarkistetuiksi();
+  return { kelvolliset: kelvolliset, aiheKartta: aiheKartta, kurssiKartta: kurssiKartta };
+}
+
+async function etsiSiltoja() {
+  const teksti = document.getElementById('silta-etsi-teksti');
+  const alkuperainenTeksti = teksti.textContent;
+  teksti.textContent = 'Etsitään...';
+
+  const tulos = await suoritaSiltaHaku();
+  teksti.textContent = alkuperainenTeksti;
+  if (tulos.virhe) {
+    naytaIlmoitus('Siltatunnistus epäonnistui: ' + tulos.virhe);
+    return;
+  }
+  piilotaSiltaOdotusIlmoitus();
+  odottavatSiltaRivitIdt = [];
+  naytaSiltaEhdotukset(tulos.kelvolliset, tulos.aiheKartta, tulos.kurssiKartta);
+}
+
+// Kurssisivun kontekstinen haku (Katrin pyyntö 2026-08-16: "kurssin solmut
+// tulis samalle sivulle hyväksyttäväksi missä materiaalin lisäys tapahtuu").
+async function etsiSiltojaKurssille(kurssi) {
+  const teksti = document.getElementById('opinto-kurssi-silta-teksti');
+  const alkuperainenTeksti = teksti.textContent;
+  teksti.textContent = 'Etsitään...';
+
+  const tulos = await suoritaSiltaHaku();
+  teksti.textContent = alkuperainenTeksti;
+  if (tulos.virhe) {
+    naytaIlmoitus('Siltatunnistus epäonnistui: ' + tulos.virhe);
+    return;
+  }
+
+  const taman_kurssin = tulos.kelvolliset.filter(function(s) {
+    return s.viittaa_aihe_id.some(function(id) {
+      const aihe = tulos.aiheKartta[id];
+      return aihe && aihe.kurssi_id === kurssi.id;
+    });
+  });
+  if (taman_kurssin.length === 0) {
+    naytaIlmoitus('Ei löytynyt siltoja tälle kurssille tällä kertaa.');
+    return;
+  }
+  odottavatSiltaRivitIdt = [];
+  naytaSiltaEhdotukset(taman_kurssin, tulos.aiheKartta, tulos.kurssiKartta);
+}
+
+// Palvelimen auto-eskalaation (api/aly-nightly.js, ks. sql/119) tallentamat
+// ehdotukset — "äly ehdottaa, ihminen kuittaa" koskee myös automaattisesti
+// generoituja: SAMA esikatseludialogi, ei mitään kirjoiteta ennen tätä.
+// Voi olla useampi odottava rivi jos usea kurssi eskaloitui eri päivinä
+// ilman että väliin ehti käsin tehty tarkistus — yhdistetään yhdeksi
+// näytöksi. Rivit poistuvat vasta kun dialogi suljetaan/tallennetaan
+// (ks. sulje-/tallenna-käsittelijät alla), eivät heti näytettäessä.
+let odottavatSiltaRivitIdt = [];
+async function naytaOdottavatSiltaEhdotukset() {
+  const { data, error } = await db.from('silta_ehdotukset_odottavat').select().eq('owner_id', currentUserId).order('created_at');
+  if (error) {
+    console.error('Odottavien siltaehdotusten haku epäonnistui:', error);
+    return;
+  }
+  if (!data || data.length === 0) return;
+
+  const kaikkiEhdotukset = [];
+  const aiheKartta = {};
+  const kurssiKartta = {};
+  data.forEach(function(rivi) {
+    (rivi.ehdotukset || []).forEach(function(e) { kaikkiEhdotukset.push(e); });
+    Object.assign(aiheKartta, rivi.aihe_kartta || {});
+    Object.assign(kurssiKartta, rivi.kurssi_kartta || {});
+  });
+  if (kaikkiEhdotukset.length === 0) return;
+
+  odottavatSiltaRivitIdt = data.map(function(r) { return r.id; });
+  naytaIlmoitus('Automaattinen siltatarkistus löysi ' + kaikkiEhdotukset.length + ' ehdotusta — tarkista Kartta-välilehdeltä.');
+  naytaSiltaEhdotukset(kaikkiEhdotukset, aiheKartta, kurssiKartta);
+}
+
+async function poistaOdottavatSiltaRivit() {
+  if (odottavatSiltaRivitIdt.length === 0) return;
+  const { error } = await db.from('silta_ehdotukset_odottavat').delete().in('id', odottavatSiltaRivitIdt);
+  if (error) console.error('Odottavien siltarivien siivous epäonnistui:', error);
+  odottavatSiltaRivitIdt = [];
 }
 
 function naytaSiltaEhdotukset(ehdotukset, aiheKartta, kurssiKartta) {
@@ -2668,6 +2857,7 @@ function naytaSiltaEhdotukset(ehdotukset, aiheKartta, kurssiKartta) {
 document.getElementById('silta-etsi-linkki').addEventListener('click', etsiSiltoja);
 document.getElementById('silta-ehdotus-sulje').addEventListener('click', function() {
   document.getElementById('silta-ehdotus-overlay').style.display = 'none';
+  poistaOdottavatSiltaRivit();
 });
 
 // Tallennusjärjestys: 1) hyväksytyt taitosolmut ensin (kerää nimi->id-kartta
@@ -2679,6 +2869,7 @@ document.getElementById('silta-ehdotus-tallenna-btn').addEventListener('click', 
   const rivit = Array.from(document.getElementById('silta-ehdotus-lista').children).filter(function(li) { return li._checkbox && li._checkbox.checked; });
   if (rivit.length === 0) {
     document.getElementById('silta-ehdotus-overlay').style.display = 'none';
+    poistaOdottavatSiltaRivit();
     return;
   }
 
@@ -2717,6 +2908,7 @@ document.getElementById('silta-ehdotus-tallenna-btn').addEventListener('click', 
   }
 
   document.getElementById('silta-ehdotus-overlay').style.display = 'none';
+  poistaOdottavatSiltaRivit();
   naytaIlmoitus(Object.keys(nimiIdKartta).length + ' siltaa tallennettu');
   lataaTaitosolmut();
 });
@@ -5592,6 +5784,8 @@ async function lataaHyttiPaanakyma() {
   lataaHyttiTanaanKaista();
   lataaOpintoKurssit();
   lataaTaitosolmut();
+  paivitaSiltaOdotusIlmoitus();
+  naytaOdottavatSiltaEhdotukset();
   lataaOpintoPaivanAskeleet();
   document.getElementById('huoli-pvm-input').value = opintoTanaanPvm();
 
@@ -6186,6 +6380,13 @@ document.getElementById('kuormanappi').addEventListener('click', function() {
   localStorage.setItem(RUORI_KUORMITUSTILA_AVAIN, ruoriKuormitustilaPaalla() ? '0' : '1');
   paivitaRuoriNakyvyys();
 });
+
+// Siltasolmujen oma kuvake (2026-08-16, Katrin väripalettihuomio jatkui —
+// "miksi puhelin kun puhutaan sillasta": emoji 🌉 ei renderöidy tunnistettavana
+// pienessä koossa. Yksinkertainen silta-pikstogrammi (kansi + kolme pilaria +
+// vesiraja), currentColor-yhteensopiva kuten SAA_IKONIT alla, ei emoji.
+const SILTA_IKONI_SVG = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 9h20"/><path d="M5 9v11M12 9v11M19 9v11"/><path d="M2 20h20"/></svg>';
+document.querySelectorAll('.silta-ikoni').forEach(function(el) { el.innerHTML = SILTA_IKONI_SVG; });
 
 // === RUORI: SÄÄ-SEGMENTTI (2026-08-11, Ruori-speksi §2) === Open-Meteo
 // api/saa.js:n kautta (palvelin välimuistittaa 30 min, ei suoraa selainkutsua
@@ -7452,6 +7653,7 @@ function avaaOsio(osio) {
       document.getElementById('kurssi-kiireellisyys-input').value = haeAsetusNumero('kurssi_kiireellisyys_paivia', 3);
       document.getElementById('silta-puskuri-input').value = haeAsetusNumero('silta_puskuri_paivia', 7);
       document.getElementById('silta-leviamissyvyys-input').value = haeAsetusNumero('silta_leviamissyvyys', 2);
+      document.getElementById('sillat-auto-paivia-input').value = haeAsetusNumero('sillat_auto_paivia', 7);
       document.getElementById('sessio-jarkevyys-input').value = haeAsetusNumero('sessio_jarkevyys_tunnit', 3);
       document.getElementById('tehdyn-nakyvyys-input').value = haeAsetusNumero('tehdyn_nakyvyys_maara', 0);
       document.getElementById('kesto-priming-input').value = haeAsetusNumero('kesto_priming_min', 15);
@@ -9586,6 +9788,10 @@ async function tallennaMateriaaliJasennys(rivi) {
   naytaIlmoitus('Tallennettu Opintopolulle (' + kurssiNimi + ').');
   peruLaiturinMateriaaliKonteksti();
   lataaLaituri(document.getElementById('laituri-search').value.trim());
+  // Kurssisivun oma materiaalilista (2026-08-16) — päivitetään SAMALLA jos
+  // ollaan parhaillaan sillä sivulla (rivi käsiteltiin joko sieltä tai
+  // Laiturin tarkistusjonosta, kumpikin päätyy tänne).
+  if (currentOpintoKurssi) lataaOpintoKurssiMateriaalit();
 }
 
 // Laituri-avustaja (2026-07-12) — ensimmäinen oikea älyominaisuus äly-putken
@@ -11205,6 +11411,7 @@ sidoHuoliKynnysInput('huoli-raskas-kynnys-input', 'huoli_raskas_kynnys', 30, 'Hu
 sidoHuoliKynnysInput('kurssi-kiireellisyys-input', 'kurssi_kiireellisyys_paivia', 3, 'Kurssin kiireellisyysraja');
 sidoHuoliKynnysInput('silta-puskuri-input', 'silta_puskuri_paivia', 7, 'Sillan puskuri');
 sidoHuoliKynnysInput('silta-leviamissyvyys-input', 'silta_leviamissyvyys', 2, 'Kiireellisyyden leviämissyvyys');
+sidoHuoliKynnysInput('sillat-auto-paivia-input', 'sillat_auto_paivia', 7, 'Siltojen auto-tarkistuksen raja');
 sidoHuoliKynnysInput('sessio-jarkevyys-input', 'sessio_jarkevyys_tunnit', 3, 'Session järkevyyskynnys');
 sidoHuoliKynnysInput('tehdyn-nakyvyys-input', 'tehdyn_nakyvyys_maara', 0, 'Tehdyn kortin näkyvyysmäärä');
 sidoHuoliKynnysInput('kesto-priming-input', 'kesto_priming_min', 15, 'Primingin kestoarvio');

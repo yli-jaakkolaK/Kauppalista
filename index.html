@@ -365,9 +365,10 @@
          kurssissa yhtä aikaa. Ei yksittäisen kurssin sisältöä (se on
          opinto_kurssit/opinto_aiheet-radalla). Täyttyy AI-avusteisen
          tunnistuksen + käyttäjän rivikohtaisen hyväksynnän kautta. -->
-    <div class="section-title">🧩 Taitosolmut <span class="opinto-kartta-linkki" id="silta-etsi-linkki">🌉 Etsi sillat</span></div>
+    <div class="section-title">🧩 Taitosolmut <span class="opinto-kartta-linkki" id="silta-etsi-linkki"><span class="silta-ikoni" id="silta-etsi-ikoni"></span><span id="silta-etsi-teksti">Etsi sillat</span></span></div>
+    <p class="section-empty" id="silta-odottaa-ilmoitus" style="display:none"></p>
     <ul class="list" id="taitosolmu-lista"></ul>
-    <p class="section-empty" id="taitosolmu-tyhja" style="display:none">Ei vielä taitosolmuja. Sillat löytyvät automaattisesti "🌉 Etsi sillat" -toiminnolla, kun vähintään kaksi aktiivista kurssia on täyttänyt materiaalikenttänsä.</p>
+    <p class="section-empty" id="taitosolmu-tyhja" style="display:none">Ei vielä taitosolmuja. Sillat löytyvät automaattisesti "Etsi sillat" -toiminnolla, kun vähintään kaksi aktiivista kurssia on täyttänyt materiaalikenttänsä.</p>
 
     <div class="add-item">
       <span class="prefix">›</span>
@@ -484,9 +485,26 @@
 
     <p class="section-link" id="opinto-kurssi-tila-linkki"></p>
 
+    <!-- Materiaali-osio uudistettu (2026-08-16, Katrin pyyntö) — korvaa
+         vanhan yhden ylikirjoitettavan tekstikentän status-tietoisella
+         listalla: jokainen "+ Lisää materiaalia" -kautta tuotu rivi näkyy
+         täällä omana rivinään (laituri.materiaali_kurssi_id, sql/117) ja
+         kertoo onko se vielä käsittelemättä vai jo jäsennetty aiheiksi/
+         deadlineiksi (piilota_laiturista). Ei enää erillistä tallennusnappia
+         — rivit syntyvät AINA saman editorin kautta joka jo tallentaa
+         itsensä sulkeutuessaan. -->
     <div class="section-title">📎 Materiaali</div>
-    <textarea id="opinto-materiaali-teksti" class="jatkorivi-teksti" rows="2" placeholder="Linkki tai muistiinpano kurssin materiaaliin..."></textarea>
-    <button class="dialog-btn dialog-btn-cancel" id="opinto-materiaali-tallenna-btn" style="margin-top:6px">Tallenna materiaali</button>
+    <button class="dialog-btn dialog-btn-cancel" id="opinto-lisaa-materiaalia-btn" style="margin-bottom:10px">+ Lisää materiaalia</button>
+    <ul class="list" id="opinto-materiaali-lista"></ul>
+    <p class="section-empty" id="opinto-materiaali-tyhja" style="display:none">Ei vielä materiaalia. "+ Lisää materiaalia" tuo tiedoston tai tekstin — tästä näet mitkä on jo käsitelty.</p>
+
+    <!-- Siltasolmut TÄSSÄ kontekstissa (Katrin pyyntö 2026-08-16: "solmut
+         samalle sivulle missä materiaalin lisäys tapahtuu") — silta on
+         määritelmällisesti kahden+ kurssin YHTEINEN käsite, joten haku
+         tarkastelee edelleen KAIKKIA aktiivisia kursseja, mutta tulos
+         suodatetaan tähän kurssiin liittyviin ehdotuksiin (script.js
+         etsiSiltojaKurssille()). -->
+    <p class="section-link" id="opinto-kurssi-silta-linkki" style="display:none"><span class="silta-ikoni"></span><span id="opinto-kurssi-silta-teksti">Tarkista sillat (tämä kurssi)</span></p>
 
     <hr class="divider">
 
@@ -504,11 +522,6 @@
     <hr class="divider">
 
     <div class="section-title">🧭 Aiheet</div>
-
-    <!-- Kurssikontekstinen materiaalin sisääntulo (2026-08-10, ks.
-         HYTTI_SPEKSI.md §3.4/§8.3) — vie Laituriin TIETÄEN jo mihin
-         kurssiin materiaali kuuluu, ks. avaaLaiturinMateriaalille(). -->
-    <button class="dialog-btn dialog-btn-cancel" id="opinto-lisaa-materiaalia-btn" style="margin-bottom:10px">+ Lisää materiaalia</button>
 
     <ul class="list" id="opinto-aihe-lista"></ul>
     <p class="section-empty" id="opinto-aihe-tyhja" style="display:none">Ei vielä aiheita.</p>
@@ -889,6 +902,10 @@
     <div class="settings-row">
       <span>Siltasolmun ikkuna sulkeutuu N päivää ennen aikaisinta viittaavaa deadlinea</span>
       <input type="number" class="settings-numero-input" id="silta-puskuri-input" min="0" step="1">
+    </div>
+    <div class="settings-row">
+      <span>Automaattinen siltatarkistus (jos ei käsin tehty) N päivän kuluttua kurssin lisäyksestä, kerran per kurssi</span>
+      <input type="number" class="settings-numero-input" id="sillat-auto-paivia-input" min="1" step="1">
     </div>
     <div class="settings-row">
       <span>Kiireellisyyden leviäminen tarvitsee-kaarten yli, enintään N askelta</span>

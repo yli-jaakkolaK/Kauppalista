@@ -2818,7 +2818,24 @@ h1 {
   letter-spacing: normal;
   cursor: pointer;
   font-size: 13px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
 }
+
+/* Siltasolmujen oma kuvake (2026-08-16) — korvaa 🌉-emojin, joka ei
+   renderöitynyt tunnistettavana pienessä koossa (Katrin huomio: "miksi
+   puhelin kun puhutaan sillasta"). currentColor periytyy vanhemmalta
+   tekstiväriltä, sama --accent kaikkialla missä ikoni esiintyy. */
+.silta-ikoni {
+  display: inline-flex;
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+  vertical-align: middle;
+  margin-bottom: 2px;
+}
+.silta-ikoni svg { width: 100%; height: 100%; }
 
 .opinto-deadline-lisays {
   display: flex;
@@ -2966,6 +2983,24 @@ h1 {
   padding: 10px 12px; margin-bottom: 8px;
 }
 #opinto-aihe-lista.list li span:first-child { font-family: var(--fontti-loki); color: var(--muste); flex: 1; min-width: 0; }
+
+/* Kurssin materiaalilista (2026-08-16) — sama luettava-pinta kuin Aiheilla,
+   status näkyy pienenä vihjeenä (⏳ odottaa / ✓ käsitelty) rivin lopussa. */
+#opinto-materiaali-lista.list li {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 8px;
+  background: var(--paperi); border: 1px solid var(--hius); border-radius: var(--r-luettava);
+  padding: 10px 12px; margin-bottom: 8px;
+}
+#opinto-materiaali-lista.list li span:first-child { font-family: var(--fontti-loki); color: var(--muste); flex: 1; min-width: 0; }
+.opinto-materiaali-tila {
+  font-size: 11px;
+  letter-spacing: 0.02em;
+  color: var(--muted);
+  white-space: nowrap;
+}
+.opinto-materiaali-tila.kasitelty {
+  color: var(--accent);
+}
 
 /* Siltatunnistuksen esikatselu (2026-08-05, ks. muistiinpanot.md
    "Siltasolmut") — rivi kerrallaan hyväksyntä, sama dialog-box/list-runko
