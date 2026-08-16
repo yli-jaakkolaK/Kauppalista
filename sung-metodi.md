@@ -4,6 +4,8 @@
 jota Satama käyttää ohjeiden generointiin. Väliaikainen ratkaisu, kunnes Laiturin
 materiaalin sisääntulo on rakennettu ja tieto tulee sisään sitä kautta.
 
+**Alkuperäinen lähde (Katrin löytämä, 2026-08-16):** https://cdn.prod.website-files.com/682d03999cd54259836f1a8e/6837d5fc8d384e89e874cc04_Report-on-Learning-August-2022.pdf — tämä on se ~70-sivuinen PDF jota käytetään Laiturin materiaalin sisääntulopipelinen (§3) live-testinä.
+
 **Lisäysohje:** uudet faktat lisätään oikean otsikon alle merkinnällä `[S]` tai `[A]`.
 Ristiriitaista tietoa ei korvata äänettömästi — merkitse molemmat ja lisää huomautus.
 

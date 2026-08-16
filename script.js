@@ -7767,7 +7767,7 @@ async function paivitaLaituriSijoittamattaTeksti() {
 // vain ketjun UUSIN segmentti näkyy täällä, ks. piirraLaituriRivi.
 async function lataaLaituri(hakusana) {
   paivitaLaituriSijoittamattaTeksti();
-  let kysely = db.from('laituri').select('id, content, created_at, user_id, status, placed_where, teema_id, koti_tyyppi, koti_kohde_id, koti_kohde_nimi, koti_segmentti_valunut, piilota_laiturista').neq('status', 'arkistoitu').is('teema_id', null).eq('piilota_laiturista', false).order('created_at', { ascending: false });
+  let kysely = db.from('laituri').select('id, content, created_at, user_id, status, placed_where, teema_id, koti_tyyppi, koti_kohde_id, koti_kohde_nimi, koti_segmentti_valunut, piilota_laiturista, materiaali_kurssi_id, materiaali_kurssi_nimi, visibility').neq('status', 'arkistoitu').is('teema_id', null).eq('piilota_laiturista', false).order('created_at', { ascending: false });
   if (hakusana) {
     kysely = kysely.ilike('content', '%' + hakusana + '%');
   }
@@ -7894,7 +7894,11 @@ async function lataaLaituri(hakusana) {
     meta.textContent = kuka + ' · ' + aika +
       (rivi.status === 'sijoitettu' ? ' · → ' + rivi.placed_where : '') +
       (onAnkkuroitu ? ' · ⚓ ankkurissa' : '') +
-      (rivi.koti_tyyppi ? ' · 🏠 koti: ' + rivi.koti_kohde_nimi : '');
+      (rivi.koti_tyyppi ? ' · 🏠 koti: ' + rivi.koti_kohde_nimi : '') +
+      // Yksityisyyskorjaus (2026-08-16, sql/118): merkki näkyy VAIN
+      // omistajalle itselleen — kumppani ei koskaan näe riviä ollenkaan
+      // (RLS suodattaa sen pois kokonaan), joten sekaannusvaaraa ei ole.
+      (rivi.visibility === 'private' ? ' · 🔒 vain sinä' : '');
     sisalto.appendChild(meta);
 
     li.appendChild(sisalto);
@@ -9292,24 +9296,43 @@ function naytaakoKurssimateriaalilta(teksti) {
 // Kurssikontekstinen materiaalin sisääntulo (2026-08-10, ks. HYTTI_SPEKSI.md
 // §8.3, CODE_vaihe1_vastaukset.md) — "+ Lisää materiaalia" kurssinäkymässä
 // vie Laituriin TIETÄEN jo mihin kurssiin materiaali kuuluu. Kun tämä on
-// asetettu: (1) materiaaliKohdeUudetRivit-joukkoon lisätyt rivit ohittavat
-// naytaakoKurssimateriaalilta()-heuristiikan kokonaan (spekin sana: se on
-// arvaus jota EI tarvita kun kurssi on jo tiedossa), (2) jäsennysdialogin
-// kurssi-nimikenttä esitäytetään ja lukitaan (käyttäjän ei tarvitse kirjoittaa
-// sitä). Ei vaikuta MIHINKÄÄN muuhun Laiturin riviin — vain juuri tässä
-// kontekstissa lisättyihin uusiin riveihin (materiaaliKohdeUudetRivit).
+// asetettu, jokainen sillä hetkellä lisättävä rivi (teksti TAI tiedosto)
+// merkitään SUORAAN TIETOKANTAAN (laituri.materiaali_kurssi_id/_nimi,
+// sql/117) — EI enää client-muistivaraiseen Settiin (BUGIKORJAUS
+// 2026-08-16: vanha materiaaliKohdeUudetRivit-Set tyhjeni aina
+// peruLaiturinMateriaaliKonteksti()-kutsussa JUURI ENNEN kuin Laiturin
+// näkymä ehti koskaan piirtyä uudelleen editorin sulkemisen jälkeen, joten
+// merkintä ei koskaan ehtinyt vaikuttaa mihinkään — rivit eivät näkyneet
+// tarkistusjonossa eikä kurssin nimi esitäyttynyt jäsennysdialogissa,
+// vaikka data itse tallentui aina oikein). Tietokantaan tallennettu merkintä
+// säilyy sivun uudelleenlatauksen ja näkymänvaihdon yli, kunnes rivi on
+// käsitelty (ks. piirraMateriaaliJasennysKortti/avaaMateriaaliJasennysDialogi).
+// Samalla merkitään rivi YKSITYISEKSI (visibility='private', sql/118) —
+// TOINEN Katrin löytämä bugi: laituri on tarkoituksella jaettu, avoimen
+// RLS:n taulu (sql/004), joten kurssikohtainen opiskelumateriaali näkyi
+// Juhan Laiturissa asti kunnes Katri ehti luokitella sen. 'private' piilottaa
+// rivin RLS-tasolla kaikilta paitsi lisääjältä itseltään.
 let materiaaliKohdeKurssi = null;
-let materiaaliKohdeUudetRivit = new Set();
 
 function avaaLaiturinMateriaalille(kurssi) {
   materiaaliKohdeKurssi = { id: kurssi.id, name: kurssi.name };
-  materiaaliKohdeUudetRivit = new Set();
   avaaJaettuEditori({ tyyppi: 'laituri', otsikko: '✱ MATERIAALI ✱' });
+}
+
+// Insert-kentät kurssikontekstin materiaalille — sama kolme kenttää
+// jokaisessa kolmesta insert-kohdasta (editorin teksti, tekstitiedosto,
+// pdf/kuva/pptx), ei toistettu ehtologiikkaa kolmesti.
+function materiaaliKohdeInsertKentat() {
+  if (!materiaaliKohdeKurssi) return {};
+  return {
+    materiaali_kurssi_id: materiaaliKohdeKurssi.id,
+    materiaali_kurssi_nimi: materiaaliKohdeKurssi.name,
+    visibility: 'private',
+  };
 }
 
 function peruLaiturinMateriaaliKonteksti() {
   materiaaliKohdeKurssi = null;
-  materiaaliKohdeUudetRivit = new Set();
   paivitaLaiturinMateriaaliBanneri();
 }
 
@@ -9343,13 +9366,18 @@ function piirraMateriaaliJasennysKortti(rivi, li) {
   // Kurssikontekstissa (ks. avaaLaiturinMateriaalille) juuri lisätyt rivit
   // ohittavat heuristiikan kokonaan — kurssi on jo tiedossa napista, ei
   // tarvitse arvata onko teksti kurssimateriaalia (HYTTI_SPEKSI.md §8.3).
-  if (!naytaakoKurssimateriaalilta(rivi.content) && !materiaaliKohdeUudetRivit.has(rivi.id)) return;
+  // Pysyvä tietokantamerkintä (materiaali_kurssi_id, sql/117), EI enää
+  // client-muistivarainen — ks. avaaLaiturinMateriaalille()-kommentti.
+  if (!naytaakoKurssimateriaalilta(rivi.content) && !rivi.materiaali_kurssi_id) return;
 
   const kortti = document.createElement('li');
   kortti.className = 'laituri-ehdotus-rivi';
 
   const teksti = document.createElement('span');
-  teksti.textContent = 'Näyttää kurssimateriaalilta (aikataulu/deadlinet)';
+  // Kurssikontekstissa tämä on TIEDETTY asia, ei heuristiikan arvaus.
+  teksti.textContent = rivi.materiaali_kurssi_id
+    ? 'Materiaalia kurssille: ' + rivi.materiaali_kurssi_nimi
+    : 'Näyttää kurssimateriaalilta (aikataulu/deadlinet)';
   kortti.appendChild(teksti);
 
   const napit = document.createElement('span');
@@ -9432,8 +9460,11 @@ function avaaMateriaaliJasennysDialogi(rivi, jasennetty) {
   const kurssiInput = document.getElementById('materiaali-jasennys-kurssi-input');
   // Kurssikontekstissa (ks. avaaLaiturinMateriaalille) kurssi on jo tiedossa
   // — käyttäjän ei tarvitse kirjoittaa/tarkistaa sitä (HYTTI_SPEKSI.md §8.3).
-  kurssiInput.value = materiaaliKohdeKurssi ? materiaaliKohdeKurssi.name : (jasennetty.kurssi_nimi || '');
-  kurssiInput.disabled = !!materiaaliKohdeKurssi;
+  // Luetaan RIVILTÄ (materiaali_kurssi_nimi, sql/117), ei materiaaliKohdeKurssi-
+  // muuttujasta — se on jo nollattu tähän mennessä (rivi voi tulla auki myös
+  // myöhemmin, eri istunnossa, kuin milloin se lisättiin).
+  kurssiInput.value = rivi.materiaali_kurssi_id ? rivi.materiaali_kurssi_nimi : (jasennetty.kurssi_nimi || '');
+  kurssiInput.disabled = !!rivi.materiaali_kurssi_id;
 
   const aiheLista = document.getElementById('materiaali-jasennys-aihe-lista');
   aiheLista.innerHTML = '';
@@ -9444,6 +9475,7 @@ function avaaMateriaaliJasennysDialogi(rivi, jasennetty) {
     const checkbox = document.createElement('input');
     checkbox.type = 'checkbox';
     checkbox.checked = true;
+    checkbox.className = 'materiaali-jasennys-checkbox';
     li.appendChild(checkbox);
     const nimiInput = document.createElement('input');
     nimiInput.type = 'text';
@@ -9469,6 +9501,7 @@ function avaaMateriaaliJasennysDialogi(rivi, jasennetty) {
     const checkbox = document.createElement('input');
     checkbox.type = 'checkbox';
     checkbox.checked = true;
+    checkbox.className = 'materiaali-jasennys-checkbox';
     li.appendChild(checkbox);
     const pvmInput = document.createElement('input');
     pvmInput.type = 'date';
@@ -9511,8 +9544,18 @@ async function tallennaMateriaaliJasennys(rivi) {
   const kurssiNimi = document.getElementById('materiaali-jasennys-kurssi-input').value.trim();
   if (!kurssiNimi) { naytaIlmoitus('Anna kurssin nimi.'); return; }
 
-  const { data: kurssi, error: kurssiError } = await haeTaiLuoOpintoKurssiNimella(kurssiNimi);
-  if (ilmoitaKirjoitusvirheesta(kurssiError, 'Kurssin haku/luonti')) return;
+  // Kurssikontekstissa kurssi on jo TIEDETTY (rivi.materiaali_kurssi_id) —
+  // käytetään sitä suoraan, ei nimihakua (kenttä on lukittu eikä käyttäjä
+  // voi muuttaa sitä, joten nimi täsmäisi joka tapauksessa, mutta id on
+  // täsmällisempi eikä riipu nimen täsmäävyydestä).
+  let kurssi;
+  if (rivi.materiaali_kurssi_id) {
+    kurssi = { id: rivi.materiaali_kurssi_id };
+  } else {
+    const { data, error: kurssiError } = await haeTaiLuoOpintoKurssiNimella(kurssiNimi);
+    if (ilmoitaKirjoitusvirheesta(kurssiError, 'Kurssin haku/luonti')) return;
+    kurssi = data;
+  }
 
   const valitutAiheet = Array.from(document.getElementById('materiaali-jasennys-aihe-lista').children)
     .filter(function(li) { return li._checkbox.checked && li._nimiInput.value.trim(); })
@@ -10830,17 +10873,16 @@ async function tallennaEditoriJaSulje() {
     return;
   }
 
-  // .select().single() (2026-08-10, ks. HYTTI_SPEKSI.md §8.3): tarvitaan
-  // uuden rivin id materiaaliKohdeUudetRivit-merkintää varten kun ollaan
-  // kurssin "+ Lisää materiaalia" -kontekstissa, ks. alla.
-  const { data: uusiRivi, error } = await db.from('laituri').insert({ user_id: currentUserId, content: teksti }).select().single();
+  const { error } = await db.from('laituri').insert(Object.assign(
+    { user_id: currentUserId, content: teksti },
+    materiaaliKohdeInsertKentat()
+  ));
   // "Ei koskaan kadota ajatusta" -periaate koskee myös epäonnistunutta
   // kirjoitusta: luonnosta EI tyhjennetä eikä editoria suljeta jos kirjoitus
   // ei onnistunut, muuten juuri se turvaverkko (localStorage-luonnos)
   // katoaisi samalla hetkellä kun sille olisi eniten tarvetta (ks.
   // muistiinpanot.md "Kirjoituspolkujen auditointi").
   if (ilmoitaKirjoitusvirheesta(error, 'Laituri-lisäys')) return;
-  if (materiaaliKohdeKurssi && uusiRivi) materiaaliKohdeUudetRivit.add(uusiRivi.id);
   tyhjennaEditoriLuonnos();
   peruLaiturinMateriaaliKonteksti();
   palaaLaituriin();
@@ -10948,9 +10990,11 @@ async function kasitteleEditoriTiedosto(file) {
         naytaEditoriTiedostoTila('Tiedosto ei näytä olevan tekstiä (binääridataa?) — ei lisätty.', true);
         return;
       }
-      const { data: uusiRivi, error } = await db.from('laituri').insert({ user_id: currentUserId, content: teksti }).select().single();
+      const { error } = await db.from('laituri').insert(Object.assign(
+        { user_id: currentUserId, content: teksti },
+        materiaaliKohdeInsertKentat()
+      ));
       if (ilmoitaKirjoitusvirheesta(error, 'Tiedoston lisäys')) return;
-      if (materiaaliKohdeKurssi && uusiRivi) materiaaliKohdeUudetRivit.add(uusiRivi.id);
       naytaEditoriTiedostoTila('"' + file.name + '" lisätty.', false);
       return;
     }
@@ -10994,9 +11038,11 @@ async function kasitteleEditoriTiedosto(file) {
     }
 
     const muruSisalto = tyyppi === 'kuva' ? '📷 ' + file.name : (poimittuTeksti || '📎 ' + file.name);
-    const { data: uusiRivi, error: muruError } = await db.from('laituri').insert({ user_id: currentUserId, content: muruSisalto }).select().single();
+    const { data: uusiRivi, error: muruError } = await db.from('laituri').insert(Object.assign(
+      { user_id: currentUserId, content: muruSisalto },
+      materiaaliKohdeInsertKentat()
+    )).select().single();
     if (ilmoitaKirjoitusvirheesta(muruError, 'Tiedoston lisäys')) return;
-    if (materiaaliKohdeKurssi && uusiRivi) materiaaliKohdeUudetRivit.add(uusiRivi.id);
 
     const { error: tiedostoError } = await db.from('laituri_tiedostot').insert({
       muru_id: uusiRivi.id,

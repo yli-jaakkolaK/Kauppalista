@@ -2411,6 +2411,12 @@ h1 {
   border-top: 1px dashed var(--border-dash);
   border-bottom: 1px dashed var(--border-dash);
   padding: 28px 20px;
+  /* BUGIKORJAUS (2026-08-16, Katrin löydös): pitkä sisältö (esim. 10
+     siltasolmu-ehdotusta) venytti laatikon yli näytön korkeuden ilman että
+     mikään koko dialogissa vieri — hyväksyntänapit jäivät tavoittamattomiin.
+     `.dialog-overlay`:n 24px padding molemmin puolin huomioitu laskussa. */
+  max-height: calc(100vh - 48px);
+  overflow-y: auto;
 }
 
 .dialog-title {
@@ -2974,6 +2980,17 @@ h1 {
   display: flex;
   align-items: center;
   gap: 8px;
+}
+/* Katrin väripalettihuomio (2026-08-16): natiivi checkbox näytti selaimen
+   omaa sinistä, joka ei ole Sataman paletissa eikä sillä ole tässä mitään
+   merkitystasoa (ei virhe/onnistuminen) — sama neutraali --accent (sinapin
+   sävyinen messinki) kuin muillakin valintaruuduilla (.valinta-checkbox). */
+.silta-ehdotus-checkbox,
+.materiaali-jasennys-checkbox {
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+  accent-color: var(--accent);
 }
 .silta-ehdotus-nimi-input {
   flex: 1;
