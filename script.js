@@ -704,6 +704,30 @@ async function lataaListatNakymaan(containerId, kategoria) {
     item.appendChild(teksti);
 
     if (lista.name !== 'Kauppalista') {
+      // Kategorian vaihto NÄKYVÄKSI listauksessa (2026-08-17, Katrin
+      // huomio: "ei käy niin helposti että intuitiivisesti löytäisin
+      // mistä se tehdään") — sama toiminto oli aiemmin VAIN listan sisällä
+      // ⚙️-asetusten takana (move-category-btn), ei näkynyt mistään ennen
+      // kuin lista avasi. VAIN normal-tyyppisille (sama rajaus kuin
+      // vanhalla move-category-btn:lla, joka ei koskaan ollut tavoitettavissa
+      // teema/vahdittu-listoilta niiden omien, erillisten näkymien takia).
+      if (lista.list_type === 'normal') {
+        const siirtoNappi = document.createElement('button');
+        siirtoNappi.textContent = '⇄';
+        siirtoNappi.className = 'edit-btn';
+        siirtoNappi.title = kategoria === 'varasto' ? 'Siirrä Muistilappuihin' : 'Siirrä Varastoon';
+        siirtoNappi.addEventListener('click', async function(e) {
+          e.stopPropagation();
+          const uusiKategoria = kategoria === 'varasto' ? 'muistilaput' : 'varasto';
+          const { error } = await db.from('lists').update({ category: uusiKategoria }).eq('id', lista.id);
+          if (ilmoitaKirjoitusvirheesta(error, 'Kategorian vaihto')) return;
+          logEvent(uusiKategoria === 'varasto' ? 'moved_to_varasto' : 'moved_to_muistilaput', 'list', lista.id, lista.name, lista.id);
+          naytaIlmoitus('Siirretty: ' + (uusiKategoria === 'varasto' ? 'Varastoon' : 'Muistilappuihin'));
+          paivitaNakyma();
+        });
+        item.appendChild(siirtoNappi);
+      }
+
       const muokkausNappi = document.createElement('button');
       muokkausNappi.textContent = '✎';
       muokkausNappi.className = 'edit-btn';
@@ -754,8 +778,32 @@ async function avaaTeemaView(lista) {
   document.getElementById('teema-title').textContent = '✱ ' + lista.name + ' ✱';
   paivitaSovittuLinjaNaytto();
   paivitaTeemaPriorityNapit();
+  paivitaTeemaNakyvyysNappi();
   await lataaTeemaSisalto();
 }
+
+// Näkyvyystoggeli (2026-08-17, Katrin pyyntö: "varaston listat olis hyvä
+// saada myös yksityiseksi") — teema/vahdittu-tyyppisillä listoilla ei ollut
+// MITÄÄN tapaa vaihtaa lists.visibility:tä (luodaan aina 'shared':na, ks.
+// new-varasto-btn), toisin kuin normaali-tyyppisillä listoilla joilla on jo
+// tämä sama toggeli olemassa olevan #settings-btn:n kautta (paivitaNakyvyysIkoni).
+// Sama 🔒/👥-merkkikäytäntö kuin siellä.
+function paivitaTeemaNakyvyysNappi() {
+  const nappi = document.getElementById('teema-nakyvyys-btn');
+  const jaettu = currentTeema.visibility === 'shared';
+  nappi.textContent = jaettu ? '👥' : '🔒';
+  nappi.title = jaettu ? 'Näkyy molemmille — napauta tehdäksesi yksityiseksi' : 'Näkyy vain sinulle — napauta jakaaksesi';
+}
+
+document.getElementById('teema-nakyvyys-btn').addEventListener('click', async function() {
+  if (!currentTeema) return;
+  const uusi = currentTeema.visibility === 'shared' ? 'private' : 'shared';
+  const { error } = await db.from('lists').update({ visibility: uusi }).eq('id', currentTeema.id);
+  if (ilmoitaKirjoitusvirheesta(error, 'Näkyvyyden muutos')) return;
+  currentTeema.visibility = uusi;
+  paivitaTeemaNakyvyysNappi();
+  naytaIlmoitus(uusi === 'shared' ? 'Näkyy nyt molemmille' : 'Näkyy nyt vain sinulle');
+});
 
 function paivitaSovittuLinjaNaytto() {
   const teksti = document.getElementById('teema-sovittu-linja-teksti');
@@ -933,8 +981,27 @@ async function avaaVahdittuView(lista) {
   showVahdittuView();
   document.getElementById('vahdittu-title').textContent = '✱ ' + lista.name + ' ✱';
   document.getElementById('vahdittu-raja-input').value = lista.vahdittu_raja_paivia;
+  paivitaVahdittuNakyvyysNappi();
   await lataaVahdittuSisalto();
 }
+
+// Sama näkyvyystoggeli kuin Teemalla — ks. paivitaTeemaNakyvyysNappi()-kommentti.
+function paivitaVahdittuNakyvyysNappi() {
+  const nappi = document.getElementById('vahdittu-nakyvyys-btn');
+  const jaettu = currentVahdittu.visibility === 'shared';
+  nappi.textContent = jaettu ? '👥' : '🔒';
+  nappi.title = jaettu ? 'Näkyy molemmille — napauta tehdäksesi yksityiseksi' : 'Näkyy vain sinulle — napauta jakaaksesi';
+}
+
+document.getElementById('vahdittu-nakyvyys-btn').addEventListener('click', async function() {
+  if (!currentVahdittu) return;
+  const uusi = currentVahdittu.visibility === 'shared' ? 'private' : 'shared';
+  const { error } = await db.from('lists').update({ visibility: uusi }).eq('id', currentVahdittu.id);
+  if (ilmoitaKirjoitusvirheesta(error, 'Näkyvyyden muutos')) return;
+  currentVahdittu.visibility = uusi;
+  paivitaVahdittuNakyvyysNappi();
+  naytaIlmoitus(uusi === 'shared' ? 'Näkyy nyt molemmille' : 'Näkyy nyt vain sinulle');
+});
 
 async function lataaVahdittuSisalto() {
   if (!currentVahdittu) return;

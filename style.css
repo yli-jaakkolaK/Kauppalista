@@ -143,6 +143,16 @@ h1 {
   text-overflow: ellipsis;
 }
 
+/* Kaksi oikean laidan nappia samassa 44px-ruudukkosarakkeessa (2026-08-17,
+   Teema-näkyvyystoggeli 🗑:n viereen) — sallitaan ylivuoto sarakkeen yli
+   sen sijaan että napit pienennettäisiin alle kosketusaluevaatimuksen. */
+.list-header-oikea {
+  grid-column: 3;
+  display: flex;
+  justify-content: flex-end;
+  gap: 2px;
+}
+
 .back-btn {
   grid-column: 1;
   min-width: 44px;
