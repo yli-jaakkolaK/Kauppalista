@@ -3703,9 +3703,33 @@ sw.js v124 → v125 (script.js muuttui).
 
 ---
 
-## Nykytila ja seuraavat askeleet (päivitetty 2026-08-12, COPILOT.md-sääntö 4)
+### Varaston "listat" → Muistikirja + aikaleimanäyttö kolmeen listatyyppiin (2026-08-16, ks. KONSEPTIKIRJA.md 4.12)
 
-**Viimeksi tehty** (tämä istunto, kaikki commitoitu ja pushattu mainiin, `sw.js` nyt v126): koko "Ruori — visuaalinen uudistus" -speksi ja `CODE_vaihe1b.md` (Hytti-vaihe 1b) rakennettu kokonaan, kolme jälkikorjauskierrosta elävästä testauksesta (alapalkki/ankkurinappi, kuormakytkin/Kalenteri/Reitti/sade, Ruorin kiinnitys), **deploy-pipeline korjattu** (ks. yllä) — tuotanto oli ollut jumissa yli vuorokauden — ja sen jälkeen alapalkin Kalenterikuvake korvattu navigointiruudukon täsmälleen samalla kuvakkeella (ks. alla).
+Katrin pyyntö: Varaston "listat" muuttuu puhtaaksi lokiksi (ei täppää), nimetään "Muistikirja", ja sama aikaleimanäyttö laajenee Teemaan ja Vahdittuun. Spekissä oli yksi avoin päätöskohta ennen rakentamista: erottuuko Varaston "listat"-käyttö (`list_type='normal'`) jo jotenkin oikeista täppäystä tarvitsevista listoista (esim. Kauppalista), vai tarvitaanko uusi lippu.
+
+**Koodikatselmointi ratkaisi AUKON ilman uutta saraketta:** täpän/⚓:n/muistutuksen piilotus oli JO tuotannossa olemassa aiemmasta "Rivien UI-remontti" -erästä, mutta ei `list_type`-kohtaisesti — ehto on `lists.category === 'varasto'` (`script.js`, `isVarasto`-muuttuja rivin piirrossa). Tämä piilottaa kaikki toiminnot KAIKILTA Varaston riveiltä list_typeista riippumatta, ja Kauppalista + muut oikeat tehtävälistat elävät `category='muistilaput'`-puolella eivätkä siis koskaan olleet vaarassa. Todennettu myös konkreettisesti: pakkauslistat (telttaretki/viikon reissu) jotka sql/088:ssa siirrettiin takaisin `list_type='normal'`-muotoon nimenomaan täppäystä varten ovat SILTI `category='varasto'`, joten nekään eivät näytä täppää — ne herätetään "Luo kopio" -toiminnolla Muistilappuihin periaatteen 7 mukaisesti, eikä täpätä paikallaan Varastossa. Ei siis ollut mitään ristiriitaa ratkaistavana, eikä kysymystä Katrilta tarvittu.
+
+**Jäljelle jäänyt työ oli puhdasta UI:ta:**
+- Nimenmuutos: `index.html`-napin teksti "📋 Lista" → "📓 Muistikirja", uuden Muistikirjan input-placeholder "uuden muistikirjan nimi...", ja 📓-etuliite Varasto-listauksen riveille (`lataaListatNakymaan`, VAIN kun `kategoria==='varasto' && list_type==='normal'` — Muistilaput-listat eivät saa etuliitettä).
+- Aikaleima puuttui kokonaan Muistikirja-riveiltä (vanha `bought_at`-näyttöehto oli `tuote.tehty && tuote.bought_at`, eikä täppää enää käytetä Varastossa — ehto ei siis koskaan lauennut). Korjattu: `isVarasto`-haarassa näytetään aina `created_at` `muotoileAikaleima()`-apufunktiolla (uusi, `paivamaaraISO()`:n vieressä).
+- Vahdittu-lepo (`lataaVahdittuSisalto`) ei näyttänyt aikaleimaa lainkaan — lisätty samalla apufunktiolla, vahditun oma täppä/kuittausmekanismi koskematta (se on eri mekanismi kuin Muistikirjan täpän poisto, ks. 4.10b 2e).
+- Teema (`lataaTeemaSisalto`) näytti jo `created_at`:n mutta vain päivänä ilman kellonaikaa — yhtenäistetty samaan pv.kk.vvvv tt:mm-muotoon muiden kanssa ("sama aikaleimanäyttö", spekin oma sanamuoto).
+
+**Koti-valuminen (§4.10b, sql/087) vahvistettu koodista toimivaksi Muistikirja-kohteille ilman erillistä korjausta:** `kirjoitaSegmenttiKotiin()` kirjoittaa `tuotteet`-riville aina `tehty:false` `list_type`/`category`-riippumatta — data oli siis aina oikein, se vain ei koskaan NÄKYNYT väärin koska täppää ei näytetä Varaston puolella eikä ole koskaan näyttänyt (isVarasto-portti edeltää tätä erää). Spekin oletus että koti-valuminen "ei toimi täysin oikein ennen §4.12:ta" ei siis pitänyt paikkaansa — kyse oli näkyvästä aukosta vain aikaleimassa, ei täpässä.
+
+**Tietoisesti rajattu pois:** bussikorttiseuranta-esimerkin älyheuristiikka (saldon karkea päättely riveistä/euromääristä) — spekissä se on käyttötapausesimerkki aikaleiman hyödystä, ei oma pyydetty ominaisuus.
+
+**Ei SQL-migraatiota:** `created_at` oli jo olemassa `tuotteet`- ja `laituri`-tauluilla ennestään (tarkistettu Supabasesta `list_tables`-työkalulla), pelkkä UI-näyttö riitti.
+
+**Ei vielä testattu oikealla laitteella.**
+
+sw.js v126 → v127.
+
+---
+
+## Nykytila ja seuraavat askeleet (päivitetty 2026-08-16, COPILOT.md-sääntö 4)
+
+**Viimeksi tehty** (tämä istunto, kaikki commitoitu ja pushattu mainiin, `sw.js` nyt v127): koko "Ruori — visuaalinen uudistus" -speksi ja `CODE_vaihe1b.md` (Hytti-vaihe 1b) rakennettu kokonaan, kolme jälkikorjauskierrosta elävästä testauksesta (alapalkki/ankkurinappi, kuormakytkin/Kalenteri/Reitti/sade, Ruorin kiinnitys), **deploy-pipeline korjattu** (ks. yllä) — tuotanto oli ollut jumissa yli vuorokauden — alapalkin Kalenterikuvake korvattu navigointiruudukon täsmälleen samalla kuvakkeella, ja tuoreimpana Varaston "listat" → Muistikirja-nimenmuutos + aikaleimanäyttö kolmeen listatyyppiin (ks. yllä, KONSEPTIKIRJA.md 4.12).
 
 ### Alapalkin Kalenterikuvake = ruudukon kuvake (2026-08-12)
 
@@ -3722,9 +3746,10 @@ Katrin pyyntö: alapalkin Kalenteri-tabi näyttäisi täsmälleen saman kuvakkee
 
 **Auki jäänyt, odottaa Katrin vastausta ennen rakentamista** (ei koodattu, koska väärä arvaus olisi tässä pahempi kuin kysyminen):
 1. Kalenterin kuittaus omille lisäyksille — todennäköisesti `kalenteri_tekijat`-taulun puuttuva/väärä organizer-kartoitus perhekalenterille, ei koodibugi. Katrin pitää tarkistaa taulun sisältö Supabasen Table Editorista.
-2. Varasto/"vahdittu" — Katri haluaa listan sijaan otsikko+aikaleimattu-lokimalli (esim. bussikortin saldohistoria). Ei skoopattu.
-3. Laiturin jatkosäie — nykyinen `valutaVanhatSegmentitKotiin()` vaatii AINA manuaalisesti asetetun kodin ennen kuin mikään valuu Varastoon; Katrin kuvaus ("säie tulee → muru menee automaattisesti Varastoon") viittaa siihen että hän odottaa automaattista laukaisua. Kysytty, ei vielä vastausta.
+2. Laiturin jatkosäie — nykyinen `valutaVanhatSegmentitKotiin()` vaatii AINA manuaalisesti asetetun kodin ennen kuin mikään valuu Varastoon; Katrin kuvaus ("säie tulee → muru menee automaattisesti Varastoon") viittaa siihen että hän odottaa automaattista laukaisua. Kysytty, ei vielä vastausta.
+
+(Entinen kohta 2, "Varasto/vahdittu haluaa otsikko+aikaleimattu-lokimallin" — rakennettu 2026-08-16 KONSEPTIKIRJA.md 4.12:na, poistettu tästä listasta.)
 
 **Tunnettu, ei korjattavissa koodilla:** haptiikka (`navigator.vibrate`) ei toimi iOS Safarissa, alustarajoitus — koodi on oikein, laite ei vain tue APIa.
 
-**Testaamatta koko istunnon ajalta** (ei mitään tässä istunnossa rakennetusta ole testattu oikealla laitteella/kirjautumisella — kaikki rakenteellisesti/syntaktisesti validoitu, ei elävästi): koko Ruori-korjauskierros, Vaihe 1b kokonaisuudessaan (välilehdet, editori, tiedostojen tuonti), parisuhdeajan muokkaus, alapalkin/ankkurinapin jälkikorjaukset, tämän erän kuusi korjausta + Ruorin kiinnitys. **Seuraava luonnollinen askel on siis elävä testaus + kolmen migraation ajaminen**, ei uusi rakentaminen, ellei Katri anna uutta työtä.
+**Testaamatta koko istunnon ajalta** (ei mitään tässä istunnossa rakennetusta ole testattu oikealla laitteella/kirjautumisella — kaikki rakenteellisesti/syntaktisesti validoitu, ei elävästi): koko Ruori-korjauskierros, Vaihe 1b kokonaisuudessaan (välilehdet, editori, tiedostojen tuonti), parisuhdeajan muokkaus, alapalkin/ankkurinapin jälkikorjaukset, aiempien erien kuusi korjausta + Ruorin kiinnitys, ja tuorein Varaston Muistikirja-nimenmuutos + aikaleimanäyttö (Muistikirja/Teema/Vahdittu). **Seuraava luonnollinen askel on siis elävä testaus + kolmen migraation ajaminen**, ei uusi rakentaminen, ellei Katri anna uutta työtä.

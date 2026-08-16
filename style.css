@@ -1509,12 +1509,19 @@ h1 {
   padding: 6px 0;
 }
 
-.list li.varasto-rivi span {
+.list li.varasto-rivi span:not(.history-time) {
   flex: 1;
   min-width: 0;
   white-space: normal;
   word-break: break-word;
   padding: 6px 0;
+}
+
+/* 4.12: Muistikirja-rivien aikaleima ei saa venyä tekstin mukana kuten
+   `.list li.varasto-rivi span` muuten pakottaisi — pysyy kompaktina samaan
+   tapaan kuin `.history-time` muuallakin. */
+.list li.varasto-rivi .history-time {
+  flex: 0 0 auto;
 }
 
 .list li.varasto-rivi .overflow-btn {

@@ -699,7 +699,8 @@ async function lataaListatNakymaan(containerId, kategoria) {
     });
 
     const teksti = document.createElement('span');
-    teksti.textContent = (lista.list_type === 'teema' ? '🧵 ' : lista.list_type === 'vahdittu' ? '⏳ ' : '') + lista.name;
+    const varastoMuistikirja = kategoria === 'varasto' && lista.list_type === 'normal';
+    teksti.textContent = (lista.list_type === 'teema' ? '🧵 ' : lista.list_type === 'vahdittu' ? '⏳ ' : varastoMuistikirja ? '📓 ' : '') + lista.name;
     item.appendChild(teksti);
 
     if (lista.name !== 'Kauppalista') {
@@ -874,8 +875,7 @@ async function lataaTeemaSisalto() {
     sisalto.appendChild(teksti);
     const meta = document.createElement('span');
     meta.className = 'laituri-meta';
-    const d = new Date(muru.created_at);
-    meta.textContent = d.getDate() + '.' + (d.getMonth() + 1) + '.' + d.getFullYear();
+    meta.textContent = muotoileAikaleima(muru.created_at);
     sisalto.appendChild(meta);
     li.appendChild(sisalto);
 
@@ -961,6 +961,13 @@ async function lataaVahdittuSisalto() {
     const teksti = document.createElement('span');
     teksti.textContent = tuote.nimi;
     li.appendChild(teksti);
+
+    // 4.12: sama aikaleimanäyttö kuin Muistikirjassa/Teemassa — milloin rivi
+    // on lisätty (ei vahdittu-mekanismin oma "kuittaamatta X pv" -tila).
+    const aikaEl = document.createElement('span');
+    aikaEl.textContent = muotoileAikaleima(tuote.created_at);
+    aikaEl.className = 'history-time';
+    li.appendChild(aikaEl);
 
     const poisto = document.createElement('button');
     poisto.className = 'delete-btn';
@@ -3940,6 +3947,17 @@ function paivitaPaivanOtsikko(otsikkoEl, teksti, rivit, isoPvm, kuormaraja, henk
 
 function paivamaaraISO(d) {
   return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+}
+
+// Sama aikaleimanäyttö (pv.kk.vvvv tt:mm) Varaston kolmelle listatyypille
+// (Muistikirja, Teema, Vahdittu) — KONSEPTIKIRJA.md 4.12.
+function muotoileAikaleima(isoString) {
+  const d = new Date(isoString);
+  return d.getDate().toString().padStart(2, '0') + '.' +
+         (d.getMonth() + 1).toString().padStart(2, '0') + '.' +
+         d.getFullYear() + ' ' +
+         d.getHours().toString().padStart(2, '0') + ':' +
+         d.getMinutes().toString().padStart(2, '0');
 }
 
 // Kuinka pitkälle taaksepäin haetaan tapahtumia, jotta ennen näkyvää
@@ -10325,15 +10343,16 @@ function paivitaNaytto(tuotteet) {
     teksti.textContent = tuote.nimi;
     item.appendChild(teksti);
 
-    if (tuote.tehty && tuote.bought_at) {
-      const d = new Date(tuote.bought_at);
-      const aika = d.getDate().toString().padStart(2, '0') + '.' +
-                   (d.getMonth() + 1).toString().padStart(2, '0') + '.' +
-                   d.getFullYear() + ' ' +
-                   d.getHours().toString().padStart(2, '0') + ':' +
-                   d.getMinutes().toString().padStart(2, '0');
+    if (isVarasto) {
+      // Muistikirja (4.12): ei täppää, joten "tehty" ei koskaan kerro mitään
+      // täällä — rivin aikaleima on aina lisäysaika, ei ostoaika.
       const aikaEl = document.createElement('span');
-      aikaEl.textContent = aika;
+      aikaEl.textContent = muotoileAikaleima(tuote.created_at);
+      aikaEl.className = 'history-time';
+      item.appendChild(aikaEl);
+    } else if (tuote.tehty && tuote.bought_at) {
+      const aikaEl = document.createElement('span');
+      aikaEl.textContent = muotoileAikaleima(tuote.bought_at);
       aikaEl.className = 'history-time';
       item.appendChild(aikaEl);
     }
@@ -11031,7 +11050,7 @@ document.querySelectorAll('.varasto-tyyppi-btn').forEach(function(btn) {
     const input = document.getElementById('new-varasto-input');
     input.placeholder = uusiVarastoTyyppi === 'teema' ? 'uuden teeman nimi...'
       : uusiVarastoTyyppi === 'vahdittu' ? 'uuden vahditun asian nimi...'
-      : 'uusi lista...';
+      : 'uuden muistikirjan nimi...';
   });
 });
 

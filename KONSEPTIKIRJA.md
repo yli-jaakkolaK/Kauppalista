@@ -448,6 +448,28 @@ Copilot-aikaa (iso). Vaihe 1 on itsenäinen ja rakennuskelpoinen heti kun aika s
 
 ---
 
+### 4.12 VARASTON RIVIEN AIKALEIMA + ETENEMÄNÄYTTÖ — RAKENNETTU 2026-08-16 (Katrin pyyntö 2026-08-16, konseptoitu chatissä)
+
+**Mikä:** kolmeen Varaston listatyyppiin (normal/"listat", teema, vahdittu-lepo) pitää saada näkyviin milloin kukin rivi on lisätty, ja miten asia on edennyt — ei vain lisäysaika. `tuotteet`- ja `laituri`-tauluilla on jo `created_at` (sql/001, sql/004) — kyse on siis suureksi osaksi UI-näytöstä, ei uudesta skeemasta, paitsi jos "eteneminen" vaatii oman tilakentän (ks. AUKKO alla).
+
+**"Listat" (list_type='normal') Varastossa — muuttuu puhtaaksi lokiksi:**
+- Ei enää tehty-täppää tässä kontekstissa. Rivit vain kertyvät allekkain aikaleimalla, ei toimintoa niiden "suorittamiseen". Poikkeus: rivin siirto Muistilappuihin (Laituriin) toimii jo, ei koske tätä.
+- **AUKKO — Ehdotus EI HYVÄKSYTTY:** `list_type='normal'` on käytössä myös oikeissa tehtävälistoissa jotka TARVITSEVAT täpän (esim. kauppalistat) — täppää ei voi poistaa globaalisti kaikilta normal-listoilta. Koodikatselmoinnissa selvitettävä erottuuko Varaston "listat"-käyttö jo jotenkin (oma näkymä/kategoria?) muista normal-listoista; jos ei, tarvitaan kevyt lippu listalle (esim. oma `naytostyyli`-sarake) ennen kuin täppä voidaan piilottaa vain oikeasta kontekstista. Ei toteuteta ilman Katrin kuittausta jos ratkaisu ei ole yksiselitteinen.
+- **Nimi päätetty (Katri 2026-08-16): "listat" → "Muistikirja".** Vanha "listat"-nimi sekoittui helposti muihin listatyyppeihin nyt kun käyttäytyminen erkanee niistä; "Loki" oli myös harkinnassa mutta se on jo varattu Hytin omalle välilehdelle (§4.11-alue), joten hylätty päällekkäisyyden vuoksi.
+- **Esimerkkikäyttötapaus (bussikorttiseuranta):** vapaamuotoiset rivit sekaisin, esim. "Jamielin bussikortilla 9e" (saldolukema) tai "tänään Jamielin bussikortille ladattu 30e" (lataus). Ei erillistä kulutuskirjausta per matka — sitä EI dokumentoida eikä haluta dokumentoida. Äly voi rivien aikaleimoista/väleistä ja teksteistä poimituista euromääristä päätellä KARKEASTI (ei tarkkaa, nyrkkisääntö riittää) milloin saldo alkaa olla vähissä ja ehdottaa tarkistusta — sama kolmiporras-ehdotusmalli kuin muualla sovelluksessa (ei koskaan pakota, vain ehdottaa).
+
+**Teema ja vahdittu-lepo:** sama aikaleimanäyttö laajennettava myös näihin kahteen listatyyppiin. **Täsmennetty (Katri 2026-08-16): "eteneminen" ei tarkoita mitään erillistä tila/statuskenttää — riittää että näkyy milloin kukin rivi on kirjoitettu.** Data on jo olemassa (`created_at`), kyse on pelkästä UI-näytöstä molemmissa.
+
+**Riippuvuus Laiturin koti-valumiseen (§4.10b, sql/087, jo rakennettu):** koti-valuminen kirjoittaa kohteeseen (esim. listat-riville) `tuotteet`-rivin OLETUSARVOISESTI `tehty=false`. Jos kohde on log-tyyppinen "listat", täppä on väärin siellä siihen asti kunnes yllä oleva täpän poisto (tämä §4.12) on rakennettu — koti-valuminen EI siis toimi täysin oikein listat-kohteille ennen tätä. **Rakennusjärjestys: §4.12 ensin, sitten koti-valuminen voidaan vahvistaa toimivaksi listat-kohteille.**
+
+**TOTEUMA 2026-08-16 — AUKKO ratkesi koodikatselmoinnissa ilman uutta lippua:** täpän piilotus oli jo tuotannossa olemassa, mutta EI `list_type`-kohtaisesti vaan `lists.category === 'varasto'` -ehdolla (`script.js` `isVarasto`-portti, "Rivien UI-remontti" -erä ennen tätä istuntoa) — piilottaa täpän/⚓:n/muistutuksen KAIKILTA Varaston riveiltä list_typeista riippumatta, ja koska Kauppalista + muut oikeat tehtävälistat elävät `category='muistilaput'`-puolella, ne eivät koskaan olleet vaarassa. Tarkistettu myös konkreettisesti: pakkauslistat (telttaretki/viikon reissu, sql/037-038) jotka sql/088:ssa siirrettiin takaisin `list_type='normal'`-muotoon nimenomaan täppäystä varten, ovat SILTI `category='varasto'` eivätkä siis näytä täppää tässäkään — periaatteen 7 ("Varastossa lista nukkuu") mukaisesti ne herätetään käyttöön "Luo kopio" -toiminnolla Muistilappuihin, ei täpätä paikallaan Varastossa. **Johtopäätös: ei uutta `naytostyyli`-saraketta tarvittu, AUKKO oli jo suljettu ennen tätä istuntoa** — jäljellä oli vain UI-työ: nimenmuutos "listat"→"Muistikirja" (varasto-tyyppi-valinnan nappi + uuden Muistikirjan placeholder + 📓-etuliite Varasto-listauksessa), ja `created_at`-pohjainen aikaleima lisätty PUUTTUVANA kaikkiin kolmeen tyyppiin (Muistikirja-rivit eivät näyttäneet MITÄÄN aikaleimaa, koska vanha ehto oli `tuote.tehty && tuote.bought_at` eikä täppää enää käytetä; Vahdittu ei näyttänyt aikaleimaa ollenkaan; Teema näytti vain päivämäärän, nyt yhtenäinen pv.kk.vvvv tt:mm kaikkialla, `muotoileAikaleima()`-apufunktio). **Koti-valuminen vahvistettu koodista toimivaksi Muistikirja-kohteille jo ennen tätä muutosta** (data oli aina oikein, `tehty=false` ei vain koskaan näkynyt väärin koska täppää ei näytetä) — ei vaatinut erillistä korjausta.
+
+Bussikorttiseuranta-esimerkin älyheuristiikka (saldon karkea päättely riveistä/euromääristä) on TIETOISESTI rajattu pois tästä erästä — spekissä se on käyttötapausesimerkki sille MIKSI aikaleima on hyödyllinen, ei oma pyydetty ominaisuus.
+
+sw.js v126 → v127.
+
+---
+
 ## OSA 5: MITEN TÄTÄ KEHITETÄÄN COPILOTIN KANSSA
 
 ### Katrin työskentelytapa (todistetusti toimiva)
