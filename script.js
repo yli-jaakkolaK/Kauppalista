@@ -8561,18 +8561,17 @@ async function hylkaaKauppaEhdotus(rivi) {
 // valehteli" -perhe kuin muistiinpanot.md:n "Kirjoituspolkujen auditointi").
 // Suodatettu pois — koti-mekanismilla (haeKotiKohteet) on teemalle OMA,
 // oikea kirjoitusreittinsä (laituri+teema_id).
+// Hytti_kortit poistettu kohdevaihtoehdoista (2026-08-16, SATAMA_SPEKSI.md
+// §16.5c -valmistelu) — pelkkä Laituri-uudistuksen edellyttämä kohdejoukon
+// kavennus, EI kosketa hytti_kortit-taulua tai hytti-kortti-view-etusivua
+// itseään, jotka pysyvät Hytin aktiivisena etusivuna Loki-välilehteen asti.
 async function haeSijoitusKohteet() {
-  const [{ data: listat, error: listatError }, { data: kortit, error: kortitError }] = await Promise.all([
-    db.from('lists').select('id, name, category, list_type').in('category', ['muistilaput', 'varasto']),
-    db.from('hytti_kortit').select('id, name').eq('status', 'aktiivinen'),
-  ]);
+  const { data: listat, error: listatError } = await db.from('lists')
+    .select('id, name, category, list_type').in('category', ['muistilaput', 'varasto']);
   if (listatError) console.error('Listojen haku sijoitusta varten epäonnistui:', listatError);
-  if (kortitError) console.error('Hytin korttien haku sijoitusta varten epäonnistui:', kortitError);
-  const listaKohteet = (listat || [])
+  return (listat || [])
     .filter(function(l) { return l.list_type !== 'teema'; })
     .map(function(l) { return { tyyppi: 'lista', id: l.id, nimi: l.name, category: l.category }; });
-  const hyttiKohteet = (kortit || []).map(function(k) { return { tyyppi: 'hytti', id: k.id, nimi: k.name }; });
-  return listaKohteet.concat(hyttiKohteet);
 }
 
 // BUGIKORJAUS (2026-07-16, ks. muistiinpanot.md kohta 10, "✨-promptidiagnoosi"):
@@ -8644,19 +8643,16 @@ async function avaaSijoitaValikko(rivi, li) {
 // mutta 'teema' MUKANA — sijoituskohteista se on tarkoituksella suodatettu
 // pois (teema-tyyppinen lista ei säilytä tuotteet-rivejä, ks. sql/081),
 // koti-mekanismi kirjoittaa sinne oman, eri reittinsä kautta (ks. alla).
+// Hytti_kortit poistettu kohdevaihtoehdoista (2026-08-16, SATAMA_SPEKSI.md
+// §16.5c -valmistelu) — ks. haeSijoitusKohteet()-kommentti yllä.
 async function haeKotiKohteet() {
-  const [{ data: listat, error: listatError }, { data: kortit, error: kortitError }] = await Promise.all([
-    db.from('lists').select('id, name, list_type').in('category', ['muistilaput', 'varasto']),
-    db.from('hytti_kortit').select('id, name').eq('status', 'aktiivinen'),
-  ]);
+  const { data: listat, error: listatError } = await db.from('lists')
+    .select('id, name, list_type').in('category', ['muistilaput', 'varasto']);
   if (listatError) console.error('Listojen haku kotivalintaa varten epäonnistui:', listatError);
-  if (kortitError) console.error('Hytin korttien haku kotivalintaa varten epäonnistui:', kortitError);
-  const listaKohteet = (listat || []).map(function(l) {
+  return (listat || []).map(function(l) {
     const tyyppi = l.list_type === 'teema' ? 'teema' : l.list_type === 'vahdittu' ? 'vahdittu' : 'lista';
     return { tyyppi: tyyppi, id: l.id, nimi: l.name };
   });
-  const hyttiKohteet = (kortit || []).map(function(k) { return { tyyppi: 'hytti', id: k.id, nimi: k.name }; });
-  return listaKohteet.concat(hyttiKohteet);
 }
 
 async function avaaKotiValikko(rivi, li) {
