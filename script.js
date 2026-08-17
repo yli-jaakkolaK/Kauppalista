@@ -1252,6 +1252,7 @@ async function avaaOpintoKurssi(kurssi) {
   document.getElementById('opinto-kurssi-title').textContent = '✱ ' + kurssi.name + ' ✱';
   piirraOpintoKurssiTilaLinkki();
   piirraOpintoTavoiteHoitotasoNapit();
+  piirraOpintoAikataulu();
   await lataaOpintoKurssiMateriaalit();
   await lataaOpintoAiheet();
   await lataaOpintoKurssinDeadlinet();
@@ -1292,6 +1293,36 @@ document.querySelectorAll('.opinto-hoitotaso-btn').forEach(function(btn) {
     piirraOpintoTavoiteHoitotasoNapit();
     naytaIlmoitus('Hoitotaso: ' + (uusi === 'taysi' ? 'täysi' : uusi === 'kevyt' ? 'kevyt' : 'vain deadlinet'));
   });
+});
+
+// A1 aikataulu: "N: aihe" per rivi -> jsonb [{viikko, aihe}]. Rivit joita ei
+// tunnisteta (ei "N:"-alkua) jätetään pois tallenteesta, ei virheilmoitusta —
+// kenttä on vapaamuotoinen eikä vaadi tarkkaa syntaksia joka rivillä.
+function jasennaOpintoAikataulu(teksti) {
+  const rivit = teksti.split('\n');
+  const tulos = [];
+  rivit.forEach(function(rivi) {
+    const osuma = rivi.match(/^\s*(\d+)\s*:\s*(.+)$/);
+    if (osuma) tulos.push({ viikko: parseInt(osuma[1], 10), aihe: osuma[2].trim() });
+  });
+  return tulos;
+}
+
+function piirraOpintoAikataulu() {
+  const aikataulu = currentOpintoKurssi.aikataulu;
+  const teksti = Array.isArray(aikataulu)
+    ? aikataulu.map(function(r) { return r.viikko + ': ' + r.aihe; }).join('\n')
+    : '';
+  document.getElementById('opinto-kurssi-aikataulu').value = teksti;
+}
+
+document.getElementById('opinto-kurssi-aikataulu').addEventListener('blur', async function(e) {
+  if (!currentOpintoKurssi) return;
+  const jasennetty = jasennaOpintoAikataulu(e.target.value);
+  const uusi = jasennetty.length > 0 ? jasennetty : null;
+  const { error } = await db.from('opinto_kurssit').update({ aikataulu: uusi }).eq('id', currentOpintoKurssi.id);
+  if (ilmoitaKirjoitusvirheesta(error, 'Aikataulun tallennus')) return;
+  currentOpintoKurssi.aikataulu = uusi;
 });
 
 // Kurssin aktiivinen/arkistoitu-tila (2026-08-05, ks. sql/097, muistiinpanot.md
@@ -1564,9 +1595,11 @@ async function avaaOpintoTehtava(aihe) {
   paivitaOpintoTehtavaOtsikko();
   await paivitaOpintoTehtavaOhje();
   paivitaOpintoTehtavaPriming();
+  paivitaOpintoTehtavaTuntemus();
   paivitaOpintoTehtavaKierros();
   paivitaOpintoTehtavaMuutVaiheet();
   paivitaOpintoTehtavaMateriaali();
+  paivitaOpintoTehtavaPerustussolmuNappi();
   document.getElementById('opinto-tehtava-jumi-vastaus').style.display = 'none';
 
   // Ajanotto: automaattinen alku. Session-loki EI salli kahta samanaikaista
@@ -1691,6 +1724,51 @@ document.getElementById('opinto-tehtava-priming-kysymykset').addEventListener('b
   const { error } = await db.from('opinto_aiheet').update({ priming_kysymykset: uusi }).eq('id', currentOpintoAihe.id);
   if (ilmoitaKirjoitusvirheesta(error, 'Priming-kysymysten tallennus')) return;
   currentOpintoAihe.priming_kysymykset = uusi;
+});
+
+// A3 tuntemus-säädin — "priming-vaiheen askel 0" (rakennusjärjestys-
+// dokumentti), näytetään siis vain priming-vaiheessa, ei muissa.
+function paivitaOpintoTehtavaTuntemus() {
+  const aihe = currentOpintoAihe;
+  const osio = document.getElementById('opinto-tehtava-tuntemus-osio');
+  if (aihe.pero_vaihe !== 'priming') {
+    osio.style.display = 'none';
+    return;
+  }
+  osio.style.display = 'flex';
+  document.querySelectorAll('.opinto-tuntemus-btn').forEach(function(b) {
+    b.classList.toggle('active', parseInt(b.dataset.tuntemus, 10) === aihe.tuntemus);
+  });
+}
+
+document.querySelectorAll('.opinto-tuntemus-btn').forEach(function(btn) {
+  btn.addEventListener('click', async function() {
+    if (!currentOpintoAihe) return;
+    const uusi = parseInt(btn.dataset.tuntemus, 10);
+    const { error } = await db.from('opinto_aiheet').update({ tuntemus: uusi }).eq('id', currentOpintoAihe.id);
+    if (ilmoitaKirjoitusvirheesta(error, 'Tuntemuksen tallennus')) return;
+    currentOpintoAihe.tuntemus = uusi;
+    paivitaOpintoTehtavaTuntemus();
+  });
+});
+
+// A3 perustussolmu — "1-3 solmua joiden päälle tulevat kurssit rakentuvat,
+// näille saa antaa enemmän aikaa". Sama toggeli-kaava kuin näkyvyyskytkimillä
+// (paivitaTeemaNakyvyysNappi).
+function paivitaOpintoTehtavaPerustussolmuNappi() {
+  const nappi = document.getElementById('opinto-tehtava-perustussolmu-btn');
+  const paalla = !!currentOpintoAihe.perustussolmu;
+  nappi.classList.toggle('active', paalla);
+  nappi.title = paalla ? 'Perustussolmu — napauta poistaaksesi merkinnän' : 'Merkitse perustussolmuksi';
+}
+
+document.getElementById('opinto-tehtava-perustussolmu-btn').addEventListener('click', async function() {
+  if (!currentOpintoAihe) return;
+  const uusi = !currentOpintoAihe.perustussolmu;
+  const { error } = await db.from('opinto_aiheet').update({ perustussolmu: uusi }).eq('id', currentOpintoAihe.id);
+  if (ilmoitaKirjoitusvirheesta(error, 'Perustussolmu-merkinnän tallennus')) return;
+  currentOpintoAihe.perustussolmu = uusi;
+  paivitaOpintoTehtavaPerustussolmuNappi();
 });
 
 function paivitaOpintoTehtavaKierros() {

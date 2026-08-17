@@ -505,6 +505,13 @@
       <button class="kalenteri-tila-btn opinto-hoitotaso-btn" data-hoitotaso="vain_deadlinet">Vain deadlinet</button>
     </div>
 
+    <!-- A1: kurssin oma aihe/viikko-ohjelma (rakennusjärjestys-dokumentti:
+         "Jos sellaista ei ole, solmut jaetaan tasan jäljellä oleville
+         viikoille" — tämä on siis valinnainen, ei pakollinen kenttä. Yksi
+         rivi per viikko, muoto "N: aihe", tallentuu jsonb-listaksi. -->
+    <div class="section-title">🗓️ Aikataulu (valinnainen)</div>
+    <textarea id="opinto-kurssi-aikataulu" class="jatkorivi-teksti" rows="4" placeholder="1: Luku 1-2&#10;2: Luku 3&#10;3: Harjoitustyö..."></textarea>
+
     <!-- Materiaali-osio uudistettu (2026-08-16, Katrin pyyntö) — korvaa
          vanhan yhden ylikirjoitettavan tekstikentän status-tietoisella
          listalla: jokainen "+ Lisää materiaalia" -kautta tuotu rivi näkyy
@@ -563,10 +570,26 @@
     <div class="list-header">
       <button class="back-btn" id="opinto-tehtava-back-btn">‹</button>
       <h1 id="opinto-tehtava-title">✱ SOLMU ✱</h1>
-      <span></span>
+      <div class="list-header-oikea">
+        <!-- A3: perustussolmu = "1-3 solmua joiden päälle tulevat kurssit
+             rakentuvat, näille saa antaa enemmän aikaa" — ominaisuus,
+             sama toggeli-muotokieli kuin näkyvyyskytkimillä. -->
+        <button class="settings-btn" id="opinto-tehtava-perustussolmu-btn" title="Perustussolmu">🏛️</button>
+      </div>
     </div>
 
     <p class="section-link" id="opinto-tehtava-tyyppi-vaihe"></p>
+
+    <!-- A3: tuntemus-säädin, priming-vaiheen askel 0 — ennen varsinaisia
+         priming-askeleita. Näkyy vain priming-vaiheessa. -->
+    <div class="varasto-tyyppi-valinta teema-priority-valinta opinto-nappirivi-rivittyva" id="opinto-tehtava-tuntemus-osio" style="display:none">
+      <span class="teema-priority-label">Tuntemus</span>
+      <button class="kalenteri-tila-btn opinto-tuntemus-btn" data-tuntemus="0" title="En ole koskaan kuullutkaan">0</button>
+      <button class="kalenteri-tila-btn opinto-tuntemus-btn" data-tuntemus="1">1</button>
+      <button class="kalenteri-tila-btn opinto-tuntemus-btn" data-tuntemus="2">2</button>
+      <button class="kalenteri-tila-btn opinto-tuntemus-btn" data-tuntemus="3">3</button>
+      <button class="kalenteri-tila-btn opinto-tuntemus-btn" data-tuntemus="4" title="Osaan jo hyvin">4</button>
+    </div>
 
     <div class="section-title">📋 Ohje</div>
     <ul class="list" id="opinto-tehtava-ohje-lista"></ul>

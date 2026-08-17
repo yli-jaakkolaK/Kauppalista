@@ -2843,6 +2843,17 @@ h1 {
   color: var(--messinki);
   font-weight: 600;
 }
+.list-header-oikea .settings-btn.active {
+  color: var(--messinki);
+}
+.opinto-tuntemus-btn {
+  flex: 0 1 auto;
+  min-width: 36px;
+}
+.opinto-tuntemus-btn.active {
+  border-color: var(--messinki);
+  color: var(--messinki);
+}
 
 /* Opintopolku VAIHE 1 (2026-07-21, ks. muistiinpanot.md "Opintopolku") */
 .opinto-kartta-linkki {
