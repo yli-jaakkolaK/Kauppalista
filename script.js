@@ -2249,14 +2249,28 @@ async function opintoPaivanKuorma() {
 // päällekkäisyyskäsittely, sama kuormavärjäys. Ainoa uusi kytkentä on
 // opinto_sessiot-toteumamerkit (paivanSessiot-parametri, valinnainen —
 // EI riko vanhaa Kalenteri-sivun kutsua, ks. sen oma kommentti).
+//
+// Selattavissa viikko kerrallaan (Katrin pyyntö 18.8.2026: "voi kliksutella
+// vaikka monen kuukauden päädänkin" — tarkistaakseen että Lukkarikoneen
+// luennot näkyvät myös tulevilla viikoilla). Oma reittiViikkoPvm, EI jaettu
+// Kalenteri-sivun kalenteriPvm:n kanssa — eri välilehti, eri selailutila.
+let reittiViikkoPvm = new Date();
+
+function siirraReittiViikkoa(suunta) {
+  reittiViikkoPvm.setDate(reittiViikkoPvm.getDate() + suunta * 7);
+  lataaReittiViikko();
+}
+
 async function lataaReittiViikko() {
   const sisalto = document.getElementById('reitti-viikko-sisalto');
   if (!sisalto) return;
-  const alku = viikonAlku(new Date());
+  const alku = viikonAlku(reittiViikkoPvm);
   const loppu = new Date(alku);
   loppu.setDate(loppu.getDate() + 6);
   const alkuIso = paivamaaraISO(alku);
   const loppuIso = paivamaaraISO(loppu);
+  const otsikkoEl = document.getElementById('reitti-viikko-otsikko');
+  if (otsikkoEl) otsikkoEl.textContent = alku.getDate() + '.' + (alku.getMonth() + 1) + '. – ' + loppu.getDate() + '.' + (loppu.getMonth() + 1) + '.';
   const isoPaivat = [];
   for (let i = 0; i < 7; i++) {
     const d = new Date(alku);
@@ -12828,6 +12842,8 @@ document.querySelectorAll('.kalenteri-tila-btn').forEach(function(btn) {
 
 document.getElementById('kalenteri-edellinen').addEventListener('click', function() { siirraKalenteria(-1); });
 document.getElementById('kalenteri-seuraava').addEventListener('click', function() { siirraKalenteria(1); });
+document.getElementById('reitti-viikko-edellinen').addEventListener('click', function() { siirraReittiViikkoa(-1); });
+document.getElementById('reitti-viikko-seuraava').addEventListener('click', function() { siirraReittiViikkoa(1); });
 
 document.getElementById('kalenteri-add-btn').addEventListener('click', async function() {
   const kalenteriInput = document.getElementById('kalenteri-input');

@@ -4004,11 +4004,23 @@ sw.js v145 → v147.
 
 ---
 
-## Nykytila (päivitetty 2026-08-17, COPILOT.md-sääntö 4 — huom: aiempi "Nykytila ja seuraavat askeleet" -osio jäi tästä tiedostosta ylemmäs pitkän istunnon aikana kertyneiden uusien osioiden taakse, ei enää tiedoston lopussa; siirto omaksi erikseen tehtäväksi työksi, ei nyt)
+### Reitin viikkokalenteri selattavaksi (2026-08-18)
 
-**Viimeksi tehty tässä istunnossa, kaikki commitoitu ja pushattu mainiin, `sw.js` nyt v147:** Laituri-uudistuksen (§16.5c) jälkeen: Teema/Vahdittu-näkyvyystoggeli + listan siirtonappi, kuormitustila-kytkimen sijoitus ruudun kulmaan, opiskelumoottorin OSA A -minimipolku, sung-metodi.md:n täysi korvaus + korjaukset, B1:n jumi-kesto, **A5 — koko Nyt-välilehti uudistettu**, materiaalin lisäyksen korjaus, **Nyt/Reitti-uudelleenjärjestely**, **4→1 Vercel-funktiokonsolidointi** (11/12 → 8/12, sittemmin 9/12 Miron myötä), **Föli-integraation pohjatyö**, **koko Miro-integraatio päästä päähän** (OAuth-callback, tokenien pysyvä säilytys, Board A/B, Frame-luonti, Live Embed Tehtävänäkymässä) — board-setup todistetusti toimiva livenä, embed itsessään ei vielä testattu — ja **Reitin viikkopaketti** (viikkokalenteriruudukko + toteutuneet opiskelumerkit, lähestyvät määräajat + tiedostoliite, kertausjono).
+Katrin pyyntö heti edellisen erän jälkeen: "voi kliksutella vaikka monen kuukauden päädänkin niin että saa näkymään omat luennot, nyt ku ei pysty niin en edes tiedä näkyykö tuolla nyt ne oikeat kurssit" — viikkoruudukko oli kiinnitetty aina kuluvaan viikkoon, ei mitään tapaa tarkistaa näkyvätkö Lukkarikoneen luennot tulevilla viikoilla.
 
-**Odottaa Katria:** Elävä testi — avaa Reitti-välilehti ja tarkista että viikkoruudukko/deadlinet/kertausjono näyttävät oikealta; avaa jokin encoding/overlearning/retrieval-vaiheen solmu Tehtävänäkymästä ja kokeile toimiiko Miro-kanvaasin muokkaus iframen sisällä suoraan.
+Lisätty oma `reittiViikkoPvm` (EI jaettu Kalenteri-sivun `kalenteriPvm`:n kanssa — eri välilehti, eri selailutila) + `siirraReittiViikkoa(suunta)` joka siirtää ±7pv ja lataa uudelleen. Nuolinapit + otsikko (`#reitti-viikko-edellinen`/`-seuraava`/`-otsikko`) uudelleenkäyttävät Kalenteri-sivun jo olemassa olevaa `.kalenteri-nav`-CSS-luokkaa sellaisenaan, sama ‹/›-kaava. Lähestyvät määräajat ja kertausjono EIVÄT seuraa selailua (ne ovat aina "tästä eteenpäin" -listoja riippumatta mitä viikkoa ruudukko näyttää).
+
+**Ei vielä testattu oikealla laitteella** — erityisesti onko Lukkarikoneen synkka tuonut kursseja oikeasti näkyviin, mikä oli koko pyynnön alkuperäinen syy.
+
+sw.js v147 → v148.
+
+---
+
+## Nykytila (päivitetty 2026-08-18, COPILOT.md-sääntö 4 — huom: aiempi "Nykytila ja seuraavat askeleet" -osio jäi tästä tiedostosta ylemmäs pitkän istunnon aikana kertyneiden uusien osioiden taakse, ei enää tiedoston lopussa; siirto omaksi erikseen tehtäväksi työksi, ei nyt)
+
+**Viimeksi tehty tässä istunnossa, kaikki commitoitu ja pushattu mainiin, `sw.js` nyt v148:** Laituri-uudistuksen (§16.5c) jälkeen: Teema/Vahdittu-näkyvyystoggeli + listan siirtonappi, kuormitustila-kytkimen sijoitus ruudun kulmaan, opiskelumoottorin OSA A -minimipolku, sung-metodi.md:n täysi korvaus + korjaukset, B1:n jumi-kesto, **A5 — koko Nyt-välilehti uudistettu**, materiaalin lisäyksen korjaus, **Nyt/Reitti-uudelleenjärjestely**, **4→1 Vercel-funktiokonsolidointi** (11/12 → 8/12, sittemmin 9/12 Miron myötä), **Föli-integraation pohjatyö**, **koko Miro-integraatio päästä päähän** (OAuth-callback, tokenien pysyvä säilytys, Board A/B, Frame-luonti, Live Embed Tehtävänäkymässä) — board-setup todistetusti toimiva livenä, embed itsessään ei vielä testattu — **Reitin viikkopaketti** (viikkokalenteriruudukko + toteutuneet opiskelumerkit, lähestyvät määräajat + tiedostoliite, kertausjono) ja **Reitin viikkoruudukon selailu** (‹/› useamman kuukauden päähän, alkuperäinen syy: tarkistaa näkyykö Lukkarikoneen luennot).
+
+**Odottaa Katria:** Elävä testi — avaa Reitti-välilehti, selaa viikkoja ‹/›-napeilla useamman viikon/kuukauden päähän ja tarkista näkyvätkö Lukkarikoneen luennot oikeasti (tämä oli koko selailupyynnön syy); tarkista myös että deadlinet/kertausjono näyttävät oikealta; avaa jokin encoding/overlearning/retrieval-vaiheen solmu Tehtävänäkymästä ja kokeile toimiiko Miro-kanvaasin muokkaus iframen sisällä suoraan.
 
 **Auki jäänyt / seuraavaksi:** "kolmiportainen kadenssi" -suunnittelugeneraattori (semesteritason suunnitelma, ei rakennettu, ks. yllä oleva merkintä — vaatii keskustelun ennen rakentamista), kurssirajat ylittävä vaiheensiirtymäkehote (§7.4-laajennus), Miron muokkausloki ajanoton varmistukseen (§4.3, ei vielä rakennettu — Frame/itemien `modifiedAt`-luku on olemassa Miron API:ssa, ei vielä kytketty). "Kertausmatikka"-epäily jäi auki, ei vahvistettu bugiksi. Vapaatekstisten tehtävien "vinkki jonojärjestykseen" -idea jätettiin tietoisesti rakentamatta.
 
