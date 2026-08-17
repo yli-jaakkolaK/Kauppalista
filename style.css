@@ -3014,13 +3014,12 @@ h1 {
 .opinto-vaihe-yllapito { color: var(--muted); }
 .opinto-vaihe-overlearning { color: var(--muted); }
 
-/* PACER-tyyppivalitsin + kertausjonossa-merkki (sql/111, 2026-08-10) —
-   oma pieni luokka, ei jaeta .opinto-vaihe-select:n kanssa vaikka
-   ulkoasu on sama, koska nämä ovat kaksi eri akselia (ks. HYTTI_SPEKSI.md
-   §7.4). #opinto-aihe-lista-rivit saavat wrapata: rivillä on nyt kuusi
-   elementtiä (vaihe+kertaus+tyyppi+ohje+materiaali+poisto) eikä kaikki
-   mahdu enää yhdelle riville ilman että aiheen nimi katkeaa mitättömäksi. */
-.opinto-pacer-select { font-family: 'Courier New', Courier, monospace; font-size: 12px; color: var(--text); background: var(--ground); border: 1px solid var(--border-dash); border-radius: 4px; padding: 4px; }
+/* Kertausjonossa-merkki (sql/111, 2026-08-10). PACER-tyyppivalitsin
+   (.opinto-pacer-select) POISTETTU 18.8.2026 riviltä — kysyi pakotetusti
+   joka aiheelta, tuntui liian raskaalta (ks. script.js:n oma kommentti
+   samasta kohdasta). #opinto-aihe-lista-rivit saavat silti wrapata,
+   riville jää yhä useampi elementti (vaihe+kertaus+ohje+materiaali+poisto)
+   eikä kaikki mahdu yhdelle riville ilman että aiheen nimi katkeaisi. */
 .opinto-kertausjonossa-merkki { color: var(--muted); font-size: 13px; }
 #opinto-aihe-lista li { flex-wrap: wrap; }
 #opinto-aihe-lista li span:first-child { flex-basis: 100%; }

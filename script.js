@@ -1511,30 +1511,15 @@ async function lataaOpintoAiheet() {
     }
 
     // PACER-tietotyyppi (sql/111, 2026-08-10, ks. HYTTI_SPEKSI.md §7.4 /
-    // sung-metodi.md §2) — päätyyppi + valinnainen sivutyyppi, ERI akseli
-    // kuin yllä oleva PERO-vaihe. V1 tarjoaa käyttäjälle vain kolme
-    // ensimmäistä tyyppiä (evidence/reference varattu, ei vielä käytössä).
-    const paatyyppiSelect = document.createElement('select');
-    paatyyppiSelect.className = 'opinto-pacer-select';
-    paatyyppiSelect.title = 'PACER-tietotyyppi (päätyyppi)';
-    const paatyyppiTyhja = document.createElement('option');
-    paatyyppiTyhja.value = '';
-    paatyyppiTyhja.textContent = 'Tyyppi?';
-    paatyyppiSelect.appendChild(paatyyppiTyhja);
-    PACER_TYYPPI_V1.forEach(function(t) {
-      const optio = document.createElement('option');
-      optio.value = t;
-      optio.textContent = PACER_TYYPPI_NIMET[t];
-      if (t === aihe.pacer_paatyyppi) optio.selected = true;
-      paatyyppiSelect.appendChild(optio);
-    });
-    paatyyppiSelect.addEventListener('change', async function() {
-      const uusi = paatyyppiSelect.value || null;
-      const { error: tyyppiError } = await db.from('opinto_aiheet').update({ pacer_paatyyppi: uusi }).eq('id', aihe.id);
-      if (ilmoitaKirjoitusvirheesta(tyyppiError, 'PACER-päätyypin tallennus')) return;
-      aihe.pacer_paatyyppi = uusi;
-    });
-    li.appendChild(paatyyppiSelect);
+    // sung-metodi.md §2) — käytetään ohjematriisin tarkennukseen
+    // (naytaOpintoOhje/kysely.eq('pacer_tyyppi', ...)), EI enää kysytä
+    // manuaalisesti joka rivillä. Katrin palaute 18.8.2026: pakotettu
+    // "Tyyppi?"-valinta jokaisella rivillä tuntui niin raskaalta että hän
+    // sulki koko sivun kesken solmun luonnin — sama "en halua ite päättää"
+    // -periaate kuin kolmiportaisella kadenssilla. pacer_paatyyppi jää nyt
+    // aina joko tyhjäksi (ohje on silloin geneerinen, ei tyyppikohtainen —
+    // jo ennestään tuettu haara) tai äylyn päättelemäksi materiaalin
+    // jäsennyksen yhteydessä (ks. rakennaMateriaaliJasennysPrompti).
 
     // PACER-ohje (2026-08-05, ks. HYTTI_SPEKSI §8) — sama "lue lisää"
     // kuin Tänään-kortilla, saatavilla myös suoraan kurssinäkymästä.
@@ -11060,11 +11045,15 @@ function rakennaMateriaaliJasennysPrompti(teksti, monessaOsassa) {
     'Palauta VAIN JSON tässä muodossa, ei muuta tekstiä:\n' +
     '{\n' +
     '  "kurssi_nimi": "kurssin nimi jos pääteltävissä, muuten paras arvaus",\n' +
-    '  "aiheet": [{ "nimi": "väliotsikon/aiheen nimi", "tavoiteikkuna": "VVVV-KK-PP tai null" }],\n' +
+    '  "aiheet": [{ "nimi": "väliotsikon/aiheen nimi", "tavoiteikkuna": "VVVV-KK-PP tai null", "tyyppi": "procedural" tai "analogous" tai "conceptual" }],\n' +
     '  "deadlinet": [{ "pvm": "VVVV-KK-PP", "tyyppi": "koe" tai "palautus" }]\n' +
     '}\n' +
     'Poimi VAIN materiaalissa oikeasti mainitut asiat, älä keksi. Aiheiden pitää olla väliotsikkotason kokonaisuuksia ' +
-    '(ei liian pieniä yksittäisiä käsitteitä, ei liian isoja koko-kurssin-kokoisia).';
+    '(ei liian pieniä yksittäisiä käsitteitä, ei liian isoja koko-kurssin-kokoisia).\n\n' +
+    'Aiheen "tyyppi" kuvaa millaista tietoa aihe pääasiassa sisältää — arvaa paras vaihtoehto äläkä jätä tyhjäksi: ' +
+    '"procedural" = miten jokin tehdään (menetelmä, algoritmi, kaava jota sovelletaan), ' +
+    '"analogous" = liittyy johonkin jo tuttuun/opittuun ja kannattaa oppia sen kautta, ' +
+    '"conceptual" = mitä jokin on (määritelmä, teoria, ilmiö). Jos oikeasti epäselvää, käytä "conceptual".';
 }
 
 // rivit (2026-08-17, Katrin havainto: pitkä materiaali liitetään usein
@@ -11151,6 +11140,11 @@ function avaaMateriaaliJasennysDialogi(rivit, jasennetty) {
     li._checkbox = checkbox;
     li._nimiInput = nimiInput;
     li._pvmInput = pvmInput;
+    // Äylyn päättelemä PACER-tietotyyppi (18.8.2026, ks. rakennaMateriaali-
+    // Jasennysprompti) — kulkee mukana HILJAA, ei omaa valintaelementtiä
+    // tässäkään dialogissa (sama periaate kuin listariviltä poistettu
+    // pakkovalinta: ei kysytä uudelleen jos joku jo vastasi puolesta).
+    li._tyyppi = PACER_TYYPPI_V1.indexOf(aihe.tyyppi) !== -1 ? aihe.tyyppi : null;
     aiheLista.appendChild(li);
   });
 
@@ -11222,7 +11216,7 @@ async function tallennaMateriaaliJasennys(rivit) {
 
   const valitutAiheet = Array.from(document.getElementById('materiaali-jasennys-aihe-lista').children)
     .filter(function(li) { return li._checkbox.checked && li._nimiInput.value.trim(); })
-    .map(function(li) { return { kurssi_id: kurssi.id, name: li._nimiInput.value.trim(), tavoiteikkuna: li._pvmInput.value || null }; });
+    .map(function(li) { return { kurssi_id: kurssi.id, name: li._nimiInput.value.trim(), tavoiteikkuna: li._pvmInput.value || null, pacer_paatyyppi: li._tyyppi || null }; });
   if (valitutAiheet.length > 0) {
     const { error } = await db.from('opinto_aiheet').insert(valitutAiheet);
     if (ilmoitaKirjoitusvirheesta(error, 'Aiheiden tallennus')) return;
