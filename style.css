@@ -2820,6 +2820,30 @@ h1 {
   color: var(--huomio);
 }
 
+/* Tavoite/Hoitotaso (2026-08-17, opiskelumoottori OSA A1) — pidemmät
+   napinnimet ("Kunnollinen osaaminen", "Vain deadlinet") kuin Teeman
+   Nostoherkkyydessä, joten sallitaan rivittyminen sen sijaan että teksti
+   puristuisi lukukelvottomaksi. */
+.opinto-nappirivi-rivittyva {
+  flex-wrap: wrap;
+}
+.opinto-tavoite-btn, .opinto-hoitotaso-btn {
+  flex: 1 1 auto;
+  white-space: normal;
+}
+.opinto-tavoite-btn.active, .opinto-hoitotaso-btn.active {
+  border-color: var(--messinki);
+  color: var(--messinki);
+}
+
+.opinto-aihe-nimi-linkki {
+  cursor: pointer;
+}
+.opinto-tehtava-muu-vaihe.nykyinen {
+  color: var(--messinki);
+  font-weight: 600;
+}
+
 /* Opintopolku VAIHE 1 (2026-07-21, ks. muistiinpanot.md "Opintopolku") */
 .opinto-kartta-linkki {
   float: right;

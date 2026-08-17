@@ -625,7 +625,7 @@ Materiaalit **eivät jää näkyville Laituriin** — `piilota_laiturista`-lippu
 - **Offline-jono ei kata Laituria.** Se kattaa vain kauppalistan (`tuotteet`).
 - **Vaakatila puuttuu kokonaan**, Laituri kärsii kapeudesta eniten.
 - **Infra-rajoite:** Vercel Hobby-tason 12 serverless functionin raja. Tarkista funktioiden määrä ennen uusia palvelinreittejä.
-- **Sillasolmu-moottori ja tiedostoputki eivät vielä puhu keskenään** — ks. §7.2 AUKKO.
+- ~~Sillasolmu-moottori ja tiedostoputki eivät vielä puhu keskenään~~ **RATKAISTU 16.8.2026** — ks. §7.2:n oma RATKAISTU-merkintä (karkealla kurssitasolla korjattu, hienompi solmutason kytkentä jää Vaihe 2:een tietoisesti, ei enää AUKKO).
 
 ---
 
@@ -747,7 +747,7 @@ Kokoontuu näkymä kerrallaan. Laituri ensin, Asetukset ja Kalenteri seuraavaksi
 - **Miron API:n aikaleimatarkkuus ja rate limit** — tarkentaa jo §4.3:ssa mainittua AUKKOa (ajanoton lopetussääntö nojaa Miron muokkauslokiin). Ei varmistettu kuinka tarkkaa Miron API antama viimeisimmän muokkauksen aikaleima on, eikä API:n kutsurajaa jatkuvalle pollaukselle.
 - **Rajatun kyselyn tarkat kysymykset** (Priming-vaiheen menetelmäosa) ovat `sung-metodi.md`:n videoissa, ei vielä poimittu tekstiksi speksiin.
 - **Overlearning-näkymä tarkentuu vasta testikurssin jälkeen** — ei rakenneta yksityiskohtia etukäteen ilman oikeaa käyttödataa.
-- **GRRINDE:n toinen R on tulkinnanvarainen** — Relational vai Reflective? Vaatii tarkistuksen `sung-metodi.md`:n lähdevideoista ennen kuin kirjataan sitovaksi.
+- ~~GRRINDE:n toinen R on tulkinnanvarainen — Relational vai Reflective?~~ **RATKAISTU 16.8.2026 (Katrin päätös): molemmat.** Ei valita jompaakumpaa — ohjeteksti kattaa sekä Relational että Reflective, ei tulkintaerimielisyyttä joka pitäisi ratkaista videosta.
 - **Reference-vaiheen täsmäohje puuttuu** — muille PACER/PERO-vaiheille on ohjeteksti, Referencelle ei vielä ole muotoiltu vastaavaa.
 - **Fontti ja tarkat hex-arvot mockupiin** — ks. myös §9:n uusi huomautus: mockup-tiedostojen värit/fontti ovat paikanpitäjiä, lopulliset arvot pitää sopia `satama-design-kuvaus.md`:n kanssa erikseen.
 

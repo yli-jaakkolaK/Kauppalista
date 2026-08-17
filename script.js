@@ -1251,10 +1251,48 @@ async function avaaOpintoKurssi(kurssi) {
   showOpintoKurssiView();
   document.getElementById('opinto-kurssi-title').textContent = '✱ ' + kurssi.name + ' ✱';
   piirraOpintoKurssiTilaLinkki();
+  piirraOpintoTavoiteHoitotasoNapit();
   await lataaOpintoKurssiMateriaalit();
   await lataaOpintoAiheet();
   await lataaOpintoKurssinDeadlinet();
 }
+
+// Opiskelumoottori OSA A1 (2026-08-17): tavoite ja hoitotaso ovat ERI
+// kentät ("Tavoite = miksi tämä kurssi. Hoitotaso = kuinka paljon
+// kapasiteettia juuri nyt", rakennusjärjestys-dokumentti). Molemmat
+// muokattavissa suoraan napista, ei erillistä tallennusnappia — sama
+// välitön kirjoitus kuin Teeman Nostoherkkyydellä.
+function piirraOpintoTavoiteHoitotasoNapit() {
+  document.querySelectorAll('.opinto-tavoite-btn').forEach(function(b) {
+    b.classList.toggle('active', b.dataset.tavoite === currentOpintoKurssi.tavoite);
+  });
+  document.querySelectorAll('.opinto-hoitotaso-btn').forEach(function(b) {
+    b.classList.toggle('active', b.dataset.hoitotaso === currentOpintoKurssi.hoitotaso);
+  });
+}
+
+document.querySelectorAll('.opinto-tavoite-btn').forEach(function(btn) {
+  btn.addEventListener('click', async function() {
+    if (!currentOpintoKurssi) return;
+    const uusi = btn.dataset.tavoite;
+    const { error } = await db.from('opinto_kurssit').update({ tavoite: uusi }).eq('id', currentOpintoKurssi.id);
+    if (ilmoitaKirjoitusvirheesta(error, 'Tavoitteen tallennus')) return;
+    currentOpintoKurssi.tavoite = uusi;
+    piirraOpintoTavoiteHoitotasoNapit();
+  });
+});
+
+document.querySelectorAll('.opinto-hoitotaso-btn').forEach(function(btn) {
+  btn.addEventListener('click', async function() {
+    if (!currentOpintoKurssi) return;
+    const uusi = btn.dataset.hoitotaso;
+    const { error } = await db.from('opinto_kurssit').update({ hoitotaso: uusi }).eq('id', currentOpintoKurssi.id);
+    if (ilmoitaKirjoitusvirheesta(error, 'Hoitotason tallennus')) return;
+    currentOpintoKurssi.hoitotaso = uusi;
+    piirraOpintoTavoiteHoitotasoNapit();
+    naytaIlmoitus('Hoitotaso: ' + (uusi === 'taysi' ? 'täysi' : uusi === 'kevyt' ? 'kevyt' : 'vain deadlinet'));
+  });
+});
 
 // Kurssin aktiivinen/arkistoitu-tila (2026-08-05, ks. sql/097, muistiinpanot.md
 // "Siltasolmut") — sama malli kuin hytti_kortit. Tarvitaan koska siltatunnistus
@@ -1371,8 +1409,14 @@ async function lataaOpintoAiheet() {
   aiheet.forEach(function(aihe) {
     const li = document.createElement('li');
 
+    // Nimi avaa Tehtävänäkymän (opiskelumoottori OSA A4, 2026-08-17) — sama
+    // "napauta tekstiä" -kaava kuin Laiturin murun korjausmuokkauksella,
+    // erillään rivin muista toiminnoista (vaihe/tyyppi-valitsimet, materiaali,
+    // poisto) jotka pysyvät napautettavina ilman navigointia pois.
     const teksti = document.createElement('span');
     teksti.textContent = aihe.name;
+    teksti.className = 'opinto-aihe-nimi-linkki';
+    teksti.addEventListener('click', function() { avaaOpintoTehtava(aihe); });
     li.appendChild(teksti);
 
     // VAIHE 1a: käsin vaihdettava PERO-tila, EI automaattista etenemistä
@@ -1492,6 +1536,267 @@ document.getElementById('opinto-uusi-aihe-btn').addEventListener('click', async 
 });
 document.getElementById('opinto-uusi-aihe-input').addEventListener('keydown', function(event) {
   if (event.key === 'Enter') document.getElementById('opinto-uusi-aihe-btn').click();
+});
+
+// === TEHTÄVÄNÄKYMÄ (opiskelumoottori OSA A4, 2026-08-17, ks. "Sataman
+// opiskelumoottori — rakennusjärjestys") ===
+// "Ohje ensin → vaiheen ohjelista täpättävänä → materiaalit." Miro-kanvaasi
+// TIETOISESTI pois (B6, ei OSA A) — paperi/kuva riittää tässä vaiheessa.
+// Ajanotto käynnistyy automaattisesti kun näkymä avataan ja päättyy kun
+// siitä poistutaan — EI näkyvää laskuria/edistymisviivaa (B-osan Ajanotto:
+// "Ei näkyvää edistymisviivaa. Ei laskuria jota pitää katsoa."), EI erillistä
+// lopeta-painallusta. Käyttää olemassa olevaa opinto_sessiot-taulua
+// (session-loki) samalla kirjoitusreitillä kuin manuaalinen ▶ Aloita/⏸
+// Lopeta -pari muualla, vain laukaisin on nyt näkymän avaus/sulku.
+
+function showOpintoTehtavaView() {
+  piilotaKaikkiNakymat();
+  document.getElementById('opinto-tehtava-view').style.display = 'block';
+}
+
+let currentOpintoAihe = null;
+let opintoTehtavaSessioId = null;
+let opintoTehtavaAlkoiAt = null;
+
+async function avaaOpintoTehtava(aihe) {
+  currentOpintoAihe = aihe;
+  showOpintoTehtavaView();
+  paivitaOpintoTehtavaOtsikko();
+  await paivitaOpintoTehtavaOhje();
+  paivitaOpintoTehtavaPriming();
+  paivitaOpintoTehtavaKierros();
+  paivitaOpintoTehtavaMuutVaiheet();
+  paivitaOpintoTehtavaMateriaali();
+  document.getElementById('opinto-tehtava-jumi-vastaus').style.display = 'none';
+
+  // Ajanotto: automaattinen alku. Session-loki EI salli kahta samanaikaista
+  // avointa istuntoa (haeKeskenaOlevaSessio-periaate) — jos jokin muu istunto
+  // on jäänyt auki (esim. selain suljettiin kesken), lopetetaan se hiljaa
+  // ensin ettei ajanotto jää haamuina roikkumaan taustalle.
+  const kesken = await haeKeskenaOlevaSessio();
+  if (kesken) {
+    await db.from('opinto_sessiot').update({ loppui_at: new Date().toISOString() }).eq('id', kesken.id);
+  }
+  const alkoiAt = new Date().toISOString();
+  const { data: uusiSessio, error } = await db.from('opinto_sessiot')
+    .insert({ owner_id: currentUserId, vaihe: aihe.pero_vaihe, aihe_id: aihe.id, alkoi_at: alkoiAt })
+    .select().single();
+  if (error) {
+    console.error('Tehtävänäkymän ajanoton aloitus epäonnistui:', error);
+    opintoTehtavaSessioId = null;
+  } else {
+    opintoTehtavaSessioId = uusiSessio.id;
+    opintoTehtavaAlkoiAt = alkoiAt;
+  }
+}
+
+async function suljeOpintoTehtava() {
+  if (opintoTehtavaSessioId) {
+    const { error } = await db.from('opinto_sessiot').update({ loppui_at: new Date().toISOString() }).eq('id', opintoTehtavaSessioId);
+    if (error) console.error('Tehtävänäkymän ajanoton lopetus epäonnistui:', error);
+    opintoTehtavaSessioId = null;
+    opintoTehtavaAlkoiAt = null;
+  }
+  currentOpintoAihe = null;
+  if (currentOpintoKurssi) {
+    showOpintoKurssiView();
+    await lataaOpintoAiheet();
+  } else {
+    showHyttiView('reitti');
+  }
+}
+
+document.getElementById('opinto-tehtava-back-btn').addEventListener('click', function() {
+  suljeOpintoTehtava();
+});
+
+function paivitaOpintoTehtavaOtsikko() {
+  document.getElementById('opinto-tehtava-title').textContent = '✱ ' + currentOpintoAihe.name + ' ✱';
+  const tyyppiNimi = currentOpintoAihe.pacer_paatyyppi ? PACER_TYYPPI_NIMET[currentOpintoAihe.pacer_paatyyppi] : 'Tyyppi asettamatta';
+  document.getElementById('opinto-tehtava-tyyppi-vaihe').textContent = tyyppiNimi + ' · ' + OPINTO_VAIHE_NIMET[currentOpintoAihe.pero_vaihe];
+}
+
+// Retrieval: kierros = tehdyt kierrokset + 1 (seuraava tehtävä kierros),
+// katkaistu 3:een koska ohjematriisi kattaa vain 3 kierrosta per tyyppi
+// ("kierroksia saa palauttaa lisää" jos yhä oppimatta, sung-metodi.md §7 —
+// kierros 4+ toistaa kierroksen 3 ohjeen, ei erillistä riviä per kierros).
+function opintoNykyinenKierros(aihe) {
+  return Math.min((aihe.retrieval_kierrokset || 0) + 1, 3);
+}
+
+async function paivitaOpintoTehtavaOhje() {
+  const aihe = currentOpintoAihe;
+  let kysely = db.from('ohjematriisi').select().eq('pero_vaihe', aihe.pero_vaihe).order('sort_order');
+  if (aihe.pero_vaihe === 'priming' || aihe.pero_vaihe === 'reference') {
+    kysely = kysely.is('pacer_tyyppi', null);
+  } else if (aihe.pacer_paatyyppi) {
+    kysely = kysely.eq('pacer_tyyppi', aihe.pacer_paatyyppi);
+  } else {
+    // Tyyppi asettamatta eikä vaihe ole tyyppiriippumaton — ei voida
+    // näyttää ohjetta, ks. #opinto-tehtava-ohje-tyhja.
+    document.getElementById('opinto-tehtava-ohje-lista').innerHTML = '';
+    document.getElementById('opinto-tehtava-ohje-tyhja').style.display = 'block';
+    return;
+  }
+  if (aihe.pero_vaihe === 'retrieval') {
+    kysely = kysely.eq('kierros_numero', opintoNykyinenKierros(aihe));
+  }
+  const { data, error } = await kysely;
+  if (error) {
+    console.error('Ohjematriisin haku epäonnistui:', error);
+    return;
+  }
+  const rivit = data || [];
+  const listEl = document.getElementById('opinto-tehtava-ohje-lista');
+  listEl.innerHTML = '';
+  document.getElementById('opinto-tehtava-ohje-tyhja').style.display = rivit.length === 0 ? 'block' : 'none';
+  rivit.forEach(function(rivi) {
+    const li = document.createElement('li');
+    const check = document.createElement('input');
+    check.type = 'checkbox';
+    check.className = 'materiaali-jasennys-checkbox';
+    li.appendChild(check);
+    const teksti = document.createElement('span');
+    teksti.textContent = rivi.ohje;
+    li.appendChild(teksti);
+    listEl.appendChild(li);
+  });
+}
+
+// Priming-vaiheessa kirjoitetaan kysymykset; encoding-vaiheesta eteenpäin
+// ne näytetään luku-tilassa (sung-metodi.md §6: "nousevat esiin kun
+// encoding alkaa").
+function paivitaOpintoTehtavaPriming() {
+  const aihe = currentOpintoAihe;
+  const kirjoitusOsio = document.getElementById('opinto-tehtava-priming-kysymykset-osio');
+  const naytto = document.getElementById('opinto-tehtava-priming-kysymykset-nayto');
+  if (aihe.pero_vaihe === 'priming') {
+    kirjoitusOsio.style.display = 'block';
+    naytto.style.display = 'none';
+    document.getElementById('opinto-tehtava-priming-kysymykset').value = aihe.priming_kysymykset || '';
+  } else if (aihe.priming_kysymykset) {
+    kirjoitusOsio.style.display = 'none';
+    naytto.style.display = 'block';
+    naytto.textContent = '💭 Priming-kysymykset: ' + aihe.priming_kysymykset;
+  } else {
+    kirjoitusOsio.style.display = 'none';
+    naytto.style.display = 'none';
+  }
+}
+
+document.getElementById('opinto-tehtava-priming-kysymykset').addEventListener('blur', async function(e) {
+  if (!currentOpintoAihe || currentOpintoAihe.pero_vaihe !== 'priming') return;
+  const uusi = e.target.value.trim() || null;
+  if (uusi === currentOpintoAihe.priming_kysymykset) return;
+  const { error } = await db.from('opinto_aiheet').update({ priming_kysymykset: uusi }).eq('id', currentOpintoAihe.id);
+  if (ilmoitaKirjoitusvirheesta(error, 'Priming-kysymysten tallennus')) return;
+  currentOpintoAihe.priming_kysymykset = uusi;
+});
+
+function paivitaOpintoTehtavaKierros() {
+  const aihe = currentOpintoAihe;
+  const el = document.getElementById('opinto-tehtava-kierros-tila');
+  if (aihe.pero_vaihe !== 'retrieval') {
+    el.style.display = 'none';
+    return;
+  }
+  el.style.display = 'block';
+  el.textContent = 'Kierros ' + opintoNykyinenKierros(aihe) + ' / ' + aihe.retrieval_tavoite;
+}
+
+function paivitaOpintoTehtavaMuutVaiheet() {
+  const listEl = document.getElementById('opinto-tehtava-vaihe-lista');
+  listEl.innerHTML = '';
+  const nykyinenIdx = PERO_VAIHE_JARJESTYS.indexOf(currentOpintoAihe.pero_vaihe);
+  PERO_VAIHE_JARJESTYS.forEach(function(v, i) {
+    const li = document.createElement('li');
+    li.className = 'opinto-tehtava-muu-vaihe' + (v === currentOpintoAihe.pero_vaihe ? ' nykyinen' : '');
+    const teksti = document.createElement('span');
+    teksti.textContent = (i < nykyinenIdx ? '✓ ' : v === currentOpintoAihe.pero_vaihe ? '▶ ' : '· ') + OPINTO_VAIHE_NIMET[v];
+    li.appendChild(teksti);
+    listEl.appendChild(li);
+  });
+}
+
+function paivitaOpintoTehtavaMateriaali() {
+  const el = document.getElementById('opinto-tehtava-materiaali');
+  if (currentOpintoAihe.materiaali) {
+    el.style.display = 'block';
+    el.textContent = '🔗 ' + currentOpintoAihe.materiaali;
+  } else {
+    el.style.display = 'none';
+  }
+}
+
+document.getElementById('opinto-tehtava-kurssi-materiaali-linkki').addEventListener('click', async function() {
+  await suljeOpintoTehtava();
+});
+
+// "✓ Merkitse tehdyksi" — käyttäytyy vaiheen mukaan (sung-metodi.md §7):
+// priming/reference käyttäjä täppää itse ja vaihe etenee; retrieval laskee
+// kierroksen ja etenee vasta kun tavoitemäärä täyttyy; encoding etenee
+// suoraan; overlearning on vapaaehtoinen eikä etene mihinkään (jatkuvaa).
+document.getElementById('opinto-tehtava-valmis-btn').addEventListener('click', async function() {
+  const aihe = currentOpintoAihe;
+  if (!aihe) return;
+  const nytIso = new Date().toISOString();
+
+  if (aihe.pero_vaihe === 'retrieval') {
+    const uusiKierrokset = (aihe.retrieval_kierrokset || 0) + 1;
+    if (uusiKierrokset < aihe.retrieval_tavoite) {
+      const { error } = await db.from('opinto_aiheet').update({ retrieval_kierrokset: uusiKierrokset, viimeksi_kosketettu: nytIso }).eq('id', aihe.id);
+      if (ilmoitaKirjoitusvirheesta(error, 'Kierroksen tallennus')) return;
+      aihe.retrieval_kierrokset = uusiKierrokset;
+      naytaIlmoitus('Kierros ' + uusiKierrokset + ' / ' + aihe.retrieval_tavoite + ' tehty');
+      paivitaOpintoTehtavaKierros();
+      await paivitaOpintoTehtavaOhje();
+      return;
+    }
+    // Tavoitemäärä täynnä — etenee seuraavaan vaiheeseen kuten muutkin.
+    const { error } = await db.from('opinto_aiheet').update({ retrieval_kierrokset: uusiKierrokset, viimeksi_kosketettu: nytIso }).eq('id', aihe.id);
+    if (ilmoitaKirjoitusvirheesta(error, 'Kierroksen tallennus')) return;
+    aihe.retrieval_kierrokset = uusiKierrokset;
+  }
+
+  if (aihe.pero_vaihe === 'overlearning') {
+    naytaIlmoitus('Merkitty — syventäminen on vapaaehtoista, voit palata milloin vain');
+    return;
+  }
+
+  const paivitys = { viimeksi_kosketettu: nytIso };
+  if (aihe.pero_vaihe === 'priming') paivitys.priming_tehty = true;
+  if (aihe.pero_vaihe === 'reference') { paivitys.reference_tehty = true; paivitys.kertausjonossa = true; }
+
+  const idx = PERO_VAIHE_JARJESTYS.indexOf(aihe.pero_vaihe);
+  const seuraava = PERO_VAIHE_JARJESTYS[idx + 1];
+  if (seuraava) paivitys.pero_vaihe = seuraava;
+
+  const { error } = await db.from('opinto_aiheet').update(paivitys).eq('id', aihe.id);
+  if (ilmoitaKirjoitusvirheesta(error, 'Vaiheen tallennus')) return;
+  Object.assign(aihe, paivitys);
+  naytaIlmoitus(seuraava ? ('Siirtyi vaiheeseen: ' + OPINTO_VAIHE_NIMET[seuraava]) : 'Tehty');
+
+  paivitaOpintoTehtavaOtsikko();
+  await paivitaOpintoTehtavaOhje();
+  paivitaOpintoTehtavaPriming();
+  paivitaOpintoTehtavaKierros();
+  paivitaOpintoTehtavaMuutVaiheet();
+});
+
+// "En pääse alkuun" (sung-metodi.md §8: "tarjoaa pienemmän askeleen samasta
+// vaiheesta ja tallentaa merkinnän. Merkinnöistä näkee myöhemmin ovatko
+// tietyt vaiheet tai tietotyypit systemaattisesti hankalia.") — kevyt loki
+// (sql/124), ei älyä. Näkymä/analyysi on B-osan laajuutta, ei tässä.
+document.getElementById('opinto-tehtava-jumi-btn').addEventListener('click', async function() {
+  const aihe = currentOpintoAihe;
+  if (!aihe) return;
+  const { error } = await db.from('opinto_jumi_merkinnat').insert({
+    owner_id: currentUserId, aihe_id: aihe.id, pero_vaihe: aihe.pero_vaihe, pacer_tyyppi: aihe.pacer_paatyyppi,
+  });
+  if (error) console.error('Jumi-merkinnän tallennus epäonnistui:', error);
+  const vastaus = document.getElementById('opinto-tehtava-jumi-vastaus');
+  vastaus.style.display = 'block';
+  vastaus.textContent = 'Tee vain yksi kohta yllä olevasta ohjeesta — ei koko vaihetta kerralla. Pienempikin askel vie eteenpäin.';
 });
 
 function muotoileOpintoPvm(pvmStr) {
