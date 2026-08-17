@@ -1,5 +1,38 @@
 # Vaihe 2 + tämän päivän lisäykset — koottu Codelle (17.8.2026)
 
+## Kolmiportainen kadenssi — MVP-scope Reitin taustalogiikalle (18.8.2026)
+
+Codelle jätetty rakentamatta tarkoituksella ("ei sisältöpäätöksiä ilman keskustelua"). Alla scope kolmelle tasolle. Tarkistettu suoraan tietokannasta ennen kirjoittamista — suurin osa tarvittavasta datasta on jo olemassa, tässä ei tarvita paljon uutta rakennetta.
+
+**Jo olemassa, käytettävissä suoraan:**
+- `opinto_aiheet`: `tavoiteikkuna` (tavoitepäivä), `viimeksi_kosketettu`, `tuntemus` (kuorma/hallinta-%), `perustussolmu`, `pero_vaihe`, `kertausjonossa`, `sr_interval_index`/`sr_next_review` (kertausjonon ajastus on jo olemassa, ei tarvitse keksiä uutta 1/3/7/21-mekanismia — tämä ON se)
+- `opinto_kurssit.hoitotaso` (CHECK: `taysi`/`kevyt`/`vain_deadlinet`) — tämä ON jo se mekanismi jolla kurssia "kevennetään", kysyttiin 17.8. ikään kuin puuttuvana, mutta se on jo skeemassa. `tavoite` (`lapaisy`/`kunnollinen_osaaminen`/`perusta_jatkolle`) kertoo tarvittavan syvyyden.
+- `opinto_sessiot` (alkoi_at/loppui_at/vaihe/taitosolmu_id) — todellisen tehdyn työn loki, tämä on "totuus" jota vasten suunnitelma tarkistetaan
+- `hytti_opiskeluaika` (viikonpaiva + alkaa/paattyy) — viikoittain toistuvat käytettävissä olevat opiskeluikkunat
+- `hytti_suljetut_ikkunat` (viikonpaiva + alkaa/paattyy + syy) — pysyvästi suljetut ikkunat (esim. 15.30–17)
+
+### Taso 3 — joka yö, rakenna ensin (mekaanisin, vähiten uutta)
+
+Cron (sama `/api/cron.js?task=` -malli kuin muut ajastetut tehtävät). Lukee eilisen `opinto_sessiot`-rivit + `opinto_jumi_merkinnat`, laskee uudelleen seuraavan päivän/parin priorisoidun jonon. Säännöt joita jo käytetään muualla, sovelletaan tässä samoina — ei uusia periaatteita:
+- Perustussolmu painottaa, ei pakota kärkeen (vahvistettu 17.8.)
+- Interleaving: 2–3 kurssia päivässä kosketettava, ei pakollista 30 min -vaihtoa, flow voittaa
+- Boost-jatkuvuus: eilen boostilla tehty ei nouse tänään ykköseksi uudelleen, jatketaan mihin jäätiin
+- `tavoiteikkuna` painottaa kurssirajojen yli (§7.4-lisäys, jo speksattu)
+- Kertausjono: `sr_next_review <= tänään` -rivit nostetaan mukaan
+- **Ei uutta taulua pakollisena** — riittää funktio joka laskee jonon pyynnöstä, ajetaan cronilla vain lämmittämään/varmistamaan ettei laskenta viivästytä aamun ensimmäistä avausta.
+
+### Taso 2 — kahden viikon välein, diagnoosi ei automaatio
+
+Jokaiselle `status='aktiivinen'` kurssille: vertaa sen aiheiden `tavoiteikkuna`-toteumaa (kuinka moni on `tuntemus`-tasolla joka vastaa aikataulua) todelliseen kalenteripäivään. Jos selvästi jäljessä: **ehdota** `hoitotaso`-muutosta (`kevyt` tai `vain_deadlinet`) — EI vaihda automaattisesti. Näytetään samalla kehote-mekanismilla kuin vaiheensiirtymä (dismissible kortti, ei blokkaa). Katri hyväksyy/hylkää.
+
+### Taso 1 — kerran syksylle, manuaalisesti käynnistettävä
+
+**Ei generoi keksittyjä tulevia tehtäviä kalenteriin** (sama periaate jota Code jo noudatti tässä erässä) — tämä on kapasiteettinäkymä, ei aikataulu: "mahtuuko kaikki". Laskee jokaiselle aktiiviselle kurssille karkean tuntitarpeen `op_maara`-kentästä (1 op ≈ 27h, josta jo aikataulutetut Lukkarikone-luennot vähennetään = itsenäisen opiskelun tarve), vertaa `hytti_opiskeluaika`-ikkunoiden kokonaiskapasiteettiin miinus `hytti_suljetut_ikkunat`. Tulos: näkymä/varoitus jos kurssit eivät yhteensä mahdu käytettävissä olevaan aikaan — ei rivi riviltä -sijoittelua.
+
+**Avoin, ei päätetty puolestasi:** 1 op ≈ 27h on Suomen yliopistojen yleinen nyrkkisääntö, ei tarkistettu sinun kursseiltasi — jos tuntuu väärältä käytännössä, tätä kerrointa pitää säätää, ei kovakoodata lopulliseksi.
+
+---
+
 ## Vaihe 2 — menetelmä, tila tarkistettu koodista
 
 7. **PERO/PACER-ristitulo ja ohjeiden generointi (§7.4)** — VALMIS. A3/A4 rakennettu tänään, `ohjematriisi` luetaan livenä Tehtävänäkymässä.

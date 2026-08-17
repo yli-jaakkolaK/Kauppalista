@@ -2226,7 +2226,14 @@ async function huolienPaivanPaino() {
 // tapahtumien määrän ja huolipainon parametrina.
 function deriveDayLoadLevel(ajallistenMaara, huoliPaino) {
   const raja = haeAsetusNumero('paivan_menoraja', 5);
-  let taso = ajallistenMaara === 0 ? 'kevyt' : (ajallistenMaara >= raja ? 'raskas' : 'keski');
+  // KORJATTU 2026-08-18 (Katrin palaute: "pohja vois olla normaalisti ihan
+  // taustan värinen") — VANHA logiikka nosti minkä tahansa nollasta
+  // poikkeavan päivän vähintään 'keski'-tasolle, jolloin lähes jokainen
+  // päivä näytti värillisenä. Nyt 'kevyt' kattaa alle puolet katosta —
+  // aidosti rauhallinen päivä pysyy taustavärisenä, vain oikeasti
+  // keskiraskas/raskas päivä erottuu.
+  const keskiRaja = Math.max(1, Math.ceil(raja / 2));
+  let taso = ajallistenMaara >= raja ? 'raskas' : (ajallistenMaara >= keskiRaja ? 'keski' : 'kevyt');
   const huoliRaskasKynnys = haeAsetusNumero('huoli_raskas_kynnys', 30);
   const huoliKeskiKynnys = haeAsetusNumero('huoli_keski_kynnys', 10);
   if (huoliPaino >= huoliRaskasKynnys) taso = 'raskas';
