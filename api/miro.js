@@ -21,6 +21,11 @@
 // 2. Sovelluksen asetuksista "Redirect URI" = tämän endpointin osoite:
 //      https://kauppalista-nine.vercel.app/api/miro?action=callback
 //    (Miro vaatii TÄSMÄLLISEN täsmäyksen tähän — ei kauppatavaraa.)
+// 2b. SAMOISSA asetuksissa, "Permissions"-välilehti: rastita VÄHINTÄÄN
+//     boards:write (board/frame-luonti) ja boards:read (myöhempi muokkaus-
+//     lokin luku ajanoton varmistukseen, §4.3). Puuttuva scope näkyy vasta
+//     kun jotain yritetään tehdä ("insufficientPermissions") — tarkista
+//     TÄSSÄ VAIHEESSA, ei jälkikäteen (löydetty käytännössä 17.8.2026).
 // 3. Kopioi Client ID + Client Secret Vercelin ympäristömuuttujiin:
 //      MIRO_CLIENT_ID, MIRO_CLIENT_SECRET
 //    ja odota/tee uusi deploy (esim. tyhjä commit) että ne astuvat voimaan.
@@ -28,18 +33,24 @@
 //      https://miro.com/oauth/authorize?response_type=code&client_id=CLIENT_ID&redirect_uri=https%3A%2F%2Fkauppalista-nine.vercel.app%2Fapi%2Fmiro%3Faction%3Dcallback
 //    Hyväksy valtuutus.
 // 5. Miro ohjaa takaisin tähän endpointiin ?code=-parametrilla — tämä
-//    tiedosto vaihtaa sen tokeneiksi ja NÄYTTÄÄ ne KERRAN ruudulla.
-// 6. Kopioi access_token/refresh_token Vercelin muuttujiin:
-//      MIRO_ACCESS_TOKEN, MIRO_REFRESH_TOKEN
-//    Sulje välilehti heti kopioinnin jälkeen — tokeneita ei tallenneta
-//    minnekään tämän palvelimen toimesta, sivu on kertakäyttöinen.
+//    tiedosto vaihtaa sen tokeneiksi ja TALLENTAA NE SUORAAN miro_tokens-
+//    tauluun (ei manuaalista Vercel-kopiointia, ks. alla). Sivu näyttää
+//    myönnetyt scope-oikeudet vahvistukseksi.
+// 6. Jos scope-lista puuttuu boards:write:n (tai muun tarvittavan), palaa
+//    vaiheeseen 2b, korjaa, ja tee vaihe 4 UUDELLEEN — vanha token ei
+//    korjaannu itsestään, uusi valtuutus tarvitaan aina scope-muutoksen
+//    jälkeen.
 //
-// Miksi tokenit NÄYTETÄÄN callbackissa eikä kirjoiteta suoraan asetukset-
-// tauluun: sen RLS on auki KAIKILLE kirjautuneille (tarkistettu 17.8.2026)
-// — sopii board_id/frame_id-viitteille (ei salaisuuksia) muttei OAuth-
-// tokeneille. Pysyvä säilytys on OMA miro_tokens-taulu (sql/130) jonka RLS
-// on päällä ILMAN YHTÄÄN policya — vain service-role (SUPABASE_SERVICE_KEY,
-// sama kuin kaikki api/_lib-funktiot jo käyttävät) pääsee siihen käsiksi.
+// Miksi tokenit tallennetaan SUORAAN eikä näytetä kopioitavaksi: sen sijaan
+// että Katrin pitäisi muistaa päivittää sekä Vercelin ympäristömuuttujat
+// ETTÄ miro_tokens-taulu joka kerta kun uudelleenvaltuutus tehdään (esim.
+// scope-korjauksen jälkeen), tämä sivu ON jo palvelin ja kirjoittaa suoraan.
+// Miksi EI asetukset-tauluun: sen RLS on auki KAIKILLE kirjautuneille
+// (tarkistettu 17.8.2026) — sopii board_id/frame_id-viitteille (ei
+// salaisuuksia) muttei OAuth-tokeneille. Pysyvä säilytys on OMA
+// miro_tokens-taulu (sql/130) jonka RLS on päällä ILMAN YHTÄÄN policya —
+// vain service-role (SUPABASE_SERVICE_KEY, sama kuin kaikki api/_lib-
+// funktiot jo käyttävät) pääsee siihen käsiksi.
 //
 // Miksi ERI taulu tokeneille kuin Vercelin ympäristömuuttujat, vaikka
 // alkuperäinen suunnitelma oli "vain env-muuttujat": Miron refresh_token
@@ -230,12 +241,18 @@ async function kasitteleCallback(req, res) {
     return res.status(400).send('<h1>Miro hylkäsi vaihdon</h1><pre>' + escapeHtml(JSON.stringify(data, null, 2)) + '</pre><p>Koodi on kertakäyttöinen ja lyhytikäinen — jos tämä epäonnistui, tee vaihe 4 (valtuutuslinkin klikkaus) uudelleen alusta.</p>');
   }
 
+  // Tallennetaan SUORAAN miro_tokens-tauluun (2026-08-17, korjattu ensimmäisen
+  // kokeilun jälkeen — alkuperäinen "näytä ruudulla, kopioi Verceliin käsin"
+  // -malli olisi vaatinut Katrin muistavan PÄIVITTÄÄ myös miro_tokens-rivi
+  // uudestaan joka kerta kun scope-asetuksia korjataan ja uudelleenvaltuutus
+  // tehdään, koska haeToimivaAccessToken() lukee sitä ENNEN ympäristö-
+  // muuttujia. Suorempi: tämä sivu on jo palvelin, kirjoittaa suoraan.
+  await tallennaTokenit(data.access_token, data.refresh_token, data.expires_in || 3599);
+
   return res.status(200).send(
-    '<h1>Valmis — kopioi nämä Vercelin ympäristömuuttujiin NYT</h1>' +
-    '<p>Tätä sivua ei voi avata uudelleen (koodi on jo käytetty). Kopioi molemmat, lisää Verceliin, sulje välilehti.</p>' +
-    '<p><b>MIRO_ACCESS_TOKEN</b><br><code>' + escapeHtml(data.access_token || '') + '</code></p>' +
-    '<p><b>MIRO_REFRESH_TOKEN</b><br><code>' + escapeHtml(data.refresh_token || '') + '</code></p>' +
-    '<p style="color:#666">Voimassa ' + escapeHtml(String(data.expires_in || '?')) + ' sekuntia, mutta se ei haittaa — palvelinpuoli uusii access_tokenin automaattisesti refresh_tokenilla ennen jokaista kutsua kun se osa rakennetaan.</p>'
+    '<h1>Valmis</h1>' +
+    '<p>Tokenit tallennettu suoraan. Ei tarvitse kopioida mitään Verceliin — voit sulkea tämän välilehden.</p>' +
+    '<p style="color:#666">Myönnetyt oikeudet (scope): ' + escapeHtml(data.scope || '(ei ilmoitettu)') + '</p>'
   );
 }
 
