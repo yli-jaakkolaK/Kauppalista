@@ -1383,9 +1383,37 @@ document.getElementById('opinto-kurssi-poista-btn').addEventListener('click', as
   showHyttiView('reitti');
 });
 
-document.getElementById('opinto-lisaa-materiaalia-btn').addEventListener('click', function() {
+// Inline materiaalikenttä (2026-08-18, Katrin palaute — ks. index.html:n
+// oma kommentti samasta kohdasta). Sama tallennusydin kuin editori-viewilla
+// (suoritaEditorinTallennus + materiaaliKohdeInsertKentat), mutta EI
+// koskaan navigoida pois kurssisivulta — konteksti asetetaan juuri ennen
+// kirjoitusta ja puretaan heti perään, ei jää roikkumaan globaaliksi tilaksi.
+document.getElementById('opinto-kurssi-materiaali-tallenna-btn').addEventListener('click', async function() {
   if (!currentOpintoKurssi) return;
-  avaaLaiturinMateriaalille(currentOpintoKurssi);
+  const pinta = document.getElementById('opinto-kurssi-materiaali-pinta');
+  const teksti = pinta.value.trim();
+  if (teksti === '') { pinta.focus(); return; }
+  materiaaliKohdeKurssi = { id: currentOpintoKurssi.id, name: currentOpintoKurssi.name };
+  const onnistui = await suoritaEditorinTallennus(teksti);
+  materiaaliKohdeKurssi = null;
+  if (!onnistui) return;
+  pinta.value = '';
+  lataaOpintoKurssiMateriaalit();
+});
+
+document.getElementById('opinto-kurssi-materiaali-tiedosto-btn').addEventListener('click', function() {
+  document.getElementById('opinto-kurssi-materiaali-tiedosto-input').click();
+});
+
+document.getElementById('opinto-kurssi-materiaali-tiedosto-input').addEventListener('change', async function(e) {
+  if (!currentOpintoKurssi) return;
+  const file = e.target.files[0];
+  e.target.value = '';
+  if (!file) return;
+  materiaaliKohdeKurssi = { id: currentOpintoKurssi.id, name: currentOpintoKurssi.name };
+  await kasitteleEditoriTiedosto(file, 'opinto-kurssi-materiaali-tiedosto-tila');
+  materiaaliKohdeKurssi = null;
+  lataaOpintoKurssiMateriaalit();
 });
 
 // Materiaali-osio uudistettu (2026-08-16, Katrin pyyntö) — status-tietoinen
@@ -10922,11 +10950,6 @@ let materiaaliKohdeKurssi = null;
 // (yksi deadline saa tyypillisesti yhden tehtävänannon, ei monta osaa).
 let materiaaliKohdeDeadline = null;
 
-function avaaLaiturinMateriaalille(kurssi) {
-  materiaaliKohdeKurssi = { id: kurssi.id, name: kurssi.name };
-  avaaJaettuEditori({ tyyppi: 'laituri', otsikko: '✱ MATERIAALI ✱' });
-}
-
 // Insert-kentät kurssi- TAI deadline-kontekstin materiaalille — sama kolme
 // kenttää jokaisessa kolmesta insert-kohdasta (editorin teksti, tekstitiedosto,
 // pdf/kuva/pptx), ei toistettu ehtologiikkaa kolmesti. Tarkalleen yksi
@@ -10989,11 +11012,11 @@ function merkitseMateriaaliOhitetuksi(muruId) {
 
 function piirraMateriaaliJasennysKortti(rivi, li) {
   if (haeMateriaaliOhitetut().has(rivi.id)) return;
-  // Kurssikontekstissa (ks. avaaLaiturinMateriaalille) juuri lisätyt rivit
-  // ohittavat heuristiikan kokonaan — kurssi on jo tiedossa napista, ei
+  // Kurssikontekstissa (kurssisivun oma materiaalikenttä) juuri lisätyt
+  // rivit ohittavat heuristiikan kokonaan — kurssi on jo tiedossa, ei
   // tarvitse arvata onko teksti kurssimateriaalia (HYTTI_SPEKSI.md §8.3).
-  // Pysyvä tietokantamerkintä (materiaali_kurssi_id, sql/117), EI enää
-  // client-muistivarainen — ks. avaaLaiturinMateriaalille()-kommentti.
+  // Pysyvä tietokantamerkintä (materiaali_kurssi_id, sql/117), EI
+  // client-muistivarainen.
   if (!naytaakoKurssimateriaalilta(rivi.content) && !rivi.materiaali_kurssi_id) return;
 
   const kortti = document.createElement('li');
@@ -11039,8 +11062,9 @@ function rakennaMateriaaliJasennysPrompti(teksti, monessaOsassa) {
   return 'Tehtäväsi on jäsentää kurssimateriaali (esim. syllabus, aikataulu, litteroitu luento) rakenteeseen jota opiskelun seurantasovellus käyttää.\n' +
     'Tänään on ' + tanaanIso + '.\n\n' +
     (monessaOsassa
-      ? 'Materiaali on liitetty useassa osassa peräkkäin (merkitty "--- osa N ---" -väliotsikoin) — käsittele KAIKKI osat yhtenä kokonaisuutena, älä tee ehdotusta minkään yksittäisen osan perusteella. Jos materiaalissa on selkeä olemassa oleva otsikkojako, noudata sitä aiheiden rajauksessa. Jos ei ole, pilko materiaali järkeviksi aihekokonaisuuksiksi ikään kuin otsikoita ei olisi lainkaan.\n\n'
+      ? 'Materiaali on liitetty useassa osassa peräkkäin (merkitty "--- osa N ---" -väliotsikoin) — käsittele KAIKKI osat yhtenä kokonaisuutena, älä tee ehdotusta minkään yksittäisen osan perusteella.\n\n'
       : '') +
+    'Aiheiden rajaus (18.8.2026, tärkeä): jokainen "aihe" vastaa YHTÄ MODUULIA/VIIKKOA/ISOA KOKONAISUUTTA opiskelusuunnitelmassa, EI yksittäistä alaotsikkoa. Jos materiaalissa on kaksitasoinen numerointi (esim. "1.1", "1.2", "2.1", "2.2" tms.), YHDISTÄ kaikki saman ylätason numeron (1.*, 2.* jne.) alaotsikot YHDEKSI aiheeksi — älä tee omaa aihetta jokaisesta alaotsikosta. Tavoite on karkeasti yksi aihe per moduuli (jos materiaalissa on esim. 7 moduulia, tuota noin 7 aihetta, ei 30+). Jos materiaalissa ei ole mitään moduulijakoa, pilko järkeviksi, riittävän isoiksi aihekokonaisuuksiksi ikään kuin otsikoita ei olisi lainkaan — vältä liian pientä pilkontaa (yksittäinen käsite ei ole oma aihe).\n\n' +
     'Materiaali: "' + teksti + '"\n\n' +
     'Palauta VAIN JSON tässä muodossa, ei muuta tekstiä:\n' +
     '{\n' +
@@ -11109,8 +11133,8 @@ function avaaMateriaaliJasennysDialogi(rivit, jasennetty) {
   const esikatseluTeksti = rivit.length > 1 ? (rivit.length + ' osaa yhteensä') : rivi.content;
   document.getElementById('materiaali-jasennys-alkuperainen').textContent = '"' + esikatseluTeksti.slice(0, 200) + (esikatseluTeksti.length > 200 ? '…' : '') + '"';
   const kurssiInput = document.getElementById('materiaali-jasennys-kurssi-input');
-  // Kurssikontekstissa (ks. avaaLaiturinMateriaalille) kurssi on jo tiedossa
-  // — käyttäjän ei tarvitse kirjoittaa/tarkistaa sitä (HYTTI_SPEKSI.md §8.3).
+  // Kurssikontekstissa kurssi on jo tiedossa (kurssisivun oma materiaali-
+  // kenttä) — käyttäjän ei tarvitse kirjoittaa/tarkistaa sitä (HYTTI_SPEKSI.md §8.3).
   // Luetaan RIVILTÄ (materiaali_kurssi_nimi, sql/117), ei materiaaliKohdeKurssi-
   // muuttujasta — se on jo nollattu tähän mennessä (rivi voi tulla auki myös
   // myöhemmin, eri istunnossa, kuin milloin se lisättiin).
@@ -12504,9 +12528,6 @@ function avaaJaettuEditori(kohde) {
   if (luonnos) pinta.value = luonnos;
   document.getElementById('editori-otsikko').textContent = editoriKohde.otsikko || '✱ UUSI ✱';
   paivitaLaiturinMateriaaliBanneri();
-  // "Tallenna, lisää seuraava osa" (2026-08-17) — vain kurssikontekstissa,
-  // ks. tallennaEditoriJatka()-kommentti.
-  document.getElementById('editori-tallenna-jatka-btn').style.display = materiaaliKohdeKurssi ? 'block' : 'none';
   piilotaKaikkiNakymat();
   document.getElementById('editori-view').style.display = 'block';
   pinta.focus();
@@ -12581,28 +12602,6 @@ document.getElementById('editori-sulje-btn').addEventListener('click', function(
   tallennaEditoriJaSulje();
 });
 
-// "Tallenna, lisää seuraava osa" (2026-08-17, Katrin raportoima UI-bugi:
-// "kopioin tekstiä niin ei ollut mitään tallenna nappia"). Sulje-nappi (‹)
-// tallensi tekstin jo aiemminkin sulkiessaan, mutta ei näyttänyt siltä
-// mitenkään — ainoa näkyvä nappi editorissa oli "📎 Liitä tiedosto", joka
-// koskee vain tiedostoja. Tämä nappi on 1) selkeästi merkitty tallennukseksi
-// ja 2) JÄTTÄÄ editorin auki, jotta pitkän materiaalin voi liittää monessa
-// osassa peräkkäin ("1 osa kerrallaan ku ei aina ehdi koko rimpsua") tietäen
-// mistä jatkaa — jokainen osa tallentuu omana rivinään (näkyy allekkain
-// kurssisivun materiaalilistalla), älyn yhteinen tarkistus (pyydaMateriaali-
-// Jasennys) käsittelee kaikki odottavat osat yhtenä kokonaisuutena.
-document.getElementById('editori-tallenna-jatka-btn').addEventListener('click', async function() {
-  const pinta = document.getElementById('editori-pinta');
-  const teksti = pinta.value.trim();
-  const onnistui = await suoritaEditorinTallennus(teksti);
-  if (!onnistui) return;
-  tyhjennaEditoriLuonnos();
-  pinta.value = '';
-  pinta.focus();
-  naytaIlmoitus('Tallennettu — liitä seuraava osa, tai sulje kun kaikki on lisätty.');
-  if (currentOpintoKurssi) lataaOpintoKurssiMateriaalit();
-});
-
 document.getElementById('laituri-input').addEventListener('click', function() {
   avaaJaettuEditori({ tyyppi: 'laituri' });
 });
@@ -12667,28 +12666,32 @@ document.getElementById('editori-tiedosto-input').addEventListener('change', asy
   await kasitteleEditoriTiedosto(file);
 });
 
-function naytaEditoriTiedostoTila(teksti, onVirhe) {
-  const tilaEl = document.getElementById('editori-tiedosto-tila');
+// tilaElId (2026-08-18, ks. lataaOpintoKurssiMateriaalit-alueen inline-
+// materiaalikenttä) — sama tiedostonkäsittely toimii nyt kahdesta paikasta
+// (editori-view JA kurssisivun oma kenttä), kumpikin näyttää tilan omaan
+// elementtiinsä. Oletus säilyttää vanhan editori-viewin käytöksen.
+function naytaEditoriTiedostoTila(teksti, onVirhe, tilaElId) {
+  const tilaEl = document.getElementById(tilaElId || 'editori-tiedosto-tila');
   tilaEl.textContent = teksti;
   tilaEl.classList.toggle('editori-tiedosto-virhe', !!onVirhe);
   tilaEl.style.display = 'block';
 }
 
-async function kasitteleEditoriTiedosto(file) {
+async function kasitteleEditoriTiedosto(file, tilaElId) {
   const tyyppi = tiedostonTyyppi(file);
 
   if (tyyppi === 'hylatty') {
-    naytaEditoriTiedostoTila('Tiedostotyyppiä ei tueta (.' + tiedostonPaate(file.name) + ') — liitä sisältö tekstinä.', true);
+    naytaEditoriTiedostoTila('Tiedostotyyppiä ei tueta (.' + tiedostonPaate(file.name) + ') — liitä sisältö tekstinä.', true, tilaElId);
     return;
   }
 
   const kokoraja = tyyppi === 'pdf' ? TIEDOSTO_PDF_KOKORAJA : TIEDOSTO_MUU_KOKORAJA;
   if (file.size > kokoraja) {
-    naytaEditoriTiedostoTila('Tiedosto on liian iso (' + Math.round(file.size / 1024 / 1024) + ' MB, raja ' + Math.round(kokoraja / 1024 / 1024) + ' MB).', true);
+    naytaEditoriTiedostoTila('Tiedosto on liian iso (' + Math.round(file.size / 1024 / 1024) + ' MB, raja ' + Math.round(kokoraja / 1024 / 1024) + ' MB).', true, tilaElId);
     return;
   }
 
-  naytaEditoriTiedostoTila('Ladataan "' + file.name + '"...', false);
+  naytaEditoriTiedostoTila('Ladataan "' + file.name + '"...', false, tilaElId);
 
   try {
     if (tyyppi === 'teksti') {
@@ -12698,7 +12701,7 @@ async function kasitteleEditoriTiedosto(file) {
       // korvausmerkeiksi, ei pitäisi päätyä muruksi sellaisenaan.
       const teksti = await file.text();
       if (teksti.indexOf('�') !== -1) {
-        naytaEditoriTiedostoTila('Tiedosto ei näytä olevan tekstiä (binääridataa?) — ei lisätty.', true);
+        naytaEditoriTiedostoTila('Tiedosto ei näytä olevan tekstiä (binääridataa?) — ei lisätty.', true, tilaElId);
         return;
       }
       const { error } = await db.from('laituri').insert(Object.assign(
@@ -12706,7 +12709,7 @@ async function kasitteleEditoriTiedosto(file) {
         materiaaliKohdeInsertKentat()
       ));
       if (ilmoitaKirjoitusvirheesta(error, 'Tiedoston lisäys')) return;
-      naytaEditoriTiedostoTila('"' + file.name + '" lisätty.', false);
+      naytaEditoriTiedostoTila('"' + file.name + '" lisätty.', false, tilaElId);
       return;
     }
 
@@ -12717,7 +12720,7 @@ async function kasitteleEditoriTiedosto(file) {
     const { error: uploadError } = await db.storage.from('materiaali').upload(polku, file, { contentType: file.type || 'application/octet-stream' });
     if (uploadError) {
       console.error('Tiedoston tallennus Storageen epäonnistui:', uploadError);
-      naytaEditoriTiedostoTila('Tallennus epäonnistui — yritä uudelleen.', true);
+      naytaEditoriTiedostoTila('Tallennus epäonnistui — yritä uudelleen.', true, tilaElId);
       return;
     }
 
@@ -12738,13 +12741,13 @@ async function kasitteleEditoriTiedosto(file) {
           // (esim. liikaa sivuja) — ei hukata koko latausta, jatketaan
           // murun luontiin ilman poimittua tekstiä ja kerrotaan syy.
           console.error('Tekstin poiminta epäonnistui:', tulos.error);
-          naytaEditoriTiedostoTila((tulos.error || 'Tekstin poiminta epäonnistui') + ' — tiedosto silti tallennettu.', true);
+          naytaEditoriTiedostoTila((tulos.error || 'Tekstin poiminta epäonnistui') + ' — tiedosto silti tallennettu.', true, tilaElId);
         } else {
           poimittuTeksti = tulos.teksti;
         }
       } catch (poimintaVirhe) {
         console.error('Poimintapyyntö epäonnistui (verkko?):', poimintaVirhe.message);
-        naytaEditoriTiedostoTila('Tekstin poiminta epäonnistui — tiedosto silti tallennettu.', true);
+        naytaEditoriTiedostoTila('Tekstin poiminta epäonnistui — tiedosto silti tallennettu.', true, tilaElId);
       }
     }
 
@@ -12765,10 +12768,10 @@ async function kasitteleEditoriTiedosto(file) {
     });
     if (tiedostoError) console.error('Tiedoston metatiedon tallennus epäonnistui (tiedosto silti Storagessa ja murussa):', tiedostoError);
 
-    naytaEditoriTiedostoTila('"' + file.name + '" lisätty' + (poimittuTeksti ? ' ja teksti poimittu' : '') + '.', false);
+    naytaEditoriTiedostoTila('"' + file.name + '" lisätty' + (poimittuTeksti ? ' ja teksti poimittu' : '') + '.', false, tilaElId);
   } catch (e) {
     console.error('Tiedoston käsittely epäonnistui:', e.message);
-    naytaEditoriTiedostoTila('Tiedoston käsittely epäonnistui — yritä uudelleen.', true);
+    naytaEditoriTiedostoTila('Tiedoston käsittely epäonnistui — yritä uudelleen.', true, tilaElId);
   }
 }
 

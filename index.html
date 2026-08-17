@@ -584,16 +584,22 @@
     <div class="section-title">🗓️ Aikataulu (valinnainen)</div>
     <textarea id="opinto-kurssi-aikataulu" class="jatkorivi-teksti" rows="4" placeholder="1: Luku 1-2&#10;2: Luku 3&#10;3: Harjoitustyö..."></textarea>
 
-    <!-- Materiaali-osio uudistettu (2026-08-16, Katrin pyyntö) — korvaa
-         vanhan yhden ylikirjoitettavan tekstikentän status-tietoisella
-         listalla: jokainen "+ Lisää materiaalia" -kautta tuotu rivi näkyy
-         täällä omana rivinään (laituri.materiaali_kurssi_id, sql/117) ja
-         kertoo onko se vielä käsittelemättä vai jo jäsennetty aiheiksi/
-         deadlineiksi (piilota_laiturista). Ei enää erillistä tallennusnappia
-         — rivit syntyvät AINA saman editorin kautta joka jo tallentaa
-         itsensä sulkeutuessaan. -->
+    <!-- Materiaali-osio (2026-08-16, uudistettu status-listaksi; kenttä
+         inline 2026-08-18, Katrin palaute: "polku sinne materiaalin
+         lisäämiseen on jotenkin pitkä... muuttaisin lisää materiaalia
+         napin tilalle sen kentän johon materiaalit syötetään" — vanha
+         "+ Lisää materiaalia" -nappi avasi erillisen täysinäytön editorin
+         (navigointi pois kurssisivulta ja takaisin). Nyt kirjoitetaan/
+         liitetään SUORAAN tälle sivulle, ei koskaan poistuta siltä —
+         "missä oli" ei voi kadota kun ei koskaan mennä minnekään. -->
     <div class="section-title">📎 Materiaali</div>
-    <button class="dialog-btn dialog-btn-cancel" id="opinto-lisaa-materiaalia-btn" style="margin-bottom:10px">+ Lisää materiaalia</button>
+    <textarea id="opinto-kurssi-materiaali-pinta" class="editori-pinta opinto-materiaali-pinta" rows="4" placeholder="liitä tai kirjoita materiaalia..."></textarea>
+    <input type="file" id="opinto-kurssi-materiaali-tiedosto-input" style="display:none">
+    <div class="opinto-materiaali-toiminnot">
+      <button class="dialog-btn dialog-btn-cancel" id="opinto-kurssi-materiaali-tiedosto-btn">📎 Liitä tiedosto</button>
+      <button class="dialog-btn" id="opinto-kurssi-materiaali-tallenna-btn">💾 Tallenna</button>
+    </div>
+    <p class="editori-tiedosto-tila" id="opinto-kurssi-materiaali-tiedosto-tila" style="display:none"></p>
     <ul class="list" id="opinto-materiaali-lista"></ul>
     <p class="section-empty" id="opinto-materiaali-tyhja" style="display:none">Ei vielä materiaalia. "+ Lisää materiaalia" tuo tiedoston tai tekstin — tästä näet mitkä on jo käsitelty.</p>
     <!-- Kurssitason yhteinen tarkistus (2026-08-17) — käsittelee KAIKKI
@@ -1296,15 +1302,6 @@
     <input type="file" id="editori-tiedosto-input" style="display:none">
     <button class="dialog-btn dialog-btn-cancel" id="editori-tiedosto-btn">📎 Liitä tiedosto</button>
     <p class="editori-tiedosto-tila" id="editori-tiedosto-tila" style="display:none"></p>
-
-    <!-- Tallenna, lisää seuraava osa (2026-08-17, Katrin havainto: pitkä
-         materiaali kopioidaan usein monessa osassa, "ei aina ehdi koko
-         rimpsua kerralla") — näkyy vain kurssikontekstissa. Sulje-nappi
-         (‹) tallentaa jo tekstin kiinni sulkiessaan, mutta se ei ole
-         merkitty tallennus-toiminnoksi mitenkään eikä käyttäjä löytänyt
-         sitä ("ei ollut mitään tallenna nappia"). Tämä on selkeästi
-         merkitty ja jättää editorin auki seuraavaa osaa varten. -->
-    <button class="dialog-btn" id="editori-tallenna-jatka-btn" style="display:none;margin-top:10px">💾 Tallenna, lisää seuraava osa</button>
   </div>
 
   <div class="container" id="laituri-view" style="display:none">
