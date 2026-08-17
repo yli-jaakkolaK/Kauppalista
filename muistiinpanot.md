@@ -3942,15 +3942,35 @@ sw.js v141 → v142.
 
 ---
 
+### Konsolidoitu 4 Vercel-funktiota yhdeksi + Föli-integraation pohja (2026-08-17)
+
+Katrin kysymys "voiko jotain noista functions yhdistää yhdeksi" (Vercel-budjetti oli 11/12) johti kahteen erilliseen työhön samassa erässä.
+
+**1) Funktiokonsolidointi.** `muistutukset-laheta.js`, `caldav-sync.js`, `aly-nightly.js` olivat jo valmiiksi saman GitHub Actions -cronin (5 min välein) pingaamia samalla `MUISTUTUKSET_CRON_SECRET`:illä — ei mitään syytä pitää erillisinä deploymentteina. `push-test.js` liitettiin mukaan (jo ennestään lähes identtinen push-lähetyskoodi). Tiedostot siirrettiin SELLAISENAAN (cp, ei käsin uudelleenkirjoitusta — liian riskialtista race-condition-herkälle claim-logiikalle) `api/_lib/`-hakemistoon (alaviiva-etuliite jättää Vercelin reitityksen ulkopuolelle, sama konventio kuin `aly-classify.js`:llä jo oli). Uusi `api/cron.js` on ohut `?task=`-dispatcher. Päivitetty: GitHub Actions -workflow, kolme client-puolen fetch-kutsua (synkkaaICloud, synkkaaKalenteriNyt, laheteTestipush). **11/12 → 8/12.**
+
+**2) Föli-integraation pohjatyö**, osana Reitti-välilehden tulevaa viikkokalenteriruudukkoa (siirtymäblokit). Tutkittu suoraan livena ennen rakentamista (ei oletettu dokumentaatiosta): `data.foli.fi` on julkinen, CORS täysin auki (`Access-Control-Allow-Origin: *`), gzip neuvotellaan läpinäkyvästi tavallisen `fetch()`:n kautta — **koko integraatio toimii suoraan selaimesta, ei tarvita uutta Vercel-funktiota**. SIRI Stop Monitoring (`data.foli.fi/siri/sm/{stop_id}`) antaa reaaliaikaiset ennustetut lähtöajat, GTFS `stops`-endpoint koko pysäkkilistan nimineen/koordinaatteineen.
+
+Katrin oma havainto rakentamisen aikana: kalenteritapahtumien LOCATION-kenttä (iCalin standardi, ical.js parsii sen jo `caldav-sync.js`:ssä) oli koko ajan käytettävissä muttei koskaan tallennettu — ratkaisi ison osan "mihin ollaan menossa" -ongelmasta ilman mitään uutta syöttö-UI:ta. Uusi `kalenteri_tapahtumat.location`-sarake (sql/129), luetaan VAIN `taysi`-tilan syötteille (ei `vain_varattu`, sama yksityisyysperiaate kuin nimi/osallistujat).
+
+Kotipysäkin oletus (kun sijaintilupaa ei anneta/saada): Marsukatu, stop_id **6011** — Katri mainitsi kaksi tuttua pysäkkiä (Oskarinaukio Kaarinassa, Marsukatu Piispanristille päin) ja täsmensi ettei rajata vain niihin ("but there may be cases when i'm somewhere else complitely" → "but like 95% of the time one of those"): sijaintipohjainen haku etsii lähimmän KOKO n. 1600 pysäkin verkosta, kahta tuttua pysäkkiä ei ole erikseen koodattu ollenkaan paitsi oletusarvona. Marsukadun KAKSI stop_id:tä (6010/6011, sama katu vastakkaisiin suuntiin) disambiguoitiin tarkistamalla SIRI:n `destinationdisplay`-kentät livenä — 6011 näytti "Sorro-Piispanristi-Keskusta", 6010 "Naantali".
+
+Rakennettu: `haeFoliPysakit()` (1vrk localStorage-välimuisti), `haeSelaimenSijainti()` (foreground-only kertakysely — EI taustaseurantaa, iOS PWA ei salli sitä luotettavasti, eikä Katri sitä lopulta pyytänytkään kun rajaus selvisi), `lahinFoliPysakki()` (haversine), `etsiFoliPysakkiNimella()` (tekstihaku location-kenttää vasten, EI älyä), `haeFoliLahdot()` (SIRI-kysely).
+
+**Ei vielä käytössä missään UI:ssa** — viikkokalenteriruudukko itse (Reitti-välilehti) ei ole rakennettu, odottaa myös kalenterivärien hex-koodeja (kysytty, ei vielä vastattu). Skedulerisääntö kirjattu muttei koodattu: peräkkäiset samassa sijainnissa olevat tapahtumat eivät tarvitse siirtymäblokkia välissään, mutta lounas pitää silti sijoittua jonnekin päivään (sama "ei jätetä pois" -logiikka kuin Nyt-lokin ateriansijoittelussa).
+
+sw.js v142 → v144.
+
+---
+
 ## Nykytila (päivitetty 2026-08-17, COPILOT.md-sääntö 4 — huom: aiempi "Nykytila ja seuraavat askeleet" -osio jäi tästä tiedostosta ylemmäs pitkän istunnon aikana kertyneiden uusien osioiden taakse, ei enää tiedoston lopussa; siirto omaksi erikseen tehtäväksi työksi, ei nyt)
 
-**Viimeksi tehty tässä istunnossa, kaikki commitoitu ja pushattu mainiin, `sw.js` nyt v142:** Laituri-uudistuksen (§16.5c) jälkeen: Teema/Vahdittu-näkyvyystoggeli + listan siirtonappi, kuormitustila-kytkimen sijoitus ruudun kulmaan, opiskelumoottorin OSA A -minimipolku (ohjematriisi, kurssin tavoite/hoitotaso/aikataulu, solmun tuntemus/perustussolmu/retrieval-kentät, A4 Tehtävänäkymä) + sung-metodi.md:n täysi korvaus + korjaukset, B1:n jumi-kesto, **A5 — koko Nyt-välilehti uudistettu** (§4:n minuuttiruudukko-aikataulutin, Boost, deadline-rivi, muut vaihtoehdot, Miro-koukku), materiaalin lisäyksen korjaus (näkyvä tallennusnappi, monessa osassa liittäminen + älyn yhdistetty solmujako), ja **Nyt/Reitti-uudelleenjärjestely** (Tehtävät/Sillat/Huoli/Kortit pois Nyt-sivulta).
+**Viimeksi tehty tässä istunnossa, kaikki commitoitu ja pushattu mainiin, `sw.js` nyt v144:** Laituri-uudistuksen (§16.5c) jälkeen: Teema/Vahdittu-näkyvyystoggeli + listan siirtonappi, kuormitustila-kytkimen sijoitus ruudun kulmaan, opiskelumoottorin OSA A -minimipolku (ohjematriisi, kurssin tavoite/hoitotaso/aikataulu, solmun tuntemus/perustussolmu/retrieval-kentät, A4 Tehtävänäkymä) + sung-metodi.md:n täysi korvaus + korjaukset, B1:n jumi-kesto, **A5 — koko Nyt-välilehti uudistettu** (§4:n minuuttiruudukko-aikataulutin, Boost, deadline-rivi, muut vaihtoehdot, Miro-koukku), materiaalin lisäyksen korjaus (näkyvä tallennusnappi, monessa osassa liittäminen + älyn yhdistetty solmujako), **Nyt/Reitti-uudelleenjärjestely** (Tehtävät/Sillat/Huoli/Kortit pois Nyt-sivulta), **4→1 Vercel-funktiokonsolidointi** (11/12 → 8/12), ja **Föli-integraation pohjatyö** (sijainnin talteenotto + client-puolen pysäkki/SIRI-moduuli, ei vielä UI:ssa käytössä).
 
-**Odottaa Katria:** Miron kertaluonteinen OAuth-askel (developers.miro.com) ennen kuin palvelinpuolen Miro-proxya voi rakentaa. Vercel-funktiobudjetti 11/12 — Miro pitää toteuttaa yhtenä konsolidoituna `api/miro.js`-endpointtina.
+**Odottaa Katria:** (1) Miron kertaluonteinen OAuth-askel (developers.miro.com) ennen kuin palvelinpuolen Miro-proxya voi rakentaa — pitää toteuttaa yhtenä konsolidoituna `api/miro.js`-endpointtina, tilaa on nyt runsaasti (8/12). (2) Kalenterivärien hex-koodit (oma keltainen, yhteinen vihreä) — viimeisin kysymys jäi teknisen virheen takia vastaamatta, kysyttävä uudelleen.
 
-**Auki jäänyt / seuraavaksi (Katrin oma prioriteettijärjestys, kirjattu `VAIHE2_JA_LISAYKSET_CODELLE.md`):** kurssirajat ylittävä vaiheensiirtymäkehote (§7.4-laajennus), Retrieval Frame-per-kierros + koko Miro-integraatio (odottaa yllä mainittua Katrin askelta), deadline-rivin tiedostoliite (`materiaali_deadline_id`). "Kertausmatikka"-epäily jäi auki, ei vahvistettu bugiksi. Vapaatekstisten tehtävien "vinkki jonojärjestykseen" -idea jätettiin tietoisesti rakentamatta (liian epämääräinen, vaatisi AI-tekstintulkintaa vastoin Katrin omaa kustannuskuria).
+**Auki jäänyt / seuraavaksi:** viikkokalenteriruudukko itse (Reitti-välilehti, käyttää Föli-pohjatyötä + kalenteriväreja kun molemmat valmiit), kurssirajat ylittävä vaiheensiirtymäkehote (§7.4-laajennus), Retrieval Frame-per-kierros + koko Miro-integraatio, deadline-rivin tiedostoliite (`materiaali_deadline_id`). "Kertausmatikka"-epäily jäi auki, ei vahvistettu bugiksi. Vapaatekstisten tehtävien "vinkki jonojärjestykseen" -idea jätettiin tietoisesti rakentamatta.
 
-**Migraatiot ajettu suoraan Supabaseen MCP:llä koko istunnon ajan** (117–128), ei jätetty ajamatta.
+**Migraatiot ajettu suoraan Supabaseen MCP:llä koko istunnon ajan** (117–129), ei jätetty ajamatta.
 
 **Auki jäänyt:** Hytin kurssien/korttien otsikkovuoto-havainto (vanha, ei vahvistettu). Kalenterin kuittaus omilla riveillä (vanha). A2:n "kurssitason teksti"/"detail coding" (ei pakollinen) ei rakennettu. **Miro-embed** koko sovelluksessa (odottaa Katrin API-tunnuksia). **Nousemismuistutus** (§4.3) ei rakennettu. **Taitosolmujen ajanotto Nyt-lokista** katosi A5:n myötä eikä ole vielä korjattu (ks. yllä). OSA B muuten tietoisesti rajattu ulkopuolelle (yksi poikkeus: B1:n jumi-kesto).
 
