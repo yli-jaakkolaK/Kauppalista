@@ -106,7 +106,13 @@ Voimassa oleva rakenne:
 
 **Kalenterimerkinnät eivät ole kortteja** vaan viivalla merkittyjä rivejä lokissa. Ero näkyy kulmasilmäyksellä: kortti on tekemistä, merkintä on jotain jonka ympäri opiskelu kiertää.
 
-> **Värit — AUKKO, ristiriita paletin kanssa, EI ratkaistu 16.8:n yhdistelyssä.** Ehdotettu "perhekalenteri punaisella" — jos tämä tarkoittaa `--vaara`:a, se on ristiriidassa §5.1:n kanssa joka varaa `--vaara`:n yksinomaan huolilipulle/ristiriidalle, ei kalenterin sisällölle. "Luento sinapilla" (`--sinappi`) on myös ristiriidassa: `--sinappi` on merkitty koristeväriksi joka ei kosketa mitään (§14/design-kuvaus), ei tilanilmaisuun. "Sininen Juhan kalenterille" on **kokonaan uusi väri**, ei nykyisessä paletissa (paperi/muste/matalikko/karikko/syvänne/messinki/sinappi/vaara) — vaatii `satama-design-kuvaus.md`:n päivityksen ennen käyttöä. **Ei mitään näistä väreistä oteta käyttöön ilman Katrin vahvistusta**, koska ne rikkovat "yksi väri, yksi tarkoitus" -periaatetta sellaisenaan. Tämä on eri asia kuin itse rakennepäätös (edellä) — rakenne on nyt sovittu, värit eivät.
+> **Värit — osittain ratkaistu 17.8.2026.** Katrin päätös: Juhan kalenteri = iCalin oma sininen (ei Sataman paletin väri, luetaan suoraan iCal-syötteestä — ei siis välttämättä tarvitse omaa `--`-tokenia ollenkaan, jos syöte kertoo värin itse). Katrin oma kalenteri = punainen. Yhteinen = liila.
+>
+> **Ei ratkaistu, oikea ristiriita: Katrin "punainen" osuu suoraan `--vaara`:n (#B8433A) päälle**, joka on tarkoituksella varattu YKSINOMAAN huolilipulle/ristiriidalle (§5.1, "Ruorin oma, ei muuteta") — "yksi väri, yksi tarkoitus" -periaate rikkoutuu jos kalenterimerkintä ja huolilippu käyttävät samaa punaista, koska silloinväri ei enää kerro yksiselitteisesti kumpaa se tarkoittaa. Tarvitaan JOKO (a) toinen, selvästi `--vaara`:sta erottuva punaisen sävy Katrin kalenterille, TAI (b) eri väri kokonaan. Ei valittu vielä — Katrin päätös kumpi.
+>
+> "Liila" (yhteinen) on myös kokonaan uusi väri, ei nykyisessä paletissa — tarvitsee oman hex-arvon `satama-design-kuvaus.md`:hen ennen käyttöä, ei valittu vielä.
+>
+> **Siirtymäblokit (§8.1 Föli) tulevat samaan yhteyteen** — reaaliaikainen, ei paikkamerkki (Föli ei ole vielä rakennettu, ks. §8.1).
 
 **Tehty kohta katoaa näkymästä kokonaan** — ei himmene, ei jää yliviivattuna. Näkymän pitää palkita etenemistä eikä listata jäljellä olevaa; päivä näyttää konkreettisesti kevenevän. Reitin puolella kaikki näkyy edelleen, myös menneet.
 
@@ -228,7 +234,7 @@ Nyt-kortista/lokista avautuva näkymä yhdelle tehtävälle. **Sisältö ylhää
 3. Miro-embed (vain kun sitä tarvitaan, esim. encoding ja retrieval)
 4. kurssin materiaalit tai linkki niihin
 
-**Solmun kohta pitää voida luoda kurssin Framen sisälle tästä näkymästä.**
+**Solmun kohta pitää voida luoda kurssin Framen sisälle tästä näkymästä.** Miksi tätä tarvitaan (Katrin kysymys 17.8., vastaus): §10.1:n mallissa koko kurssi on YKSI iso käsitekartta, ja "kukin solmu avautuu siitä kohdasta jota on tarkoitus työstää" — eli jotta uuden solmun encoding voi ylipäätään avautua johonkin, sillä pitää ensin OLLA paikka isolla kartalla. Tämä nappi luo sen paikan (uuden alueen/section) kartalle ensimmäisellä kerralla kun solmua aletaan encodata — ilman tätä ei olisi mihin "avautua".
 
 **Ohjeen esitystapa:** koko vaiheen ohje näkyy kerralla, mutta **vain käsillä oleva vaihe on täpättävänä**. Nykyinen vaihe auki, muut kutistettuina — neljän vaiheen ohjeet yhtä aikaa ruudulla olisi juuri sitä hajautettua huomiota jota menetelmä varoittaa välttämään.
 
@@ -274,6 +280,24 @@ Päivät ovat **pystysarakkeita**, kussakin näkyy päivän mahdollinen kuorma.
 - **Toteutuneet opiskelut näkyvät Reitin kalenterissa** samassa näkymässä kuin live-luennot — tämä on päivän kertymän paikka, ei tarvita erillistä laskuria Nyt-välilehdelle.
 - **Kurssien välinen tauko on suunniteltu ikkuna.** Solmut joilla on silta tulevaan kurssiin jäävät kertausjonoon kurssin päätyttyä (esim. syksyn potenssit → tammikuun precalculus, ks. §7.2, §7.5). Tauko on optimaalinen hetki nostaa ne kertaukseen ennen kuin ne tulevat vastaan "uusina".
 - **Satama kysyy tulevat kurssit noin kuukautta ennen kurssin päättymistä**, jotta se tietää mitkä solmut jäävät jonoon.
+
+**Täydennykset 17.8.2026 (Katrin kuvaus koko Reitin rakenteesta):**
+
+> **RISTIRIITA yllä olevan kanssa, ei ratkaistu:** tämä kappale sanoo "päivät ovat pystysarakkeita." Katri kuvasi juuri Reitin yläosaksi **vaakaan menevän viikkokalenterin**. Nämä ovat eri asetteluja — kumpi on voimassa, tarvitaan päätös ennen rakentamista.
+
+Katrin kuvaus ylhäältä alas:
+
+1. **Viikkokalenteri (vaakaan), selvästi näkyvät luennot.** Sama rivi/näkymä säilyttää ja näyttää myös **mitä oikeasti opiskeltiin**, ei vain suunnitelmaa — luennot haetaan lukkarikoneesta (jo linjassa yllä olevan "toteutuneet opiskelut näkyvät" -kohdan kanssa, ei uusi päätös, vain sijainnin vahvistus).
+2. **Sen alla itslearningistä haetut tehtävät/palautukset/deadlinet.**
+   - **Uusi kysymys, ratkaistava ennen rakentamista:** voiko käyttäjä raahata tehtävänannon tiedoston itse siihen riviin jossa kyseinen palautus näkyy? Järkevä vastaus: kyllä — sama tiedostomekanismi kuin materiaalilla (§16.3, monta-moneen-suhde), kohteena tämä deadline-rivi eikä solmu. Ei rakennettu, ei speksattu tarkemmin.
+3. **Kurssit** (jo rakennettu, §16.4/§5.2).
+4. **Kertausjono kunkin kurssin alla.** Täpättävä lista solmuista jotka ovat unohtumisvaarassa. **Sung ei anna kiinteitä päiviä, mutta systeemin kannalta yksinkertaisin tavoiteväli on 1/3/7/21 päivää** — ei haittaa jos jollekin solmulle toteutuu vain 3 (lyhyttä) kertausta koko välillä, tavoite on suuntaa-antava, ei pakollinen täsmäys.
+
+**Suunnittelun kolmiportainen kadenssi (uusi, 17.8.2026):**
+
+1. **Kerran, koko syksylle:** täysi opiskelusuunnitelma tehdään kerralla niin että näkee miten kaikki mahtuu kalenteriin.
+2. **Kerran 2 viikossa:** tarkistus tarvitseeko muuttaa jotain — lähinnä onko kaikki kurssit "ajan tasalla" vai pitäisikö ehdottaa jotain kurssia kevennettäväksi.
+3. **Joka yö:** ajetaan uudelleenlaskenta joka näkee mitä oikeasti tehtiin (buusti käytetty vai ei, jäikö jotain kesken) — niin että aamulla on tuore suunnitelma valmiina herätessä. **Tämä on myös vastaus aiemmin avoimeksi jääneeseen kysymykseen "milloin päivä lasketaan uudelleen Boostin jälkeen" (A5_INTERAKTIOKARTTA.md kohta 4) — yöllä, ei käyttäjän paluun laukaisemana.**
 
 **Lisäys (relay 16.8.):**
 
@@ -528,7 +552,11 @@ Käyttäjä ei ole opiskellut Sungin menetelmällä aiemmin. Priming on luontevi
 - **Väärä tyyppi paljastuu oireesta** ("tämä ohje ei sovi tähän"), ei taksonomian arvioinnista.
 - **Tyypin vaihdos merkitään muistiin.** Priming on tyypistä riippumaton, encodingissa tehty työ ei katoa vaihdoksessa. Toistuvat vaihdokset kertovat että luokittelukehote kaipaa korjausta (data: §18).
 
-### 7.5 Ylläpito
+**Täydennys 17.8.2026 — Miro proseduraaliselle/analogiselle vs. konseptuaaliselle.** Vahvistettu (Katri): Miro-taulu on käytössä konseptuaaliselle ja analogiselle tyypille. Proseduraaliselle (matikka/koodaus/fysiikka-tehtävät) EI — korjattu encoding/procedural-ohje (sql/125) ei enää edes mainitse karttaa, se on "sovella todellisuudessa" -tyyppinen. **Mihin proseduraalinen työ sitten menee:** ei omaa uutta editoria — tehtävä ratkaistaan paperilla/koodiympäristössä kuten flashcardit-päätöksessä (§7.6-alue), tulos raportoidaan Satamaan lyhyenä täppäyksenä/tekstinä, ei täyttä ratkaisua tallenneta.
+
+**"Jäin jumiin kohtaan X" — proseduraaliselle jo olemassa oleva mekanismi.** Katrin kysymys vaikeuden kirjaamisesta ratkeaa jo rakennetulla `opinto_jumi_merkinnat`-taulukolla ("En pääse alkuun" -nappi, §4.9, `aika_kaytetty_s` lisätty tänään aiemmin) — sama mekanismi toimii tässä, ei tarvitse uutta.
+
+**Overlearning-kutsu, sijainti (uusi, 17.8.2026):** koska overlearning on vapaaehtoinen ja tulee vasta kun solmu on jo "valmis" (priming+encoding+retrieval×kertaa+reference tehty), luonteva paikka lyhyelle kutsulauseelle ("jos haluat haastaa itseäsi...") on juuri siinä valmistumishetkellä — kutsuvana, ei velvoittavana. Ei tarkkaa sanamuotoa vielä, vain sijainti.
 
 Solmu **poistuu retrieval-vaiheesta** kun jompikumpi täyttyy:
 
@@ -696,6 +724,8 @@ Perustelu: generaattorin tehtävää oikeasti painetaan, luentoa ei. Muotokielen
 **Täydennykset 9.8.2026 (toinen keskustelu):**
 
 - **Retrieval-kanvaasi: oma Frame per kierros.** Hytistä nappi → Miro sen solmun recall-Frameen → tallennus näkyy Hytissä. Jokainen kierros alkaa **täysin tyhjältä** — tyhjyys on free recallin pointti. Vanhoja ei poisteta: kierros 1 ja kierros 3 voi asettaa vierekkäin ja nähdä mitä on kertynyt.
+
+  **Vastaus Katrin 17.8. kysymykseen ("pitääkö rakentaa oma editori"):** ei tarvitse. Tämä Frame-per-kierros-malli ratkaisee juuri sen ongelman jota hän epäili — ei tarvitse manuaalisesti tyhjentää yhteistä taulua joka kierroksella, koska jokainen kierros SAA oman uuden Framen automaattisesti. Ei oma Satama-editori, ei toinen erillinen Miro-taulu jota pitäisi tyhjentää käsin — sama Miro-upotus, vain uusi Frame per kierros samalla kurssin taululla.
 - **Yksityisyys ratkeaa olemassa olevalla rakenteella.** Kohdevalinta ohjaa suoraan omaan hyttiin eikä toisen hyttiin ole näkymää — recall-kartta ei kulje jaetun näkymän kautta missään vaiheessa.
 - **Sisällöllisen vertailun raja:** Miron API palauttaa tekstilaatikoiden sisällön, joten äly näkee mitkä käsitteet muistettiin ja voi verrata materiaaliin. Se **ei näe piirroksia eikä symboleja**. Käytännössä riittää: kattavuus on se mitä siirtymäpäätökseen tarvitaan, ja rakenteen laadun käyttäjä täppää itse.
 

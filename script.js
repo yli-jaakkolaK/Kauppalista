@@ -1409,16 +1409,21 @@ async function lataaOpintoKurssiMateriaalit() {
     tila.textContent = rivi.materiaali_kasitelty ? '✓ käsitelty' : '⏳ odottaa';
     li.appendChild(tila);
 
-    if (!rivi.materiaali_kasitelty) {
-      const tarkistaNappi = document.createElement('button');
-      tarkistaNappi.className = 'dialog-btn dialog-btn-cancel';
-      tarkistaNappi.textContent = 'Tarkista';
-      tarkistaNappi.addEventListener('click', function() { pyydaMateriaaliJasennys(rivi, tarkistaNappi); });
-      li.appendChild(tarkistaNappi);
-    }
-
     listEl.appendChild(li);
   });
+
+  // Kurssitason yhteinen tarkistus (2026-08-17, Katrin havainto: pitkä
+  // materiaali liitetään usein monessa osassa — äly ei saa ehdottaa solmuja
+  // yhden osan perusteella, pitää nähdä kaikki odottavat osat yhtenä
+  // kokonaisuutena). Korvaa vanhan rivikohtaisen "Tarkista"-napin, joka olisi
+  // kutsunut älyä erikseen JOKAISELLE liitetylle osalle. Vanhin ensin
+  // (paluujärjestys `.order('created_at', {ascending:false})` yllä on
+  // näyttöä varten uusin-ensin — käännetään tässä liittämisjärjestykseen).
+  const odottavat = rivit.filter(function(r) { return !r.materiaali_kasitelty; }).slice().reverse();
+  const tarkistaKaikkiBtn = document.getElementById('opinto-materiaali-tarkista-kaikki-btn');
+  tarkistaKaikkiBtn.style.display = odottavat.length > 0 ? 'block' : 'none';
+  tarkistaKaikkiBtn.textContent = odottavat.length > 1 ? ('🧩 Tarkista kaikki odottavat (' + odottavat.length + ' osaa)') : '🧩 Tarkista';
+  tarkistaKaikkiBtn.onclick = function() { pyydaMateriaaliJasennys(odottavat, tarkistaKaikkiBtn); };
 }
 
 document.getElementById('opinto-kurssi-silta-linkki').addEventListener('click', function() {
@@ -10292,7 +10297,7 @@ function piirraMateriaaliJasennysKortti(rivi, li) {
   const tarkistaNappi = document.createElement('button');
   tarkistaNappi.className = 'dialog-btn dialog-btn-cancel';
   tarkistaNappi.textContent = 'Tarkista';
-  tarkistaNappi.addEventListener('click', function() { pyydaMateriaaliJasennys(rivi, tarkistaNappi); });
+  tarkistaNappi.addEventListener('click', function() { pyydaMateriaaliJasennys([rivi], tarkistaNappi); });
   napit.appendChild(tarkistaNappi);
 
   const eiNappi = document.createElement('button');
@@ -10308,10 +10313,19 @@ function piirraMateriaaliJasennysKortti(rivi, li) {
   li.insertAdjacentElement('afterend', kortti);
 }
 
-function rakennaMateriaaliJasennysPrompti(teksti) {
+// monessaOsassa (2026-08-17, Katrin havainto: pitkä materiaali liitetään
+// usein useassa palassa, "1 osa kerrallaan ku ei aina ehdi koko rimpsua") —
+// AI:n pitää käsitellä KAIKKI osat yhtenä kokonaisuutena eikä ehdottaa
+// solmuja yhden osan perusteella. Jos materiaalissa on selkeä olemassa
+// oleva otsikkojako, sitä noudatetaan; muuten AI pilkkoo järkevästi ikään
+// kuin otsikoita ei olisi.
+function rakennaMateriaaliJasennysPrompti(teksti, monessaOsassa) {
   const tanaanIso = paivamaaraISO(new Date());
   return 'Tehtäväsi on jäsentää kurssimateriaali (esim. syllabus, aikataulu, litteroitu luento) rakenteeseen jota opiskelun seurantasovellus käyttää.\n' +
     'Tänään on ' + tanaanIso + '.\n\n' +
+    (monessaOsassa
+      ? 'Materiaali on liitetty useassa osassa peräkkäin (merkitty "--- osa N ---" -väliotsikoin) — käsittele KAIKKI osat yhtenä kokonaisuutena, älä tee ehdotusta minkään yksittäisen osan perusteella. Jos materiaalissa on selkeä olemassa oleva otsikkojako, noudata sitä aiheiden rajauksessa. Jos ei ole, pilko materiaali järkeviksi aihekokonaisuuksiksi ikään kuin otsikoita ei olisi lainkaan.\n\n'
+      : '') +
     'Materiaali: "' + teksti + '"\n\n' +
     'Palauta VAIN JSON tässä muodossa, ei muuta tekstiä:\n' +
     '{\n' +
@@ -10323,12 +10337,22 @@ function rakennaMateriaaliJasennysPrompti(teksti) {
     '(ei liian pieniä yksittäisiä käsitteitä, ei liian isoja koko-kurssin-kokoisia).';
 }
 
-async function pyydaMateriaaliJasennys(rivi, nappi) {
+// rivit (2026-08-17, Katrin havainto: pitkä materiaali liitetään usein
+// monessa osassa, äly ei saa nähdä/ehdottaa vain viimeisimmän osan
+// perusteella) — AINA taulukko, myös yhden rivin tapauksessa (Laiturin
+// yleinen heuristiikkalöydös, ei kurssikontekstia). Rivit yhdistetään
+// content-kentistä yhdeksi tekstiksi "--- osa N ---" -väliotsikoin kun
+// niitä on useampi.
+async function pyydaMateriaaliJasennys(rivit, nappi) {
   const alkuperainenTeksti = nappi.textContent;
   nappi.disabled = true;
   nappi.textContent = 'Tarkistetaan...';
 
-  const prompti = rakennaMateriaaliJasennysPrompti(rivi.content);
+  const monessaOsassa = rivit.length > 1;
+  const yhdistettyTeksti = monessaOsassa
+    ? rivit.map(function(r, i) { return '--- osa ' + (i + 1) + ' ---\n' + r.content; }).join('\n\n')
+    : rivit[0].content;
+  const prompti = rakennaMateriaaliJasennysPrompti(yhdistettyTeksti, monessaOsassa);
   let tulos = null;
   let virhe = null;
   try {
@@ -10358,11 +10382,13 @@ async function pyydaMateriaaliJasennys(rivi, nappi) {
     return;
   }
 
-  avaaMateriaaliJasennysDialogi(rivi, jasennetty);
+  avaaMateriaaliJasennysDialogi(rivit, jasennetty);
 }
 
-function avaaMateriaaliJasennysDialogi(rivi, jasennetty) {
-  document.getElementById('materiaali-jasennys-alkuperainen').textContent = '"' + rivi.content.slice(0, 200) + (rivi.content.length > 200 ? '…' : '') + '"';
+function avaaMateriaaliJasennysDialogi(rivit, jasennetty) {
+  const rivi = rivit[0]; // kurssikontekstissa kaikki rivit jakavat saman kurssin — riittää edustajaksi
+  const esikatseluTeksti = rivit.length > 1 ? (rivit.length + ' osaa yhteensä') : rivi.content;
+  document.getElementById('materiaali-jasennys-alkuperainen').textContent = '"' + esikatseluTeksti.slice(0, 200) + (esikatseluTeksti.length > 200 ? '…' : '') + '"';
   const kurssiInput = document.getElementById('materiaali-jasennys-kurssi-input');
   // Kurssikontekstissa (ks. avaaLaiturinMateriaalille) kurssi on jo tiedossa
   // — käyttäjän ei tarvitse kirjoittaa/tarkistaa sitä (HYTTI_SPEKSI.md §8.3).
@@ -10428,7 +10454,7 @@ function avaaMateriaaliJasennysDialogi(rivi, jasennetty) {
     deadlineLista.appendChild(li);
   });
 
-  document.getElementById('materiaali-jasennys-tallenna-btn').onclick = function() { tallennaMateriaaliJasennys(rivi); };
+  document.getElementById('materiaali-jasennys-tallenna-btn').onclick = function() { tallennaMateriaaliJasennys(rivit); };
   document.getElementById('materiaali-jasennys-overlay').style.display = 'flex';
 }
 
@@ -10446,7 +10472,8 @@ async function haeTaiLuoOpintoKurssiNimella(nimi) {
   return await db.from('opinto_kurssit').insert({ name: nimi, owner_id: currentUserId }).select().single();
 }
 
-async function tallennaMateriaaliJasennys(rivi) {
+async function tallennaMateriaaliJasennys(rivit) {
+  const rivi = rivit[0];
   const kurssiNimi = document.getElementById('materiaali-jasennys-kurssi-input').value.trim();
   if (!kurssiNimi) { naytaIlmoitus('Anna kurssin nimi.'); return; }
 
@@ -10490,8 +10517,10 @@ async function tallennaMateriaaliJasennys(rivi) {
   // kurssisivun oma "✓ käsitelty" -tila, ei sama asia kuin Laiturista
   // piiloutuminen. merkitseMateriaaliOhitetuksi() pysyy käytössä VAIN
   // "Ei liity" -hylkäykselle (ks. piirraMateriaaliJasennysKortti) — se on
-  // eri asia: ehdotuksen hylkäys, ei sisällön piilotus.
-  const { error: piilotaError } = await db.from('laituri').update({ piilota_laiturista: true, materiaali_kasitelty: true }).eq('id', rivi.id);
+  // eri asia: ehdotuksen hylkäys, ei sisällön piilotus. Merkitään KAIKKI
+  // yhdistetyt rivit (ei vain ensimmäinen) jottei sama osa jää ikuisesti
+  // "⏳ odottaa" -tilaan yhdistetyn tarkistuksen jälkeen.
+  const { error: piilotaError } = await db.from('laituri').update({ piilota_laiturista: true, materiaali_kasitelty: true }).in('id', rivit.map(function(r) { return r.id; }));
   if (piilotaError) console.error('Materiaalin piilotus/käsittelymerkintä epäonnistui (tallennus onnistui silti):', piilotaError);
   document.getElementById('materiaali-jasennys-overlay').style.display = 'none';
   naytaIlmoitus('Tallennettu Opintopolulle (' + kurssiNimi + ').');
@@ -11751,27 +11780,21 @@ function avaaJaettuEditori(kohde) {
   if (luonnos) pinta.value = luonnos;
   document.getElementById('editori-otsikko').textContent = editoriKohde.otsikko || '✱ UUSI ✱';
   paivitaLaiturinMateriaaliBanneri();
+  // "Tallenna, lisää seuraava osa" (2026-08-17) — vain kurssikontekstissa,
+  // ks. tallennaEditoriJatka()-kommentti.
+  document.getElementById('editori-tallenna-jatka-btn').style.display = materiaaliKohdeKurssi ? 'block' : 'none';
   piilotaKaikkiNakymat();
   document.getElementById('editori-view').style.display = 'block';
   pinta.focus();
 }
 
-async function tallennaEditoriJaSulje() {
-  const pinta = document.getElementById('editori-pinta');
-  const teksti = pinta.value.trim();
-  const palaaLaituriin = function() {
-    piilotaKaikkiNakymat();
-    document.getElementById('laituri-view').style.display = 'block';
-    naytaAlapalkki('laituri');
-    lataaLaituri(document.getElementById('laituri-search').value.trim());
-    merkitseLaituriNahdyksi();
-  };
-  if (teksti === '') {
-    // Tyhjä editori suljetaan ilman kirjoitusta — ei tyhjää laituri-riviä.
-    peruLaiturinMateriaaliKonteksti();
-    palaaLaituriin();
-    return;
-  }
+// Yhteinen tallennuslogiikka (2026-08-17, eriytetty tallennaEditoriJaSulje/
+// tallennaEditoriJatka:n yhteiseksi ytimeksi) — laukaisusanan tunnistus +
+// varsinainen insert. Palauttaa true jos tekstille TEHTIIN jotain (tallennus
+// tai ehdotus), false jos teksti oli tyhjä tai kirjoitus epäonnistui (jolloin
+// kutsuja EI saa tyhjentää luonnosta, "ei koskaan kadota ajatusta").
+async function suoritaEditorinTallennus(teksti) {
+  if (teksti === '') return false;
 
   // Laukaisusana (2026-07-18, ks. muistiinpanot.md "Laukaisusana Laiturissa"):
   // "Juhalle:"/"laita Juhalle:" rivin alussa ohittaa tavallisen lisäyksen
@@ -11781,10 +11804,7 @@ async function tallennaEditoriJaSulje() {
   if (ehdotusSisalto) {
     const onnistui = await ehdotaSisaltoToiselle(ehdotusSisalto);
     naytaIlmoitus(onnistui ? ('Ehdotettu ' + henkiloAllatiivi(toinenKayttaja.henkilo)) : 'Ehdotuksen lähetys epäonnistui');
-    tyhjennaEditoriLuonnos();
-    peruLaiturinMateriaaliKonteksti();
-    palaaLaituriin();
-    return;
+    return true;
   }
 
   const { error } = await db.from('laituri').insert(Object.assign(
@@ -11796,14 +11816,67 @@ async function tallennaEditoriJaSulje() {
   // ei onnistunut, muuten juuri se turvaverkko (localStorage-luonnos)
   // katoaisi samalla hetkellä kun sille olisi eniten tarvetta (ks.
   // muistiinpanot.md "Kirjoituspolkujen auditointi").
-  if (ilmoitaKirjoitusvirheesta(error, 'Laituri-lisäys')) return;
+  if (ilmoitaKirjoitusvirheesta(error, 'Laituri-lisäys')) return false;
+  return true;
+}
+
+async function tallennaEditoriJaSulje() {
+  const pinta = document.getElementById('editori-pinta');
+  const teksti = pinta.value.trim();
+  // Kurssikonteksti napattu talteen ENNEN peruLaiturinMateriaaliKonteksti():
+  // sen jälkeen palataan kurssisivulle (ei geneeriseen Laituriin) jotta
+  // kasvava materiaalilista näkyy heti (Katrin havainto 17.8.2026 — muuten
+  // ei tunnu siltä että osat todella kertyvät).
+  const kurssiJohonPalataan = materiaaliKohdeKurssi;
+  const palaaLaituriin = function() {
+    piilotaKaikkiNakymat();
+    document.getElementById('laituri-view').style.display = 'block';
+    naytaAlapalkki('laituri');
+    lataaLaituri(document.getElementById('laituri-search').value.trim());
+    merkitseLaituriNahdyksi();
+  };
+  const palaaKurssille = async function() {
+    const { data: kurssi } = await db.from('opinto_kurssit').select().eq('id', kurssiJohonPalataan.id).single();
+    if (kurssi) avaaOpintoKurssi(kurssi); else palaaLaituriin();
+  };
+  if (teksti === '') {
+    // Tyhjä editori suljetaan ilman kirjoitusta — ei tyhjää laituri-riviä.
+    peruLaiturinMateriaaliKonteksti();
+    if (kurssiJohonPalataan) await palaaKurssille(); else palaaLaituriin();
+    return;
+  }
+
+  const onnistui = await suoritaEditorinTallennus(teksti);
+  if (!onnistui) return;
   tyhjennaEditoriLuonnos();
   peruLaiturinMateriaaliKonteksti();
-  palaaLaituriin();
+  if (kurssiJohonPalataan) await palaaKurssille(); else palaaLaituriin();
 }
 
 document.getElementById('editori-sulje-btn').addEventListener('click', function() {
   tallennaEditoriJaSulje();
+});
+
+// "Tallenna, lisää seuraava osa" (2026-08-17, Katrin raportoima UI-bugi:
+// "kopioin tekstiä niin ei ollut mitään tallenna nappia"). Sulje-nappi (‹)
+// tallensi tekstin jo aiemminkin sulkiessaan, mutta ei näyttänyt siltä
+// mitenkään — ainoa näkyvä nappi editorissa oli "📎 Liitä tiedosto", joka
+// koskee vain tiedostoja. Tämä nappi on 1) selkeästi merkitty tallennukseksi
+// ja 2) JÄTTÄÄ editorin auki, jotta pitkän materiaalin voi liittää monessa
+// osassa peräkkäin ("1 osa kerrallaan ku ei aina ehdi koko rimpsua") tietäen
+// mistä jatkaa — jokainen osa tallentuu omana rivinään (näkyy allekkain
+// kurssisivun materiaalilistalla), älyn yhteinen tarkistus (pyydaMateriaali-
+// Jasennys) käsittelee kaikki odottavat osat yhtenä kokonaisuutena.
+document.getElementById('editori-tallenna-jatka-btn').addEventListener('click', async function() {
+  const pinta = document.getElementById('editori-pinta');
+  const teksti = pinta.value.trim();
+  const onnistui = await suoritaEditorinTallennus(teksti);
+  if (!onnistui) return;
+  tyhjennaEditoriLuonnos();
+  pinta.value = '';
+  pinta.focus();
+  naytaIlmoitus('Tallennettu — liitä seuraava osa, tai sulje kun kaikki on lisätty.');
+  if (currentOpintoKurssi) lataaOpintoKurssiMateriaalit();
 });
 
 document.getElementById('laituri-input').addEventListener('click', function() {

@@ -535,6 +535,12 @@
     <button class="dialog-btn dialog-btn-cancel" id="opinto-lisaa-materiaalia-btn" style="margin-bottom:10px">+ Lisää materiaalia</button>
     <ul class="list" id="opinto-materiaali-lista"></ul>
     <p class="section-empty" id="opinto-materiaali-tyhja" style="display:none">Ei vielä materiaalia. "+ Lisää materiaalia" tuo tiedoston tai tekstin — tästä näet mitkä on jo käsitelty.</p>
+    <!-- Kurssitason yhteinen tarkistus (2026-08-17) — käsittelee KAIKKI
+         odottavat osat yhtenä kokonaisuutena (Katrin havainto: pitkä
+         materiaali liitetään usein monessa osassa, äly ei saa ehdottaa
+         solmuja yhden osan perusteella). Korvaa vanhan rivikohtaisen
+         "Tarkista"-napin. -->
+    <button class="dialog-btn dialog-btn-cancel" id="opinto-materiaali-tarkista-kaikki-btn" style="display:none;margin-top:6px">🧩 Tarkista</button>
 
     <!-- Siltasolmut TÄSSÄ kontekstissa (Katrin pyyntö 2026-08-16: "solmut
          samalle sivulle missä materiaalin lisäys tapahtuu") — silta on
@@ -1221,6 +1227,15 @@
     <input type="file" id="editori-tiedosto-input" style="display:none">
     <button class="dialog-btn dialog-btn-cancel" id="editori-tiedosto-btn">📎 Liitä tiedosto</button>
     <p class="editori-tiedosto-tila" id="editori-tiedosto-tila" style="display:none"></p>
+
+    <!-- Tallenna, lisää seuraava osa (2026-08-17, Katrin havainto: pitkä
+         materiaali kopioidaan usein monessa osassa, "ei aina ehdi koko
+         rimpsua kerralla") — näkyy vain kurssikontekstissa. Sulje-nappi
+         (‹) tallentaa jo tekstin kiinni sulkiessaan, mutta se ei ole
+         merkitty tallennus-toiminnoksi mitenkään eikä käyttäjä löytänyt
+         sitä ("ei ollut mitään tallenna nappia"). Tämä on selkeästi
+         merkitty ja jättää editorin auki seuraavaa osaa varten. -->
+    <button class="dialog-btn" id="editori-tallenna-jatka-btn" style="display:none;margin-top:10px">💾 Tallenna, lisää seuraava osa</button>
   </div>
 
   <div class="container" id="laituri-view" style="display:none">
