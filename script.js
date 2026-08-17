@@ -20,6 +20,7 @@ function piilotaKaikkiNakymat() {
   document.getElementById('teema-view').style.display = 'none';
   document.getElementById('vahdittu-view').style.display = 'none';
   document.getElementById('opinto-kurssi-view').style.display = 'none';
+  document.getElementById('opinto-tehtava-view').style.display = 'none';
   document.getElementById('taitosolmu-view').style.display = 'none';
   document.getElementById('lapsi-view').style.display = 'none';
   piilotaAlapalkki();
@@ -12989,6 +12990,16 @@ async function lataaHyttiOpiskeluaika() {
     loppuInput.value = rivi ? rivi.paattyy.slice(0, 5) : '15:30';
     el.appendChild(loppuInput);
 
+    // Kentät ESITÄYTTYVÄT oletusarvolla vaikka mitään ei ole vielä
+    // tallennettu — ilman tätä merkkiä se näyttää tallennetulta vaikka ei
+    // ole (Katrin havaitsema luottamusaukko 18.8.2026).
+    if (!rivi) {
+      const merkki = document.createElement('span');
+      merkki.className = 'hytti-opiskeluaika-ei-tallennettu';
+      merkki.textContent = 'ei tallennettu';
+      el.appendChild(merkki);
+    }
+
     async function tallenna() {
       const alku = alkuInput.value, loppu = loppuInput.value;
       if (!alku || !loppu || alku >= loppu) {
@@ -13010,6 +13021,30 @@ async function lataaHyttiOpiskeluaika() {
     ruudukko.appendChild(el);
   }
 }
+
+// Arkipäivien pikatäyttö (2026-08-18) — täyttää ma–pe (viikonpaiva 1–5)
+// yhdellä painalluksella sen sijaan että kaikki viisi päivää pitäisi
+// käydä läpi erikseen (ks. index.html:n oma kommentti samasta kohdasta).
+document.getElementById('hytti-opiskeluaika-arki-btn').addEventListener('click', async function() {
+  if (!currentUserId) return;
+  const alku = document.getElementById('hytti-opiskeluaika-arki-alku').value;
+  const loppu = document.getElementById('hytti-opiskeluaika-arki-loppu').value;
+  if (!alku || !loppu || alku >= loppu) {
+    naytaIlmoitus('Alun pitää olla ennen loppua');
+    return;
+  }
+  const rivit = [1, 2, 3, 4, 5].map(function(vp) {
+    return { owner_id: currentUserId, viikonpaiva: vp, alkaa: alku, paattyy: loppu };
+  });
+  const { error } = await db.from('hytti_opiskeluaika').upsert(rivit, { onConflict: 'owner_id,viikonpaiva' });
+  if (error) {
+    console.error('Arkipäivien opiskeluajan tallennus epäonnistui:', error);
+    naytaIlmoitus('Tallennus epäonnistui');
+    return;
+  }
+  naytaIlmoitus('Ma–pe: ' + alku + '–' + loppu);
+  lataaHyttiOpiskeluaika();
+});
 
 async function lataaHyttiSuljetutIkkunat() {
   if (!currentUserId) return;

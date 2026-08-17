@@ -1149,7 +1149,23 @@
       <input type="number" class="settings-numero-input" id="aterian-kesto-input" min="1" step="1">
     </div>
 
-    <p class="section-empty">Päivän opiskeluaika (oletus 09:00–15:30, säädettävissä päiväkohtaisesti)</p>
+    <!-- Arkipäivien pikatäyttö (2026-08-18, Katrin palaute: "9.15-15.30 on
+         opiskeluaika... toi taitaa olla asetuksissa säädettävissä mut ei
+         näytä ihan vielä toimivan" — tietokannasta tarkistettu: taulu oli
+         täysin tyhjä, ei yhtään tallennettua riviä. Todennäköinen syy:
+         alla oleva ruudukko ESITÄYTTI 09:00/15:30-oletuksen kenttiin näyttäen
+         siltä että se on jo tallennettu, mutta se on VAIN näytettävä
+         placeholder-arvo — tallennus vaatii jonkin kentän oikean MUUTOKSEN
+         (change-tapahtuma), ei pelkkää olemassaolevan arvon vahvistusta.
+         Tämä pikarivi täyttää ma–pe yhdellä painalluksella eikä vaadi
+         viiden erillisen päivän läpikäyntiä. -->
+    <p class="section-empty">Päivän opiskeluaika (oletus 09:00–15:30, säädettävissä päiväkohtaisesti alla)</p>
+    <div class="hytti-ikkuna-lisays" id="hytti-opiskeluaika-arki-rivi">
+      <input type="time" class="settings-numero-input" id="hytti-opiskeluaika-arki-alku" value="09:15">
+      <span>–</span>
+      <input type="time" class="settings-numero-input" id="hytti-opiskeluaika-arki-loppu" value="15:30">
+      <button class="dialog-btn dialog-btn-cancel" id="hytti-opiskeluaika-arki-btn">Käytä ma–pe</button>
+    </div>
     <div id="hytti-opiskeluaika-ruudukko"></div>
 
     <p class="section-empty">Suljetut ikkunat — generaattorin rajoite, ei näy päivänäkymässä</p>
