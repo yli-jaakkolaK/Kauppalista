@@ -3865,16 +3865,22 @@ Katri toimitti ison "Sataman opiskelumoottori — rakennusjärjestys" -dokumenti
 
 **Ei vielä testattu oikealla laitteella** — erityisesti koko Tehtävänäkymän vaiheittainen eteneminen ja ajanoton automaattinen alku/loppu.
 
-sw.js v133 → v135 (v134 välissä ohjematriisi-taulun lisäyksen yhteydessä, ei omaa UI-muutosta).
+**Jälkikorjaus samassa istunnossa, koodikatselmoinnista (ei käyttäjän raportoima):** "✓ Merkitse tehdyksi" teki retrieval-kierroksen tavoitteen täyttyessä kaksi erillistä tietokantakirjoitusta peräkkäin (kierroslaskuri, sitten vaiheenvaihto) — jos jälkimmäinen epäonnistui verkkokatkoon, uusintapainallus olisi kasvattanut kierroslaskuria uudelleen ennen kuin vaiheenvaihto viimein onnistui. Yhdistetty yhdeksi kirjoitukseksi.
+
+**A5:n tarvitsemat vastaukset odottavat Katria** — SATAMA_SPEKSI.md:n oma huomio Nyt-näkymän "ylimääräisistä asioista" jäi 16.8. tarkentamatta, joten A5 (viimeinen OSA A:n viidestä) ei alkanut. Katri: "voi jatkaa muuta, palaan vastauksineen."
+
+**Sillä välin pieni, turvallinen OSA B -lisäys:** B1 vaatii nimenomaisesti "epäonnistumiseen käytetyn ajan" datana ("niihin käytetty aika ovat tärkeää dataa") — `opinto_jumi_merkinnat` (sql/124) tallensi jo tapahtuman muttei kestoa. Lisätty `aika_kaytetty_s` (sql/126), laskettu tehtävänäkymän avautumishetkestä jumi-painallukseen. Ei omaa näkymää (B1: "riittää että data tallentuu").
+
+sw.js v133 → v137 (v134/v136 välissä pieniä taustamuutoksia, ei omaa UI-muutosta).
 
 ---
 
 ## Nykytila (päivitetty 2026-08-17, COPILOT.md-sääntö 4 — huom: aiempi "Nykytila ja seuraavat askeleet" -osio jäi tästä tiedostosta ylemmäs pitkän istunnon aikana kertyneiden uusien osioiden taakse, ei enää tiedoston lopussa; siirto omaksi erikseen tehtäväksi työksi, ei nyt)
 
-**Viimeksi tehty tässä istunnossa, kaikki commitoitu ja pushattu mainiin, `sw.js` nyt v135:** Laituri-uudistuksen (§16.5c) jälkeen: Teema/Vahdittu-näkyvyystoggeli + listan siirtonappi, kuormitustila-kytkimen sijoitus ruudun kulmaan, ja isoin: opiskelumoottorin OSA A -minimipolku (ohjematriisi, kurssin tavoite/hoitotaso/aikataulu, solmun tuntemus/perustussolmu/retrieval-kentät, uusi Tehtävänäkymä) + sung-metodi.md:n täysi korvaus 17.8.2026-versiolla ja siitä löytyneiden kahden asiasisältövirheen (Reference-parkkipaikka, GRIND-lyhenne) korjaus jo ajettuun ohjematriisi-seediin.
+**Viimeksi tehty tässä istunnossa, kaikki commitoitu ja pushattu mainiin, `sw.js` nyt v137:** Laituri-uudistuksen (§16.5c) jälkeen: Teema/Vahdittu-näkyvyystoggeli + listan siirtonappi, kuormitustila-kytkimen sijoitus ruudun kulmaan, ja isoin: opiskelumoottorin OSA A -minimipolku (ohjematriisi, kurssin tavoite/hoitotaso/aikataulu, solmun tuntemus/perustussolmu/retrieval-kentät, uusi Tehtävänäkymä) + sung-metodi.md:n täysi korvaus 17.8.2026-versiolla ja siitä löytyneiden kahden asiasisältövirheen (Reference-parkkipaikka, GRIND-lyhenne) korjaus jo ajettuun ohjematriisi-seediin + retrieval-kirjoitusten yhdistäminen + B1:n jumi-kesto.
 
-**Migraatiot ajettu suoraan Supabaseen MCP:llä koko istunnon ajan** (117–125), ei jätetty ajamatta.
+**Migraatiot ajettu suoraan Supabaseen MCP:llä koko istunnon ajan** (117–126), ei jätetty ajamatta.
 
-**Auki jäänyt:** Hytin kurssien/korttien otsikkovuoto-havainto (ei vahvistettu, ei staattisesti löydetty — tarvitsee Katrin live-toistokuvauksen). Kalenterin kuittaus omilla riveillä (vanha, ei tässä istunnossa käsitelty). A2:n "kurssitason teksti"/"detail coding" (rakennusjärjestys-dokumentti, ei pakollinen) ei rakennettu. A5 (Nyt-näkymän uudistus) ei alkanut. Iso, tietoisesti rajattu ulkopuolelle: OSA B kokonaisuudessaan (12 kohtaa).
+**Auki jäänyt:** Hytin kurssien/korttien otsikkovuoto-havainto (ei vahvistettu, ei staattisesti löydetty — tarvitsee Katrin live-toistokuvauksen). Kalenterin kuittaus omilla riveillä (vanha, ei tässä istunnossa käsitelty). A2:n "kurssitason teksti"/"detail coding" (rakennusjärjestys-dokumentti, ei pakollinen) ei rakennettu. **A5 (Nyt-näkymän uudistus) odottaa Katrin vastausta** siitä mitä nykyisessä Nyt-näkymässä on "ylimääräistä" (SATAMA_SPEKSI.md, jäi 16.8. tarkentamatta) — viimeinen OSA A:n viidestä kohdasta, ei aloitettu tästä syystä. Iso, tietoisesti rajattu ulkopuolelle: OSA B kokonaisuudessaan (12 kohtaa, yksi pieni poikkeus tehty: B1:n jumi-kesto).
 
 **Seuraava luonnollinen askel: elävä testaus.** Sekä Laituri-uudistus että koko uusi Tehtävänäkymä koskettavat dataa/käyttäytymistä joita ei ole vielä nähty oikealla laitteella — testaa ensin varovaisesti.
