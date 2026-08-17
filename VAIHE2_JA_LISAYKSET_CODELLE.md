@@ -1,8 +1,13 @@
 # Vaihe 2 + tämän päivän lisäykset — koottu Codelle (17.8.2026)
 
-## Kolmiportainen kadenssi — MVP-scope Reitin taustalogiikalle (18.8.2026)
+## Kolmiportainen kadenssi — MVP-scope Reitin taustalogiikalle (18.8.2026, korjattu 18.8.)
 
-Codelle jätetty rakentamatta tarkoituksella ("ei sisältöpäätöksiä ilman keskustelua"). Alla scope kolmelle tasolle. Tarkistettu suoraan tietokannasta ennen kirjoittamista — suurin osa tarvittavasta datasta on jo olemassa, tässä ei tarvita paljon uutta rakennetta.
+**Korjaus samana päivänä: "ei sisältöpäätöksiä ilman keskustelua" -sääntöä sovellettiin liian laajasti.** Katrin täsmennys: hän EI halua itse päättää mitä opiskella milloin — koko sovelluksen tarkoitus on että systeemi päättää sen puolesta, jotta ei tarvitse ajatella sitä eikä ehdi paniikkiin. Sääntö koskee kahta ERI asiaa, jotka on syytä pitää erillään jatkossa:
+
+1. **Panokselliset päätökset — pysyvät kysy-ensin:** uusien aiheiden/solmujen keksiminen joita ei ole oikeasti kursseilla, `hoitotaso`-tason laskeminen (kurssin tietoinen alibudjetointi), tehtävien sisällön generointi, osaamisen merkitseminen valmiiksi.
+2. **Sijoittelu olemassa olevasta datasta — EI tarvitse kysyä, tämä on koko moottorin tarkoitus:** minkä JO OLEMASSA OLEVAN, jo kursseille syötetyn aiheen vuoro on tänään ja missä järjestyksessä. Tämä on laskentaa jo hyväksytyillä säännöillä (perustussolmu, tavoiteikkuna, interleaving, kertausjono, kuorma, boost-jatkuvuus) — ei sisällön keksimistä. Taso 1 alla on päivitetty tämän mukaisesti: ei enää pelkkä kapasiteettinäkymä vaan oikea päiväkohtainen sijoittelu.
+
+Alla scope kolmelle tasolle. Tarkistettu suoraan tietokannasta ennen kirjoittamista — suurin osa tarvittavasta datasta on jo olemassa, tässä ei tarvita paljon uutta rakennetta.
 
 **Jo olemassa, käytettävissä suoraan:**
 - `opinto_aiheet`: `tavoiteikkuna` (tavoitepäivä), `viimeksi_kosketettu`, `tuntemus` (kuorma/hallinta-%), `perustussolmu`, `pero_vaihe`, `kertausjonossa`, `sr_interval_index`/`sr_next_review` (kertausjonon ajastus on jo olemassa, ei tarvitse keksiä uutta 1/3/7/21-mekanismia — tämä ON se)
@@ -11,25 +16,25 @@ Codelle jätetty rakentamatta tarkoituksella ("ei sisältöpäätöksiä ilman k
 - `hytti_opiskeluaika` (viikonpaiva + alkaa/paattyy) — viikoittain toistuvat käytettävissä olevat opiskeluikkunat
 - `hytti_suljetut_ikkunat` (viikonpaiva + alkaa/paattyy + syy) — pysyvästi suljetut ikkunat (esim. 15.30–17)
 
-### Taso 3 — joka yö, rakenna ensin (mekaanisin, vähiten uutta)
+### Taso 1 — kerran syksylle: laskee tavoitetahdin jokaiselle aiheelle
 
-Cron (sama `/api/cron.js?task=` -malli kuin muut ajastetut tehtävät). Lukee eilisen `opinto_sessiot`-rivit + `opinto_jumi_merkinnat`, laskee uudelleen seuraavan päivän/parin priorisoidun jonon. Säännöt joita jo käytetään muualla, sovelletaan tässä samoina — ei uusia periaatteita:
+Tämä on nyt oikea sijoittelija, ei pelkkä kapasiteettinäkymä. Laskee jokaiselle aktiiviselle kurssille karkean tuntitarpeen `op_maara`-kentästä (1 op ≈ 27h, josta aikataulutetut Lukkarikone-luennot vähennetään = itsenäisen opiskelun tarve), jakaa tämän kurssin aiheille painottaen `perustussolmu`/`tavoite`-kentillä, ja **asettaa/tarkistaa jokaiselle aiheelle `tavoiteikkuna`-arvon** niin että koko kurssi mahtuu `hytti_opiskeluaika` miinus `hytti_suljetut_ikkunat` -kapasiteettiin ennen kurssin päättymistä. Jos kokonaiskuorma ei mahdu käytettävissä olevaan aikaan, tämä NÄKYY (varoitus, ei hiljainen ylikuormitus) — se on ainoa kohta jossa tämä taso puhuu Katrille sen sijaan että vain laskisi.
+
+**Avoin, ei päätetty puolestasi:** 1 op ≈ 27h on Suomen yliopistojen yleinen nyrkkisääntö, ei tarkistettu sinun kursseiltasi — jos tuntuu väärältä käytännössä, tätä kerrointa pitää säätää, ei kovakoodata lopulliseksi.
+
+### Taso 3 — joka yö: oikea päätösmoottori, tämä syöttää Nyt-kortin
+
+Cron (sama `/api/cron.js?task=` -malli kuin muut ajastetut tehtävät). Lukee eilisen `opinto_sessiot`-rivit + `opinto_jumi_merkinnat`, laskee uudelleen tämän päivän priorisoidun jonon — **tämän tuloksen Nyt-välilehti näyttää suoraan `.nyt`-korttina, Katrin ei tarvitse valita mitään.** Säännöt joita jo käytetään muualla, sovelletaan tässä samoina — ei uusia periaatteita, ei kysytä lupaa jokaiselle sijoitukselle:
 - Perustussolmu painottaa, ei pakota kärkeen (vahvistettu 17.8.)
 - Interleaving: 2–3 kurssia päivässä kosketettava, ei pakollista 30 min -vaihtoa, flow voittaa
 - Boost-jatkuvuus: eilen boostilla tehty ei nouse tänään ykköseksi uudelleen, jatketaan mihin jäätiin
-- `tavoiteikkuna` painottaa kurssirajojen yli (§7.4-lisäys, jo speksattu)
+- `tavoiteikkuna` (Taso 1:n asettama) painottaa kurssirajojen yli — mitä lähempänä ja mitä enemmän jäljessä, sitä korkeampi paino
 - Kertausjono: `sr_next_review <= tänään` -rivit nostetaan mukaan
 - **Ei uutta taulua pakollisena** — riittää funktio joka laskee jonon pyynnöstä, ajetaan cronilla vain lämmittämään/varmistamaan ettei laskenta viivästytä aamun ensimmäistä avausta.
 
-### Taso 2 — kahden viikon välein, diagnoosi ei automaatio
+### Taso 2 — kahden viikon välein, ainoa taso joka yhä kysyy
 
-Jokaiselle `status='aktiivinen'` kurssille: vertaa sen aiheiden `tavoiteikkuna`-toteumaa (kuinka moni on `tuntemus`-tasolla joka vastaa aikataulua) todelliseen kalenteripäivään. Jos selvästi jäljessä: **ehdota** `hoitotaso`-muutosta (`kevyt` tai `vain_deadlinet`) — EI vaihda automaattisesti. Näytetään samalla kehote-mekanismilla kuin vaiheensiirtymä (dismissible kortti, ei blokkaa). Katri hyväksyy/hylkää.
-
-### Taso 1 — kerran syksylle, manuaalisesti käynnistettävä
-
-**Ei generoi keksittyjä tulevia tehtäviä kalenteriin** (sama periaate jota Code jo noudatti tässä erässä) — tämä on kapasiteettinäkymä, ei aikataulu: "mahtuuko kaikki". Laskee jokaiselle aktiiviselle kurssille karkean tuntitarpeen `op_maara`-kentästä (1 op ≈ 27h, josta jo aikataulutetut Lukkarikone-luennot vähennetään = itsenäisen opiskelun tarve), vertaa `hytti_opiskeluaika`-ikkunoiden kokonaiskapasiteettiin miinus `hytti_suljetut_ikkunat`. Tulos: näkymä/varoitus jos kurssit eivät yhteensä mahdu käytettävissä olevaan aikaan — ei rivi riviltä -sijoittelua.
-
-**Avoin, ei päätetty puolestasi:** 1 op ≈ 27h on Suomen yliopistojen yleinen nyrkkisääntö, ei tarkistettu sinun kursseiltasi — jos tuntuu väärältä käytännössä, tätä kerrointa pitää säätää, ei kovakoodata lopulliseksi.
+Jokaiselle `status='aktiivinen'` kurssille: vertaa sen aiheiden `tavoiteikkuna`-toteumaa (kuinka moni on `tuntemus`-tasolla joka vastaa aikataulua) todelliseen kalenteripäivään. Jos selvästi jäljessä: **ehdota** `hoitotaso`-muutosta (`kevyt` tai `vain_deadlinet`) — EI vaihda automaattisesti, koska tämä on kategoria 1 -päätös (kurssin tietoinen alibudjetointi vaikuttaa arvosanaan/tutkintoon, ei pelkkää sijoittelua). Näytetään samalla kehote-mekanismilla kuin vaiheensiirtymä (dismissible kortti, ei blokkaa). Katri hyväksyy/hylkää. **Jos tämäkin tuntuu liian raskaalta pyytää joka kerta, sano — voidaan vaihtaa esim. automaattiseksi kevennykseksi jos jälkeenjääneisyys ylittää tietyn kynnyksen, mutta se on eri päätös kuin tämän erän aihe.**
 
 ---
 

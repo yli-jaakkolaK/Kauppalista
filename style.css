@@ -703,7 +703,7 @@ h1 {
 #reitti-deadline-lista .pieni {
   margin-left: auto;
   font-size: 12.5px;
-  color: var(--muted);
+  color: var(--vaimea);
 }
 
 .unohtuu {
@@ -3406,6 +3406,61 @@ h1 {
   color: var(--muted);
   margin-top: 2px;
   font-style: italic;
+}
+
+/* Loki-muistiinpanolista (2026-08-18, §6b) — luettava-pinta-kortti kuten
+   kurssilistalla (.opinto-kurssi-kortti yllä), korvaa vanhan .list li
+   -ulkoasun TÄLLE yhdelle listalle. Katrin pyyntö: "käytä enemmän Sataman
+   muotokieltä, pidä yhtenäisenä eri näkymien välillä". */
+#hytti-kortit-list.list li.hytti-kortti-rivi {
+  display: block;
+  background: var(--paperi); border: 1px solid var(--hius); border-radius: var(--r-luettava);
+  padding: 4px 14px; margin-bottom: 10px;
+}
+#hytti-kortit-list .hytti-kortti-nimi {
+  font-family: var(--fontti-loki); font-size: 15px; color: var(--muste);
+}
+#hytti-kortit-list .hytti-kortti-askel {
+  font-family: var(--fontti-loki); font-size: 11.5px; color: var(--vaimea); font-style: normal;
+}
+
+/* Loki: "+ uusi muistiinpano" -nappi ja Jatkuva/Päättyvä-valinta samalla
+   lasimaisella kosketettava-pinta-kaavalla kuin Reitin viikkonavigaatio. */
+#hytti-tabi-loki .add-item button {
+  border-radius: var(--r-kosketettava);
+  background: linear-gradient(165deg, rgba(255, 252, 244, .7), rgba(234, 230, 220, .25));
+  border: 1px solid var(--hius-vahva);
+  backdrop-filter: blur(7px); -webkit-backdrop-filter: blur(7px);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .6);
+  color: var(--muste); font-size: 24px;
+  transition: transform var(--keski) var(--kelluu), box-shadow var(--keski) var(--kelluu);
+}
+#hytti-tabi-loki .add-item button:hover,
+#hytti-tabi-loki .add-item button:focus-visible {
+  transform: translateY(-2px);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .7), 0 4px 12px rgba(34, 31, 26, .12);
+}
+#hytti-tabi-loki .add-item button:active { transform: translateY(0) scale(.95); }
+#hytti-tabi-loki .add-item input { font-family: var(--fontti-loki); }
+
+#hytti-tabi-loki .hytti-tyyppi-btn {
+  border-radius: var(--r-kosketettava);
+  border: 1px solid var(--hius-vahva);
+  background: linear-gradient(165deg, rgba(255, 252, 244, .5), rgba(234, 230, 220, .18));
+  color: var(--vaimea);
+  font-family: var(--fontti-loki); font-size: 11.5px; letter-spacing: .1em;
+  transition: transform var(--keski) var(--kelluu), border-color var(--keski) var(--kelluu), color var(--keski) var(--kelluu);
+}
+#hytti-tabi-loki .hytti-tyyppi-btn.active {
+  border-color: var(--messinki); color: var(--muste);
+  background: linear-gradient(165deg, rgba(255, 252, 244, .75), rgba(234, 230, 220, .3));
+}
+#hytti-tabi-loki .hytti-tyyppi-btn:active { transform: translateY(0) scale(.97); }
+#hytti-tabi-loki .hytti-tyyppi-selite { font-family: var(--fontti-loki); color: var(--vaimea); }
+#hytti-tabi-loki .section-title,
+#hytti-tabi-loki .section-empty,
+#hytti-tabi-loki .section-link {
+  font-family: var(--fontti-loki);
 }
 
 .hytti-tehtava-teksti {

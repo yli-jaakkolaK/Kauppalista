@@ -437,8 +437,7 @@
 
       <hr class="divider">
 
-      <!-- Huoli (2026-08-17, siirretty Nyt-välilehdeltä — ei vielä Loki-
-           välilehteä minne se kuuluisi lopulta, §6b, ei rakennettu). -->
+      <!-- Huoli (2026-08-17, siirretty Nyt-välilehdeltä). -->
       <div class="section-title">🚩 Huoli</div>
       <div class="huoli-pikalisays">
         <input type="date" id="huoli-pvm-input">
@@ -450,17 +449,16 @@
         </div>
       </div>
       <p class="section-empty">Merkitse päivä jolta ennakoit kuormaa (esim. sisarusriitaa) vaikka kalenteri näyttää rauhalliselta — väri ja läheisyys vaikuttavat yhdessä tämän päivän opiskelutarjontaan.</p>
+    </div>
 
-      <hr class="divider">
-
-      <!-- Kortit (2026-08-17, siirretty Nyt-välilehdeltä — Katrin pyyntö:
-           "kortit osio pois", mutta hytti-kortti-view (yksittäisen kortin
-           näkymä) on tavoitettavissa VAIN täältä (rivin napautus) tai
-           Arkistosta, joten säilytetty kompaktina täällä eikä poistettu
-           kokonaan — muuten olemassa olevat kortit jäisivät pysyvästi
-           avaamattomiksi. Korvautuu kokonaan Lokilla, §6b, ei vielä. -->
+    <!-- Loki (2026-08-18, §6b) — ent. "Kortit"-osio Reitin pohjalla, nyt oma
+         ensiluokkainen välilehti. Data-malli koskematon (hytti_kortit/
+         hytti_rivit, sama avaaHyttiKortti-yksityiskohtanäkymä jolla on jo
+         otsikko + uudelleenavattava tarkistuslista/väliotsikko-rakenne
+         valmiina) — vain oma koti + merikartta-muotokieli. -->
+    <div id="hytti-tabi-loki" style="display:none">
       <div id="hytti-kortit-osio">
-        <div class="section-title">🗂 Kortit</div>
+        <div class="section-title">🗂 Loki</div>
         <ul class="list" id="hytti-kortit-list"></ul>
       </div>
       <p class="section-empty" id="hytti-tyhja" style="display:none">Yksi kortti per kurssi, projekti tai tilaisuus. Kirjoita muistiinpanot riveiksi, merkkaa toimintaa vaativat tehtäviksi — ne kokoontuvat itsestään ylös. Pidä seuraava askel pienenä ja rumana: ei "kirjoita essee" vaan "avaa tiedosto ja kirjoita yksi ruma kappale". Ideat kuuluvat Laituriin — työn alla olevat tänne.</p>
@@ -473,7 +471,7 @@
 
       <div class="add-item">
         <span class="prefix">›</span>
-        <input type="text" id="hytti-uusi-input" placeholder="uuden kortin nimi...">
+        <input type="text" id="hytti-uusi-input" placeholder="uuden muistiinpanon nimi...">
         <button id="hytti-uusi-btn">+</button>
       </div>
 
