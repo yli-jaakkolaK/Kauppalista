@@ -735,26 +735,6 @@ h1 {
   color: var(--text);
 }
 
-/* 7c-jatko (2026-08-03): kohdekohtainen "ei koskaan Laiturissa" -oletuslista
-   (Asetukset → 🛟 Laituri, ks. script.js paivitaLaiturinPiilotusAsetukset). */
-.laituri-piilotus-lista {
-  margin-top: 8px;
-}
-
-.laituri-piilotus-rivi {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 8px 0;
-  border-bottom: 1px dashed var(--border-dash);
-  font-size: 14px;
-  color: var(--text);
-}
-
-.laituri-piilotus-rivi:last-child {
-  border-bottom: none;
-}
-
 /* E3-keskiportaan "Mitä äly on tehnyt" -loki (Asetukset). */
 .aly-log-list {
   margin-top: 12px;
