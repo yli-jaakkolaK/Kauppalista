@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="fi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Nyt-välilehti — mockup v1</title>
+<link rel="stylesheet" href="satama-design-system.css">
+<style>
+/* Sivun kehysasettelu — ei osa design-systemiä, sama periaate kuin
+   hytti-kuori-v1.html:ssä (kehys tälle sivulle, ei komponentteihin). */
+.sivu{position:relative;z-index:1;max-width:520px;margin:0 auto;padding:26px 18px 90px}
+.deadline{font-weight:700;font-size:13.5px;margin:0 0 16px;padding:8px 0 8px 12px;border-left:2px solid var(--vaara);color:var(--vaara)}
+.loki{margin:0 0 26px}
+.loki-rivi{display:flex;gap:13px;padding:11px 2px;border-bottom:1px solid var(--hius);align-items:baseline}
+.loki-rivi.matala{color:var(--vaimea)}
+.loki-rivi.matala .loki-teksti b{font-weight:700;color:var(--vaimea)}
+.loki-rivi.live .loki-teksti b{font-weight:700;color:var(--muste)}
+.loki-aika{font-size:15px;font-weight:700;flex:none;width:46px;letter-spacing:-.02em}
+.loki-teksti{flex:1;min-width:0;font-size:15px}
+.loki-teksti .pieni{display:block;margin-top:1px}
+.live-merkki{display:inline-flex;align-items:center;gap:5px;font-size:10.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--muste);font-weight:700}
+.live-piste{width:7px;height:7px;border-radius:50%;background:var(--muste);flex:none}
+.nyt-kohta{margin:14px 0 22px}
+/* "Muut vaihtoehdot" — kosketettava pinta, korjattu 17.8.2026: riittävä
+   padding ettei r-kosketettava näytä täydeltä pilliltä pienellä napilla. */
+.vaihtoehdot-nappi{padding:12px 18px}
+.vaihtoehdot-lista{margin:10px 0 0;padding:0;list-style:none;display:flex;flex-direction:column;gap:8px}
+.vaihtoehto{
+  display:block;width:100%;text-align:left;font-family:inherit;color:var(--muste);cursor:pointer;
+  font-size:13.5px;padding:12px 16px;border-radius:var(--r-kosketettava);
+  border:1px solid rgba(156,122,67,.5);
+  background:linear-gradient(165deg,rgba(255,252,244,.72),rgba(234,230,220,.28));
+  backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.65);
+  transition:all var(--keski) var(--kelluu);
+}
+.vaihtoehto:hover,.vaihtoehto:focus-visible{transform:translateY(-2px)}
+.vaihtoehto b{display:block;font-weight:700}
+.vaihtoehto span{display:block;font-size:11.5px;color:var(--vaimea);margin-top:2px}
+</style>
+</head>
+<body>
+<div class="sivu">
+
+  <div class="hytti-otsake"><h2>Nyt</h2><span class="pieni" id="pvm"></span></div>
+
+  <!-- Deadline-rivi: näkyy vain 1-2pv ennen palautusta (§7.3). Väri
+       TARKOITUKSELLA asettamatta — huomioväri on avoin päätös (§4.1),
+       ei ratkaistu tässä mockupissa. -->
+  <p class="deadline" id="deadline"></p>
+
+  <div class="loki" id="loki"></div>
+
+  <div class="osio">
+    <div class="osio-nimi">Boost</div>
+    <div class="boost" id="boost"></div>
+    <p class="selite" id="boost-tulos"></p>
+  </div>
+
+</div>
+
+<script>
+const PAIVAT = ['su','ma','ti','ke','to','pe','la'];
+function paivamaaraTeksti(d){ return PAIVAT[d.getDay()]+' '+d.getDate()+'.'+(d.getMonth()+1)+'.'; }
+document.getElementById('pvm').textContent = paivamaaraTeksti(new Date());
+
+document.getElementById('deadline').textContent = 'Algebra 2 — Quadratic formula, koe 2 pv päässä';
+
+// Kiinteä esimerkkidata, oikeista kursseista (sql/100). Ei oikeaa
+// generaattorilogiikkaa — tarkoitus on näyttää MUOTOKIELI, ei laskenta.
+// Huom interleaving tässä esimerkissä noudattaa §4.7:ää (eri kurssi n.
+// 30 min välein) — KESKUSTELTAVA jos aamun pitäisi sen sijaan olla
+// sama aihe eri kulmista, ks. viesti.
+const LOKI = [
+  { klo:'10:15', tyyppi:'nyt', kurssi:'Introduction to Programming', solmu:'1.5 ehtolauseet', vaihe:'Priming', kesto:'20 min', perustelu:'Tänään on tilaa.' },
+  // §4.6 kohta 1 + §8.1 Föli: lähtöaika varataan menon eteen — generaattori
+  // EI laita opiskelupätkää kiinni luennon alkuun. HUOM: Föliä EI ole vielä
+  // rakennettu (tarkistettu 17.8. — ei GTFS/SIRI-kutsuja koodissa), joten
+  // nämä kellonajat ovat paikkamerkki-esimerkki, ei oikeaa API-dataa.
+  // Matematiikka silti oikein: bussi 10:45, kävely+puskuri 5 min, paikalla
+  // ennen 11:00 — ei "lähdössä kun luento jo alkaa".
+  { klo:'10:35', tyyppi:'lahto', teksti:'Lähtö pysäkille', pieni:'bussi 10:45 (Föli, esimerkkiaika) — paikalla n. 10:55' },
+  // liveluento — kiinteä, ei väisty (§4.6), pitää erottua selvästi ettei
+  // sekoitu siirrettävään opiskelupätkään. Ei muuttunut/himmennetty.
+  { klo:'11:00', tyyppi:'live', teksti:'Tietoverkot ja tietoturva — luento' },
+  { klo:'12:00', tyyppi:'lounas' },
+  { klo:'12:30', tyyppi:'tuleva', kurssi:'Algebra 2', solmu:'Systems of equations', vaihe:'Encoding' },
+  { klo:'13:00', tyyppi:'tuleva', kurssi:'Introduction to Programming', solmu:'2.2 haarautuvat ehtolauseet', vaihe:'Encoding' },
+  // 15:30–17:00: suljettu ikkuna (lapset kotona) — ei rivin, ei mitään (§4.5).
+  { klo:'17:00', tyyppi:'tuleva', kurssi:'Algebra 2', solmu:'Quadratic formula', vaihe:'Retrieval' },
+];
+
+function piirraNytKohta(k){
+  const kortti = document.createElement('button');
+  kortti.className = 'nyt nouse';
+  kortti.type = 'button';
+  kortti.innerHTML =
+    '<div class="nyt-ylarivi">' +
+      '<div>' +
+        '<div class="nyt-kurssi">'+k.kurssi+'</div>' +
+        '<div class="nyt-solmu">'+k.solmu+'</div>' +
+      '</div>' +
+      '<div class="nyt-aika">'+k.klo+'</div>' +
+    '</div>' +
+    '<div class="nyt-alarivi">' +
+      '<span class="vaihe">'+k.vaihe+'</span>' +
+      '<span class="pieni">'+k.kesto+'</span>' +
+    '</div>';
+  kortti.addEventListener('click', function(){ avaaTehtava(k); });
+
+  const wrap = document.createElement('div');
+  wrap.className = 'nyt-kohta';
+  wrap.appendChild(kortti);
+
+  const perustelu = document.createElement('p');
+  perustelu.className = 'selite';
+  perustelu.textContent = k.perustelu;
+  wrap.appendChild(perustelu);
+
+  // "Muut vaihtoehdot" — EI vielä §4:ssä speksattuna, kompaktina
+  // kuten pyydetty (ei pudotusvalikkoa, ei omaa tilaansa vievä kortti).
+  // Avautuessaan vaihtoehdot ovat itse kosketettavia laatikoita (17.8.2026).
+  const vaihtoNappi = document.createElement('button');
+  vaihtoNappi.className = 'saadin vaihtoehdot-nappi';
+  vaihtoNappi.type = 'button';
+  vaihtoNappi.textContent = 'muut vaihtoehdot';
+  vaihtoNappi.style.marginTop = '10px';
+  const vaihtoLista = document.createElement('div');
+  vaihtoLista.className = 'vaihtoehdot-lista';
+  vaihtoLista.style.display = 'none';
+  const VAIHTOEHDOT = [
+    { kurssi:'Algebra 2', solmu:'Systems of equations', vaihe:'encoding' },
+    { kurssi:'Trigonometry', solmu:'Unit circle', vaihe:'retrieval' },
+  ];
+  VAIHTOEHDOT.forEach(function(v){
+    const nappi = document.createElement('button');
+    nappi.type = 'button';
+    nappi.className = 'vaihtoehto';
+    nappi.innerHTML = '<b>'+v.solmu+'</b><span>'+v.kurssi+' · '+v.vaihe+'</span>';
+    nappi.addEventListener('click', function(){ avaaTehtava({ kurssi:v.kurssi, solmu:v.solmu, vaihe:v.vaihe.charAt(0).toUpperCase()+v.vaihe.slice(1) }); });
+    vaihtoLista.appendChild(nappi);
+  });
+  vaihtoNappi.addEventListener('click', function(){
+    const auki = vaihtoLista.style.display !== 'none';
+    vaihtoLista.style.display = auki ? 'none' : 'flex';
+    vaihtoNappi.setAttribute('aria-pressed', String(!auki));
+  });
+  wrap.appendChild(vaihtoNappi);
+  wrap.appendChild(vaihtoLista);
+  return wrap;
+}
+
+function piirraLokiRivi(k){
+  const rivi = document.createElement('div');
+  if (k.tyyppi === 'lounas'){
+    rivi.className = 'loki-rivi matala';
+    rivi.innerHTML = '<div class="loki-aika">'+k.klo+'</div><div class="loki-teksti">Lounas</div>';
+  } else if (k.tyyppi === 'lahto'){
+    // Föli-lähtöaika (§8.1) — ei oma opiskelutehtävä, ei kiinteä meno,
+    // mutta pitää näkyä ettei tila näytä tyhjältä väliltä kahden asian välissä.
+    rivi.className = 'loki-rivi matala';
+    rivi.innerHTML =
+      '<div class="loki-aika">'+k.klo+'</div>' +
+      '<div class="loki-teksti">'+k.teksti+'<span class="pieni">'+k.pieni+'</span></div>';
+  } else if (k.tyyppi === 'live'){
+    // Kiinteä meno — ei matala/himmennetty, oma selkeä LIVE-merkki (17.8.2026).
+    rivi.className = 'loki-rivi live';
+    rivi.innerHTML =
+      '<div class="loki-aika">'+k.klo+'</div>' +
+      '<div class="loki-teksti"><b>'+k.teksti+'</b>' +
+      '<span class="live-merkki"><span class="live-piste"></span>live — ei siirry</span></div>';
+  } else {
+    rivi.className = 'loki-rivi matala';
+    rivi.innerHTML =
+      '<div class="loki-aika">'+k.klo+'</div>' +
+      '<div class="loki-teksti"><b>'+k.solmu+'</b>' +
+      '<span class="pieni">'+k.kurssi+' · '+k.vaihe+'</span></div>';
+  }
+  return rivi;
+}
+
+function piirraLoki(){
+  const kehys = document.getElementById('loki');
+  kehys.innerHTML = '';
+  LOKI.forEach(function(k){
+    if (k.tyyppi === 'nyt'){ kehys.appendChild(piirraNytKohta(k)); }
+    else { kehys.appendChild(piirraLokiRivi(k)); }
+  });
+}
+
+function avaaTehtava(k){
+  // §4.9: Miro-embed vain encoding ja retrieval — EI priming.
+  const miro = (k.vaihe === 'Encoding' || k.vaihe === 'Retrieval');
+  console.log('Tehtävänäkymä avattu:', k.solmu, k.vaihe, miro ? '(Miro avautuu)' : '(ei Miroa — priming)');
+}
+
+const BOOST_MIN = [15, 30, 60, '··'];
+function piirraBoost(){
+  const kehys = document.getElementById('boost');
+  kehys.innerHTML = '';
+  BOOST_MIN.forEach(function(m){
+    const nappi = document.createElement('button');
+    nappi.className = 'min';
+    nappi.type = 'button';
+    nappi.innerHTML = '<b>'+m+'</b><span>'+(m==='··' ? 'muu' : 'min')+'</span>';
+    nappi.addEventListener('click', function(){
+      const tulos = document.getElementById('boost-tulos');
+      if (m === '··'){
+        tulos.textContent = 'rullavalitsin avautuu (10–120 min, §4.8).';
+      } else {
+        // §4.6: boost ottaa saman päivän jonosta, kestolla suodatettuna.
+        const sopivat = LOKI.filter(function(k){ return k.tyyppi !== 'lounas'; }).slice(0, Math.max(1, Math.round(m/20)));
+        tulos.textContent = m+' min tänään jonosta: ' + sopivat.map(function(k){return k.solmu;}).join(', ');
+      }
+    });
+    kehys.appendChild(nappi);
+  });
+}
+
+piirraLoki();
+piirraBoost();
+</script>
+</body>
+</html>

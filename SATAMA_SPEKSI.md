@@ -120,6 +120,12 @@ Ei kurssilistaa, ei karttoja, ei ylläpitolistaa.
 
 **Flow voittaa suunnitelman.** Jos Boost on vienyt flow-tilaan ja suunnitelman mukaan toinen aihe olisi juuri alkamassa, **mitään ei tapahdu** — työtä voi jatkaa keskeytyksettä. Kun käyttäjä on valmis, päivä laskee seuraavan askeleen uudelleen siitä hetkestä.
 
+**Kiinteät menot (liveluennot ym.) — lisäys 17.8.2026.** Lokissa kiinteä meno ei saa näyttää samalta kuin siirrettävä opiskelupätkä eikä himmentyä kuten tulevat pätkät (§4.1 syvyyslogiikka koskee vain opiskelupätkiä). Kiinteä meno tarvitsee oman, selkeän merkin että se on live eikä siirry (ks. §4.6 "eivät väisty").
+
+**"Muut vaihtoehdot" — uusi lisäys 17.8.2026, ei aiemmin speksattu.** Kompakti, kosketettava nappi (ei pudotusvalikko, ei omaa tilaansa vievä kortti). Avattaessa vaihtoehdot renderöityvät itse kosketettavana pintana (`--r-kosketettava`, messinki-kehys) — ei vaimeana listana. **Huom korjaus samana päivänä:** kosketettavalla pinnalla pitää olla riittävä padding, muuten `--r-kosketettava` (13px) pienellä napilla näyttää täydeltä pillimuodolta eikä pyöristetyltä suorakulmiolta kuten Boost-napeissa.
+
+**Boost-jatkuvuus (päätetty 17.8.2026).** Boostilla tehty työ ei saa koskaan nousta seuraavan päivän ykkösehdotukseksi uudelleen niin kuin sitä ei olisi tehty. Generaattori laskee seuraavan askeleen aina solmun **senhetkisestä tilasta** (`pero_vaihe`, `retrieval_kierrokset`, `kertausjonossa` — samat kentät jotka Boostin kuittaus jo päivittää), ei kiinteästä suunnitelmasta joka ei tiedä Boostista mitään. Käytännössä: kun päivä lasketaan uudelleen (joko yöllä tai kun käyttäjä palaa Boostin jälkeen, §4.1), sen pitää lukea sama tila josta Boost kuittasi edistymisen — ei erillistä, Boostista tietämätöntä jonoa.
+
 ### 4.2 Nyt = päivän seuraava asia
 
 Nyt-kortti näyttää aina sen mikä tapahtuu seuraavaksi, riippumatta tyypistä. Luentopäivänä liveluento, lounasaikaan lounas, muuten solmu.
@@ -189,16 +195,17 @@ Generaattori ei sijoita opiskelupätkiä tämän ikkunan ulkopuolelle. Illan sat
 
 Jos päivä ei vedä, generaattori **pudottaa opiskelupätkän, ei suojattua ikkunaa.**
 
-### 4.7 Opiskelupätkien järjestys — interleaving
+### 4.7 Opiskelupätkien järjestys — interleaving (korjattu 17.8.2026)
 
-Peräkkäiset pätkät ovat **eri kursseilta tai eri aiheista**.
+**Korjaus:** alla ollut kuvaus ("peräkkäiset pätkät eri kursseilta/aiheista", Taylor & Rohrer -sitaatti) kuvasi väärää määritelmää. `sung-metodi.md` §27 (korjattu 17.8.2026): **"Interleaving ≠ aiheiden vaihtelu. Se on saman aiheen sisäistä variaatioiden vertailua."** Yksi opiskelupätkä — tai aamun 2–3 lyhyempää settiä peräkkäin — saa siis käsitellä **samaa solmua/teemaa eri kulmista**; se EI ole virhe eikä vaadi poikkeuslupaa §4.7:stä, se on §4.7:n oikea muoto.
 
-- Taylor & Rohrer (2010): sekoitettu harjoittelu tuotti seuraavan päivän kokeessa 77 % vs. lohkoharjoittelun 38 %. Välistys pidettiin vakiona — hyöty tuli aiheen vaihtelusta, ei tauoista.
-- Välistys (spacing) on erillinen mekanismi ja koskee päivien välisiä taukoja.
+**Taylor & Rohrer -sitaatti pudotettu 17.8.2026** — koski eri, yleisempää tutkimuskirjallisuuden "interleaving"-käsitettä (aiheenvaihto), ei Sungin määritelmää. Ei korvaavaa lähdettä; sääntö nojaa `sung-metodi.md`:hen sellaisenaan.
 
-**30 minuuttia ei ole tutkimuksesta johdettu luku.** Sääntö on "vaihda aihetta noin puolen tunnin välein".
+**Erillinen, rinnakkainen vaatimus (ei sama asia kuin interleaving):** päivän aikana kosketetaan silti **2–3 eri kurssia**, ei koko päivää yhdestä kurssista putkeen. Tämä on kurssien välisen vaihtelun/tasapainon periaate päivätasolla; interleaving taas koskee sitä miten YHTÄ aihetta työstetään kussakin pätkässä.
 
-**Käyttöliittymäseuraus:** interleaving tuntuu tehdessä huonommalta. Se on tarkoituksellinen vaikeus, ja se kannattaa sanoa ääneen ettei käyttäjä tulkitse takkuamista epäonnistumiseksi.
+**Käyttöliittymäseuraus:** interleaving (oikeana, sisäisenä variaationa) voi silti tuntua tehdessä huonommalta kuin suora toisto. Sanotaan ääneen ettei käyttäjä tulkitse sitä epäonnistumiseksi.
+
+**Flow-tarkennus (17.8.2026, säilyy):** kumpikaan sääntö (interleaving pätkän sisällä, 2–3 kurssia päivässä) ei ole pakollinen kesken flow-tilan — §4.1:n "Flow voittaa suunnitelman" on aina voimassa. Nämä ovat generaattorin suunnitteluperiaatteita jonon rakentamiseen, eivät istunnon aikaisia pakotteita.
 
 ### 4.8 Boost
 
@@ -476,6 +483,8 @@ Silta etsii **lähes samanlaisia teemoja eri kursseista**. Tavoite on oppia **mi
 
 **Priming ajoissa:** aiheesta josta ei tiedä mitään priming olisi hyvä olla aiemmin kuin edellisenä iltana.
 
+**Huomioväri 1–2 pv -rivillä (päätetty 17.8.2026): `--vaara`.** Tähän yhteen, tarkasti rajattuun kohtaan (§4.1:n deadline-rivi, tehtävä 1–2 pv päässä) saa käyttää `--vaara`-väriä. Tämä EI avaa muuta kalenteri-/deadline-värikysymystä (perhekalenteri, Juhan kalenteri) — ne pysyvät edelleen ratkaisematta, ks. §4.1 huomautus.
+
 **Sillan aikakäyrä:** paino nousee lähestyttäessä tarvehetkeä mutta laskee juuri ennen sitä (1–2 pv sisällä). Silta on parhaimmillaan hieman etukäteen opittuna.
 
 **Kertautuva vaikutus:** paino kasvaa sen mukaan moneenko myöhempään asiaan silta vaikuttaa.
@@ -551,6 +560,8 @@ Kaikki muu on laskentaa. **Suurin osa vaiheensiirtymistä ei tarvitse älyä lai
 **Äly huomioi aikataulun** eikä saa jäädä hinkkaamaan yhtä solmua kun muuta on menossa. **Poikkeus: perustussolmut** (§7.1) saavat viedä tavallista enemmän kapasiteettia.
 
 **Harjoitustehtävien lähteet järjestyksessä:** kurssin omat tehtävät → ulkoiset lähteet (esim. Khan Academy) → Sataman näyttämä valmis prompti jonka käyttäjä kopioi Copilotille. Kolmas ei vaadi API-kutsua eikä maksa mitään. Promptipohja on rivi kannassa per (tyyppi, vaihe), joten automatisointi myöhemmin ei vaadi rakennemuutosta.
+
+**Huomio 17.8.2026 — matikkamerkintä promptipohjissa.** Kolmannen lähteen (kopioitava Copilot-prompti) ongelma erityisesti proseduraalisille/matemaattisille solmuille: yleiskäyttöinen AI kirjoittaa murtoluvut/potenssit/juuret oletuksena koodimerkinnällä (`x**2`, `sqrt(x)`, `\frac{}{}`), ei tavallisella matikkamerkinnällä (x², √x, 3/4) — lukukelvotonta ilman että pitää itse kääntää. Koska promptipohja on kannassa rivinä per (tyyppi, vaihe), korjaus on lisätä jokaiseen matemaattista sisältöä koskevaan promptipohjaan kiinteä muotoiluohje-rivinloppu (esim. "kirjoita murtoluvut, potenssit ja juuret tavallisella matikkamerkinnällä, ei koodimerkinnällä") — ei uutta rakennetta, vain promptipohjan sisältöön kirjoitettava vaatimus kun promptipohjat rakennetaan.
 
 ### 7.7 Menetelmämateriaali ja Learning Framework Extraction Course (relay 16.8., ei vielä rakennettu, ei vielä konseptoitu loppuun)
 

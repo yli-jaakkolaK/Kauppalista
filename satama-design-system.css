@@ -111,8 +111,12 @@ body::before{
              background var(--keski) var(--kelluu);
 }
 .nyt::before{
+  /* messinki, ei syvänne (korjattu 17.8.2026) — syvänne on varattu
+     yksinomaan "hallussa" (>=50% vahvuus) -merkitykselle. Tämä viiva
+     merkitsee "tämä on nyt pinnalla / tästä painetaan", ei vahvuutta;
+     messinki on oikea väri koska koko kortti on kosketettava (kehys). */
   content:'';position:absolute;left:0;top:0;bottom:0;width:3px;
-  background:var(--syvanne);
+  background:var(--messinki);
 }
 .nyt:hover,.nyt:focus-visible{
   transform:translateY(-2px);
