@@ -3918,9 +3918,37 @@ sw.js v140 → v141.
 
 ---
 
+### Nyt-välilehti siivottu: Tehtävät/Sillat/Huoli/Kortit siirretty Reittiin (2026-08-17)
+
+Katri toimitti ison "Vaihe 2 + Miro" -jatkodokumentin (`VAIHE2_JA_LISAYKSET_CODELLE.md`, `A5_INTERAKTIOKARTTA.md`, molemmat repossa). Kaksi nopeaa tarkistusta ennen rakentamista: **Vercel-funktiobudjetti on 11/12** — Miron palvelinosuus EI mahdu montaa erillistä `api/miro-*.js`-tiedostoa, pitää olla yksi konsolidoitu `api/miro.js`. **Miro itsessään odottaa Katrin kertaluonteista OAuth-askelta** (developers.miro.com, tokenit Vercelin ympäristömuuttujiin) — ei voi kirjoittaa palvelinkoodia ennen kuin ne on olemassa. "Kertausmatikka melkein lopussa vaikka en oo tehny mitään" -epäilyä tutkittiin suoraan Supabasesta: kurssilla 0/3 aihetta encodingin ohi, ei deadlinea — ei löytynyt aikaperustaista automaattietenemistä SR/vaihemoottorista, jäi auki (Katri ei ollut varma oliko edes bugi).
+
+Katri valitsi ensin: Nyt/Reitti-uudelleenjärjestely (ei riipu Mirosta).
+
+**Poistettu kokonaan:** "⏱ Minulla on aikaa" (15/30/45min) — Boost (A5) korvaa saman tarpeen. Alla oleva moottori (`etsiIkkunaanSopivaAskel`) säilyi, Boost käyttää sitä. Kuollut UI-koodi (`piirraOpintoIkkunaTulos`, `rakennaOpintoPrompti`, `kopioiLeikepoydalle`, `OPINTO_PROMPTI_VAIHEELLE`) ja CSS poistettu.
+
+**Siirretty Reitti-välilehdelle:** Huoli, "🧩 Taitosolmut" → **"🌉 Sillat"** (Katrin täsmennys kesken työn: "sillä sivulla millä kurssilistaus ei yksittäisen kurssin sisällä" — siis Reitin kurssilistaustasolle, ei yksittäisen kurssin sisään), koko Kortit-osio, ja Tehtävät Reitin **alkuun** (paikalle mihin viikkokalenteri tulee myöhemmin, §5 — ei vielä rakennettu). Kaikki ID-pohjaisia siirtoja, ei JS-logiikkamuutoksia itse siirrolle — `vaihdaHyttiValilehti()` kutsuu nyt `lataaHyttiPaanakyma()`:aa myös Reitti-välilehdelle siirryttäessä.
+
+**Riippuvuus tunnistettu ja säilytetty ennen poistoa** (Katrin oma ohje: "kerää talteen ja poista sit ku voi"): Kortit-listan rivin napautus ja Arkisto-linkki ovat AINOA reitti `hytti-kortti-view`-yksityiskohtanäkymään (`avaaHyttiKortti()`). Jos koko Kortit-osio olisi poistettu kokonaan, olemassa olevat kortit olisivat jääneet pysyvästi avaamattomiksi. Siksi osio siirrettiin (ei tuhottu) kompaktina Reitin pohjalle.
+
+**"Opiskelu näkyvissä" -kytkin säilyi**, väri vaihdettu iOS-vihreästä (`#34C759`) messinkiin (`--messinki`) omalla skoopatulla `.toggle-messinki`-luokalla — yleinen `.toggle`-komponentti (käytössä muuallakin sovelluksessa) ei muuttunut.
+
+**"Tänään"-osio (hytti-tanaan-kaista, hytti-scope-kalenteri) EI koskettu** — Katri ei maininnut sitä eksplisiittisesti, jätetty paikalleen Nyt-välilehdelle. Mahdollisesti nyt osittain päällekkäinen uuden Nyt-loki-scheduler'in kanssa (eri datalähde: `kalenteri_syotteet.scope='hytti'` vs. kaikki Katrin omat `kalenteri_tapahtumat`), ei ratkaistu, ei kysytty.
+
+**Sivuhuomio (Katrin positiivinen palaute, tallennettu muistiin):** materiaalin lisäyksen korjauksen (edellinen erä) sivuvaikutus — editori palaa nyt kurssisivulle eikä yleiseen Laituriin — sai Katrilta kehun ("hyvä idea"). Yleistettävä periaate: kun näkymä avataan tietystä kontekstista, paluun kannattaa palata samaan kontekstiin, ei sovelluksen yleiseen oletusaloitussivuun.
+
+**Ei vielä testattu oikealla laitteella.**
+
+sw.js v141 → v142.
+
+---
+
 ## Nykytila (päivitetty 2026-08-17, COPILOT.md-sääntö 4 — huom: aiempi "Nykytila ja seuraavat askeleet" -osio jäi tästä tiedostosta ylemmäs pitkän istunnon aikana kertyneiden uusien osioiden taakse, ei enää tiedoston lopussa; siirto omaksi erikseen tehtäväksi työksi, ei nyt)
 
-**Viimeksi tehty tässä istunnossa, kaikki commitoitu ja pushattu mainiin, `sw.js` nyt v141:** Laituri-uudistuksen (§16.5c) jälkeen: Teema/Vahdittu-näkyvyystoggeli + listan siirtonappi, kuormitustila-kytkimen sijoitus ruudun kulmaan, opiskelumoottorin OSA A -minimipolku (ohjematriisi, kurssin tavoite/hoitotaso/aikataulu, solmun tuntemus/perustussolmu/retrieval-kentät, A4 Tehtävänäkymä) + sung-metodi.md:n täysi korvaus + korjaukset, B1:n jumi-kesto, **A5 — koko Nyt-välilehti uudistettu** (§4:n minuuttiruudukko-aikataulutin, Boost, deadline-rivi, muut vaihtoehdot, Miro-koukku), ja materiaalin lisäyksen korjaus (näkyvä tallennusnappi, monessa osassa liittäminen + älyn yhdistetty solmujako).
+**Viimeksi tehty tässä istunnossa, kaikki commitoitu ja pushattu mainiin, `sw.js` nyt v142:** Laituri-uudistuksen (§16.5c) jälkeen: Teema/Vahdittu-näkyvyystoggeli + listan siirtonappi, kuormitustila-kytkimen sijoitus ruudun kulmaan, opiskelumoottorin OSA A -minimipolku (ohjematriisi, kurssin tavoite/hoitotaso/aikataulu, solmun tuntemus/perustussolmu/retrieval-kentät, A4 Tehtävänäkymä) + sung-metodi.md:n täysi korvaus + korjaukset, B1:n jumi-kesto, **A5 — koko Nyt-välilehti uudistettu** (§4:n minuuttiruudukko-aikataulutin, Boost, deadline-rivi, muut vaihtoehdot, Miro-koukku), materiaalin lisäyksen korjaus (näkyvä tallennusnappi, monessa osassa liittäminen + älyn yhdistetty solmujako), ja **Nyt/Reitti-uudelleenjärjestely** (Tehtävät/Sillat/Huoli/Kortit pois Nyt-sivulta).
+
+**Odottaa Katria:** Miron kertaluonteinen OAuth-askel (developers.miro.com) ennen kuin palvelinpuolen Miro-proxya voi rakentaa. Vercel-funktiobudjetti 11/12 — Miro pitää toteuttaa yhtenä konsolidoituna `api/miro.js`-endpointtina.
+
+**Auki jäänyt / seuraavaksi (Katrin oma prioriteettijärjestys, kirjattu `VAIHE2_JA_LISAYKSET_CODELLE.md`):** kurssirajat ylittävä vaiheensiirtymäkehote (§7.4-laajennus), Retrieval Frame-per-kierros + koko Miro-integraatio (odottaa yllä mainittua Katrin askelta), deadline-rivin tiedostoliite (`materiaali_deadline_id`). "Kertausmatikka"-epäily jäi auki, ei vahvistettu bugiksi. Vapaatekstisten tehtävien "vinkki jonojärjestykseen" -idea jätettiin tietoisesti rakentamatta (liian epämääräinen, vaatisi AI-tekstintulkintaa vastoin Katrin omaa kustannuskuria).
 
 **Migraatiot ajettu suoraan Supabaseen MCP:llä koko istunnon ajan** (117–128), ei jätetty ajamatta.
 
