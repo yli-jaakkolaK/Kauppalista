@@ -1,625 +1,568 @@
-# Sung-metodi — Sataman opiskelumoottorin tietopohja
+# Sungin metodi — lähdekooste
 
-**Tarkoitus:** tähän tiedostoon kerätään kaikki Justin Sungin metodiin liittyvä tieto,
-jota Satama käyttää ohjeiden generointiin. Väliaikainen ratkaisu, kunnes Laiturin
-materiaalin sisääntulo on rakennettu ja tieto tulee sisään sitä kautta.
+Koottu 17.8.2026. Sisältää kaiken olennaisen tähän mennessä käsitellyistä lähteistä.
 
-**Alkuperäinen lähde (Katrin löytämä, 2026-08-16):** https://cdn.prod.website-files.com/682d03999cd54259836f1a8e/6837d5fc8d384e89e874cc04_Report-on-Learning-August-2022.pdf — tämä on se ~70-sivuinen PDF jota käytetään Laiturin materiaalin sisääntulopipelinen (§3) live-testinä.
-
-**Lisäysohje:** uudet faktat lisätään oikean otsikon alle merkinnällä `[S]` tai `[A]`.
-Ristiriitaista tietoa ei korvata äänettömästi — merkitse molemmat ja lisää huomautus.
-
-**Merkintätapa:**
-- `[S]` = Sungin omasta materiaalista
-- `[A]` = arvaus tai yleisen oppimistutkimuksen konventio, ei Sungilta
-
-Päivitetty: 9.8.2026 (Report on Learning, elokuu 2022, luettu kokonaan)
+**Merkinnät:**
+- `[S]` = Sungin omasta lähteestä
+- `[A]` = oma päätös tai tulkinta, ei lähteestä
+- `[P]` = ratkaistu politiikalla, koska lähde sanoo ettei vastausta ole
+- `[X]` = muu kuin Sung-lähde
 
 ---
 
-## 1. Kolme eri kehystä — älä sekoita
+## Lähteet
 
-**PACER = tietotyyppiluokittelu.** Viisi rinnakkaista tyyppiä, joihin sisältö
-luokitellaan. Ei vaiheistus. `[S]`
+| Lähde | Kattaa |
+|---|---|
+| iCanStudy: Report on Learning (2022, PDF) | Teoriaperusta, CLT, Bear Hunter System, tutkimustulokset |
+| PERO-yleisvideo | Vaiheiden nimet ja perusmääritelmät |
+| Study with me (IB psykologia, ~1,5 h) | Kokonainen läpikäyty esimerkki, sanatarkat kysymykset |
+| Master class (4 h, 4 lukua) | Retrieval, encoding, mind mapping, skill acquisition |
+| Interleaving-video | Neljä sääntöä, efektikoot |
+| GRIND-video | Mind mapin kuusi askelta, AI-säännöt |
+| 5 levels of learners | Tasomalli ja siirtymät |
+| Thinking on paper | Kolme periaatetta muistiinpanojen tekoon |
+| Learn any hard concept | Schema fit, neljä estettä |
+| Schema priming | Primingin kolme askelta |
+| Rest/recovery | Palautumisen neljä ulottuvuutta |
 
-**PERO = vaiheistus.** Sungin oma nimi opiskeluprosessilleen: priming, encoding,
-reference, retrieval, overlearning. `[S]`
-
-**BHS (Bear Hunter System) = encoding-vaiheen varsinainen menettely.** Viisi askelta,
-kuvattu Report on Learningissa. Tämä on se konkretia jota ohjeisiin tarvitaan. `[S]`
-
-Satamassa: solmulla on **tyyppi** (pysyy samana) ja **vaihe** (etenee). Ohje syntyy
-näiden ristitulosta, ja encoding-vaiheen ohje on BHS:n askeleet.
+**Ei-Sung-lähteet** (käsitelty, poimittu vain yhteensopiva osa): opiskelutauko-video, Jim Kwik.
 
 ---
 
-## 2. PACER — tietotyypit ja niiden tekniikat
+## 1. Perusmalli
 
-| Tyyppi | Mitä se on | Tekniikka | Lähde |
+`[S]` Aivot karsivat tehokkaasti pois kaiken mikä ei kytkeydy mihinkään. Tämä ei ole vika vaan energiansäästöä — aivot kuluttavat noin 20 % lepoenergiasta.
+
+`[S]` Oppimisen kaksi puoliskoa:
+- **Encoding** = tiedon vieminen pitkäkestoiseen muistiin
+- **Retrieval** = tiedon hakeminen sieltä käyttöön
+
+`[S]` Encoding määrää kuinka paljon aukkoja syntyy. Retrieval löytää ja paikkaa aukot. Jos encoding on heikko, retrievalia tarvitaan loputtomasti — tämä on flashcard-jauhamisen umpikuja.
+
+`[S]` Opiskelu ja oppiminen ovat eri asioita. Opiskelu on fyysinen toiminta, oppiminen on kognitiivinen prosessi jonka opiskelu käynnistää. Sama tuntimäärä voi tuottaa hyvin eri määrän oppimista.
+
+`[S]` Tiedon unohtumisnopeus riippuu ennen kaikkea siitä miten se prosessoitiin ja järjestettiin ensimmäisellä kerralla. Keskimääräinen oppija unohtaa viikossa 50–70 % opiskelemastaan.
+
+---
+
+## 2. Kolme pilaria ja niiden järjestys
+
+`[S]` Kehitysjärjestys on **enablerit → retrieval → encoding**, vaikka encoding on tärkein.
+
+**Enablerit** — eivät ole oppimistaitoja vaan taitoja jotka mahdollistavat työn tekemisen:
+- Itsehallinta: prokrastinaatio, ajanhallinta, priorisointi, keskittyminen
+- Kasvutaidot: **kokeilu** ja **kriittinen reflektio**
+
+`[S]` Kasvutaidot ovat se mitä useimmat ohittavat. Sung sanoo että 99 kertaa sadasta hitaasti edistyvä opiskelija joko pidättelee kokeilua tai ei reflektoi.
+
+**Retrieval** rakennetaan toiseksi, koska se on nopea oppia ja toimii turvaverkkona.
+
+**Encoding** viimeisenä, koska se vie kuukausia tai vuosia — kyse on ajattelutottumusten purkamisesta.
+
+---
+
+## 3. Kognitiivinen kuorma
+
+`[S]` Encoding ei tapahdu ilman riittävää kognitiivista kuormaa. Suhde on käänteinen U: liian vähän kuormaa = ei oppimista, liian paljon = ylikuormitus.
+
+`[S]` Miltä oikea kuorma tuntuu: sekavalta. "Mihin tämä liittyy? Miten tämä eroaa siitä? Miten sovellan tätä?" Tämä hämmennys **on** kognitiivinen kuorma.
+
+`[S]` Vastakohta on tylsyys ja uneliaisuus. Jos opiskelu tuntuu puuduttavalta ja nukuttaa, tekniikka ei tuota kuormaa.
+
+`[S]` Kuormankantokykyä voi harjoittaa. Sitä ei ole tutkimuksessa vahvistettu mutta neuroplastisuus tekee siitä todennäköistä.
+
+`[S]` **Desirable difficulty**: epämukavuus on merkki tehosta, kuten lihasten väsyminen salilla.
+
+---
+
+## 4. Oppimisen tasot
+
+`[S]` Bloomin taksonomia: muistaminen → ymmärtäminen → soveltaminen → analysointi → arviointi → luominen.
+
+`[S]` Ymmärtäminen ei riitä — sekin on eristettyä. Hyvässä encodingissa tieto ei ole koskaan eristettyä.
+
+`[S]` **Käänteinen ajattelu**: tähtää korkeamman tason ajatteluun (analysointi, arviointi) **niin aikaisin kuin mahdollista**. Aivot täyttävät alemmat tasot automaattisesti matkan varrella.
+
+`[S]` Perustelu: työmuistista on sekunteja aikaa siirtää tieto pitkäkestoiseen. Jos päätät katsoa asiaa ensin eristyksessä, järjestely alkaa väärältä pohjalta ja se pitää purkaa myöhemmin.
+
+`[S]` Analysointi = ideoiden vertaaminen keskenään. Arviointi = **priorisointi**: mikä suhteista on tärkein, ja mikä on suhteen luonne.
+
+`[S]` SOLO-taksonomia on Sungin mielestä hieman parempi kuin Bloom.
+
+---
+
+## 5. PACER — viisi tietotyyppiä
+
+`[S]` Tietotyyppi tunnistetaan **lukiessa**, ei kurssitasolla. Yhdessä luennossa on kaikkia viittä.
+
+### P — Procedural (miten jokin tehdään)
+**Prosessi: harjoittele.** Sovella todellisuudessa niin aikaisin kuin mahdollista.
+
+`[S]` Jos et voi harjoitella nyt, **älä kuluta sitä materiaalia** — siirry muuhun tai odota. Älä yritä muistaa sitä sillä välin.
+
+Esimerkkejä: koodaus, kielet, kliininen tutkimus.
+
+### A — Analogous (tämä muistuttaa jotain jonka jo tiedän)
+**Prosessi: kritisoi.**
+
+`[S]` Kun analogia on syntynyt, tutki:
+- Miltä osin nämä ovat samanlaisia?
+- Miltä osin erilaisia?
+- Missä tilanteessa analogia lakkaa toimimasta?
+- Onko parempaa analogiaa, tai voiko tätä laajentaa?
+
+`[S]` Tämä on se osa jonka lähes kaikki jättävät tekemättä.
+
+`[S]` Analogous voi esiintyä sekä Proceduralin että Conceptualin sisällä.
+
+### C — Conceptual (mikä jokin on ja miten se liittyy muuhun)
+**Prosessi: kartoita.** Epälineaarinen verkkomuotoinen muistiinpano.
+
+`[S]` Perustelu: käsitteellinen tieto on luonnostaan verkko. Oppikirja on lineaarinen, mutta kirjoittajan osaaminen ei ole. Asiantuntija voi aloittaa mistä tahansa kohdasta ja navigoida mihin tahansa toiseen.
+
+`[S]` Useimmilla luonnontieteen aineilla suurin osa opittavasta on Conceptual.
+
+### E — Evidence (esimerkit ja todisteet jotka konkretisoivat käsitteen)
+**Prosessi: varastoi + kertaa.**
+
+- Varastoi heti tunnistushetkellä
+- Kertaus myöhemmin (illalla, viikon lopussa)
+- Kertaus on **soveltamista**: ratkaise ongelma, kirjoita vastaus, luo selitys, opeta toiselle, kirjoita essee jossa käytät tätä todisteena
+
+### R — Reference (pikkuyksityiskohdat)
+**Prosessi: varastoi + kertaa.**
+
+- Vakiot, nimet, geenit, muuttujaluettelot
+- Kertaus on **suoraa faktapalautusta** → flashcardit ja välitoisto sopivat tähän
+- `[S]` Älä käytä lukuaikaa näiden muistamiseen. Se aika kuuluu kolmelle ensimmäiselle tyypille.
+
+---
+
+## 6. Kulutus ja sulatus
+
+`[S]` **Kaikki mitä kulutat pitää sulattaa.** Oppimista tapahtuu vain kun vaihe 1 seuraa vaihe 2.
+
+`[S]` Jos et ehdi sulattaa, älä kuluta lisää. Muuten kyseessä on oppimisen vastine ylensyömiselle — tulos on unohtaminen.
+
+`[S]` Tutkimuksissa jopa 90 % luetusta unohtuu. Siksi on järkevämpää käyttää **vähemmän aikaa kulutukseen ja enemmän sulatukseen**.
+
+`[S]` Sulata **usein ja pieninä erinä**, älä kerää tuntikausia ja järjestä lopuksi. Kolmen käsitteen yhdistäminen on helppoa, 25:n ei ole.
+
+`[S]` Kaksi tarkistuskysymystä joita Sung kysyy itseltään koko ajan:
+1. Tuntuuko tämä järkevältä (ei vain: ymmärränkö tämän)?
+2. Tuntuuko siltä että olen unohtamassa tämän?
+
+Jos kumpikin osoittaa huonoon suuntaan, lopeta kuluttaminen.
+
+---
+
+## 7. Encoding — 12 sääntöä
+
+`[S]`
+1. **Älä taistele aivojasi vastaan.** Aivot etsivät paikkaa mihin tieto kuuluu. Kun paikkaa ei löydy, ne heittävät sen pois — ja toistaminen on huutokilpailu aivojen kanssa.
+2. **Estä oppimisvelka.** Jokainen "hoidan tämän myöhemmin" siirtää työn tulevalle itsellesi, ja korko on toistoa.
+3. **Älä ahmi tietoa.** Kuluta ja sulata vuorotellen.
+4. **Yksinkertaista kaikki.** Älä yritä muistaa tai ymmärtää — yritä yksinkertaistaa. Muistaminen tulee sivutuotteena. Väärinkin yksinkertaistaminen vahvistaa muistia, kun oikea versio tulee.
+5. **Vertaa kaikkea.** Tieto saa merkityksen vain suhteessa toiseen tietoon.
+6. **Yhdistä kaikki.** Vertailun jälkeen näet vaikutukset ja seuraukset.
+7. **Ryhmittele kaikki.** Kun yhteyksiä on liikaa, etsi jaettuja yhtäläisyyksiä ja tiivistä.
+8. **Totu ajattelemaan raskaasti.** Tähän ei ole oikotietä.
+9. **Tee kaikki uudestaan.** Encoding ei lopu koskaan. Kun tietoa tulee lisää, aiempi ryhmittely ei enää riitä.
+10. **Tee parempia analogioita.** Hyvä analogia on kattava, yksinkertainen ja tarkka yhtä aikaa — näiden tasapainottaminen on itsessään encodingia.
+11. **Käytä muistiinpanoja kuormanpurkuna.** Muistiinpano on ajattelun apuväline, ei tallennusväline. Sen pitäisi olla mielesi kuva.
+12. **Haasta hypoteesisi jatkuvasti.** Kaikki tieto on hypoteesi. Ilman haastamista varhaiset virheet jäävät perustaksi.
+
+`[S]` Sanat "kaikki" ovat tarkoituksellisia: ei silloin kun huvittaa, vaan joka kerta.
+
+---
+
+## 8. Thinking on paper — kolme periaatetta
+
+`[S]` **Make it wrong.** Jos se mitä kirjoitat on oikein, teet väärin. Kirjoita avainsanat nopeasti hajalleen, katso niitä, arvaa yhteydet. Arvaus itsessään primeeraa aivot. Täydellisyyden tavoittelu halvaannuttaa.
+
+`[S]` **Make it shorter.** Ei kokonaisia lauseita, ei siisteyttä. Tutkimus: retentio laskee kun sanamäärä kasvaa. Enemmän sanoja = vähemmän prosessointia. Lyhyt muoto myös nopeuttaa hahmojen näkemistä.
+
+`[S]` **Make it again.** Kun kartta menee sekavaksi tai löydät virheen: ryhmittele uudelleen, siirrä asioita, lisää ja poista yhteyksiä. **Uudelleenjärjestely on se kohta jossa oppiminen tapahtuu**, vaikka mitään uutta ei tule sisään.
+
+---
+
+## 9. Viivästetty muistiinpano
+
+`[S]` Muistiinpanon kirjoittaminen heti kuulemisen jälkeen heikentää oppimista — väliin ei jää tilaa ajattelulle.
+
+`[S]` **Juggle mode vs organizing mode.** Pieni viive (pari lausetta) johtaa jonglööraustilaan: yrität pitää kaikkea päässä. Vaiva nousee, muisti ei parane.
+
+`[S]` Yli 1–2 minuutin viive tekee kaiken muistamisen mahdottomaksi, ja **se pakottaa järjestelytilaan**: alat ryhmitellä ja tiivistää. Vaiva laskee, muisti ja ymmärrys nousevat jyrkästi.
+
+`[S]` Tehokas oppija viivyttää noin 5 minuuttia. 3–5 minuutin tasolle pääsy voi viedä vuosia.
+
+---
+
+## 10. GRIND — mind mapin kuusi askelta
+
+> **Korjaus:** akronyymi on GRIND, ei GRINDE eikä GRRINDE. **E = Emphasized**, ei Reflective.
+
+`[S]`
+1. **G — Grouping.** Toisiinsa liittyvien ideoiden järjestäminen yhteen. Vaikea osa on päättää *millä perusteella* ryhmittelet. Vaihtoehtoja on aina useita, eikä ilmeisin ole välttämättä paras sinulle.
+2. **R — Relational.** Suhteiden ilmaiseminen. Kolme tasoa: liian vähän suhteita / liian paljon / sopivasti ja järjestyneesti. Ei riitä tietää *että* kaksi asiaa liittyvät — pitää ymmärtää suhteen **luonne** (vaikutus, syy-seuraus, kronologia).
+3. **I — Interconnected.** Ryhmien pitää liittyä toisiinsa. Ilman tätä syntyy **saaria**: tiheitä mutta eristyneitä rypäleitä. Silloin osaat käsitteet mutta et osaa soveltaa niitä.
+4. **N — Nonverbal.** Vähemmän sanoja. Viivat, nuolet ja tilallinen sijoittelu korvaavat tekstiä. Tämä aktivoi generointiefektin. Seuraava taso: yksinkertaiset, hieman abstraktit kuvat = **muistimaamerkit**.
+5. **D — Directional.** Nuolet näyttävät miten ideat vaikuttavat toisiinsa. Samat suhteet eri suuntaisina antavat täysin eri kuvan.
+6. **E — Emphasized.** Päätä mitkä ryhmät ja suhteet ovat **tärkeimpiä** ja merkitse se visuaalisesti. Tämä on kartan **selkäranka**.
+
+`[S]` Askeleet vaikuttavat toisiinsa. Kun mietit mikä on tärkeintä, huomaat usein että ryhmittely ei ollutkaan paras — ja joudut takaisin askeleeseen 1. **Tämä on hyvä asia**, ei ajanhukkaa; tutkimuksessa tätä kutsutaan syvän oppimisen rekursiiviseksi luonteeksi.
+
+`[S]` Kyky selittää mikä on tärkeää ja perustella se on asiantuntijuuden tuntomerkki. Pelkkä joukko toisiinsa liittyviä faktoja on aloittelijan merkki.
+
+`[S]` Aikataulu: GRIN-osuus vie vähintään pari kuukautta harjoittelua. Kolmen ensimmäisen askeleen opettaminen vie ohjatusti 3–4 viikkoa + 3–4 viikkoa vakiinnuttamista.
+
+---
+
+## 11. Mind mapin tasot 0–3
+
+`[S]`
+- **Taso 0** — lineaarinen, sanarikas, pinnallinen, paljon korostuksia. Aikaa vievää ilman hyötyä.
+- **Taso 1** — epälineaarinen, yhteyksiä on. Usein sotkuinen. **Ei vielä tuota hyötyä**, mutta on välttämätön välivaihe.
+- **Taso 2** — ryhmiä, ryhmien välisiä suhteita, selkeämpi virtaus. Tästä alkaa hyöty. Arvosanahyöty noin 10–15 %.
+- **Taso 3** — selkeä rakenne ja virtaus, **painotus** (paksummat nuolet), intuitiiviset ryhmänimet jotka eivät ole samoja kuin oppikirjan termit.
+
+`[S]` Siirtymä 0→1: ei kokonaisia lauseita, vähemmän sanoja, tilallinen esittäminen.
+Siirtymä 1→2: mieti mikä on samanlaista ja mikä erilaista, miten tieto virtaa, rakenna tietoisesti rakennetta.
+Siirtymä 2→3: laatu. Etsi **vaihtoehtoisia** ryhmittelyjä ja tee arvio siitä mikä on paras.
+
+`[S]` Ero tason 2 ja 3 välillä vaikuttaa tuloksiin enemmän kuin koko matka 0→2. Taso 3 vastaa noin 10 % parhaimmistoa.
+
+`[S]` **Havaittava merkki:** tasolla 0–1 kirjoitat jotain 5–10 sekunnin välein. Tasolla 2 mietit 20–30 sekuntia ennen kuin kirjoitat mitään. Tason 2 syvyydellä ajattelu ja jatkuva kirjoittaminen eivät ole yhtä aikaa mahdollisia.
+
+---
+
+## 12. Schema priming — primingin kolme askelta
+
+`[S]` Kesto 5–10 minuuttia. Tavoite: muodostaa iso kuva etukäteen, jotta varsinaisen opiskelun aikana aivojen tarvitsee vain ymmärtää sisältöä eikä samanaikaisesti keksiä mihin se kuuluu.
+
+**Askel 1 — hahmota maasto (scope the topic)**
+- *Syntopinen lukeminen*: käy kaikkia lähteitä rinnakkain, ei yhtä kerrallaan. Luentokalvoissa on asioita joita oppikirjassa ei ole ja päinvastoin.
+- *Fiksu skimmaus*: otsikot, väliotsikot, lihavoinnit, tärkeät kuvat. Muu ohitetaan tietoisesti.
+- *Detail coding*: merkitse mistä lähteestä löytyy minkätasoista tietoa, jotta myöhemmin tiedät mistä katsoa.
+
+**Askel 2 — tee arvioita ja hypoteeseja**
+- Vertaa ideoita keskenään
+- Arvioi kuinka tärkeä jokin vaikutussuhde on
+- Nämä ovat hypoteeseja, ei varmuuksia
+- **Keskity siihen miten tästä aiheesta kannattaa ajatella, ei siihen mitä pitää muistaa**
+
+**Askel 3 — valmistele tuleva itsesi**
+- Aseta lippuja: kirjoita **kysymyksiä** kohdista jotka vaikuttivat monimutkaisilta
+- Etsi aktiivisesti kohtia jotka eivät tunnu järkeviltä ("tämän pitäisi johtaa tuohon, mutta en näe miten")
+- Nämä toimivat maalitauluina myöhemmin
+
+**Kolme tarkistusmerkkiä että meni oikein:**
+1. **Aika** — 5–10 min, korkeintaan 30. Pidempi tarkoittaa että menit liian syvälle.
+2. **Tunne** — aihe tuntuu lähestyttävältä vaikket tiedä siitä juuri mitään.
+3. **Tiedon laji** — iso kuva. **Jos pystyt selittämään käsitteitä yksityiskohtaisesti, teit sen väärin.**
+
+---
+
+## 13. Schema fit ja neljä estettä
+
+`[S]` Asia tuntuu intuitiiviselta kun se sopii kaavaan johon olet tottunut. Vaikeus ei ole tiedon ominaisuus vaan kysymys siitä montako sopivaa kaavaa sinulla on.
+
+`[S]` Kaksi tapaa parantaa sopivuutta: **tuota lisää kaavoja** (toimii kun tunnet alaa jo hyvin) tai **etsi kaava uudesta aineksesta** (toimii kun ala on uusi).
+
+`[S]` Neljä estettä ja niiden korjaukset:
+
+**1. Interferenssi** — aivot löytävät kaavan joka *tuntuu* sopivalta mutta on väärä (negatiivinen siirtovaikutus). Vaarallinen koska et huomaa sitä ennen kuin viikkoja myöhemmin.
+→ **Korjaus:** haasta kaava. **Generatiivinen päättely**: jos A on totta ja B on totta, niin C:n pitää olla totta. Tarkista C. Jos C ei päde, ymmärryksesi on väärä tai vajaa.
+
+**2. Element interactivity** — liikaa liikkuvia osia yhtä aikaa. Kuudella käsitteellä on satoja mahdollisia suhteita.
+→ **Korjaus:** aloita pienestä. Kaksi käsitettä, sitten yksi lisää, sitten taas yksi. Kun kaksi muodostaa ryhmän, ne muuttuvat yhdeksi asiaksi (chunking).
+
+**3. Ylikuormitus** — liikaa termistöä. Yksi termi voi edustaa kokonaista käsitejoukkoa.
+→ **Korjaus:** pura selkokielelle. Tai — usein tehokkaampi — **kuvahaku**. Visuaalinen prosessointi on kertaluokkia nopeampaa, ja joku asiantuntija on jo miettinyt miten asia esitetään ymmärrettävästi.
+
+**4. Abstraktius** — asia on niin epäkonkreettinen ettei siihen saa otetta.
+→ **Korjaus:** pyydä konkreettisia esimerkkejä.
+
+`[S]` **Matematiikka:** Sung nimeää tämän erikseen abstraktiuden esimerkkinä. Matematiikkaa opetetaan perinteisesti kaavojen ja suoritusten ulkoaopetteluna, jolloin intuitiivista käsitystä ei synny ja se kostautuu myöhemmin. Korjaus on visualisointi: miltä funktio näyttää kuvaajana, miten sen muuttaminen muuttaa muotoa.
+
+---
+
+## 14. Tikapuumenetelmä (ladder method)
+
+`[S]` Tarkoitus: mahdollistaa opiskelu väsyneenä ja estää ylivoimaisuuden tunne.
+
+`[S]` Miksi ylivoimaisuus syntyy: aivot arvioivat ennalta kuinka paljon energiaa jokin vaatii. Kolme energiasyöppöä ovat ymmärtäminen, vertaaminen ja **päättäminen mihin tieto kuuluu**. Kun näitä kolmea yrittää yhtä aikaa, syntyy "en jaksa opiskella" -tunne.
+
+`[S]` Menetelmä:
+- Käy materiaali läpi ja poimi **vain se mikä tuntuu helpolta**: mikä on vaivaton ymmärtää, mikä on helppo verrata tuttuun, minkä paikan hahmotat
+- Ohita loput tietoisesti
+- Syntyy karkea runko (~15 min)
+- Toinen kierros samalla logiikalla — kestää vähän kauemmin, menee syvemmälle, tuntuu silti kevyeltä koska runko on olemassa
+- **Useimmat aiheet valmistuvat kolmella kierroksella**
+
+`[S]` Jokainen kierros vie suunnilleen saman verran vaivaa; ero on siinä mihin vaiva kuluu. Ensimmäisellä kierroksella ymmärtämiseen, toisella tarkennuksiin ja päätöksiin.
+
+`[S]` Toimii myös projekteille ja tehtäville: aloita helposta korkean tason suunnittelusta ja tarkenna kierros kierrokselta.
+
+---
+
+## 15. Retrieval
+
+`[S]` Retrieval on välttämätön osa jokaista oppimisjärjestelmää. Se testaa osaamista **ja** vahvistaa muistia uudelleenprosessoinnin kautta.
+
+`[S]` Menetelmä valitaan sen mukaan miten tietoa pitää käyttää: flashcardit yksityiskohtiin, monimutkaiset ongelmat useamman käsitteen yhdistämiseen, opettaminen, omien kysymysten laatiminen, brain dump, mind map -muistidumppi, harjoitusesseet.
+
+`[S]` Yksikään strategia ei ole toista parempi — kyse on siitä että strategia vastaa käyttötarvetta.
+
+### Flashcardien käyttö oikein
+
+`[S]` Hyvä kolmeen asiaan: aktiivinen palautus, helppo välitys yksittäisen faktan tasolla, mikro-oppiminen (3–7 min pätkät).
+
+`[S]` Huono kolmeen asiaan:
+1. Testaa 1:1-suhteella, ei sovellu korkeamman tason osaamiseen
+2. Muuttuu ylivoimaiseksi nopeasti
+3. **Opit kortin, et asian** — tunnistat kysymyksen alusta ja tiedät vastauksen lukematta koko kysymystä
+
+`[S]` **Sungin strategia** — jaa pitkä opiskelusessio kolmeen osaan:
+1. **Kohdennettu kertaus** (alussa)
+2. **Vakiinnuttaminen ja valmistelu** (uusi materiaali, encoding)
+3. **Esikatselu** (priming tulevaan)
+
+`[S]` Viikon aikana: merkitse kortit jotka menivät **3× oikein peräkkäin** ja ne jotka menivät **3× väärin peräkkäin** (eri merkinnät).
+
+Seuraavassa pitkässä sessiossa:
+- **Väärät:** 5–10 min per kortti. Yhdistä asia aiempaan tietoon, luo analogioita, rakenna verkkoa. Tarvittaessa aiheen ulkopuolelle. Joskus huomaat ettet edes tarvitse korttia — silloin poista se.
+- **Oikeat:** yhdistä kaksi korttia yhdeksi korkeamman tason kysymykseksi. Esim. "miten proteiinisynteesi toimii" + "miten hormonit sitoutuvat reseptoreihin" → "miten hormonit vaikuttavat proteiinisynteesiin".
+
+`[S]` Korttien määrä siis **laskee** ajan myötä eikä kasva.
+
+`[S]` **Diagnostinen raja: yli ~100–150 korttia viikossa tarkoittaa että encoding ei toimi.**
+
+`[S]` **Esikatselu on tärkein kolmesta osasta.** Jos pitäisi valita kertauksen ja esikatselun väliltä, valitse esikatselu — se estää unohtamisen syntymisen. Kertauksen voi kuroa kiinni, esikatselun laiminlyönnin ei.
+
+---
+
+## 16. Interleaving
+
+`[S]` Määritelmä: saman asian opiskelu **useasta näkökulmasta ja variaatiosta** sen sijaan että yksi käsite opitaan täysin ennen seuraavaa (blocked practice).
+
+`[S]` Efektikoko: Hedges g ≈ 0,65 muistille ja siirtovaikutukselle. Vertailuksi: muistiinpanojen tekeminen ≈ 0,5, uudelleenlukeminen ≈ 0,2–0,3, spaced + active recall ≈ 0,8.
+
+`[S]` **Neljä sääntöä:**
+
+**1. Pakota vertailu.** Jos tapa jolla teet interleavingiä ei auta vertaamaan variaatioita, se ei toimi. Käytä **eri testaustapaa joka kertauskerralla**.
+
+**2. Etsi variaatioita, älä täysin uusia aiheita.** Vertailtavien pitää olla riittävän samanlaisia että yhtymäkohtia on, ja riittävän erilaisia että ne erottaa. Mitoosi ja meioosi kelpaavat. Mitoosi ja fotosynteesi eivät. Kaksi lähes identtistä käytäntöä eivät myöskään — niitä ei erota toisistaan.
+
+**3. Tee sitä usein.** Vertaa **10–15 minuutin välein**, ei päivien välein. Hyöty haihtuu kun väli kasvaa, ja kokonaisen päivän vertaaminen toiseen päivään on ylivoimaista.
+
+**4. Odota hitaampaa tuntumaa.** Tieto kasvaa kuin kylpyamme, ei koeputki. Osaamisen tunne nousee hitaammin, mutta tilavuus on suurempi. Nopea nousun tunne blocked practicessa on **luottamuksen illuusio** — tieto on hauras.
+
+> **HUOM:** interleaving ei tarkoita aiheiden tai kurssien vaihtamista. Se on **saman aiheen sisäistä** variaatioiden vertailua. Eri kurssien vuorottelu päivän sisällä on aikataulutusta, ei interleavingiä.
+
+---
+
+## 17. Välitoiston kritiikki
+
+`[S]` Active recall ja välitoisto toimivat siirtämällä sinua unohtamiskäyrällä eteenpäin. Ne toimivat, **jos et tee mitään toistoa nyt**.
+
+`[S]` Ongelma on jyrkästi laskeva rajahyöty. Tutkimus näyttää että toistoa käyttävät pärjäävät paremmin kuin ne jotka eivät käytä — mutta se on siirtymä huonosta parempaan, ei parempaan kuin hyvä.
+
+`[S]` **Suurin osa välitoistoa käyttävistä ei pärjää hyvin.** Ne jotka pärjäävät, ovat todennäköisesti luontaisesti hyviä encodaajia.
+
+`[S]` Kolme syytä miksi myytti elää: **Dunning–Kruger** (vähän tietoa = paljon varmuutta), **menestysharha** (kukaan ei tee videota epäonnistumisestaan), **saatavuusharha** (mitä useammin näemme jotain, sitä uskottavampana pidämme).
+
+`[S]` Raportissa (2022) sama kanta: havaittu käänteinen U — korkeilla välitoistomäärillä tulokset ja mielenterveys kärsivät.
+
+`[S]` Raportin muut poiminnat:
+- Opiskelijat eivät osaa tunnistaa tehokkaita kertaustekniikoita edes kun heille kerrotaan mitkä ovat parempia
+- Uudelleenlukeminen lisää väärää hallinnan tunnetta
+- Laajenevat toistovälit eivät selvästi voita kiinteitä — tutkimus on ristiriitaista
+- Välien tarkkoja suosituksia **ei voi tutkimuksen perusteella antaa** `[P]`
+
+---
+
+## 18. Viisi oppijatasoa
+
+`[S]`
+| Taso | Nimi | Ongelma | Ratkaisu seuraavalle |
 |---|---|---|---|
-| **P**rocedural | Miten jokin tehdään: askeleet, suoritus | Harjoittele heti, älä pelkästään lue | `[S]` |
-| **A**nalogous | Liittyy johonkin jonka jo tiedät | Luo analogia ja kritisoi sitä | `[S]` |
-| **C**onceptual | Mitä jokin on: teoriat, suhteet, periaatteet | Kartoita (GRINDE / BHS) | `[S]` |
-| **E**vidence | Faktat, luvut, päivämäärät, esimerkit jotka tukevat käsitettä | Säilö lukiessa, kertaa myöhemmin soveltamalla | `[S]` |
-| **R**eference | Suoraan muistettava data, ei vaadi syvää ymmärrystä | Toistokortit + välistetty kertaus | `[S]` |
+| 1 | Aloittelija | Kaaos | Opiskele enemmän |
+| 2 | Noviisi | Vuotava muisti | Älykäs toisto |
+| 3 | Keskitaso | Tasanne | Laatu (encoding + parempi toisto) |
+| 4 | Edistynyt | **Epäjohdonmukaisuus** | Optimointi |
+| 5 | Nero | Tylsyys | — |
 
-**Sataman v1:ssä tuetaan vain P, A ja C.** Päätös 8.8.2026.
+`[S]` **Tason 4 ongelma on tärkein Satamalle:** tiedät mitä pitäisi tehdä, mutta kun aika loppuu ja paine kasvaa, palaat alemman tason tapoihin. Erityisesti nopeatempoisissa tilanteissa.
 
-**Kaksi tyyppiä yhtä aikaa (päätös 9.8.2026).** Solmulla on **päätyyppi** ja
-valinnainen **sivutyyppi**. Kenttä on olemassa alusta asti, vaikka v1 käyttää vain
-päätyyppiä — näin myöhempi laajennus ei vaadi rakennemuutosta. Ohje muodostuu niin
-että päätyyppi antaa koko ohjeen ja sivutyyppi lisää **korkeintaan yhden askeleen**.
-Kahta täyttä ohjesarjaa ei koskaan yhdistetä: se kaksinkertaistaisi kuormituksen
-juuri siinä vaiheessa jossa kuormituksen pitäisi olla optimialueella.
-
-**Extraction course kerää tiedon myös Evidencestä ja Referencestä**, vaikka v1 ei
-niitä toteuta — jotta ne voidaan ottaa käyttöön varsinaisissa kursseissa ilman uutta
-materiaalikierrosta.
-
-**Vahva tuki päätökselle `[S]`.** Sungin järjestelmä nimenomaan lykkää irralliset,
-ulkoa opeteltavat elementit viimeiseksi. BHS:n askel 5 erottaa ne omaksi prosessikseen
-vasta sen jälkeen kun rakenne on kunnossa. Hän kutsuu tätä "käänteiseksi ajatteluksi":
-korkeamman asteen oppiminen tulee kronologisesti ennen alemman asteen ulkoa
-opettelua, ja tämä järjestys tuottaa tehokkuutta ilman että alemman tason osaaminen
-kärsii. Evidence ja Reference eivät siis ole v1:stä puuttuva palanen vaan
-menetelmän mukaan viimeisenä tuleva palanen.
-
-**Luokittelu:** äly ehdottaa tyypin kerran kurssin sisääntulossa. Käyttäjä kuittaa
-**ohjeen**, ei tyyppiä. Tyypin voi vaihtaa kesken kaiken; vaihe ei nollaudu, mutta
-vaihdos merkitään muistiin (toistuvat vaihdokset kertovat että luokittelukehote
-kaipaa korjausta).
+`[S]` Tason 5 tunnusmerkki: **oman aivon mekaanikko** — seuraat jatkuvasti miten tekniikka vaikuttaa muistiin ja ymmärrykseen käytettävissä olevilla resursseilla, ja säädät sen mukaan.
 
 ---
 
-## 3. PERO — vaiheet
+## 19. RAIL — taitojen oppiminen
 
-**Sungin oma järjestys `[S]`:** Priming → Encoding → Reference → Retrieval → Overlearning.
+`[S]` Neljä vaihetta ja kussakin kaksi toimintaa:
 
-**Sataman toteutus (päätös 9.8.2026):** sama viisi vaihetta. Erillinen "ylläpito"
-poistuu — se ei ollut oma vaihe vaan välistetty kertaus, joka kuuluu retrievalin
-sisään (SIR = spaced interleaved retrieval). Kenttien nimet: `pero_vaihe` ja
-`pacer_tyyppi`.
+1. **R — Relevance.** Et tiedä mistä aloittaa etkä osaa edes kysyä. Toiminnot: **tutkiminen** ja **haastaminen** (omien oletusten kyseenalaistaminen). Merkki edistymisestä: alat tunnistaa uusia muuttujia joista välittää.
+2. **A — Awareness.** Yrität ja epäonnistut toistuvasti. Toiminnot: **kokeilu** ja **reflektio**. Tavoite on tehdä virheet nopeasti. Merkki: virheitä tulee vähemmän.
+3. **I — Iteration.** Osaat tehdä oikein, mutta hitaasti ja epäjohdonmukaisesti. Toiminnot: **vaihteleva harjoittelu** ja **säätäminen**. Järjestys on tärkeä: johdonmukaisuus ensin, nopeus vasta sitten.
+4. **L — Lifelong.** Taidosta on tullut tapa. Ylläpito, muuten **taidon rappeutuminen**.
 
-**Aiempi ristiriita ratkesi.** Lista "priming, reference, retrieval/interleaving,
-overlearning, encoding" on **opetusjärjestys**. Sung opettaa ensin SIR:n (spaced
-interleaved retrieval), koska laadukas encoding vaatii monimutkaisemman taitosarjan. `[S]`
+`[S]` Perustuu neljän kompetenssivaiheen malliin, mutta on käytännöllisempi koska kertoo mitä pitää tehdä.
 
-**Vaiheiden sisältö:**
-
-- **Priming** — Sung perustelee tämän ohimenevän tiedon ilmiöllä: luennolla tieto
-  kulkee ohi eikä oppija voi säädellä sen tahtia. Kirjoitetussa muodossa tietoa voisi
-  koodata rauhassa, mutta luennolla se ei ole oppijan hallinnassa. Semanttisella
-  primingilla oppija kasvattaa etukäteisasiantuntemustaan ja ohittaa tämän
-  rajoitteen. `[S]`
-- **Encoding** — mikä tahansa prosessi joka siirtää tiedon pitkäkestoiseen muistiin,
-  laadusta riippumatta. Jos tieto haihtuu nopeasti, se encodattiin heikommin. Mitä
-  korkeamman asteinen ja relationaalisempi rakenne, sitä pitkäkestoisempi muisti.
-  Vaikeus ei ole encodingissa vaan **laadukkaassa** encodingissa. Menettely = BHS. `[S]`
-- **Reference** — omien muistiinpanojen ja hakumateriaalin luominen. Reportin
-  muistiinpanotutkimus valaisee tätä: sanatarkat muistiinpanot korreloivat heikomman
-  muistamisen kanssa, jäsennellyt ja käsitellyt muistiinpanot ovat parempia. Määrä ei
-  ole hyve. `[S]`
-- **Retrieval** — mieleenpalautus. Sungin muoto on SIR: välistetty ja lomitettu. `[S]`
-  **Tämä vaihe toistuu.** Kertausvälit elävät retrievalin sisällä, eivät erillisenä
-  vaiheena. Solmu voi olla valmis ja silti olla kertausjonossa.
-- **Overlearning** — tarkoituksellista oppimista enemmän ja korkeammalle tasolle kuin
-  on tarpeen. `[S]` **Vapaaehtoinen:** solmu valmistuu ilman tätä vaihetta. Overlearning
-  on syvennys, ei vaatimus. Päätös 9.8.2026.
-
-**AUKKO:** kulkevatko kaikki tietotyypit samojen vaiheiden läpi.
-**AUKKO:** vaiheiden kestot.
+`[S]` **Latenssijakso**: monimutkaisissa taidoissa palaute tulee vasta viikkojen tai kuukausien päästä. Ammatillisessa oppimisessa tämä pitää **kutistaa nollaan**: opi, muodosta käsitys, ehdota miten sovellat, ja tarkistuta se heti.
 
 ---
 
-## 4. BHS — encoding-vaiheen viisi askelta
+## 20. Teoriaylikuormitus
 
-Sungin oma järjestelmä, nimeltään Bear Hunter System. `[S]`
+`[S]` Uuden taidon opettelussa saa kokeilla **vain yhtä tai kahta asiaa kerrallaan**.
 
-1. **Tunnista avainsanat ja termistö** aiheesta. Kerätään yhteen paikkaan, mikä
-   vähentää työmuistin kuormaa (hajautetun huomion ilmiö).
-2. **Rajattu kysely (restricted inquiry)**, jonka avulla muodostat pääryhmät.
-   Kysymykset jakautuvat kahteen: (a) millainen suhde käsitteillä on toisiinsa,
-   (b) mikä on tämän käsitteen toiminnallinen tai käsitteellinen tärkeys. "Rajattu"
-   tarkoittaa että kysymyksiä on vain muutama ja ne toimivat kaikilla aihealueilla.
-3. **Sama kysely uudelleen** suhteiden tunnistamiseen ryhmien ja käsitteiden välillä,
-   ja suhteille annetaan **tiukka keskinäinen tärkeysjärjestys**.
-4. **Ei-lineaarinen esitys** ideoista ja suhteista, kuvat täydentämässä sanoja siellä
-   missä se sopii.
-5. **Kysely vielä kerran**, ja irralliset elementit erotetaan omaan prosessiinsa
-   (välistetty kertaus tai ulkoa opettelu).
+`[S]` Nyrkkisääntö: **vähintään 5 tuntia harjoittelua jokaista teoriatuntia kohden.**
 
-**Huomionarvoista:** tieto opitaan siinä järjestyksessä joka tuntuu oppijasta
-kiinnostavimmalta, ei materiaalin järjestyksessä. Sung perustelee: vaikka järjestys
-poikkeaa materiaalista, se on oikea järjestys suhteessa siihen mikä juuri nyt
-todennäköisimmin koodautuu. `[S]`
+`[S]` Tarkempi mittari kuin tuntimäärä: **kuinka nopeasti uusia tapoja muodostuu**. Kun asia alkaa tuntua helpommalta ja nopeammalta ilman että tarkkuus kärsii, on tilaa uudelle teorialle.
 
-**BHS ja GRINDE ovat sama asia eri kulmasta.** BHS on prosessi, GRINDE on tarkistus
-lopputulokselle: ryhmät (askel 2), suhteet (3), yhteydet ryhmien välillä (3),
-sanattomuus (4), suunta ja korostus (3–4).
+`[S]` Esimerkki: opiskelija joka kävi 31 % kurssista 5 viikossa **laski** 80 %:sta 71 %:iin. Opiskelija joka kävi 20 % kurssista 54 viikossa **nousi** 62 %:sta 92 %:iin.
 
 ---
 
-## 5. GRRINDE — encoding-vaiheen tarkistuslista
+## 21. Lepo ja palautuminen
 
-**Sataman oma laajennus (päätös 9.8.2026).** Lähteet olivat eri mieltä siitä onko R
-"Relational" vai "Reflective". Ratkaisu: molemmat. Ne ovat eri tekemistä ja kumpikin
-on tarpeellinen. Merkitse omaksi laajennukseksi, Sungin oma akronyymi on GRINDE.
+`[S]` **Lepo ei ole sama kuin palautuminen.**
 
-- **G**rouping — ryhmittele. 10 erillisen asian sijaan 3 ryhmää joiden välillä näet yhtäläisyyksiä
-- **R**elational — merkitse suhteet käsitteiden välille
-- **R**eflective — kartta heijastaa sitä miten ajattelusi kulki, ei lineaarista tekstiä
-- **I**nterconnected — yhdistä ryhmät toisiinsa syy-seuraussuhteilla. Eristetty tieto unohtuu helpoiten
-- **N**on-verbal — kuvia ja symboleja. Käytännössä: mahdollisimman vähän sanoja
-- **D**irectional — anna yhteyksille suunta, syy ja seuraus tai tärkeysjärjestys näkyviin
-- **E**mphasized — korosta tärkein
+`[S]` Rentoutuminen määritellään matalaksi aktiivisuudeksi **sille järjestelmälle jota yritetään palauttaa**. Kognitiivisesti kuormittavan päivän jälkeen tarvitaan henkisesti matalaa toimintaa.
 
-**Kartta ei ole päämäärä.** Tarkoitus on pakottaa aivot oikeisiin
-ajatteluprosesseihin. `[S]`
+`[S]` **Vähäinen vaivannäkö ei ole sama kuin rentoutuminen.** Puhelimen selaaminen on vaivatonta mutta ei palauttavaa: jatkuvia mikropäätöksiä, tunnevaihteluita ja dopamiinipiikkejä. Sung kutsuu tätä matalan vaivan kiihtymykseksi.
 
-**Satamassa:** käyttäjä täppää kohdat itse. Ei automaattista tunnistusta Miron datasta.
+`[S]` **Uni ei korjaa kognitiivista uupumusta.** Fyysinen väsymys palautuu unella hyvin; kognitiivinen ja emotionaalinen ei — se voi jatkua viikkoja ja heikentää unen laatua.
 
----
+`[S]` Korkean vaivan toiminnot tuottavat usein **enemmän** palautumista kuin matalan.
 
-## 6. Ohjematriisi (vaihe × tietotyyppi)
+### Neljä ulottuvuutta (Sonnentag & Fritz)
 
-### Priming — sama kaikille tyypeille
+1. **Rentoutuminen** — matala aktiivisuus kuormittuneelle järjestelmälle
+2. **Psykologinen irtikytkeytyminen** — vahvimpia palautumisen ennustajia. Este on usein uskomus: "jos en ajattele tätä, en välitä tarpeeksi."
+3. **Mestaruus** — edistymisen tunne jossakin. Laukaisee myös irtikytkeytymisen ja kasvattaa harrastuspääomaa tulevaisuutta varten.
+4. **Hallinta** — se että päätit itse. **15–20 min itse valittua riittää.**
 
-0. Säädä tuntemustaso **ennen kuin selaat mitään** `[A]`
-1. Selaa materiaalin rakenne läpi lukematta `[S]`
-2. Kirjoita 3 kysymystä joihin haluat vastauksen `[A]` (määrä arvaus)
+`[S]` **Recovery paradox:** ihmiset palautuvat vähiten silloin kun tarvitsisivat sitä eniten. Mitä kuormittavampi tilanne, sitä vaikeampi irrottautua.
 
-### Encoding
+### Väsymyksen mittaaminen
 
-| Tyyppi | Ohje | Lähde |
-|---|---|---|
-| Conceptual | BHS:n viisi askelta: kerää termit → kysele suhteita ja tärkeyttä → muodosta ryhmät → priorisoi suhteet → piirrä ei-lineaarisesti symbolein. Tarkista GRINDEllä | `[S]` |
-| Procedural | Käy ensin läpi **useita valmiiksi ratkaistuja esimerkkejä** ja selitä itsellesi miksi kukin askel tehdään. Kirjoita sitten oma toimiva esimerkki. Piirrä lopuksi haarat kartaksi | `[S]` |
-| Analogous | Kirjoita analogia auki ja etsi kolme kohtaa joissa se pettää | `[S]` |
+`[S]` Itsearvio on epäluotettava. **Luotettavin mittari on millaisia päätöksiä teet.** Kun valitset toistuvasti vähemmän suunnittelua vaativan vaihtoehdon vaikka tiedät ettei se ole paras, otsalohko on väsynyt.
 
-**Proseduraalisen perustelu `[S]`:** valmiiksi ratkaistut esimerkit olivat
-katsauksessa selvästi tehokkaampia ja aikataloudellisempia kuin mallista oppiminen tai
-analoginen ongelmanratkaisu. Ratkaiseva ehto on että oppija selittää ratkaisut
-itselleen — ne jotka selittävät itselleen ratkaisevat uusia ongelmia paremmin, ja
-oma-aloitteinen selittäminen on tehokkaampaa kuin kehotettu.
+`[S]` Korjaus: **päätä etukäteen ja poista päätöksiä hetkestä.** Sung kalenteroi salin viikkoa aiemmin eikä mieti hetkessä muuta kuin että lähtee.
 
-**Proseduraalisen oma vaiheistus `[S]`:** taitojen hankinnan vaiheet ovat
-(a) periaatteen koodaus, (b) ongelmanratkaisun opettelu ja tietoaukkojen korjaus,
-(c) automatisointi. Tämä on lupaava vastaus siihen kulkevatko tyypit eri polkuja —
-proseduraalisella on oma sisäinen etenemisensä.
+### Käytännön ohjeet
 
-### Reference
+`[S]`
+- Tee lista asioista jotka voisivat olla rentouttavia
+- Aseta viikkoon pari **ankkuria** (Sungilla liikunta 2×/vk), suojele niitä
+- Poimi listalta 2–3 asiaa joihin annat 10–15 min iltaisin, mieluiten jotain jossa on edistymistä
+- Jos et jaksa miettiä mitään: **luonto, 30 min**. Suositus ~30 min kerralla tai ~120 min viikossa.
 
-Kokoa encoding-vaiheen tuotoksesta se muoto johon palaat myöhemmin. **Ei sanatarkkaa
-kopiointia** — jäsennelty ja käsitelty muoto. `[S]` periaate, `[A]` toteutus.
+`[X]` Yhteensopivat poiminnat muista lähteistä: ulkoilu, liikunta, paikan vaihtaminen tauolla, ei ruutuja, siivoaminen ilman taustaääntä, 5–10 min torkut (yli 20 min haittaa).
 
-**Toteutus (päätös 9.8.2026):** Reference ei ole erillinen muistiinpano vaan
-**tarkennuksia olemassa olevaan käsitekarttaan**. Kartta on jo se rakenne johon
-palataan; yksityiskohdat kiinnitetään siihen sen sijaan että ne asuisivat toisaalla.
-Tämä on myös menetelmän mukaista: Sungilla yksityiskohdat kiinnittyvät siihen
-käsitteeseen jota ne tukevat, eivät irralleen.
-
-### Retrieval
-
-| Tyyppi | Ohje | Lähde |
-|---|---|---|
-| Conceptual | Tyhjä sivu. Piirrä kartta muistista ilman materiaalia. Korjaa vasta sitten materiaalia vasten eri värillä | `[S]` |
-| Procedural | Ratkaise yksi tehtävä ilman muistiinpanoja **ja ilman tekoälyä** | `[A]` |
-| Analogous | Rakenna analogia uudestaan muistista | `[A]` |
-
-**Kanvaasi (päätös 9.8.2026):** jokainen retrieval-kierros saa **oman tyhjän
-Framen**. Tyhjyys on koko pointti — vanhaa ei jatketa. Aiemmat kierrokset säilyvät,
-jolloin kierros 1 ja kierros 3 voi asettaa vierekkäin ja nähdä mitä on kertynyt.
-
-**Free recall tarkemmin `[S]`:** tyhjä sivu, palauta mieleen niin paljon kuin pystyt
-käsitekarttana katsomatta lähdettä. Ääretön kanvaasi on hyvä alusta. Tee kartasta niin
-sanaton kuin pystyt — kuvia, ikoneita, värejä. Ryhmittele loogisesti, käytä
-suuntanuolia. Vasta sen jälkeen palaa materiaaliin korjaamaan. Ohjeessa pitää lukea
-että kyse on free recallista.
-
-**Retrievalin laatu `[S]`:** mieleenpalautus hyödyttää enemmän kun se on kognitiivisesti
-kuormittavampaa. Palauttaminen hyödyttää riippumatta siitä meniko oikein. Viivästetty
-palaute voi olla parempi kuin välitön, mutta vain jos sen käy huolella läpi.
-
-### Retrievalin kertausvälit
-
-**Tärkeä korjaus aiempaan `[S]`.** Report sanoo suoraan: laajenevat välit eivät
-selvästi paranna tuloksia kiinteisiin verrattuna, ja tutkimus on ristiriitaista.
-Tarkkoja aikataulusuosituksia ei voi antaa. Jos tieto pitää säilyttää pidempään,
-pidemmät välit voivat auttaa. Sataman [1,3,7,21] on siis yhtä perusteltu kuin mikä
-tahansa muu — ei kannata hienosäätää, koska tutkimus ei tue hienosäätöä.
-
-**Vielä tärkeämpi varoitus `[S]`:** liiallisella välistetyllä kertauksella on
-käänteinen U-vaikutus. Sung on havainnut että liian suuri määrä kertausta heikentää
-sekä tuloksia että mielenterveyttä, koska se on toistavaa ja aikaa vievää. Hänen
-hypoteesinsa on että välistetty kertaus toimii parhaiten **täydentävänä** osana
-järjestelmää joka ensisijaisesti optimoi encodingin, ja että se on suorastaan
-haitallista jos encoding on jäänyt liian ohueksi.
-
-**Sataman suunnitteluperiaate tästä:** ylläpitokertoja ei pidä maksimoida. Jos
-ylläpitojono kasvaa pitkäksi, se on merkki siitä että encoding-vaihe on jäänyt
-kesken — ei merkki siitä että pitäisi kerrata enemmän.
-
-**Ehdotus `[A]`, nyt vahvemmalla pohjalla:** kertausväli kytketään encoding-laatuun.
-Sung sanoo suoraan että työ encoding-vaiheessa vähentää kertauksen tarvetta. Kaavaa
-hän ei anna.
-
-### Overlearning
-
-Vapaaehtoinen syventävä vaihe retrievalin jälkeen. Ei estä solmun valmistumista.
-Ehdotetaan kun solmu on ollut valmiina jonkin aikaa ja päivä on rauhallinen.
-
-| Tyyppi | Ohje |
-|---|---|
-| Conceptual | Piirrä ydinrakenne muistista ja laajenna sitä oman ajattelun suuntaan |
-| Procedural | Ratkaise tehtävä joka on vaikeampi kuin kurssin vaatimustaso |
-
-`[A]` molemmat — Sung antaa määritelmän muttei menettelyä.
+`[X]` **Ei oteta mukaan:** jonglööraus, "super brain yoga", ristikkäisliikkeet, väite nesteytyksen 30 % vaikutuksesta, Pomodoron jäykkyys.
 
 ---
 
-## 6b. Luennot (päätös 9.8.2026)
+## 22. Tekoälyn käyttö
 
-**Ennen jokaista luentoa ehdotetaan priming.** Laukaisin on kalenterimerkintä:
-luento kalenterissa → priming-tehtävä nousee edellisenä päivänä. Perustelu `[S]`:
-luennon tieto on ohimenevää eikä oppijan säädeltävissä, ja priming on ainoa keino
-ohittaa tämä rajoite.
+`[S]` **Haitallista** jos:
+1. Tekee tiedon jäsentämisestä kognitiivisesti helpompaa
+2. Ohittaa tarpeen verrata tai tehdä itsenäisiä arvioita
 
-**Luennolla muistiinpanot ei-lineaarisesti.** Tämä on oma opetettava taito, ei sama
-asia kuin encoding. Ohje `[A]`: älä kirjoita lauseita peräkkäin. Kirjaa käsitteitä
-laatikoiksi eri puolille sivua ja vedä niiden välille viivoja sitä mukaa kun luennoija
-kertoo miten ne liittyvät toisiinsa. Jos et ehdi, kirjaa vain käsitteet ja lisää
-suhteet heti luennon jälkeen. Perustelu `[S]`: sanatarkat muistiinpanot korreloivat
-heikomman muistamisen kanssa.
+`[S]` **Hyödyllistä** jos:
+1. Säästää aikaa tiedon keräämisessä
+2. Tiivistää ison massan jonka sinä sitten prosessoit ja arvioit
+3. Säästää aikaa verrattuna Google-hakuun
 
-## 6c. Mistä harjoitustehtävät tulevat (päätös 9.8.2026)
+`[S]` Esimerkit: avainsanojen syöttäminen ja ryhmien generoiminen = haitallista. Omien ryhmien tarkistuttaminen = hyödyllistä, koska vaikea osa on jo tehty.
 
-Kolme lähdettä, tässä järjestyksessä:
-
-1. **Kurssin omat tehtävät** — MOOC sisältää ne valmiina, samoin matikka
-2. **Ulkoiset lähteet** — Khan Academy matikassa
-3. **Generoidut** — Satama näyttää valmiin promptin johon solmun nimi ja vaihe on
-   täytetty, käyttäjä kopioi sen Copilotille. Ei API-kutsua, ei kustannusta.
-
-Promptipohja on rivi kannassa per (tyyppi, vaihe), samalla tavalla kuin ohjeetkin.
-Myöhemmin sen voi automatisoida ilman rakennemuutosta.
-
-## 6d. Free recall -kanvaasi (päätös 9.8.2026)
-
-**Toteutus: oma Frame Mirossa per retrieval-kierros.** Ei uutta editoria, ei upotettua
-kolmannen osapuolen piirtotyökalua. Hytistä painetaan nappia → aukeaa Miro sen solmun
-recall-Frameen → tallennus näkyy Hytissä.
-
-**Yksityisyys ratkeaa jo olemassa olevalla rakenteella:** Laiturin kohdevalinta ohjaa
-sisällön suoraan omaan hyttiin, eikä toisen hyttiin ole näkymää lainkaan. Recall-kartta
-ei siis kulje jaetun näkymän kautta missään vaiheessa.
-
-**Vertailu on teknisesti mahdollista `[A]`, mutta rajallista.** Miron API palauttaa
-tekstilaatikoiden sisällön, joten äly näkee **mitkä käsitteet muistit** ja voi verrata
-sitä materiaaliin. Se ei näe piirroksia, symboleja eikä kartan rakennetta. Käytännössä
-tämä riittää: kattavuuden arviointi on juuri se mitä siirtymäpäätökseen tarvitaan, ja
-rakenteen laadun täppäät itse GRRINDEllä.
-
-## 7. Vaiheen valmius
-
-- **Encoding:** GRINDE-kohdat täpättynä `[S]`
-- **Priming:** ohjeen askeleet tehtynä `[A]`
-- **Retrieval:** free recall tehty ja korjattu materiaalia vasten; äly vertaa `[A]`
-- **Reference:** muistiinpanot koottu jäsennellyssä, ei sanatarkassa muodossa `[A]`
-- **Overlearning:** ei valmiuskriteeriä — vaihe on vapaaehtoinen eikä estä valmistumista
-
-### Solmun valmiussääntö (päätös 9.8.2026)
-
-**Solmu on valmis kun:**
-1. Priming tehty — käyttäjä täppää itse
-2. Encoding tehty
-3. Retrieval tehty **x kertaa** (oletus 3, muokattava data)
-4. Reference tehty — käyttäjä täppää itse
-
-Sen jälkeen solmu jää kertausjonoon ja voi vapaaehtoisesti siirtyä overlearningiin.
-
-**Valmistuminen ei ole lopullinen.** Jos asia näyttää olevan oppimatta, retrieval
-kierroksia saa palauttaa lisää.
-
-**Älyn rooli on rajattu tähän:** se auttaa liikkumaan encodingin ja retrievalin
-välillä, tarvittaessa edestakaisin. Priming-vaiheen valmiuden käyttäjä tunnistaa itse.
-Riittää nopea vilkaisu, ei huolellista muistiinpanojen analyysiä — ensimmäinen
-retrieval kertoo luotettavammin ja nopeammin onko asia opittu kuin encodingin
-tuotoksen tarkka arviointi. **Tämä on se ominaisuus jonka voi kytkeä pois** kun
-käyttäjä ei enää tarvitse sitä.
-
-**Älyn pitää huomioida aikataulu.** Ei saa jäädä hinkkaamaan yhtä solmua kun muuta
-on menossa. Poikkeus: käyttäjä voi merkitä **1–3 perustussolmua** lukukaudessa,
-joiden päälle tulevat kurssit rakentuvat — niille annetaan enemmän aikaa.
-
-### Vaiheiden kestot (päätös 9.8.2026)
-
-- **Priming:** ohjeellinen aika näkyviin
-- **Muut vaiheet:** ei kestoa, siirtymä tapahtuu kun tehty tai opittu riittävästi,
-  huomioiden mitä muuta kursseissa on menossa
-- **Overlearning:** jatkuvaa, ei jaksoa x päivää ennen koetta
-- Kaikki kestot ovat dataa ja muokattavissa
-
-### Opiskelurytmi (päätös 9.8.2026)
-
-**Mitoitus.** 1 op = 27 h. 20 op lukukaudessa = 540 h, 25 op = 675 h. Noin 16 viikossa
-se on 34–42 h viikossa eli käytännössä kokopäivätyö. Kun luennot vievät osan,
-itsenäistä opiskelua jää arkipäivälle karkeasti 4–6 h.
-
-**Tästä seuraa katon oikea tarkoitus.** Katto ei rajoita kunnianhimoa vaan pitää
-opiskelun työpäivän sisällä. Riski ei ole liian vähäinen opiskelu vaan se että
-opiskelu valuu iltoihin ja viikonloppuihin.
-
-**Ei aihepäiviä.** Yksi kurssi per päivä (matikkapäivä, elektroniikkapäivä) on
-blocking, ja Sungin SIR (spaced interleaved retrieval) on nimenomaan sen vastakohta.
-Päivässä kosketetaan **3–4 kurssia**, ei yhtä eikä kaikkia viittä. Lomittaminen 2–3
-aiheen välillä on tehokkaampaa kuin 7–8:n. `[A]` yleisestä tutkimuksesta, `[S]`
-lomittamisen periaate.
-
-**Lohkon pituus määräytyy vaiheesta, ei aiheesta.** Tämä on tärkein rytmisääntö:
-
-| Vaihe | Lohko | Perustelu |
-|---|---|---|
-| Encoding | 60–90 min, yhtenäinen | Vaatii pisimmän yhtäjaksoisen ajan, kuormittavin osa |
-| Priming | 15–25 min | Kevyt, tehdään ennen luentoa |
-| Retrieval | 20–30 min | Lyhyt ja tiheä, useita eri kursseille samana päivänä |
-| Overlearning | 20–45 min | Joustaa, tehdään kun jaksaa |
-
-Tyypillinen arkipäivä: 1–2 pitkää encoding-lohkoa + 2–3 lyhyttä retrieval-lohkoa eri
-kursseilta. Sungin omia lukuja lohkojen pituuksista ei löytynyt; nämä ovat `[A]`
-yleisestä kirjallisuudesta (30–90 min per aihe, 45 min tavallisin lähtökohta).
-
-**Kattoa ei aseteta keksittynä numerona (päätös 9.8.2026).** V1 kerää dataa: päivän
-kertymä näkyy ilman arvostelua, ja ylitysmerkintä ilmestyy vasta kun datasta näkyy
-montako slottia on sopivasti. Katto voi lisäksi johtua opintopisteistä (15 op = 405 h,
-20 op = 540 h, 25 op = 675 h; jaettuna lukukauden viikoille 25/34/42 h viikossa,
-miinus luennot), jolloin se säätyy itsestään kun kurssimäärä varmistuu.
-
-**Ylitys tehdään Boostilla**, ei erillisellä jatka-napilla. Boost on jo olemassa ja se
-on määräaikainen (15/30/45 min) — rajaton jatko olisi väärä ylitysmuoto. Boostit
-merkitään dataan: jos boostaa joka päivä, katto on liian matala; jos ei koskaan,
-liian korkea.
-
-### Aktiivinen lepo (päätös 9.8.2026)
-
-Tunti päivässä seitsemänä päivänä on parempi kuin seitsemän tuntia yhtenä päivänä.
-Opiskeluehdotusten pitää ottaa aktiivinen lepo huomioon ja **ehdottaa sitä**, ei vain
-sallia sitä.
-
-**Kriittinen varoitus `[S]`:** oppijan omat ennusteet muistamisestaan eivät korreloi
-todellisen suorituksen kanssa. Uudelleenlukeminen lisää väärää hallinnan tunnetta.
-Sekä nuoret että aikuiset oppijat ovat hyvin huonoja tunnistamaan tehokkaita
-kertaustapoja, ja pitävät helpompia tapoja tehokkaampina — jopa silloin kun heille on
-suoraan kerrottu mikä on objektiivisesti parempi.
-
-**Mitä tämä tarkoittaa Satamalle:** "tuntuu valmiilta" ei kelpaa siirtymäkriteeriksi.
-Kelpaavat kriteerit ovat **tekoja** (onko askel tehty, onko nuolet piirretty) tai
-**tuotoksen vertailu materiaaliin**. Tämä on samalla vahva peruste sille miksi
-moottori ylipäätään on olemassa: ilman ulkoista kriteeriä oppija valitsee
-systemaattisesti helpomman ja huonomman tavan.
+`[S]` Erikseen suositeltu: jargonin purkaminen selkokielelle ja konkreettisten esimerkkien pyytäminen.
 
 ---
 
-## 8. Arkkitehtuuripäätökset
+## 23. Bear Hunter System (raportti 2022)
 
-**Datavetoisuus.** Vaiheet, tietotyypit ja ohjematriisi ovat rivejä tauluissa, eivät
-enumeja koodissa. Uusi kehys on uusi rivijoukko, ei purkutyö.
+`[S]` Viisi askelta:
 
-**Jokaisella ohjerivillä on lähdemerkintä kenttänä** (`[S]` / `[A]`), ei tekstinä.
+1. Avainsanojen ja termistön kerääminen yhteen paikkaan
+2. **Rajattu kysely** (restricted inquiry) joka tuottaa spontaaneja itseselityksiä ja niistä chunkeja. Kysely kohdistuu kahteen asiaan: (a) käsitteiden välinen suhde, (b) käsitteen toiminnallinen tai käsitteellinen tärkeys
+3. Sama kysely chunkien välisiin suhteisiin + **tiukka priorisointi**
+4. Suhteiden epälineaarinen visuaalinen esittäminen
+5. Kyselyn toisto ja irrallisten elementtien erottaminen omaan toisto- tai ulkoaopettelupinoon
 
-**Äly kutsutaan täsmälleen kolmessa kohdassa:**
-1. Materiaalin sisääntulo — kurssi puretaan osioiksi ja solmuiksi, tyyppi tunnistetaan
-2. Ohjeen generointi solmulle ja vaiheelle — **kerran**, tallennetaan riviksi
-3. Sisällöllinen vertailu — vastaako muistettu sitä mitä materiaalissa oli
+`[S]` Rakenteelliset havainnot:
+- Askel avataan vasta kun edellinen on riittävällä tasolla
+- Retrieval sijoittuu **encoding-kierrosten väliin**, ei niiden jälkeen
+- Käänteinen ajattelu: korkeamman tason osaaminen ennen yksityiskohtia
 
-Kohta 3 on ainoa toistuva ja ainoa jonka voi kytkeä pois. Ohjeet eivät katoa silloinkaan.
+### Rajatun kyselyn sanamuoto
 
-**Vaiheensiirtymän kehote** näkyy kanvaasilla kun solmu avataan, ei istunnon lopussa.
+`[S]` Study with me -sessiosta: kysymys on **"miksi tämä on tärkeää"**, esitettynä tiukasti ja hyvin tiheästi.
 
-**"En pääse alkuun" -nappi:** tarjoaa pienemmän askeleen samasta vaiheesta ja
-tallentaa merkinnän.
+`[S]` Väärä vastaus on muodollinen: "se on tärkeä koska se on osa tutkimusta." Oikea vastaus tarkoittaa: mihin muuhun tämä liittyy, mihin se vaikuttaa, mikä vaikuttaa siihen.
 
-### Tehtävien priorisointi ja kuormitus (päätös 9.8.2026)
-
-**Ehdoton ykkösprioriteetti:** kaikki palautukset deadlineen mennessä. Tämä ohittaa
-retrievalin aina.
-
-**Kertausvälit saavat joustaa.** [1,3,7,21] ja [3,10,29] ovat käytännössä yhtä hyviä —
-Reportin mukaan tarkkoja aikataulusuosituksia ei voi antaa eikä laajenevien välien
-paremmuudesta ole näyttöä. Pääasia on että kertaus tulee jollain välillä tehdyksi.
-Väli on siis suositus, ei sitoumus, ja se väistää deadlineja.
-
-**Vaihe valitaan päivän kuormituksen mukaan:**
-
-| Kuormitus | Mitä nostetaan |
-|---|---|
-| Kevyt | Encoding ja priming — uuden opettelu vaatii eniten kapasiteettia |
-| Keskitaso | Retrieval |
-| Raskas | Overlearning, kevyt retrieval — ei uuden opettelua |
-
-Perustelu `[S]`: encoding on järjestelmän kuormittavin osa, ja se on nimenomaan se
-osa jossa kuormituksen pitää olla optimialueella. Uuden opettelun tunkeminen raskaaseen
-päivään tuottaa heikkoa encodingia, mikä kostautuu myöhemmin kertaustaakkana.
-
-**Varaus `[S]`:** Report sanoo että retrieval hyödyttää enemmän kun se on
-kognitiivisesti kuormittavampaa. "Kevyt retrieval" väsyneenä on siis parempi kuin ei
-mitään, mutta ei korvaa kunnollista kertausta.
-
-**Kertaus ei saa syödä uuden opettelua.** Jos kertausjono kasvaa, se ei ole syy
-lykätä encodingia — se on merkki siitä että encoding on jäänyt ohueksi.
-
-### Kertausjono kurssin päätyttyä (päätös 9.8.2026)
-
-Kertausjono päättyy lähtökohtaisesti kurssin mukana. **Poikkeus:** solmut joilla on
-silta tulevaan kurssiin jäävät jonoon. Esimerkki: syksyn matikan potenssit ja
-toisen asteen yhtälöt, kun tammikuussa alkaa precalculus — kurssien välinen tauko on
-optimaalinen ikkuna nostaa nämä kertaukseen ennen kuin ne tulevat vastaan "uusina".
-Insinöörifysiikka tai Low Code No Code ei tarvitse jäädä jonoon jos mikään ei jatka
-niistä.
-
-**Tämä ei vaadi uutta kenttää** — se on seuraus sillasta joka osoittaa eteenpäin.
-Satama tarvitsee kuitenkin tiedon tulevista kursseista: kysytään käyttäjältä n
-kuukautta ennen kurssin päättymistä mitä seuraavalla lukukaudella on tulossa.
-
-### Kolme uutta suunnitteluperiaatetta Reportista
-
-**a) Älä kysy tuntemusta liian usein `[S]`.** Tutkimus osoitti että mitä useammin
-oppijaa pyydettiin arvioimaan vaikeutta, sitä todennäköisemmin hän käytti epätarkkoja
-ja epäolennaisia vihjeitä — ja suoriutui huonommin. Sungin johtopäätös: itsearviointi
-on hyödyllistä eikä siitä ole näyttöä haitasta, kunhan **tiheys ei ole liiallinen**.
-Tarkkaa rajaa ei tiedetä. Satamassa: tuntemus-säädin kerran solmun alussa, ei joka
-istunnossa, ei joka vaiheessa.
-
-**b) Ohjeiden pitää haalistua kun osaaminen kasvaa `[S]`.** Asiantuntemuksen
-käänteisvaikutus: ohjeistus joka auttaa aloittelijaa haittaa edistynyttä. Ohjaus
-hyödyttää kun kuorma on korkea ja haittaa kun kuorma on kevyt. Satamassa: ohjeiden
-yksityiskohtaisuuden pitää voida laskea, ja käyttäjän mahdollisuus kytkeä kehotteet
-pois ei ole mukavuusominaisuus vaan menetelmän vaatimus.
-
-**c) Kiirehtiminen ja valikoiva oppiminen ovat suurimmat epäonnistumisen syyt `[S]`.**
-iCanStudyn omassa datassa oppijat jotka kiirehtivät vaiheiden läpi ilman riittävää
-harjoittelua tai jättivät osan tekniikoista väliin epäonnistuivat jopa yhdeksän kertaa
-todennäköisemmin. Heidän vastalääkkeensä olivat selkeä viitoitus, tekemiseen perustuva
-eteneminen ja sisällön avautuminen ajan myötä. Satamassa: vaiheita ei saa voida
-hyppiä ohi ilman merkintää, ja "en pääse alkuun" -merkinnät ovat juuri sitä dataa
-josta valikoivan oppimisen näkee.
-
-### Materiaalin tallennus
-
-- Teksti tallennetaan kerran per tiedosto, ei pilkota
-- Solmun kohdalle kirjataan kohtatieto (esim. sivut 12–18) kun poiminta sen tietää
-- Tiedoston ja solmun suhde on monta moneen molempiin suuntiin
-- Materiaali kiinnittyy solmuun poimintaehdotuksen kuittauksen yhteydessä
-
-**Materiaalin neljä kohdetta:**
-1. Päivämäärät ja deadlinet → riveiksi, ei tekstivarastoon
-2. Kurssitason teksti (arviointiperusteet, kokeen muoto) → tallennetaan, vain älyn käytössä
-3. Solmutason sisältö → tekstinä
-4. Kaikki muu → ei tallenneta
-
-**Kuittausnäkymä on kaksitasoinen:** lista solmuista aikoineen, jokaisen perässä pieni
-merkki liitetyistä tiedostoista.
-
-**Miro:** muokkaus Mirossa, embed Satamassa. API:lta tarvitaan vain Framen olemassaolo
-ja viimeisin muokkausaika.
-
-**Ristiriitatilanteet:** arvaus sallittu, mutta merkitään käyttäjälle näkyvästi.
+`[S]` Master classissa sama asia toisin muotoiltuna: "asteikolla 1–10, kuinka tärkeä tämä on?"
 
 ---
 
-## 9. Learning Framework Extraction Course
+## 24. Study with me -session havainnot
 
-Työkalu, ei suoritettava kurssi. Testikurssi "Justin Sungin metodi", jolla syötetään
-metodimateriaalia sisään ja jota käyttäjä samalla opiskelee. Sen jälkeen
-MOOC-koodauskurssi (tekstimuotoinen).
+`[S]` Sungin todellinen työjärjestys:
+1. Katsoo kurssin opetussuunnitelman — mistä on kyse
+2. Katsoo **arviointitehtävän** ennen materiaalia — mihin tietoa käytetään
+3. Skimmaa materiaalin, poimii avainsanat erilliseen muistioon
+4. Rakentaa suhteet **mielessä**, googlaa tuntemattomat termit lennossa
+5. Piirtää mind mapin vasta tämän jälkeen, **muistista**
+6. Muistitekniikat (loci, chunkkaus) vasta kun kartta on olemassa
+7. Loput yksityiskohdat flashcardeihin
 
-**Kurssin tietotyyppi:** pääosin Procedural, osin Conceptual.
+`[S]` Kartan piirtäminen muistista on **mikroretrievalia**. Se ei juuri auta encodingissa mutta pitää tiedon liikkuvana.
 
-**Testikurssi etenee opetusjärjestyksessä**, koska sen tarkoitus on opettaa metodi
-käyttäjälle. Varsinaiset kurssit (MOOC, matikka) noudattavat vaiheiden omaa
-järjestystä. Seuraus: vaihemoottorin ensimmäinen oikea koeajo tapahtuu vasta
-MOOC-kurssilla.
+`[S]` Chunkkausohjeet:
+- Ryhmittele **merkityksen** mukaan, ei pinnan. "Kaksi näistä alkaa p-kirjaimella" on hyödytön ryhmittely.
+- **Numeroi** ryhmän osat (1, 2, 3) — selkeyttää huomattavasti
+- Kun jokin ei jää mieleen: ensisijainen keino on **etsiä oikea syy** (mene aiheen ulkopuolelle, selvitä mekanismi). Mnemoniikka on toissijainen, aikapulan vaihtoehto.
 
-**Materiaalin muoto:** Report on Learning ensin (tekstiä, tarkempaa kuin videot).
-Videot valikoiden, kokonaisina transkripteina, ei etukäteistiivistystä.
+`[S]` Yleisin virhe: aloittaa liian zoomattuna.
 
----
-
-## 10. Vielä auki
-
-Reportista **ratkennut:** vaiheiden järjestys, encodingin konkreettinen menettely
-(BHS), proseduraalisen tietotyypin oma vaiheistus, välien laskenta (ei voi tarkentaa),
-overlearningin määritelmä, Reference-vaiheen periaate, valmiuskriteerin luonne.
-
-**Yhä auki:**
-
-- [ ] GRINDEn R: "Relational" vai "Reflective"
-- [ ] Mitkä ovat rajatun kyselyn tarkat kysymykset — Report kertoo kysymysten kaksi
-      kohdetta (suhteet, tärkeys) muttei sanamuotoja. Tämä on tärkein jäljellä oleva
-      aukko, koska se on ohjeen ydin
-- [ ] Vaiheiden kestot
-- [ ] Reference-vaiheen täsmäohje (periaate on, sanamuoto puuttuu)
-- [ ] Milloin overlearning kannattaa tehdä — ennen koetta, vai jatkuvasti
-- [ ] Yksi konkreettinen esimerkki alusta loppuun, mieluiten tekninen aihe
-
-**Hyviä lähteitä katsottavaksi:**
-- "7 Years of Building a Learning System in 12 minutes" — PERO kokonaisuutena
-- "The Ultimate Guide to The Perfect Mindmap (6-Step Checklist)" — GRINDE
-- "How to Study With Me (Instructions)" — istunnon läpikäynti: valmistautuminen,
-  priming, arviointi, kysymysten esittäminen, aktiivinen lepo, seuraava sykli
+`[S]` Aloittelijalle tämä tuntuu hitaalta, raskaalta ja venyvältä. Sungilla se on nopeaa vain koska taito on automatisoitunut.
 
 ---
 
-## 11. Päiväsuunnitelman generaattori (päätös 9.8.2026)
+## 25. Epäonnistumistavat
 
-**Horisontti:** viikko tai kaksi eteenpäin. Lyhyempi horisontti ei paljastaisi ajoissa
-jos kurssimäärä ei mahdu.
+`[S]` Raportissa nimetyt kaksi, jotka **yhdeksänkertaistavat** epäonnistumisriskin:
+- **Rushing** — eteneminen tekniikoissa ilman riittävää harjoittelua
+- **Selective learning** — osien tietoinen ohittaminen
 
-**Iltatarkistus:** edellisenä iltana katsotaan mikä on olennaisinta seuraavaksi. Jos
-suunnitelma vastaa suunnilleen sitä, uutta ei tehdä — täydellistä vastaavuutta ei
-vaadita. Uusi suunnitelma tehdään vain jos jotain olennaista on muuttunut (yllättävä
-deadline).
+`[S]` Vastatoimet joita iCanStudy käytti: selkeä opastus, tehtäväperusteinen eteneminen, sisällön aikaperustainen tiputtelu, pelillistäminen, uudet harjoitukset ja tarkistukset, rakenteen muuttaminen niin että kiirehtiminen ohjautuu haitattomaan silmukkaan.
 
-**Tavoite ja hoitotaso ovat eri kentät.**
+`[S]` Elokuussa 2022 noin 80 % oppijoista saavutti järjestelmän hallinnan.
 
-| Kenttä | Mikä | Muuttuu |
-|---|---|---|
-| Tavoite | Miksi tämä kurssi: läpäisy / kunnollinen osaaminen / perusta jatkolle | Asetetaan kurssin alussa, pysyy |
-| Hoitotaso | Kuinka paljon kapasiteettia juuri nyt: täysi / kevyt / vain deadlinet | Elää viikoittain |
+---
 
-Tavoite määrää hoitotason oletuksen ja sen, mikä kurssi kevenee ensimmäisenä kun
-viikko ei mahdu. Erillisyys on tarkoituksellinen: tiukalla viikolla ei pidä joutua
-muuttamaan sitä mitä kurssi merkitsee.
+## 26. Mitä lähteistä EI löydy
 
-**Päivän täyttöjärjestys:**
+`[A]` Nämä ovat aitoja aukkoja, ei vielä etsimättä jääneitä:
 
-1. Deadline-tehtävät
-2. Priming huomisen luennoille (aikasidonnaisia, ei voi siirtää)
-3. Erääntyvät kertaukset, painotettuna tavoitteen mukaan (syvällisesti opittavan
-   kurssin kertaus menee läpäisykurssin edelle)
-4. Yksi encoding-lohko kurssilta joka on eniten jäljessä omasta aikataulustaan
-5. Overlearning perustussolmuille jos tilaa jää
+- **"Aktiivinen lepo"** terminä ei esiinny missään käsitellyssä Sung-lähteessä. Lähin vastine on palautumisen neljä ulottuvuutta.
+- **Vaiheiden kestot ja välit numeroina.** Sung sanoo suoraan ettei täsmällisiä aikatauluohjeita voi antaa. `[P]`
+- **Ylläpitovälit mestaruuden jälkeen** (21–28 pv, ×1,5). Ei löydy mistään lähteestä. `[A]`
+- **Overlearningin tarkka sisältö.** Määritellään vain valinnaiseksi ja kilpailtuihin kokeisiin tarkoitetuksi.
+- **Reference-vaiheen askel askeleelta -ohje** samalla tarkkuudella kuin muilla vaiheilla. Prosessi (varastoi + kertaa) on selvä, sanamuoto ei.
+- **Tekninen study with me** (matematiikka, koodaus). Kaikki läpikäydyt esimerkit ovat käsite- ja tutkimuspainotteisia.
 
-**Kurssin oma aikataulu** tulee kurssin materiaalista (viikko-ohjelma, aihe/viikko).
-Jos sellaista ei ole, solmut jaetaan tasan jäljellä oleville viikoille.
+---
 
-**Rajat:**
-- Vähintään 2 eri kurssia päivässä, mieluiten 3, korkeintaan 4
-- Korkeintaan 2 encoding-lohkoa päivässä
+## 27. Korjaukset aiempiin kirjauksiin
 
-**Sillisalaattihuoli ratkeaa vaiheiden kautta.** Konteksti ei vaihdu kurssin
-vaihtuessa vaan vaiheen vaihtuessa. Yksi pitkä encoding-lohko + kaksi lyhyttä
-kertausta muilta kursseilta koskettaa kolmea kurssia mutta sisältää vain yhden syvän
-kontekstinvaihdon. Kolme encoding-lohkoa kolmelta kurssilta olisi sillisalaatti.
-
-**Korjattu 10.8.2026 (ks. HYTTI_SPEKSI.md §7.2):** tämä kohta väitti aiemmin virheellisesti
-että "sillat eivät nosta solmua päiväsuunnitelmaan" — väärin, koska päiväsuunnitelma on
-**ainoa** reitti sillan opiskeluun (sillalla ei ole omaa sivua eikä selattavaa listaa).
-**Sillat NOSTAVAT solmun päiväsuunnitelmaan** — generaattori nostaa sillan Nyt-osioon
-siinä missä kurssienkin solmut, edistäen niitä kursseja joita silta koskee. Kurssien
-sisällöt eivät siis mene siltojen ohi. Sillat vaikuttavat lisäksi siihen jääkö solmu
-kertausjonoon kurssin päätyttyä — tämä osa oli ja on ennallaan.
-
-**Jokaisella solmulla on oma PERO-kuvionsa** — generaattori toimii solmutasolla, ei
-kurssitasolla.
-
-**Kun päivä ei täyty:** täytteeksi encoding, mutta generaattori saa nostaa sen mikä on
-ajankohtaisinta.
-
-**Kun päivä on täynnä pelkistä deadlineista:** sitten se on niin. Ei yritetä
-mahduttaa muuta. Boostilla voi tehdä lisää jos jaksaa.
-
-**Boost ottaa saman päivän jonosta**, kestolla suodatettuna: 15 min = kertaus tai
-priming, 30 min = kertaus + reference, 60 min = encoding-lohko. Boost ei tarvitse omaa
-tehtävälähdettään.
-
-**Boostilla tehty korvataan uudella tehtävällä jonosta** — se ei saa näkyä seuraavan
-päivän ensimmäisenä kohtana. Suunnitelman ei tarvitse virrata heti uudelleen;
-korvaus tapahtuu iltatarkistuksessa.
-
-**Iltatarkistus klo 21.45 (säädettävissä).** Uusi suunnitelma tehdään jos on
-ilmestynyt uusi deadline joka pakottaa muutokseen — kaikki opettajat eivät aseta
-deadlineja kurssin alussa vaan kurssin mittaan. Lisäksi boostilla tehdyn tilalle
-nostetaan uusi tehtävä jonosta.
-
-**Harjoitustehtävien lähteet** (ennallaan): kurssin omat tehtävät → ulkoiset lähteet →
-Sataman näyttämä valmis prompti jonka käyttäjä kopioi Copilotille.
+- **GRRINDE → GRIND.** E on Emphasized, ei Reflective. Reflective-tulkinta ei perustu mihinkään lähteeseen.
+- **Reference ei ole karttaan tehtävä tarkennus vaan parkkipaikka.** Kolme riippumatonta lähdettä sanoo saman: yksityiskohdat siirretään **pois** encoding-työn tieltä.
+- **Vaiheita on viisi, ei seitsemän.** Se 7-kohtainen lista ei ole peräisin mistään Sung-lähteestä.
+- **Interleaving ≠ aiheiden vaihtelu.** Se on saman aiheen sisäistä variaatioiden vertailua.
+- **Primingin onnistumista ei mitata syvyydellä vaan laajuudella.** Yksityiskohtainen selittäminen primingin jälkeen on merkki siitä että se tehtiin väärin.
