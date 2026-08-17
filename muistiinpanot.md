@@ -3984,16 +3984,36 @@ sw.js v144 → v145.
 
 ---
 
+### Reitti-välilehden viikkopaketti: kalenteriruudukko + deadlinet + kertausjono (2026-08-17)
+
+Katri antoi kalenterivärien hex-koodit (Katri/Lukkarikone `#D32F2F`, Juha `#1976D2`, yhteinen `#8E44AD`, Sataman itse generoimat opiskelulohkot `#E3A62F` + 2px `--muste`-reunaviiva pakollisena erottumaan Kuormavahti-taustasta) ja valitsi AskUserQuestionilla "Rakenna koko paketti kerralla". `EVENT_OWNER_COLORS` päivitetty näihin (oli aiemmin `#e05555`/`#3b82d6`/`#a855c7`), uudet `--kal-*`-tokenit merikartta-`:root`-lohkoon.
+
+**Viikkoruudukko ei ole uusi rakenne** — Explore-agentilla varmistettu ensin että olemassa oleva `piirraViikkoAikajana()` (Kalenteri-sivun oma, oikea proportionaalinen 07–23-tuntiakseli, päällekkäisyyskäsittely, kuormavärjäys) on uudelleenkäyttökelpoinen sellaisenaan. Lisätty VAIN valinnainen 6. parametri (`sessiot`) ja uusi `piirraViikkoOpiskeluMerkit()` joka piirtää ohuen reunamerkin (`--kal-opiskelu`) valmiiden `opinto_sessiot`-rivien (vain `loppui_at` asetettu = oikeasti pidetty) kohdalle — vanha Kalenteri-sivun kutsu toimii koskemattomana ilman 6. parametria. Uusi `lataaReittiViikko()` hakee saman viikon kalenteritapahtumat + henkselit + toteutuneet opiskelusessiot rinnakkain ja piirtää Reitin omaan `#reitti-viikko-sisalto`-konttiin.
+
+**Tietoinen rajaus, ei vielä kerrottu Katrille ennen tätä merkintää:** "kolmiportainen kadenssi" -suunnittelugeneraattori (kerran lukukaudessa koko suunnitelma, kahden viikon tarkistus, yöllinen uudelleenlaskenta) EI ole rakennettu tässä erässä — se vaatisi keksimään monen viikon generointialgoritmin ilman keskustelua, ristiriidassa "sisältöpäätöksiä ei tehdä ilman keskustelua" -periaatteen kanssa. Viikkoruudukko näyttää siis VAIN todellista dataa: oikeat kalenteritapahtumat kaikille 7 päivälle, kuormaväritys (laskettavissa jo tunnetuista tulevista tapahtumista), ja toteutuneet `opinto_sessiot`-merkit menneille/tälle päivälle — mutta EI keksittyjä "suunniteltuja opiskelulohkoja" tuleville päiville, koska mitään tallennettua monipäiväsuunnitelmaa ei ole olemassa.
+
+**Lähestyvät määräajat** (`lataaReittiDeadlinet`, §5.1 kohta 2): enintään 3 lähintä tulevaa `opinto_deadlinet`-riviä (kurssi- TAI aihetasoinen) aktiivisilta kursseilta, lähin ensin. Jokaisella rivillä 📎-nappi joka avaa jaetun editorin uudella `materiaaliKohdeDeadline`-kontekstilla (sql/133: `laituri.materiaali_deadline_id`) — laajennettu tarkalleen samaan `materiaaliKohdeKurssi`-kaavaan (`materiaaliKohdeInsertKentat`/`peruLaiturinMateriaaliKonteksti`/`paivitaLaiturinMateriaaliBanneri`) jota kurssimateriaalin liittäminen jo käytti, vain toinen kohdekenttä.
+
+**Kertausjono** (`lataaReittiKertausjono`, §5.3): kaikki aktiivisten kurssien `kertausjonossa=true`-aiheet YHTENÄ listana (ei kurssikohtaisesti eroteltuna kuten spekin "kunkin kurssin alla" kirjaimellisesti sanoisi — tietoinen yksinkertaistus, tiivis yleiskatsaus riitti tässä vaiheessa). "Tämä alkaa unohtua" -nappi (uusi `.unohtuu`-tyyli, `--huomio`-väri) AIKAISTAA `sr_next_review`:n enintään 5 päivän päähän — EI KOSKAAN siirrä myöhemmäksi jos kertaus on jo lähempänä.
+
+Kaikki kolme funktiota kutsutaan `lataaHyttiPaanakyma()`:sta (jo ennestään ajettu Reitti-välilehdelle siirryttäessä). HTML lisätty järjestykseen Viikkokalenteri → Tehtävät → Lähestyvät määräajat → Opinnot(kurssit) → Kertausjono → Sillat/Huoli/Kortit.
+
+**Ei vielä testattu oikealla laitteella.**
+
+sw.js v145 → v147.
+
+---
+
 ## Nykytila (päivitetty 2026-08-17, COPILOT.md-sääntö 4 — huom: aiempi "Nykytila ja seuraavat askeleet" -osio jäi tästä tiedostosta ylemmäs pitkän istunnon aikana kertyneiden uusien osioiden taakse, ei enää tiedoston lopussa; siirto omaksi erikseen tehtäväksi työksi, ei nyt)
 
-**Viimeksi tehty tässä istunnossa, kaikki commitoitu ja pushattu mainiin, `sw.js` nyt v145:** Laituri-uudistuksen (§16.5c) jälkeen: Teema/Vahdittu-näkyvyystoggeli + listan siirtonappi, kuormitustila-kytkimen sijoitus ruudun kulmaan, opiskelumoottorin OSA A -minimipolku, sung-metodi.md:n täysi korvaus + korjaukset, B1:n jumi-kesto, **A5 — koko Nyt-välilehti uudistettu**, materiaalin lisäyksen korjaus, **Nyt/Reitti-uudelleenjärjestely**, **4→1 Vercel-funktiokonsolidointi** (11/12 → 8/12, sittemmin 9/12 Miron myötä), **Föli-integraation pohjatyö**, ja **koko Miro-integraatio päästä päähän** (OAuth-callback, tokenien pysyvä säilytys, Board A/B, Frame-luonti, Live Embed Tehtävänäkymässä) — board-setup todistetusti toimiva livenä, embed itsessään ei vielä testattu.
+**Viimeksi tehty tässä istunnossa, kaikki commitoitu ja pushattu mainiin, `sw.js` nyt v147:** Laituri-uudistuksen (§16.5c) jälkeen: Teema/Vahdittu-näkyvyystoggeli + listan siirtonappi, kuormitustila-kytkimen sijoitus ruudun kulmaan, opiskelumoottorin OSA A -minimipolku, sung-metodi.md:n täysi korvaus + korjaukset, B1:n jumi-kesto, **A5 — koko Nyt-välilehti uudistettu**, materiaalin lisäyksen korjaus, **Nyt/Reitti-uudelleenjärjestely**, **4→1 Vercel-funktiokonsolidointi** (11/12 → 8/12, sittemmin 9/12 Miron myötä), **Föli-integraation pohjatyö**, **koko Miro-integraatio päästä päähän** (OAuth-callback, tokenien pysyvä säilytys, Board A/B, Frame-luonti, Live Embed Tehtävänäkymässä) — board-setup todistetusti toimiva livenä, embed itsessään ei vielä testattu — ja **Reitin viikkopaketti** (viikkokalenteriruudukko + toteutuneet opiskelumerkit, lähestyvät määräajat + tiedostoliite, kertausjono).
 
-**Odottaa Katria:** (1) Kalenterivärien hex-koodit (oma keltainen, yhteinen vihreä) — kysytty kahdesti, ei vielä vastattu. (2) Elävä testi: avaa jokin encoding/overlearning/retrieval-vaiheen solmu Tehtävänäkymästä ja kokeile toimiiko Miro-kanvaasin muokkaus iframen sisällä suoraan.
+**Odottaa Katria:** Elävä testi — avaa Reitti-välilehti ja tarkista että viikkoruudukko/deadlinet/kertausjono näyttävät oikealta; avaa jokin encoding/overlearning/retrieval-vaiheen solmu Tehtävänäkymästä ja kokeile toimiiko Miro-kanvaasin muokkaus iframen sisällä suoraan.
 
-**Auki jäänyt / seuraavaksi:** viikkokalenteriruudukko itse (Reitti-välilehti, käyttää Föli-pohjatyötä + kalenteriväreja kun molemmat valmiit), kurssirajat ylittävä vaiheensiirtymäkehote (§7.4-laajennus), deadline-rivin tiedostoliite (`materiaali_deadline_id`), Miron muokkausloki ajanoton varmistukseen (§4.3, ei vielä rakennettu — Frame/itemien `modifiedAt`-luku on olemassa Miron API:ssa, ei vielä kytketty). "Kertausmatikka"-epäily jäi auki, ei vahvistettu bugiksi. Vapaatekstisten tehtävien "vinkki jonojärjestykseen" -idea jätettiin tietoisesti rakentamatta.
+**Auki jäänyt / seuraavaksi:** "kolmiportainen kadenssi" -suunnittelugeneraattori (semesteritason suunnitelma, ei rakennettu, ks. yllä oleva merkintä — vaatii keskustelun ennen rakentamista), kurssirajat ylittävä vaiheensiirtymäkehote (§7.4-laajennus), Miron muokkausloki ajanoton varmistukseen (§4.3, ei vielä rakennettu — Frame/itemien `modifiedAt`-luku on olemassa Miron API:ssa, ei vielä kytketty). "Kertausmatikka"-epäily jäi auki, ei vahvistettu bugiksi. Vapaatekstisten tehtävien "vinkki jonojärjestykseen" -idea jätettiin tietoisesti rakentamatta.
 
-**Migraatiot ajettu suoraan Supabaseen MCP:llä koko istunnon ajan** (117–131), ei jätetty ajamatta.
+**Migraatiot ajettu suoraan Supabaseen MCP:llä koko istunnon ajan** (117–133), ei jätetty ajamatta.
 
 **Auki jäänyt:** Hytin kurssien/korttien otsikkovuoto-havainto (vanha, ei vahvistettu). Kalenterin kuittaus omilla riveillä (vanha). A2:n "kurssitason teksti"/"detail coding" (ei pakollinen) ei rakennettu. **Nousemismuistutus** (§4.3) ei rakennettu. **Taitosolmujen ajanotto Nyt-lokista** katosi A5:n myötä eikä ole vielä korjattu. OSA B muuten tietoisesti rajattu ulkopuolelle (yksi poikkeus: B1:n jumi-kesto).
 
-**Seuraava luonnollinen askel: elävä testaus.** Laituri-uudistus, koko Tehtävänäkymä (nyt myös Miro-upotuksineen), koko uusi Nyt-välilehden aikataulutuslogiikka JA Miro-integraatio koskettavat merkittävästi käyttäytymistä jota ei ole vielä nähty oikealla laitteella/datalla — testaa varovaisesti.
+**Seuraava luonnollinen askel: elävä testaus.** Laituri-uudistus, koko Tehtävänäkymä (nyt myös Miro-upotuksineen), koko uusi Nyt-välilehden aikataulutuslogiikka, Miro-integraatio JA nyt myös Reitin viikkopaketti koskettavat merkittävästi käyttäytymistä jota ei ole vielä nähty oikealla laitteella/datalla — testaa varovaisesti.

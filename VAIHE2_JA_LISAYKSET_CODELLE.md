@@ -28,10 +28,11 @@ REST API sisältyy Miron ilmaistasoon (tarkistettu miro.com/pricing 17.8.2026) �
 
 **Miksi tämä reitti, ei monimutkaisempaa:** Satamalla on käytännössä 2 käyttäjää (Katri + Juha) yhdellä Supabase-projektilla, ei julkinen monivuokralainen palvelu. Täyttä OAuth-asennusvirtaa (jonka Miro-appit yleensä tarvitsevat uusille käyttäjille) ei tarvita — riittää KERTALUONTOINEN valtuutus, jonka jälkeen palvelin pitää tokenit hengissä itse.
 
-**1. Katrin kertaluonteinen askel (ei koodia):**
+**1. Katrin kertaluonteinen askel — PÄIVITETTY, callback-endpoint (`/api/miro?action=callback`) on nyt rakennettu ja deployattu:**
 - Luo Miro-appi osoitteessa developers.miro.com ("Build an app", ilmaistilillä).
-- Käynnistä appin OAuth-asennus kerran omalle tilille (Miro näyttää valtuutusnäytön, hyväksy).
-- Miro palauttaa `access_token` + `refresh_token` — nämä kopioidaan Vercelin ympäristömuuttujiin (`MIRO_ACCESS_TOKEN`, `MIRO_REFRESH_TOKEN`, `MIRO_CLIENT_ID`, `MIRO_CLIENT_SECRET`), EI koskaan clientille asti.
+- Redirect URI appin asetuksiin: `https://kauppalista-nine.vercel.app/api/miro?action=callback`
+- Client ID + Client Secret Verceliin (`MIRO_CLIENT_ID`, `MIRO_CLIENT_SECRET`), redeploy (tyhjä commit riittää) jotta arvot tulevat voimaan.
+- Valtuutuslinkki selaimeen (oma Client ID tilalle): `https://miro.com/oauth/authorize?response_type=code&client_id=YOUR_CLIENT_ID&redirect_uri=https%3A%2F%2Fkauppalista-nine.vercel.app%2Fapi%2Fmiro%3Faction%3Dcallback` — hyväksy, sivu näyttää `MIRO_ACCESS_TOKEN`/`MIRO_REFRESH_TOKEN` KERRAN (koodi kertakäyttöinen, sivua ei voi ladata uudelleen) — kopioi molemmat Verceliin.
 
 **2. Palvelinpuolen proxy (Coden työ), uudet Vercel-funktiot `api/miro-*.js`:**
 - Kaikki Miro-kutsut kulkevat palvelimen kautta, token ei koskaan selaimeen.
@@ -66,11 +67,24 @@ REST API sisältyy Miron ilmaistasoon (tarkistettu miro.com/pricing 17.8.2026) �
 - **Toteutunut opiskelu jää näkyviin samaan ruudukkoon**, ei vain suunnitelma — tämä on päivän kertymän paikka (jo linjassa §5.1:n kanssa)
 - **Realistinen siirtymäaika paikasta toiseen**, Föli-pohjainen — **RIIPPUVUUS: vaatii oikean Föli-integraation (§8.1), joka EI ole vielä rakennettu (ei GTFS/SIRI-kutsuja koodissa, tarkistettu 17.8.).** Tämä pitää rakentaa ensin tai samassa yhteydessä, muuten siirtymäblokit jäävät paikkamerkeiksi.
 
-**Kalenterivärit — Katrin päätös 17.8., uudet tokenit `satama-design-kuvaus.md`:hen:**
-- Katrin oma = kirkas keltainen (EI `--sinappi`, selvästi erottuva siitä)
-- Juhan kalenteri = iCalin oma natiivi sininen, luetaan suoraan syötteestä — todennäköisesti ei tarvitse omaa Satama-tokenia ollenkaan
-- Yhteinen = kirkas vihreä (EI `--syvänne` — tiedostettu, hyväksytty riski: "oma väri + Juhan väri = yhteinen väri" -sekoituslogiikka, Katrin oma perustelu, ei virhe)
-- **Tarkat hex-arvot vielä vahvistamatta** — älä lyö lukkoon lopullisia sävyjä ilman erillistä pikatarkistusta Katrilta ennen julkaisua, sama periaate kuin muillakin uusilla väreillä (§4.1).
+**Kalenterivärit — KOKONAAN RATKAISTU 17.8., osa jo livenä ennen tätäkin keskustelua. Lopullinen, tarkistettu tietokannasta.**
+
+Kaksi erillistä värijärjestelmää, älä sekoita:
+
+1. **Henkilöidentiteetti ("kuka menee minne")** — `kalenteri_syotteet.vari`, jo täytetty:
+   - Katri (`Katri`, `Katri (Juhan tilin kautta)`, ja nyt myös `Lukkarikone`) = `#D32F2F`
+   - Juha (`Juha`, `Juha (Juhan tili)`) = `#1976D2`
+   - Perhekalenteri / Yhteinen kalenteri (Juhan tili) = `#8E44AD` (liila)
+   - Itslearning ja Juhan `Oma`-syöte: EI väriä tässä järjestelmässä, oma aiheen mukainen värinsä myöhemmin, ei koske tätä.
+   - **`sql/130` ajettu 17.8.:** Lukkarikone (luennot) yhtenäistettiin Katrin punaiseen — aiemmin `vari` oli NULL.
+
+2. **Sataman itse generoimat opiskelulohkot ("oppimissessiot", esim. boost-varaukset/opiskelusuunnitelma)** — UUSI, ei ole `kalenteri_syotteet`-rivi vaan Satamassa itse piirretty, tarvitsee oman värinsä koska ei tule mistään syötteestä:
+   - Täyttöväri `#E3A62F` (keltainen, Katrin toive) + **pakollinen 2px `--muste`-reunaviiva.**
+   - Reunaviiva ei ole koriste — se on ainoa keino pitää lohko luettavana kun Kuormavahdin taustaväri (`matalikko`/`karikko`) on päällä. Mitattu: kellertävä täyttöväri vs. `matalikko`/`karikko` antaa kontrastisuhteen ~1,0–1,4:1 (käytännössä näkymätön). Reunaviiva korjaa tämän riippumatta taustasta.
+
+**Mitattu, todellinen ristiriita: Katrin `#D32F2F` ≈ `--vaara` (#B8433A).** Kontrastisuhde 1,08:1, sävyero ~4° — silmälle sama punainen. **Päätös: `--vaara` EI muutu** (koskematon, sen tehtävä riippuu itsensä-tunnistuksesta), Katrin punainen säilyy (10+v tunnistevärinä, ei vaihdeta). **Sen sijaan: deadline-rivi (§4.1, §7.3, käyttää `--vaara`:a) saa ei-väripohjaisen lisämerkin** — pieni ikoni tai paksumpi reunaviiva — jotta kahden identtisen punaisen esiintyessä samalla Reitti-näkymällä merkitys ei riipu pelkästä sävystä. Tämä on Coden toteutettavaksi, ei vielä rakennettu.
+
+**Kuormavahti-tausta (päivän/viikon solun taustaväri kuormatason mukaan):** EI uutta väriä. Käyttää `matalikko` (kohonnut kuorma) / `karikko` (SOS) / `paperi` (normaali) täsmälleen samalla merkityksellä kuin muuallakin sovelluksessa — sama token, uusi käyttöpaikka.
 
 **Alempana samalla välilehdellä (järjestys ylhäältä alas):**
 1. itslearningistä haetut tehtävät/palautukset/deadlinet (`opinto_deadlinet`, jo olemassa)

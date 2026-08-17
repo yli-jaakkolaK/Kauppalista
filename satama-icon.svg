@@ -1,0 +1,6 @@
+<svg width="512" height="512" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg">
+<title>Satama-kuvake</title>
+<desc>Natiivi ⚓-emoji grayscale-suotimella, sama tekniikka kuin ANKKURI_SVG script.js:ssä — muoto on emojin oma, väri hallitaan suotimella.</desc>
+<rect width="512" height="512" rx="112" fill="#EAE6DC"/>
+<text x="256" y="366" font-size="300" text-anchor="middle" style="filter:grayscale(1)">⚓</text>
+</svg>

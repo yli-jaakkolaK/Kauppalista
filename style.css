@@ -680,9 +680,49 @@ h1 {
   text-overflow: ellipsis;
 }
 
+/* Toteutunut opiskelu — ohut reunamerkki (2026-08-17), EI täysleveä palkki
+   kuten kalenteritapahtumat, ettei kilpaile niiden kanssa tilasta samalla
+   akselilla. Oma väri (--kal-opiskelu), ei owner-paletista. */
+.kalenteri-viikko-opiskelu-merkki {
+  position: absolute;
+  left: 0;
+  width: 4px;
+  min-height: 3px;
+  background: var(--kal-opiskelu);
+  border-radius: 0 2px 2px 0;
+}
+
 .kalenteri-viikko-paiva.tanaan .kalenteri-viikko-paiva-otsikko {
   font-weight: bold;
   color: var(--accent-text);
+}
+
+/* Reitti: lähestyvät määräajat + kertausjono (SATAMA_SPEKSI.md §5.1/§5.3,
+   2026-08-17). Molemmat ovat tiiviitä .list-rivejä, oma .pieni-skaalaus
+   koska yleinen .pieni on skoopattu muihin näkymiin (.ruori/.nyt-loki). */
+#reitti-deadline-lista .pieni {
+  margin-left: auto;
+  font-size: 12.5px;
+  color: var(--muted);
+}
+
+.unohtuu {
+  margin-left: auto;
+  min-height: 36px;
+  padding: 0 10px;
+  background: none;
+  border: 1px solid var(--huomio);
+  border-radius: 6px;
+  color: var(--huomio);
+  font-size: 12.5px;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.unohtuu:hover,
+.unohtuu:active {
+  background: var(--huomio);
+  color: var(--paperi, #fff);
 }
 
 /* === PÄIVÄN KUORMA TAUSTAVÄRINÄ (2026-08-05, Kalenteri UI -uudistus) ===

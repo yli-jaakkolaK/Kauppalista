@@ -2242,6 +2242,168 @@ async function opintoPaivanKuorma() {
   return deriveDayLoadLevel(count || 0, huoliPaino);
 }
 
+// === REITIN VIIKKOKALENTERI (SATAMA_SPEKSI.md §5.1, 2026-08-17) ===
+// Uudelleenkäyttää OLEMASSA OLEVAN Kalenteri-sivun viikko-ruudukkoa
+// (piirraViikkoAikajana + apufunktiot, script.js:n Kalenteri-osio) sen
+// sijaan että rakentaisi rinnakkaisen — sama 07-23-aikajana, sama
+// päällekkäisyyskäsittely, sama kuormavärjäys. Ainoa uusi kytkentä on
+// opinto_sessiot-toteumamerkit (paivanSessiot-parametri, valinnainen —
+// EI riko vanhaa Kalenteri-sivun kutsua, ks. sen oma kommentti).
+async function lataaReittiViikko() {
+  const sisalto = document.getElementById('reitti-viikko-sisalto');
+  if (!sisalto) return;
+  const alku = viikonAlku(new Date());
+  const loppu = new Date(alku);
+  loppu.setDate(loppu.getDate() + 6);
+  const alkuIso = paivamaaraISO(alku);
+  const loppuIso = paivamaaraISO(loppu);
+  const isoPaivat = [];
+  for (let i = 0; i < 7; i++) {
+    const d = new Date(alku);
+    d.setDate(d.getDate() + i);
+    isoPaivat.push(paivamaaraISO(d));
+  }
+
+  await paivitaAsetukset();
+
+  const [{ data: haetut, error }, henkselitLista, { data: sessiot }] = await Promise.all([
+    db.from('kalenteri_tapahtumat').select('*, kalenteri_syotteet(vari, henkilo, scope)')
+      .gte('event_date', alkuIso).lte('event_date', loppuIso)
+      .order('event_date').order('event_time', { nullsFirst: false }),
+    fetchVisibleHenkselit(alkuIso, loppuIso),
+    db.from('opinto_sessiot').select('alkoi_at, loppui_at')
+      .gte('alkoi_at', alkuIso + 'T00:00:00').lte('alkoi_at', loppuIso + 'T23:59:59').not('loppui_at', 'is', null),
+  ]);
+  if (error) {
+    console.error('Reitin viikkokalenterin haku epäonnistui:', error);
+    return;
+  }
+
+  const data = (haetut || []).map(function(t) {
+    return Object.assign({}, t, {
+      _vari: t.kalenteri_syotteet ? t.kalenteri_syotteet.vari : null,
+      _henkilo: t.kalenteri_syotteet ? t.kalenteri_syotteet.henkilo : null,
+      _scope: t.kalenteri_syotteet ? t.kalenteri_syotteet.scope : null,
+    });
+  });
+
+  const signaalit = await computeVisibleDaySignals(data, isoPaivat);
+  sisalto.innerHTML = '';
+  piirraViikkoAikajana(sisalto, data, alku, signaalit.kuormaTasot, henkselitLista, sessiot || []);
+}
+
+// === LÄHESTYVÄT MÄÄRÄAJAT (§5.1 kohta 2: "3 seuraavaa palautusta") ===
+// itslearning-integraatiota ei ole (§8.2, ei rakennettu) — ainoa
+// sisääntulo tälle on opinto_deadlinet, joko käsin lisätty tai äylyn
+// materiaalinjäsennyksestä poimittu (§8.3). Vain aktiivisten kurssien
+// TULEVAT deadlinet, lähin ensin, enintään 3 (spekin oma raja).
+async function lataaReittiDeadlinet() {
+  const listEl = document.getElementById('reitti-deadline-lista');
+  const tyhjaEl = document.getElementById('reitti-deadline-tyhja');
+  if (!listEl) return;
+  const tanaan = opintoTanaanPvm();
+
+  const { data: kurssit, error: kurssiError } = await db.from('opinto_kurssit').select('id, name').eq('owner_id', currentUserId).eq('status', 'aktiivinen');
+  if (kurssiError) { console.error('Kurssien haku deadline-listaa varten epäonnistui:', kurssiError); return; }
+  const kurssiKartta = {};
+  (kurssit || []).forEach(function(k) { kurssiKartta[k.id] = k.name; });
+  const kurssiIdt = (kurssit || []).map(function(k) { return k.id; });
+
+  listEl.innerHTML = '';
+  if (kurssiIdt.length === 0) {
+    tyhjaEl.style.display = 'block';
+    return;
+  }
+
+  const [{ data: kurssiDl }, { data: aiheDl }] = await Promise.all([
+    db.from('opinto_deadlinet').select('id, kurssi_id, pvm, tyyppi').in('kurssi_id', kurssiIdt).gte('pvm', tanaan),
+    db.from('opinto_deadlinet').select('id, pvm, tyyppi, opinto_aiheet!inner(name, kurssi_id)').in('opinto_aiheet.kurssi_id', kurssiIdt).gte('pvm', tanaan),
+  ]);
+
+  const kaikki = []
+    .concat((kurssiDl || []).map(function(d) { return { id: d.id, pvm: d.pvm, teksti: kurssiKartta[d.kurssi_id] + ', ' + (d.tyyppi === 'koe' ? 'koe' : 'palautus') }; }))
+    .concat((aiheDl || []).map(function(d) { return { id: d.id, pvm: d.pvm, teksti: kurssiKartta[d.opinto_aiheet.kurssi_id] + ' — ' + d.opinto_aiheet.name + ', ' + (d.tyyppi === 'koe' ? 'koe' : 'palautus') }; }))
+    .sort(function(a, b) { return a.pvm < b.pvm ? -1 : 1; })
+    .slice(0, 3);
+
+  tyhjaEl.style.display = kaikki.length === 0 ? 'block' : 'none';
+  kaikki.forEach(function(d) {
+    const li = document.createElement('li');
+    const teksti = document.createElement('span');
+    teksti.textContent = d.teksti;
+    li.appendChild(teksti);
+    const pvmSpan = document.createElement('span');
+    pvmSpan.className = 'pieni';
+    pvmSpan.textContent = muotoileOpintoPvm(d.pvm);
+    li.appendChild(pvmSpan);
+
+    // Tiedostoliite (VAIHE2_JA_LISAYKSET_CODELLE.md kohta 2, sql/133) — sama
+    // editorin-kautta-liittäminen kuin kurssimateriaalilla, kohteena tämä
+    // deadline-rivi. "+" jos ei vielä liitetty, muuten pelkkä ilmoitus
+    // lukumäärästä (ei erillistä listausta tässä tiiviissä näkymässä).
+    const liiteNappi = document.createElement('button');
+    liiteNappi.className = 'link-btn';
+    liiteNappi.textContent = '📎';
+    liiteNappi.title = 'Liitä tiedosto tähän määräaikaan';
+    liiteNappi.addEventListener('click', function(e) {
+      e.stopPropagation();
+      materiaaliKohdeDeadline = { id: d.id, teksti: d.teksti };
+      avaaJaettuEditori({ tyyppi: 'laituri', otsikko: '✱ LIITE ✱' });
+    });
+    li.appendChild(liiteNappi);
+
+    listEl.appendChild(li);
+  });
+}
+
+// === KERTAUSJONO (§5.3) — RAKENNETTU. Kurssien alla näkyvät solmut jotka
+// ovat ylläpidossa/kertauksessa, täpättävä "tämä alkaa unohtua" -nappi
+// aikaistaa seuraavan kertauksen enintään 5 päivän päähän (ei pyyhi
+// historiaa, ei nollaa väliä — VAIN sr_next_review lyhenee tarvittaessa). ===
+async function lataaReittiKertausjono() {
+  const listEl = document.getElementById('reitti-kertausjono-lista');
+  const tyhjaEl = document.getElementById('reitti-kertausjono-tyhja');
+  if (!listEl) return;
+
+  const { data: aiheet, error } = await db.from('opinto_aiheet')
+    .select('id, name, sr_next_review, opinto_kurssit!inner(name, status)')
+    .eq('kertausjonossa', true).eq('opinto_kurssit.status', 'aktiivinen').eq('opinto_kurssit.owner_id', currentUserId)
+    .order('sr_next_review', { nullsFirst: true });
+  if (error) { console.error('Kertausjonon haku epäonnistui:', error); return; }
+
+  listEl.innerHTML = '';
+  const rivit = aiheet || [];
+  tyhjaEl.style.display = rivit.length === 0 ? 'block' : 'none';
+
+  rivit.forEach(function(aihe) {
+    const li = document.createElement('li');
+    const teksti = document.createElement('span');
+    teksti.textContent = aihe.name + ' · ' + aihe.opinto_kurssit.name;
+    li.appendChild(teksti);
+
+    const unohtuuNappi = document.createElement('button');
+    unohtuuNappi.className = 'unohtuu';
+    unohtuuNappi.textContent = 'Tämä alkaa unohtua';
+    unohtuuNappi.addEventListener('click', async function() {
+      const viiden_pv_paasta = paivamaaraISO(new Date(Date.now() + 5 * 86400000));
+      // Vain AIKAISTAA — ei koskaan siirrä myöhemmäksi jos kertaus on jo
+      // lähempänä kuin 5 pv (§5.3: "enintään 5 päivän päähän painamisesta").
+      const nykyinen = aihe.sr_next_review;
+      if (nykyinen && nykyinen <= viiden_pv_paasta) {
+        naytaIlmoitus('Kertaus on jo lähempänä kuin 5 päivän päässä.');
+        return;
+      }
+      const { error: paivitysError } = await db.from('opinto_aiheet').update({ sr_next_review: viiden_pv_paasta }).eq('id', aihe.id);
+      if (ilmoitaKirjoitusvirheesta(paivitysError, 'Kertauksen aikaistus')) return;
+      naytaIlmoitus('Kertaus siirretty ' + muotoileOpintoPvm(viiden_pv_paasta) + ' -päivään.');
+      lataaReittiKertausjono();
+    });
+    li.appendChild(unohtuuNappi);
+
+    listEl.appendChild(li);
+  });
+}
+
 // PACER jäsentää: aihe on ylipäätään kandidaatti VAIN jos sen nykyinen vaihe
 // sallii toiminnan juuri nyt. priming/encoding ovat AINA valmiita (ei SR-
 // ajastusta, ensikertaista työtä). retrieval/yllapito vaativat että
@@ -5179,7 +5341,11 @@ document.getElementById('pacer-kehote-toggle').addEventListener('change', async 
 // 'lapset' ei ole tällä hetkellä saavutettavissa mistään oikeasta syötteestä
 // (henkilo-sarakkeen check-constraint sallii vain katri/juha/null) — varattu
 // tulevaa lapsikohtaista kalenterisyötettä varten.
-const EVENT_OWNER_COLORS = { katri: '#e05555', juha: '#3b82d6', molemmat: '#a855c7', lapset: '#6b6660' };
+// Päivitetty 2026-08-17 (Katrin kalenterivärit-päätös, ks. style.css
+// --kal-katri/--kal-juha/--kal-yhteinen) — samat arvot molemmissa
+// paikoissa (ei luettu CSS-muuttujasta koska EVENT_OWNER_COLORS oli jo
+// suora hex-objekti tätä ennenkin, ei muutettu rakennetta).
+const EVENT_OWNER_COLORS = { katri: '#D32F2F', juha: '#1976D2', molemmat: '#8E44AD', lapset: '#6b6660' };
 function resolveEventOwnerColor(tapahtuma) {
   if (tapahtuma._henkilo === 'katri') return EVENT_OWNER_COLORS.katri;
   if (tapahtuma._henkilo === 'juha') return EVENT_OWNER_COLORS.juha;
@@ -6102,10 +6268,31 @@ function piirraViikkoHenkselitTausta(henkselitLista, iso) {
     });
 }
 
-function piirraViikkoTuntialue(paivanAjalliset, henkselitLista, iso) {
+// Toteutuneen opiskelun ohuet merkit (2026-08-17, Reitti-välilehden
+// viikkoruudukko, §5.1: "toteutuneet opiskelut näkyvät Reitin kalenterissa
+// samassa näkymässä kuin live-luennot — päivän kertymän paikka"). EI osallistu
+// assignWeekOverlapSlots-limitykseen (oma kapea reuna, ei kilpaile
+// kalenteripalkkien tilasta) — sama minutesToPercent-akseli, joten
+// kohdistuu silti oikein kellonaikaan. Vain PÄÄTTYNEET istunnot (loppui_at
+// ei null) — kesken oleva ei tiedä vielä todellista kestoaan.
+function piirraViikkoOpiskeluMerkit(paivanSessiot) {
+  return paivanSessiot.filter(function(s) { return s.loppui_at; }).map(function(s) {
+    const alku = new Date(s.alkoi_at);
+    const loppu = new Date(s.loppui_at);
+    const merkki = document.createElement('div');
+    merkki.className = 'kalenteri-viikko-opiskelu-merkki';
+    merkki.style.top = minutesToPercent(alku.getHours() * 60 + alku.getMinutes()) + '%';
+    merkki.style.height = Math.max(minutesToPercent(loppu.getHours() * 60 + loppu.getMinutes()) - minutesToPercent(alku.getHours() * 60 + alku.getMinutes()), 1) + '%';
+    merkki.title = 'Opiskeltu ' + alku.toLocaleTimeString('fi-FI', { hour: '2-digit', minute: '2-digit' }) + '–' + loppu.toLocaleTimeString('fi-FI', { hour: '2-digit', minute: '2-digit' });
+    return merkki;
+  });
+}
+
+function piirraViikkoTuntialue(paivanAjalliset, henkselitLista, iso, paivanSessiot) {
   const alue = document.createElement('div');
   alue.className = 'kalenteri-viikko-tuntialue';
   piirraViikkoHenkselitTausta(henkselitLista, iso).forEach(function(tausta) { alue.appendChild(tausta); });
+  piirraViikkoOpiskeluMerkit(paivanSessiot || []).forEach(function(merkki) { alue.appendChild(merkki); });
   assignWeekOverlapSlots(paivanAjalliset).forEach(function(kohde) {
     const t = kohde.tapahtuma;
     const palkki = document.createElement('div');
@@ -6137,7 +6324,7 @@ function piirraViikkoTuntialue(paivanAjalliset, henkselitLista, iso) {
   return alue;
 }
 
-function piirraViikkoAikajana(sisalto, data, viikonAlkuPvm, kuormaTasot, henkselitLista) {
+function piirraViikkoAikajana(sisalto, data, viikonAlkuPvm, kuormaTasot, henkselitLista, sessiot) {
   const aikajana = document.createElement('div');
   aikajana.className = 'kalenteri-viikko-aikajana';
 
@@ -6158,6 +6345,7 @@ function piirraViikkoAikajana(sisalto, data, viikonAlkuPvm, kuormaTasot, henksel
     const iso = paivamaaraISO(pvm);
     const paivanKaikki = data.filter(function(t) { return tapahtumaKattaaPaivan(t, iso); });
     const paivanAjalliset = paivanKaikki.filter(function(t) { return t.event_time && !onkoMonipaivainen(t); });
+    const paivanSessiot = (sessiot || []).filter(function(s) { return paivamaaraISO(new Date(s.alkoi_at)) === iso; });
 
     const sarake = document.createElement('div');
     sarake.className = 'kalenteri-viikko-paiva';
@@ -6177,7 +6365,7 @@ function piirraViikkoAikajana(sisalto, data, viikonAlkuPvm, kuormaTasot, henksel
     sarake.appendChild(otsikko);
 
     sarake.appendChild(piirraViikkoKokopaivaRivi(paivanKaikki, iso));
-    sarake.appendChild(piirraViikkoTuntialue(paivanAjalliset, henkselitLista, iso));
+    sarake.appendChild(piirraViikkoTuntialue(paivanAjalliset, henkselitLista, iso, paivanSessiot));
 
     aikajana.appendChild(sarake);
   }
@@ -6610,6 +6798,9 @@ async function lataaHyttiPaanakyma() {
   if (raahattavaRivi) return;
   paivitaHyttiTyoVapaaLabel();
   lataaHyttiTanaanKaista();
+  lataaReittiViikko();
+  lataaReittiDeadlinet();
+  lataaReittiKertausjono();
   lataaOpintoKurssit();
   lataaTaitosolmut();
   paivitaSiltaOdotusIlmoitus();
@@ -10317,16 +10508,30 @@ function naytaakoKurssimateriaalilta(teksti) {
 // Juhan Laiturissa asti kunnes Katri ehti luokitella sen. 'private' piilottaa
 // rivin RLS-tasolla kaikilta paitsi lisääjältä itseltään.
 let materiaaliKohdeKurssi = null;
+// Deadline-rivin tiedostoliite (sql/133, 2026-08-17, VAIHE2_JA_LISAYKSET_
+// CODELLE.md kohta 2) — SAMA editori/kohdevalinta-kaava kuin kurssimateriaali,
+// vain eri kohdekenttä. Ei omaa "tallenna, lisää seuraava osa" -kaavaa
+// (yksi deadline saa tyypillisesti yhden tehtävänannon, ei monta osaa).
+let materiaaliKohdeDeadline = null;
 
 function avaaLaiturinMateriaalille(kurssi) {
   materiaaliKohdeKurssi = { id: kurssi.id, name: kurssi.name };
   avaaJaettuEditori({ tyyppi: 'laituri', otsikko: '✱ MATERIAALI ✱' });
 }
 
-// Insert-kentät kurssikontekstin materiaalille — sama kolme kenttää
-// jokaisessa kolmesta insert-kohdasta (editorin teksti, tekstitiedosto,
-// pdf/kuva/pptx), ei toistettu ehtologiikkaa kolmesti.
+// Insert-kentät kurssi- TAI deadline-kontekstin materiaalille — sama kolme
+// kenttää jokaisessa kolmesta insert-kohdasta (editorin teksti, tekstitiedosto,
+// pdf/kuva/pptx), ei toistettu ehtologiikkaa kolmesti. Tarkalleen yksi
+// konteksti voi olla auki kerrallaan (avaaJaettuEditori nollaa aina
+// edellisen ennen uutta).
 function materiaaliKohdeInsertKentat() {
+  if (materiaaliKohdeDeadline) {
+    return {
+      materiaali_deadline_id: materiaaliKohdeDeadline.id,
+      visibility: 'private',
+      piilota_laiturista: true,
+    };
+  }
   if (!materiaaliKohdeKurssi) return {};
   return {
     materiaali_kurssi_id: materiaaliKohdeKurssi.id,
@@ -10342,13 +10547,17 @@ function materiaaliKohdeInsertKentat() {
 
 function peruLaiturinMateriaaliKonteksti() {
   materiaaliKohdeKurssi = null;
+  materiaaliKohdeDeadline = null;
   paivitaLaiturinMateriaaliBanneri();
 }
 
 function paivitaLaiturinMateriaaliBanneri() {
   const banneri = document.getElementById('editori-materiaali-banneri');
   if (!banneri) return;
-  if (materiaaliKohdeKurssi) {
+  if (materiaaliKohdeDeadline) {
+    banneri.style.display = 'flex';
+    document.getElementById('editori-materiaali-banneri-teksti').textContent = 'Liite: ' + materiaaliKohdeDeadline.teksti;
+  } else if (materiaaliKohdeKurssi) {
     banneri.style.display = 'flex';
     document.getElementById('editori-materiaali-banneri-teksti').textContent = 'Materiaalia kurssille: ' + materiaaliKohdeKurssi.name;
   } else {

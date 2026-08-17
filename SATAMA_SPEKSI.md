@@ -106,11 +106,15 @@ Voimassa oleva rakenne:
 
 **Kalenterimerkinnät eivät ole kortteja** vaan viivalla merkittyjä rivejä lokissa. Ero näkyy kulmasilmäyksellä: kortti on tekemistä, merkintä on jotain jonka ympäri opiskelu kiertää.
 
-> **Värit — osittain ratkaistu 17.8.2026.** Katrin päätös: Juhan kalenteri = iCalin oma sininen (ei Sataman paletin väri, luetaan suoraan iCal-syötteestä — ei siis välttämättä tarvitse omaa `--`-tokenia ollenkaan, jos syöte kertoo värin itse). Katrin oma kalenteri = punainen. Yhteinen = liila.
+> **Värit — RATKAISTU, ja osittain jo rakennettu ennen tätäkin keskustelua.** Tarkistettu suoraan tietokannasta (`kalenteri_syotteet`, `sql/061`, 2026-07-17): Juha = `#1976D2`, Katri = `#D32F2F`, Perhekalenteri/Yhteinen = `#8E44AD` (liila) — kaikki kolme jo live'ssä, eivät enää avoimia päätöksiä. Nämä ovat henkilöidentiteettivärejä ("kuka menee minne") — ei sama järjestelmä kuin Kuormavahti tai `--vaara`.
 >
-> **Ei ratkaistu, oikea ristiriita: Katrin "punainen" osuu suoraan `--vaara`:n (#B8433A) päälle**, joka on tarkoituksella varattu YKSINOMAAN huolilipulle/ristiriidalle (§5.1, "Ruorin oma, ei muuteta") — "yksi väri, yksi tarkoitus" -periaate rikkoutuu jos kalenterimerkintä ja huolilippu käyttävät samaa punaista, koska silloinväri ei enää kerro yksiselitteisesti kumpaa se tarkoittaa. Tarvitaan JOKO (a) toinen, selvästi `--vaara`:sta erottuva punaisen sävy Katrin kalenterille, TAI (b) eri väri kokonaan. Ei valittu vielä — Katrin päätös kumpi.
+> **Todellinen ristiriita löytyi ja MITATTIIN 17.8.2026: Katrin `#D32F2F` on käytännössä sama väri kuin `--vaara` (#B8433A).** Kontrastisuhde 1,08:1, sävyero ~4° — silmälle identtinen punainen. Tummennus ei auta, koska ongelma on sävy, ei vaaleus. **Ratkaisu: `--vaara` pysyy koskemattomana** (sen ainoa tehtävä riippuu siitä että se tunnistaa itsensä välittömästi), ja Katrin punainen saa jäädä omaksi, 10+ vuotta käytössä olleeksi tunnistevärikseen — MUTTA deadline-rivit (jotka käyttävät `--vaara`:a) saavat lisäksi ei-väripohjaisen merkin (ikoni tai paksu reunaviiva), jotta merkitys ei koskaan riipu pelkästä punaisen sävystä kun molemmat sattuvat näkymään samalla Reitti-näkymällä.
 >
-> "Liila" (yhteinen) on myös kokonaan uusi väri, ei nykyisessä paletissa — tarvitsee oman hex-arvon `satama-design-kuvaus.md`:hen ennen käyttöä, ei valittu vielä.
+> **Lukkarikone (luennot) päätetty 17.8.: sama punainen kuin Katrin oma kalenteri (`#D32F2F`)** — aiemmin värittämätön (`vari` oli NULL), nyt yhtenäistetty koska luennotkin ovat "Katrin omaa". Itslearning ja Juhan Oma-syöte pysyvät koskemattomina (oma aiheen mukainen värinsä, ei osa tätä identiteettijärjestelmää).
+>
+> **Uusi, erillinen väri: Sataman itse generoimat opiskelulohkot ("oppimissessiot").** Nämä eivät ole henkilöidentiteettejä vaan Sataman omaa ehdotusta — oma väri, "keltaisen sävyinen" Katrin toiveesta. Ongelma: mikään kellertävä ei erotu Kuormavahdin `matalikko`/`karikko`-taustasta riittävästi (mitattu kontrasti ~1,0–1,4:1 useilla kokeilluilla sävyillä — sama ilmiö kuin punaisella, mutta tässä sävykin on lähellä). Ratkaisu ei ole väriä hienosäätää vaan lisätä 2px `--muste`-reunaviiva lohkon ympärille — reunaviiva pitää muodon luettavana taustan kuormatasosta riippumatta. Väri: `#E3A62F`.
+>
+> **Kuormavahti-tausta:** ei uutta väriä — käyttää `matalikko`/`karikko`/`paperi` täsmälleen samalla merkityksellä kuin muuallakin (kevyt/raskas kuorma, SOS), vain sovellettuna päivän/viikon taustaväriksi eikä prosenttiympyrään.
 >
 > **Siirtymäblokit (§8.1 Föli) tulevat samaan yhteyteen** — reaaliaikainen, ei paikkamerkki (Föli ei ole vielä rakennettu, ks. §8.1).
 
@@ -509,7 +513,7 @@ Silta etsii **lähes samanlaisia teemoja eri kursseista**. Tavoite on oppia **mi
 
 **Priming ajoissa:** aiheesta josta ei tiedä mitään priming olisi hyvä olla aiemmin kuin edellisenä iltana.
 
-**Huomioväri 1–2 pv -rivillä (päätetty 17.8.2026): `--vaara`.** Tähän yhteen, tarkasti rajattuun kohtaan (§4.1:n deadline-rivi, tehtävä 1–2 pv päässä) saa käyttää `--vaara`-väriä. Tämä EI avaa muuta kalenteri-/deadline-värikysymystä (perhekalenteri, Juhan kalenteri) — ne pysyvät edelleen ratkaisematta, ks. §4.1 huomautus.
+**Huomioväri 1–2 pv -rivillä (päätetty 17.8.2026): `--vaara`.** Tähän yhteen, tarkasti rajattuun kohtaan (§4.1:n deadline-rivi, tehtävä 1–2 pv päässä) saa käyttää `--vaara`-väriä. **Lisäys 17.8.: koska Katrin oma kalenteripunainen (`#D32F2F`) mitattiin lähes identtiseksi `--vaara`:n kanssa (ks. §4.1), tämä rivi tarvitsee myös ei-väripohjaisen merkin (ikoni/paksu reunaviiva)** — muuten kahden identtisen punaisen esiintyessä samalla Reitti-näkymällä merkitys ei erotu pelkästä väristä.
 
 **Sillan aikakäyrä:** paino nousee lähestyttäessä tarvehetkeä mutta laskee juuri ennen sitä (1–2 pv sisällä). Silta on parhaimmillaan hieman etukäteen opittuna.
 
@@ -699,7 +703,7 @@ Perustelu: generaattorin tehtävää oikeasti painetaan, luentoa ei. Muotokielen
 
 - **Merikartta/loki-metafora tarkentuu kirjaimelliseksi lokinäkymäksi:** ajatuksena rivi riville etenevä loki jossa syvyys (väri, `--syvanne`-suuntaan) kertoo kuinka pitkälle asia on viety — ei erillinen kortti + kalenteririvi -rakenne vaan yksi yhtenäinen loki jossa nykyinen/käynnissä oleva asia näyttäytyy Nyt-korttina. **Tämä on ristiriidassa §4.1:n nykyisen kortti+kalenteririvi-rakenteen kanssa** — merkitty jo §4.1:n AUKKO-lohkona, ei toisteta tässä uudelleen.
 - **Messinki/sinappi-erottelu vahvistuu käytännössä:** messinki = kaikki kosketettava, sinappi = pelkkä koriste, ei koskaan tap-kohde. Sääntö ei ole muuttunut, mutta elävä käyttö on osoittanut sen tärkeäksi pitää tiukasti — sekoittuminen näkyy heti käyttäjälle vääränä signaalina.
-- **Uusia, ei-palettiin-kuuluvia värejä on ilmaantunut käytännön ehdotuksiin:** "sininen" (Juhan kalenterin/perhekalenterin merkintä) ja "persikka" eivät ole osa nykyistä `satama-design-kuvaus.md`-palettia. Sama koskee jo aiemmin merkittyä punaista, joka on ristiriidassa `--vaara`:n varauksen kanssa. **Kaikki kolme vaativat erillisen sovituksen `satama-design-kuvaus.md`:n kanssa ennen rakentamista** — ei päätetä hiljaa tässä dokumentissa.
+- **Kalenteri-/identiteettivärit ratkaistu 17.8.2026, ks. §4.1.** (Vanha huomautus tästä koski "sinistä"/"persikkaa"/punaista avoimina kysymyksinä — vanhentunut, korvattu §4.1:n mitatulla ratkaisulla.)
 - **Mockup-tiedostojen (esim. `satama-ruori-header-v2.html`) hex-arvot ja `--font-ui` ovat paikanpitäjiä**, ei lopullisia päätöksiä — Coden ei pidä olettaa niitä sellaisenaan lopullisiksi ilman erillistä vahvistusta, vaikka tiedosto muuten onkin sitova visuaalinen speksi (§0).
 - **Liike (relay 16.8.):** siirtymät "veden alla" -tuntuisia, 500–850ms — hitaampia kuin tavallinen UI-animaatio, tarkoituksella. Haptiikka vain aidosti kosketettavissa kohdissa (jo §9:n sääntö, ei uusi).
 
