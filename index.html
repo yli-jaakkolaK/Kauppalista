@@ -399,6 +399,12 @@
 
       <hr class="divider">
 
+      <!-- Kolmiportainen kadenssi, Taso 2 (VAIHE2_JA_LISAYKSET_CODELLE.md,
+           18.8.2026) — "ainoa taso joka yhä kysyy". Dismissible-kortit,
+           ei-blokkaava, näkyy vain jos moottori on ehdottanut jotain
+           (opinto_hoitotaso_ehdotukset, kasitelty=false). -->
+      <div id="opinto-hoitotaso-ehdotukset"></div>
+
       <div class="section-title">📚 Opinnot</div>
       <ul class="list" id="opinto-kurssi-lista"></ul>
       <p class="section-empty" id="opinto-tyhja" style="display:none">Ei vielä kursseja. Lisää ensimmäinen alta.</p>
@@ -408,6 +414,15 @@
         <input type="text" id="opinto-uusi-kurssi-input" placeholder="uuden kurssin nimi...">
         <button id="opinto-uusi-kurssi-btn">+</button>
       </div>
+
+      <!-- Kolmiportainen kadenssi, Taso 1 (VAIHE2_JA_LISAYKSET_CODELLE.md,
+           18.8.2026) — "kerran syksylle, manuaalisesti käynnistettävä".
+           Laskee jokaiselle kurssille (jolla on opintopistemäärä JA
+           vähintään yksi deadline) tavoitetahdin ja asettaa aiheiden
+           tavoiteikkunat — ei kysy jokaista sijoitusta, vain kertoo jos
+           kokonaisuus ei mahdu käytettävään aikaan. -->
+      <p class="section-link" id="opinto-tavoitetahti-btn">🎯 Laske tavoitetahti kaikille kursseille</p>
+      <div class="opinto-tavoitetahti-tulos" id="opinto-tavoitetahti-tulos" style="display:none"></div>
 
       <hr class="divider">
 
@@ -550,6 +565,16 @@
       <button class="kalenteri-tila-btn opinto-hoitotaso-btn" data-hoitotaso="taysi">Täysi</button>
       <button class="kalenteri-tila-btn opinto-hoitotaso-btn" data-hoitotaso="kevyt">Kevyt</button>
       <button class="kalenteri-tila-btn opinto-hoitotaso-btn" data-hoitotaso="vain_deadlinet">Vain deadlinet</button>
+    </div>
+
+    <!-- Kolmiportainen kadenssi, Taso 1 (VAIHE2_JA_LISAYKSET_CODELLE.md,
+         18.8.2026) — op_maara oli jo skeemassa muttei koskaan UI:ssa.
+         Tavoitetahdin laskenta (Taso 1) tarvitsee tämän jokaiselta
+         kurssilta jolle tahtia halutaan laskea; puuttuva arvo ei estä
+         muuta käyttöä, Taso 1 vain ohittaa sen kurssin. -->
+    <div class="settings-row">
+      <span>Opintopisteet</span>
+      <input type="number" class="settings-numero-input" id="opinto-kurssi-opmaara-input" min="0" step="0.5" placeholder="esim. 5">
     </div>
 
     <!-- A1: kurssin oma aihe/viikko-ohjelma (rakennusjärjestys-dokumentti:
@@ -1051,6 +1076,14 @@
     <div class="settings-row">
       <span>Aloittamaton kurssitehtävä saa kovan etusijan kun deadlineen on enintään N päivää</span>
       <input type="number" class="settings-numero-input" id="kurssi-kiireellisyys-input" min="0" step="1">
+    </div>
+    <div class="settings-row">
+      <span>Tavoitetahdin laskennassa (Taso 1) käytettävä tuntimäärä per opintopiste — nyrkkisääntö, säädä jos tuntuu väärältä</span>
+      <input type="number" class="settings-numero-input" id="tuntia-per-op-input" min="1" step="1">
+    </div>
+    <div class="settings-row">
+      <span>Hoitotason kevennysehdotus (Taso 2) kun tästä useampi % kurssin aiheista on tavoiteikkunastaan jäljessä</span>
+      <input type="number" class="settings-numero-input" id="hoitotaso-jalkeenjaanti-input" min="1" max="100" step="1">
     </div>
     <div class="settings-row">
       <span>Siltasolmun ikkuna sulkeutuu N päivää ennen aikaisinta viittaavaa deadlinea</span>

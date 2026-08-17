@@ -1257,6 +1257,7 @@ async function avaaOpintoKurssi(kurssi) {
   document.getElementById('opinto-kurssi-title').textContent = '✱ ' + kurssi.name + ' ✱';
   piirraOpintoKurssiTilaLinkki();
   piirraOpintoTavoiteHoitotasoNapit();
+  piirraOpintoOpMaara();
   piirraOpintoAikataulu();
   await lataaOpintoKurssiMateriaalit();
   await lataaOpintoAiheet();
@@ -1298,6 +1299,24 @@ document.querySelectorAll('.opinto-hoitotaso-btn').forEach(function(btn) {
     piirraOpintoTavoiteHoitotasoNapit();
     naytaIlmoitus('Hoitotaso: ' + (uusi === 'taysi' ? 'täysi' : uusi === 'kevyt' ? 'kevyt' : 'vain deadlinet'));
   });
+});
+
+// Kolmiportainen kadenssi Taso 1 -syöte: op_maara oli jo sarakkeena mutta
+// ilman UI:ta (VAIHE2_JA_LISAYKSET_CODELLE.md, 18.8.2026). Sama blur-
+// tallennus kuin aikataululla, ei erillistä tallennusnappia.
+function piirraOpintoOpMaara() {
+  const input = document.getElementById('opinto-kurssi-opmaara-input');
+  input.value = currentOpintoKurssi.op_maara != null ? currentOpintoKurssi.op_maara : '';
+}
+
+document.getElementById('opinto-kurssi-opmaara-input').addEventListener('blur', async function(e) {
+  if (!currentOpintoKurssi) return;
+  const arvo = e.target.value.trim();
+  const uusi = arvo === '' ? null : parseFloat(arvo);
+  if (uusi !== null && (isNaN(uusi) || uusi < 0)) { piirraOpintoOpMaara(); return; }
+  const { error } = await db.from('opinto_kurssit').update({ op_maara: uusi }).eq('id', currentOpintoKurssi.id);
+  if (ilmoitaKirjoitusvirheesta(error, 'Opintopistemäärän tallennus')) return;
+  currentOpintoKurssi.op_maara = uusi;
 });
 
 // A1 aikataulu: "N: aihe" per rivi -> jsonb [{viikko, aihe}]. Rivit joita ei
@@ -2185,6 +2204,10 @@ function opintoTanaanPvm() {
   return paivamaaraISO(new Date());
 }
 
+function opintoEilinenPvm() {
+  return paivamaaraISO(new Date(Date.now() - 86400000));
+}
+
 // KUORMA rajoittaa: sama Kuormavahdin "kellonaikameno"-määritelmä ja
 // paivan_menoraja-asetus kuin muualla sovelluksessa (ks. laskeMenoja(),
 // haeAsetusNumero('paivan_menoraja', 5)) — ei uutta kynnysarvoa keksitty.
@@ -2289,13 +2312,22 @@ async function lataaReittiViikko() {
 
   await paivitaAsetukset();
 
-  const [{ data: haetut, error }, henkselitLista, { data: sessiot }] = await Promise.all([
+  const tanaanIso = opintoTanaanPvm();
+  const [{ data: haetut, error }, henkselitLista, { data: sessiot }, { data: suunnitellut }] = await Promise.all([
     db.from('kalenteri_tapahtumat').select('*, kalenteri_syotteet(vari, henkilo, scope)')
       .gte('event_date', alkuIso).lte('event_date', loppuIso)
       .order('event_date').order('event_time', { nullsFirst: false }),
     fetchVisibleHenkselit(alkuIso, loppuIso),
-    db.from('opinto_sessiot').select('alkoi_at, loppui_at')
+    db.from('opinto_sessiot').select('aihe_id, alkoi_at, loppui_at')
       .gte('alkoi_at', alkuIso + 'T00:00:00').lte('alkoi_at', loppuIso + 'T23:59:59').not('loppui_at', 'is', null),
+    // Kolmiportainen kadenssi Taso 1:n asettama tavoiteikkuna (18.8.2026) —
+    // EI näytetä menneille päiville (ei koskaan fiktiivistä "olisi pitänyt"),
+    // vain tänään/tulevaisuudessa. Rajaus tehdään piirraViikkoAikajanassa
+    // per-päivä (tanaanIso saatavilla siellä), tässä haetaan koko näkyvä
+    // väli kerralla.
+    db.from('opinto_aiheet').select('id, name, tavoiteikkuna, opinto_kurssit!inner(owner_id, status, name)')
+      .eq('opinto_kurssit.owner_id', currentUserId).eq('opinto_kurssit.status', 'aktiivinen')
+      .gte('tavoiteikkuna', alkuIso >= tanaanIso ? alkuIso : tanaanIso).lte('tavoiteikkuna', loppuIso),
   ]);
   if (error) {
     console.error('Reitin viikkokalenterin haku epäonnistui:', error);
@@ -2309,10 +2341,13 @@ async function lataaReittiViikko() {
       _scope: t.kalenteri_syotteet ? t.kalenteri_syotteet.scope : null,
     });
   });
+  const suunnitellutAiheet = (suunnitellut || []).map(function(a) {
+    return { id: a.id, name: a.name, tavoiteikkuna: a.tavoiteikkuna, kurssiNimi: a.opinto_kurssit.name };
+  });
 
   const signaalit = await computeVisibleDaySignals(data, isoPaivat);
   sisalto.innerHTML = '';
-  piirraViikkoAikajana(sisalto, data, alku, signaalit.kuormaTasot, henkselitLista, sessiot || []);
+  piirraViikkoAikajana(sisalto, data, alku, signaalit.kuormaTasot, henkselitLista, sessiot || [], suunnitellutAiheet);
 }
 
 // === LÄHESTYVÄT MÄÄRÄAJAT (§5.1 kohta 2: "3 seuraavaa palautusta") ===
@@ -2427,6 +2462,295 @@ async function lataaReittiKertausjono() {
   });
 }
 
+// === KOLMIPORTAINEN KADENSSI, TASO 1 (VAIHE2_JA_LISAYKSET_CODELLE.md,
+// 18.8.2026) — "kerran syksylle, manuaalisesti käynnistettävä". EI
+// sisältöpäätös (doc:n oma jaottelu): sijoittelee JO OLEMASSA OLEVAT
+// aiheet aikajanalle jo hyväksytyillä säännöillä, ei keksi mitään uutta.
+// ===
+
+// Viikon opiskelukapasiteetti tunteina — sama minuuttiruudukko-blokkaus
+// kuin piirraNytLoki:ssä (hytti_opiskeluaika miinus hytti_suljetut_ikkunat),
+// mutta KAIKILLE seitsemälle viikonpäivälle kerralla. Rakenteellinen
+// yläraja ("mahtuuko ylipäätään"), ei ota huomioon jo aikataulutettuja
+// yksittäisiä kalenteritapahtumia (ne vaihtelevat viikoittain).
+async function laskeViikonOpiskeluKapasiteettiTunteina() {
+  const [{ data: opiskeluajat }, { data: suljetut }] = await Promise.all([
+    db.from('hytti_opiskeluaika').select('viikonpaiva, alkaa, paattyy').eq('owner_id', currentUserId),
+    db.from('hytti_suljetut_ikkunat').select('viikonpaiva, alkaa, paattyy').eq('owner_id', currentUserId),
+  ]);
+  let minuutteja = 0;
+  for (let vp = 0; vp < 7; vp++) {
+    const paivan = (opiskeluajat || []).filter(function(o) { return o.viikonpaiva === vp; });
+    if (paivan.length === 0) continue;
+    const varattu = new Array(1440).fill(true);
+    paivan.forEach(function(ikkuna) {
+      const a = aikaMinuutteina(ikkuna.alkaa.slice(0, 5)), b = aikaMinuutteina(ikkuna.paattyy.slice(0, 5));
+      for (let m = a; m < b; m++) varattu[m] = false;
+    });
+    (suljetut || []).filter(function(s) { return s.viikonpaiva === vp; }).forEach(function(ikkuna) {
+      const a = aikaMinuutteina(ikkuna.alkaa.slice(0, 5)), b = aikaMinuutteina(ikkuna.paattyy.slice(0, 5));
+      for (let m = a; m < b; m++) varattu[m] = true;
+    });
+    for (let m = 0; m < 1440; m++) { if (!varattu[m]) minuutteja++; }
+  }
+  return minuutteja / 60;
+}
+
+// Kurssin "loppupvm" ei ole oma kenttä missään skeemassa — käytetään
+// kurssin MYÖHÄISINTÄ tunnettua deadlinea (kurssi- TAI aihetasoinen)
+// proxyna ("mihin mennessä tämän pitää olla valmis"). Kurssi jolla ei ole
+// yhtään deadlinea ei voi saada tavoitetahtia — ei tiedetä mihin mennessä.
+//
+// Luentotuntien vähennys (spekin oma maininta, "josta aikataulutetut
+// Lukkarikone-luennot vähennetään") JÄTETTY POIS: Lukkarikoneen
+// kalenteritapahtumilla ei ole mitään linkkiä opinto_kurssit-riveihin (eri
+// järjestelmät, ei yhteistä avainta) — automaattinen vähennys vaatisi
+// hauraan nimenperusteisen täsmäytyksen kurssin nimen ja tapahtuman
+// title-tekstin välillä. tuntitarve on siis TÄYSI op_maara × tuntia_per_op
+// -arvio, kerrottu Katrille tuloksessa, ei piiloteltu.
+async function suoritaOpintoTavoitetahtiLaskenta() {
+  const tanaan = opintoTanaanPvm();
+  const tanaanD = new Date(tanaan + 'T00:00:00');
+  const tuntiaPerOp = haeAsetusNumero('tuntia_per_op', 27);
+
+  const { data: kurssit, error: kurssiError } = await db.from('opinto_kurssit')
+    .select('id, name, op_maara').eq('owner_id', currentUserId).eq('status', 'aktiivinen');
+  if (kurssiError) { console.error('Kurssien haku tavoitetahtia varten epäonnistui:', kurssiError); return null; }
+  if ((kurssit || []).length === 0) return { tulokset: [], kapasiteettiTunteja: 0, tarveTunteja: 0, ylitysTunteja: 0 };
+
+  const kurssiIdt = kurssit.map(function(k) { return k.id; });
+  const [{ data: kurssiDl, error: kurssiDlError }, { data: aiheDl, error: aiheDlError }, { data: aiheet, error: aiheetError }, kapasiteettiTunteja] = await Promise.all([
+    db.from('opinto_deadlinet').select('kurssi_id, pvm').in('kurssi_id', kurssiIdt),
+    db.from('opinto_deadlinet').select('pvm, opinto_aiheet!inner(kurssi_id)').in('opinto_aiheet.kurssi_id', kurssiIdt),
+    db.from('opinto_aiheet').select('id, kurssi_id, sort_order, perustussolmu, reference_tehty').in('kurssi_id', kurssiIdt),
+    laskeViikonOpiskeluKapasiteettiTunteina(),
+  ]);
+  if (kurssiDlError || aiheDlError || aiheetError) {
+    console.error('Deadline/aihe-datan haku tavoitetahtia varten epäonnistui:', kurssiDlError || aiheDlError || aiheetError);
+    return null;
+  }
+
+  const loppupvmKartta = {};
+  (kurssiDl || []).forEach(function(d) {
+    if (!loppupvmKartta[d.kurssi_id] || d.pvm > loppupvmKartta[d.kurssi_id]) loppupvmKartta[d.kurssi_id] = d.pvm;
+  });
+  (aiheDl || []).forEach(function(d) {
+    const kid = d.opinto_aiheet.kurssi_id;
+    if (!loppupvmKartta[kid] || d.pvm > loppupvmKartta[kid]) loppupvmKartta[kid] = d.pvm;
+  });
+
+  const aiheetKurssilla = {};
+  (aiheet || []).forEach(function(a) { (aiheetKurssilla[a.kurssi_id] = aiheetKurssilla[a.kurssi_id] || []).push(a); });
+
+  const tulokset = [];
+  let tarveTunteja = 0;
+
+  for (const kurssi of kurssit) {
+    if (kurssi.op_maara == null) { tulokset.push({ kurssi: kurssi, tila: 'ei_op_maaraa' }); continue; }
+    const loppupvm = loppupvmKartta[kurssi.id];
+    if (!loppupvm) { tulokset.push({ kurssi: kurssi, tila: 'ei_deadlinea' }); continue; }
+
+    const viikkojaJaljella = Math.max(1, (new Date(loppupvm + 'T00:00:00') - tanaanD) / (7 * 86400000));
+    const tuntitarve = kurssi.op_maara * tuntiaPerOp;
+    const tuntiaViikossa = tuntitarve / viikkojaJaljella;
+    tarveTunteja += tuntiaViikossa;
+
+    // Jäljellä olevat aiheet: reference_tehty merkitsee PACER-kierroksen
+    // valmiiksi (viimeinen vaihe ennen ylläpitoa) — nämä eivät enää
+    // tarvitse uutta tavoiteikkunaa.
+    const jaljella = (aiheetKurssilla[kurssi.id] || [])
+      .filter(function(a) { return !a.reference_tehty; })
+      .sort(function(a, b) {
+        // Perustussolmut ETUKÄTEEN (etupainotteinen aikajana — perustussolmu
+        // opitaan ensin, sama periaate kuin moottorin muualla soveltama
+        // "perustussolmu painottaa"), sort_order toissijaisena.
+        if (a.perustussolmu !== b.perustussolmu) return a.perustussolmu ? -1 : 1;
+        return a.sort_order - b.sort_order;
+      });
+
+    if (jaljella.length === 0) { tulokset.push({ kurssi: kurssi, tila: 'ei_jaljella_olevia_aiheita' }); continue; }
+
+    // Tasainen jako aikajanalle tänään→loppupvm — ei yritä painottaa
+    // aihekohtaista laajuutta, sitä ei ole tietona (ei arviointikenttää
+    // per aihe tässä vaiheessa).
+    const paiviaJaljella = Math.max(jaljella.length, Math.round((new Date(loppupvm + 'T00:00:00') - tanaanD) / 86400000));
+    const askel = paiviaJaljella / jaljella.length;
+    for (let i = 0; i < jaljella.length; i++) {
+      const pvm = new Date(tanaanD.getTime() + Math.round((i + 1) * askel) * 86400000);
+      const { error } = await db.from('opinto_aiheet').update({ tavoiteikkuna: paivamaaraISO(pvm) }).eq('id', jaljella[i].id);
+      if (error) console.error('Tavoiteikkunan tallennus epäonnistui (aihe ' + jaljella[i].id + '):', error);
+    }
+
+    tulokset.push({ kurssi: kurssi, tila: 'laskettu', tuntiaViikossa: tuntiaViikossa, loppupvm: loppupvm, aiheitaPaivitetty: jaljella.length });
+  }
+
+  return { tulokset: tulokset, kapasiteettiTunteja: kapasiteettiTunteja, tarveTunteja: tarveTunteja, ylitysTunteja: Math.max(0, tarveTunteja - kapasiteettiTunteja) };
+}
+
+function piirraOpintoTavoitetahtiTulos(tulos) {
+  const kotelo = document.getElementById('opinto-tavoitetahti-tulos');
+  kotelo.innerHTML = '';
+  kotelo.style.display = 'block';
+
+  if (tulos.tulokset.length === 0) {
+    kotelo.textContent = 'Ei aktiivisia kursseja.';
+    return;
+  }
+
+  const yhteenveto = document.createElement('p');
+  yhteenveto.className = 'opinto-tavoitetahti-yhteenveto' + (tulos.ylitysTunteja > 0 ? ' ylittaa' : '');
+  yhteenveto.textContent = 'Tarve ' + tulos.tarveTunteja.toFixed(1) + ' h/vko · Kapasiteetti ' + tulos.kapasiteettiTunteja.toFixed(1) + ' h/vko'
+    + (tulos.ylitysTunteja > 0 ? ' — ei mahdu, ylitys ' + tulos.ylitysTunteja.toFixed(1) + ' h/vko' : ' — mahtuu');
+  kotelo.appendChild(yhteenveto);
+
+  const TILA_TEKSTI = {
+    ei_op_maaraa: 'ei opintopistemäärää — täytä kurssin sivulla',
+    ei_deadlinea: 'ei yhtään deadlinea — ei voida asettaa tavoitetahtia',
+    ei_jaljella_olevia_aiheita: 'kaikki aiheet jo kierroksen loppupäässä',
+  };
+  tulos.tulokset.forEach(function(r) {
+    const rivi = document.createElement('p');
+    rivi.className = 'opinto-tavoitetahti-rivi';
+    if (r.tila === 'laskettu') {
+      rivi.textContent = r.kurssi.name + ': ' + r.tuntiaViikossa.toFixed(1) + ' h/vko, ' + r.aiheitaPaivitetty + ' aihetta aikataulutettu ' + muotoileOpintoPvm(r.loppupvm) + ' asti';
+    } else {
+      rivi.textContent = r.kurssi.name + ': ' + (TILA_TEKSTI[r.tila] || r.tila);
+      rivi.classList.add('ohitettu');
+    }
+    kotelo.appendChild(rivi);
+  });
+}
+
+document.getElementById('opinto-tavoitetahti-btn').addEventListener('click', async function() {
+  const nappi = this;
+  const alkuperainenTeksti = nappi.textContent;
+  nappi.textContent = 'Lasketaan…';
+  try {
+    const tulos = await suoritaOpintoTavoitetahtiLaskenta();
+    if (!tulos) { naytaIlmoitus('Tavoitetahdin laskenta epäonnistui.'); return; }
+    piirraOpintoTavoitetahtiTulos(tulos);
+    naytaIlmoitus('Tavoitetahti laskettu.');
+  } finally {
+    nappi.textContent = alkuperainenTeksti;
+  }
+});
+
+// === KOLMIPORTAINEN KADENSSI, TASO 2 (VAIHE2_JA_LISAYKSET_CODELLE.md,
+// 18.8.2026) — "kahden viikon välein, ainoa taso joka yhä kysyy". Kategoria
+// 1 -päätös (doc:n oma jaottelu): kurssin tietoinen alibudjetointi vaikuttaa
+// arvosanaan/tutkintoon, joten EHDOTTAA, ei vaihda itse. Sama malli kuin
+// silta_ehdotukset_odottavat: moottori kirjoittaa rivin, Katri hyväksyy/
+// hylkää dismissible-kortilla. ===
+
+// Kadenssi (2 viikkoa) ilman cronia — sama periaate kuin Taso 3:n päätös
+// tänään (ei kahta rinnakkaista laskijaa): asetukset-taulun aikaleima
+// riittää, tarkistetaan luonnollisesti kun Reitti-välilehti muutenkin
+// ladataan, ei tarvitse omaa ajastustaan.
+async function suoritaHoitotasoDiagnoosiJosAika() {
+  const viimeksi = haeAsetusTeksti('taso2_viimeksi_ajettu', null);
+  const tanaan = opintoTanaanPvm();
+  if (viimeksi) {
+    const paiviaSitten = Math.round((new Date(tanaan + 'T00:00:00') - new Date(viimeksi + 'T00:00:00')) / 86400000);
+    if (paiviaSitten < 14) return;
+  }
+  await suoritaHoitotasoDiagnoosi();
+  await db.from('asetukset').upsert({ key: 'taso2_viimeksi_ajettu', value: tanaan }, { onConflict: 'key' });
+  asetuksetKartta['taso2_viimeksi_ajettu'] = tanaan;
+}
+
+// Jälkeenjäänti = aihe jonka tavoiteikkuna (Taso 1:n asettama) on jo
+// mennyt UMPEEN eikä aihe ole silti reference_tehty (PACER-kierros ei
+// valmis). Vain aiheet joilla on ylipäätään tavoiteikkuna lasketaan mukaan
+// nimittäjään — Taso 1:tä ei ole vielä ajettu -> ei diagnoosia, ei väärää
+// hälytystä tyhjästä datasta.
+async function suoritaHoitotasoDiagnoosi() {
+  const tanaan = opintoTanaanPvm();
+  const kynnys = haeAsetusNumero('hoitotaso_jalkeenjaanti_kynnys', 40);
+
+  const { data: kurssit, error: kurssiError } = await db.from('opinto_kurssit')
+    .select('id, name').eq('owner_id', currentUserId).eq('status', 'aktiivinen').eq('hoitotaso', 'taysi');
+  if (kurssiError) { console.error('Kurssien haku hoitotaso-diagnoosia varten epäonnistui:', kurssiError); return; }
+  if ((kurssit || []).length === 0) return;
+
+  const { data: aiheet, error: aiheError } = await db.from('opinto_aiheet')
+    .select('kurssi_id, tavoiteikkuna, reference_tehty').in('kurssi_id', kurssit.map(function(k) { return k.id; })).not('tavoiteikkuna', 'is', null);
+  if (aiheError) { console.error('Aihedatan haku hoitotaso-diagnoosia varten epäonnistui:', aiheError); return; }
+
+  const { data: odottavat, error: odottavatError } = await db.from('opinto_hoitotaso_ehdotukset')
+    .select('kurssi_id').eq('owner_id', currentUserId).eq('kasitelty', false);
+  if (odottavatError) { console.error('Odottavien ehdotusten haku epäonnistui:', odottavatError); return; }
+  const jollaJoOdottaa = new Set((odottavat || []).map(function(r) { return r.kurssi_id; }));
+
+  const ryhmat = {};
+  (aiheet || []).forEach(function(a) { (ryhmat[a.kurssi_id] = ryhmat[a.kurssi_id] || []).push(a); });
+
+  for (const kurssi of kurssit) {
+    if (jollaJoOdottaa.has(kurssi.id)) continue;
+    const omat = ryhmat[kurssi.id] || [];
+    if (omat.length === 0) continue;
+    const jaljessa = omat.filter(function(a) { return a.tavoiteikkuna < tanaan && !a.reference_tehty; });
+    const prosentti = Math.round((jaljessa.length / omat.length) * 100);
+    if (prosentti < kynnys) continue;
+
+    const perustelu = jaljessa.length + '/' + omat.length + ' aihetta (' + prosentti + ' %) on jäljessä tavoitetahdista.';
+    const { error: insertError } = await db.from('opinto_hoitotaso_ehdotukset').insert({
+      owner_id: currentUserId, kurssi_id: kurssi.id, ehdotettu_hoitotaso: 'kevyt', perustelu: perustelu,
+    });
+    if (insertError) console.error('Hoitotasoehdotuksen tallennus epäonnistui:', insertError);
+  }
+}
+
+async function lataaHoitotasoEhdotukset() {
+  const kontti = document.getElementById('opinto-hoitotaso-ehdotukset');
+  if (!kontti) return;
+  const { data, error } = await db.from('opinto_hoitotaso_ehdotukset')
+    .select('*, opinto_kurssit(name)').eq('owner_id', currentUserId).eq('kasitelty', false).order('luotu_at');
+  if (error) { console.error('Hoitotasoehdotusten haku epäonnistui:', error); return; }
+
+  kontti.innerHTML = '';
+  (data || []).forEach(function(ehdotus) {
+    const kortti = document.createElement('div');
+    kortti.className = 'opinto-hoitotaso-kortti';
+
+    const otsikko = document.createElement('p');
+    otsikko.className = 'opinto-hoitotaso-otsikko';
+    otsikko.textContent = (ehdotus.opinto_kurssit ? ehdotus.opinto_kurssit.name : 'Kurssi') + ' jää jälkeen';
+    kortti.appendChild(otsikko);
+
+    const perustelu = document.createElement('p');
+    perustelu.className = 'opinto-hoitotaso-perustelu';
+    perustelu.textContent = ehdotus.perustelu + ' Kevennetäänkö hoitotaso kevyeksi?';
+    kortti.appendChild(perustelu);
+
+    const napit = document.createElement('div');
+    napit.className = 'opinto-hoitotaso-napit';
+
+    const hyvaksy = document.createElement('button');
+    hyvaksy.className = 'opinto-hoitotaso-hyvaksy';
+    hyvaksy.textContent = 'Kevennä';
+    hyvaksy.addEventListener('click', async function() {
+      const { error: paivitysError } = await db.from('opinto_kurssit').update({ hoitotaso: ehdotus.ehdotettu_hoitotaso }).eq('id', ehdotus.kurssi_id);
+      if (ilmoitaKirjoitusvirheesta(paivitysError, 'Hoitotason kevennys')) return;
+      await db.from('opinto_hoitotaso_ehdotukset').update({ kasitelty: true }).eq('id', ehdotus.id);
+      naytaIlmoitus('Hoitotaso kevennetty.');
+      lataaHoitotasoEhdotukset();
+    });
+    napit.appendChild(hyvaksy);
+
+    const hylkaa = document.createElement('button');
+    hylkaa.className = 'opinto-hoitotaso-hylkaa';
+    hylkaa.textContent = 'Ei nyt';
+    hylkaa.addEventListener('click', async function() {
+      await db.from('opinto_hoitotaso_ehdotukset').update({ kasitelty: true }).eq('id', ehdotus.id);
+      lataaHoitotasoEhdotukset();
+    });
+    napit.appendChild(hylkaa);
+
+    kortti.appendChild(napit);
+    kontti.appendChild(kortti);
+  });
+}
+
 // PACER jäsentää: aihe on ylipäätään kandidaatti VAIN jos sen nykyinen vaihe
 // sallii toiminnan juuri nyt. priming/encoding ovat AINA valmiita (ei SR-
 // ajastusta, ensikertaista työtä). retrieval/yllapito vaativat että
@@ -2463,6 +2787,30 @@ function opintoKuormaBonus(vaihe, kuormaTaso) {
   if (kuormaTaso === 'raskas') return kevytTyo ? 50 : -1000;
   if (kuormaTaso === 'kevyt') return kevytTyo ? 0 : 20;
   return 0;
+}
+
+// "Boost-jatkuvuus" (Kolmiportainen kadenssi, Taso 3, VAIHE2_JA_LISAYKSET_
+// CODELLE.md 18.8.2026): eilen 'tehty'-tilaan merkitty aihe/solmu ei saa
+// automaattisesti kruunautua tämän päivän ykköseksi uudelleen — PIENI
+// SAKKO (ei poissulkeminen, ei koskaan tier1:n kova deadline-etusija, joka
+// ei edes katso pisteet-kenttää). Useimmiten tämä ei edes laukea, koska
+// 'tehty' vie PACER-vaiheen eteenpäin (etenetaOpintoKohde) ja seuraava
+// vaihe pisteytyy jo eri tavalla — sakko koskee vain tapausta jossa sama
+// rivi on silti tänäänkin kelvollinen ehdokas (esim. sama päivä useampi
+// encoding-osa, tai retrieval jonka sr_next_review sattuu olemaan tänään
+// heti eilisen jälkeen).
+function opintoEilenTehtyPaino(id, eilenTehdytIdt) {
+  return eilenTehdytIdt.has(id) ? -30 : 0;
+}
+
+// Jumi-merkintä (sung-metodi.md §8, "En pääse alkuun") tarkoittaa "yritin,
+// en päässyt eteenpäin" — EI "vältä tätä". Pieni POSITIIVINEN paino eilisen
+// jumin jälkeen pitää aiheen näkyvillä sen sijaan että pisteytys hautaisi
+// sen hiljaa — sama periaate kuin §19:n kertausjono-huomautus ("keskeneräinen
+// encoding ei ole syy lykätä"). Tulkintapäätös, ei Katrin eksplisiittisesti
+// vahvistama arvo — helppo säätää jos tuntuu väärältä käytännössä.
+function opintoJumiPaino(aiheId, eilenJumitAiheIdt) {
+  return eilenJumitAiheIdt.has(aiheId) ? 15 : 0;
 }
 
 // Taitosolmujen AND-portti (2026-08-04/05, ks. sql/092, muistiinpanot.md
@@ -2649,14 +2997,20 @@ async function laskeOpintoPaivanAskeleet(maxAskeliaYlikirjoitus, poissuljetutAih
   const kurssiIdt = Array.from(new Set(kaikkiAiheet.map(function(a) { return a.kurssi_id; })));
   const aiheIdt = kaikkiAiheet.map(function(a) { return a.id; });
 
-  const [{ data: kurssiDl }, { data: aiheDl }] = await Promise.all([
+  const eilen = opintoEilinenPvm();
+  const [{ data: kurssiDl }, { data: aiheDl }, { data: eilenAskeleet }, { data: eilenJumit }] = await Promise.all([
     db.from('opinto_deadlinet').select('kurssi_id, pvm').in('kurssi_id', kurssiIdt.length ? kurssiIdt : [-1]),
     db.from('opinto_deadlinet').select('aihe_id, pvm').in('aihe_id', aiheIdt.length ? aiheIdt : [-1]),
+    db.from('opinto_paivan_askeleet').select('aihe_id, taitosolmu_id').eq('owner_id', currentUserId).eq('pvm', eilen).eq('tila', 'tehty'),
+    db.from('opinto_jumi_merkinnat').select('aihe_id').eq('owner_id', currentUserId).gte('created_at', eilen + 'T00:00:00').lt('created_at', tanaan + 'T00:00:00'),
   ]);
   const kurssienDeadlinet = {};
   (kurssiDl || []).forEach(function(d) { if (!d.kurssi_id) return; (kurssienDeadlinet[d.kurssi_id] = kurssienDeadlinet[d.kurssi_id] || []).push(d); });
   const aiheidenDeadlinet = {};
   (aiheDl || []).forEach(function(d) { if (!d.aihe_id) return; (aiheidenDeadlinet[d.aihe_id] = aiheidenDeadlinet[d.aihe_id] || []).push(d); });
+  const eilenTehdytAiheIdt = new Set((eilenAskeleet || []).filter(function(r) { return r.aihe_id; }).map(function(r) { return r.aihe_id; }));
+  const eilenTehdytSolmuIdt = new Set((eilenAskeleet || []).filter(function(r) { return r.taitosolmu_id; }).map(function(r) { return r.taitosolmu_id; }));
+  const eilenJumitAiheIdt = new Set((eilenJumit || []).map(function(r) { return r.aihe_id; }));
 
   const kuormaTaso = await opintoPaivanKuorma();
   const maxAskelia = maxAskeliaYlikirjoitus != null ? maxAskeliaYlikirjoitus : (kuormaTaso === 'raskas' ? 1 : 2);
@@ -2698,10 +3052,14 @@ async function laskeOpintoPaivanAskeleet(maxAskeliaYlikirjoitus, poissuljetutAih
     .map(function(a) {
       const kovaPaino = opintoDeadlinePaino(a, kurssienDeadlinet, aiheidenDeadlinet, tanaan);
       const pehmeaPaino = opintoDeadlinePainoSolmu(a, tanaan);
-      return { tyyppi: 'aihe', item: a, pisteet: Math.max(kovaPaino, pehmeaPaino) + opintoKuormaBonus(a.pero_vaihe, kuormaTaso) };
+      const pisteet = Math.max(kovaPaino, pehmeaPaino) + opintoKuormaBonus(a.pero_vaihe, kuormaTaso)
+        + opintoEilenTehtyPaino(a.id, eilenTehdytAiheIdt) + opintoJumiPaino(a.id, eilenJumitAiheIdt);
+      return { tyyppi: 'aihe', item: a, pisteet: pisteet };
     });
   const solmuEhdokkaat = taitosolmuKandidaatit.map(function(s) {
-    return { tyyppi: 'taitosolmu', item: s, pisteet: (lopullisetSiltaPainot.get(s.id) || 0) + opintoKuormaBonus(s.vaihe, kuormaTaso) };
+    const pisteet = (lopullisetSiltaPainot.get(s.id) || 0) + opintoKuormaBonus(s.vaihe, kuormaTaso)
+      + opintoEilenTehtyPaino(s.id, eilenTehdytSolmuIdt);
+    return { tyyppi: 'taitosolmu', item: s, pisteet: pisteet };
   });
 
   const ehdokkaat = aiheEhdokkaat.concat(solmuEhdokkaat)
@@ -6347,7 +6705,25 @@ function piirraViikkoTuntialue(paivanAjalliset, henkselitLista, iso, paivanSessi
   return alue;
 }
 
-function piirraViikkoAikajana(sisalto, data, viikonAlkuPvm, kuormaTasot, henkselitLista, sessiot) {
+// Kolmiportainen kadenssi Taso 1:n suunnitelma viikkoruudukossa (18.8.2026,
+// Katrin pyyntö: "biweekly plan should show in calendar once done and day
+// by day it gets replaced by actual study session lengths"). Kutsuja
+// (piirraViikkoAikajana) rajaa jo pois menneet päivät JA tänään jo tehdyt
+// aiheet — tämä piirtää vain sen mitä jää jäljelle.
+function piirraViikkoSuunniteltuRivi(paivanSuunnitellut) {
+  const rivi = document.createElement('div');
+  rivi.className = 'kalenteri-viikko-suunniteltu-rivi';
+  paivanSuunnitellut.forEach(function(a) {
+    const chip = document.createElement('span');
+    chip.className = 'kalenteri-viikko-suunniteltu-chip';
+    chip.textContent = a.name;
+    chip.title = 'Suunniteltu tavoitepäivä: ' + a.name + ' (' + a.kurssiNimi + ')';
+    rivi.appendChild(chip);
+  });
+  return rivi;
+}
+
+function piirraViikkoAikajana(sisalto, data, viikonAlkuPvm, kuormaTasot, henkselitLista, sessiot, suunnitellutAiheet) {
   const aikajana = document.createElement('div');
   aikajana.className = 'kalenteri-viikko-aikajana';
 
@@ -6386,6 +6762,17 @@ function piirraViikkoAikajana(sisalto, data, viikonAlkuPvm, kuormaTasot, henksel
       lataaKalenteri();
     });
     sarake.appendChild(otsikko);
+
+    // Suunniteltu-rivi (Kolmiportainen kadenssi Taso 1, 18.8.2026) — "päivä
+    // kerrallaan korvautuu toteutuneella": jos aiheelle on jo TÄNÄÄN
+    // valmistunut oikea sessio, sitä ei enää näytetä suunniteltuna, koska
+    // se on jo totta eikä enää pelkkä tavoite. EI kellonaika-sijoitettu (ei
+    // tiedetä milloin päivästä) — kevyt tekstirivi otsikon alla, tuntiruudukko
+    // pysyy varattuna vain todelliselle datalle (ei-fake-data-periaate).
+    const paivanTehdytAiheIdt = new Set(paivanSessiot.map(function(s) { return s.aihe_id; }).filter(Boolean));
+    const paivanSuunnitellut = (suunnitellutAiheet || [])
+      .filter(function(a) { return a.tavoiteikkuna === iso && !paivanTehdytAiheIdt.has(a.id); });
+    if (paivanSuunnitellut.length > 0) sarake.appendChild(piirraViikkoSuunniteltuRivi(paivanSuunnitellut));
 
     sarake.appendChild(piirraViikkoKokopaivaRivi(paivanKaikki, iso));
     sarake.appendChild(piirraViikkoTuntialue(paivanAjalliset, henkselitLista, iso, paivanSessiot));
@@ -6830,6 +7217,7 @@ async function lataaHyttiPaanakyma() {
   lataaReittiKertausjono();
   lataaOpintoKurssit();
   lataaTaitosolmut();
+  suoritaHoitotasoDiagnoosiJosAika().then(lataaHoitotasoEhdotukset);
   paivitaSiltaOdotusIlmoitus();
   naytaOdottavatSiltaEhdotukset();
   lataaOpintoPaivanAskeleet();
@@ -8723,6 +9111,8 @@ function avaaOsio(osio) {
       document.getElementById('huoli-keski-kynnys-input').value = haeAsetusNumero('huoli_keski_kynnys', 10);
       document.getElementById('huoli-raskas-kynnys-input').value = haeAsetusNumero('huoli_raskas_kynnys', 30);
       document.getElementById('kurssi-kiireellisyys-input').value = haeAsetusNumero('kurssi_kiireellisyys_paivia', 3);
+      document.getElementById('tuntia-per-op-input').value = haeAsetusNumero('tuntia_per_op', 27);
+      document.getElementById('hoitotaso-jalkeenjaanti-input').value = haeAsetusNumero('hoitotaso_jalkeenjaanti_kynnys', 40);
       document.getElementById('silta-puskuri-input').value = haeAsetusNumero('silta_puskuri_paivia', 7);
       document.getElementById('silta-leviamissyvyys-input').value = haeAsetusNumero('silta_leviamissyvyys', 2);
       document.getElementById('sillat-auto-paivia-input').value = haeAsetusNumero('sillat_auto_paivia', 7);
@@ -12530,6 +12920,8 @@ function sidoHuoliKynnysInput(inputId, avain, oletus, nimi) {
 sidoHuoliKynnysInput('huoli-keski-kynnys-input', 'huoli_keski_kynnys', 10, 'Huolen keski-kynnys');
 sidoHuoliKynnysInput('huoli-raskas-kynnys-input', 'huoli_raskas_kynnys', 30, 'Huolen raskas-kynnys');
 sidoHuoliKynnysInput('kurssi-kiireellisyys-input', 'kurssi_kiireellisyys_paivia', 3, 'Kurssin kiireellisyysraja');
+sidoHuoliKynnysInput('tuntia-per-op-input', 'tuntia_per_op', 27, 'Tuntia per opintopiste');
+sidoHuoliKynnysInput('hoitotaso-jalkeenjaanti-input', 'hoitotaso_jalkeenjaanti_kynnys', 40, 'Hoitotason jälkeenjääntikynnys');
 sidoHuoliKynnysInput('silta-puskuri-input', 'silta_puskuri_paivia', 7, 'Sillan puskuri');
 sidoHuoliKynnysInput('silta-leviamissyvyys-input', 'silta_leviamissyvyys', 2, 'Kiireellisyyden leviämissyvyys');
 sidoHuoliKynnysInput('sillat-auto-paivia-input', 'sillat_auto_paivia', 7, 'Siltojen auto-tarkistuksen raja');
