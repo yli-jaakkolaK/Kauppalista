@@ -314,26 +314,18 @@
 
     <div class="settings-row">
       <span id="hytti-tyo-vapaa-label">Opiskelu näkyvissä</span>
-      <label class="toggle">
+      <!-- Satama-muotokieli (2026-08-17, Katrin pyyntö "väri & muotokieli
+           sataman designiin sopiva") — sama .toggle-pohja kuin muualla
+           sovelluksessa, mutta OMA luokka päällä jotta vain tämä yksi
+           kytkin saa messinki-värin (--messinki, "kaikki kosketettava"),
+           ei muuteta yleistä .toggle-komponenttia kaikkialla. -->
+      <label class="toggle toggle-messinki">
         <input type="checkbox" id="hytti-kalenteri-toggle">
         <span class="toggle-track"></span>
       </label>
     </div>
 
     <hr class="divider">
-
-    <!-- Aikaikkuna (2026-08-05, ks. muistiinpanot.md "Aikaikkuna") — "minulla
-         on N minuuttia juuri nyt", moottori etsii sen mittaisen tehtävän
-         SAMALLA pisteytyksellä (TASO 1 + deadline + kuorma) kuin Tänään-
-         osio, mutta suodatettuna kestoarviolla. Kertaluontoinen kysely, ei
-         tallennu opinto_paivan_askeleet-tauluun. -->
-    <div class="section-title">⏱ Minulla on aikaa</div>
-    <div class="opinto-ikkuna-napit">
-      <button class="opinto-ikkuna-btn" data-min="15">15 min</button>
-      <button class="opinto-ikkuna-btn" data-min="30">30 min</button>
-      <button class="opinto-ikkuna-btn" data-min="45">45 min</button>
-    </div>
-    <div id="opinto-ikkuna-tulos" style="display:none"></div>
 
     <!-- Nyt-välilehti (SATAMA_SPEKSI.md §4, uudistettu 17.8.2026) — päivän
          loki ylimpänä (kalenteri Katrin omilta tapahtumilta + suojatut
@@ -356,71 +348,10 @@
       </div>
     </div>
 
-    <!-- Huolilippu (2026-08-04, ks. muistiinpanot.md "Huolilippu") — kevyt
-         ennakoiva merkintä joka vaikuttaa Kuormavahtiin (opintoPaivanKuorma).
-         EI ristiriitapaketin väri/rakenne, oma pikkuosionsa. Kertaluontoinen
-         pikalisäys: valitse päivä + vakavuus, tallenna. -->
-    <div class="section-title">🚩 Huoli</div>
-    <div class="huoli-pikalisays">
-      <input type="date" id="huoli-pvm-input">
-      <div class="huoli-vakavuus-rivi">
-        <button class="huoli-vakavuus-btn" data-vakavuus="1">🟡</button>
-        <button class="huoli-vakavuus-btn" data-vakavuus="2">🟠</button>
-        <button class="huoli-vakavuus-btn" data-vakavuus="3">🔴</button>
-        <button class="huoli-vakavuus-btn" data-vakavuus="4">🏴</button>
-      </div>
-    </div>
-    <p class="section-empty">Merkitse päivä jolta ennakoit kuormaa (esim. sisarusriitaa) vaikka kalenteri näyttää rauhalliselta — väri ja läheisyys vaikuttavat yhdessä tämän päivän opiskelutarjontaan.</p>
-
-    <hr class="divider">
-
-    <!-- Siltasolmut (2026-08-05, ks. muistiinpanot.md "Siltasolmut") — VAIN
-         käsitteet jotka toistuvat kahdessa tai useammassa AKTIIVISESSA
-         kurssissa yhtä aikaa. Ei yksittäisen kurssin sisältöä (se on
-         opinto_kurssit/opinto_aiheet-radalla). Täyttyy AI-avusteisen
-         tunnistuksen + käyttäjän rivikohtaisen hyväksynnän kautta. -->
-    <div class="section-title">🧩 Taitosolmut <span class="opinto-kartta-linkki" id="silta-etsi-linkki"><span class="silta-ikoni" id="silta-etsi-ikoni"></span><span id="silta-etsi-teksti">Etsi sillat</span></span></div>
-    <p class="section-empty" id="silta-odottaa-ilmoitus" style="display:none"></p>
-    <ul class="list" id="taitosolmu-lista"></ul>
-    <p class="section-empty" id="taitosolmu-tyhja" style="display:none">Ei vielä taitosolmuja. Sillat löytyvät automaattisesti "Etsi sillat" -toiminnolla, kun vähintään kaksi aktiivista kurssia on täyttänyt materiaalikenttänsä.</p>
-
-    <div class="add-item">
-      <span class="prefix">›</span>
-      <input type="text" id="taitosolmu-uusi-input" placeholder="uuden taitosolmun nimi...">
-      <button id="taitosolmu-uusi-btn">+</button>
-    </div>
-
     <div id="hytti-tanaan-osio" style="display:none">
       <div class="section-title">📅 Tänään</div>
       <ul class="list" id="hytti-tanaan-list"></ul>
     </div>
-
-    <div id="hytti-tehtavat-osio">
-      <div class="section-title">✅ Tehtävät</div>
-      <ul class="list" id="hytti-tehtavat-list"></ul>
-      <p class="section-empty" id="hytti-tehtavat-tyhja" style="display:none">Ei avoimia tehtäviä.</p>
-    </div>
-
-    <div id="hytti-kortit-osio">
-      <div class="section-title">🗂 Kortit</div>
-      <ul class="list" id="hytti-kortit-list"></ul>
-    </div>
-
-    <p class="section-empty" id="hytti-tyhja" style="display:none">Yksi kortti per kurssi, projekti tai tilaisuus. Kirjoita muistiinpanot riveiksi, merkkaa toimintaa vaativat tehtäviksi — ne kokoontuvat itsestään ylös. Pidä seuraava askel pienenä ja rumana: ei "kirjoita essee" vaan "avaa tiedosto ja kirjoita yksi ruma kappale". Ideat kuuluvat Laituriin — työn alla olevat tänne.</p>
-
-    <div class="hytti-tyyppi-valinta">
-      <button class="kalenteri-tila-btn hytti-tyyppi-btn active" data-tyyppi="jatkuva">Jatkuva</button>
-      <button class="kalenteri-tila-btn hytti-tyyppi-btn" data-tyyppi="paattyva">Päättyvä</button>
-    </div>
-    <p class="hytti-tyyppi-selite">Päättyvä = valmistuu ja arkistoituu. Jatkuva = elää pitkään.</p>
-
-    <div class="add-item">
-      <span class="prefix">›</span>
-      <input type="text" id="hytti-uusi-input" placeholder="uuden kortin nimi...">
-      <button id="hytti-uusi-btn">+</button>
-    </div>
-
-    <p class="section-link" id="hytti-arkisto-linkki" style="display:none">Arkisto</p>
 
     </div> <!-- /hytti-tabi-nyt -->
 
@@ -431,6 +362,21 @@
          Muotokieli uusitaan omana erikseen tehtävänä (§4) — tässä vain
          siirretty pois "Nyt"-välilehdeltä, sisältö koskematta. -->
     <div id="hytti-tabi-reitti" style="display:none">
+      <!-- Tehtävät (2026-08-17, siirretty Nyt-välilehdeltä) — "heti kalenterin
+           alapuolelle": Reitissä ei vielä ole omaa kalenteria (§5, ei
+           rakennettu), joten tämä on ensimmäisenä sisältönä, sen paikalla
+           mihin kalenteri tulee myöhemmin. itslearning-integraatio ei ole
+           rakennettu — ainoa sisääntulo tällä hetkellä on käsin lisätty
+           kortin rivi joka on merkitty tehtäväksi (hytti_rivit.is_task).
+           Hälytysnappi (luoMuistutusNappi) on jo rivillä, ei uusi. -->
+      <div id="hytti-tehtavat-osio">
+        <div class="section-title">✅ Tehtävät</div>
+        <ul class="list" id="hytti-tehtavat-list"></ul>
+        <p class="section-empty" id="hytti-tehtavat-tyhja" style="display:none">Ei avoimia tehtäviä.</p>
+      </div>
+
+      <hr class="divider">
+
       <div class="section-title">📚 Opinnot</div>
       <ul class="list" id="opinto-kurssi-lista"></ul>
       <p class="section-empty" id="opinto-tyhja" style="display:none">Ei vielä kursseja. Lisää ensimmäinen alta.</p>
@@ -440,6 +386,67 @@
         <input type="text" id="opinto-uusi-kurssi-input" placeholder="uuden kurssin nimi...">
         <button id="opinto-uusi-kurssi-btn">+</button>
       </div>
+
+      <hr class="divider">
+
+      <!-- Sillat (2026-08-17, ent. "Taitosolmut", siirretty Nyt-välilehdeltä
+           — Katrin täsmennys: "sillä sivulla millä kurssilistaus ei
+           yksittäisen kurssin sisällä"). VAIN käsitteet jotka toistuvat
+           kahdessa+ AKTIIVISESSA kurssissa yhtä aikaa. -->
+      <div class="section-title">🌉 Sillat <span class="opinto-kartta-linkki" id="silta-etsi-linkki"><span class="silta-ikoni" id="silta-etsi-ikoni"></span><span id="silta-etsi-teksti">Etsi sillat</span></span></div>
+      <p class="section-empty" id="silta-odottaa-ilmoitus" style="display:none"></p>
+      <ul class="list" id="taitosolmu-lista"></ul>
+      <p class="section-empty" id="taitosolmu-tyhja" style="display:none">Ei vielä siltoja. Sillat löytyvät automaattisesti "Etsi sillat" -toiminnolla, kun vähintään kaksi aktiivista kurssia on täyttänyt materiaalikenttänsä.</p>
+
+      <div class="add-item">
+        <span class="prefix">›</span>
+        <input type="text" id="taitosolmu-uusi-input" placeholder="uuden sillan nimi...">
+        <button id="taitosolmu-uusi-btn">+</button>
+      </div>
+
+      <hr class="divider">
+
+      <!-- Huoli (2026-08-17, siirretty Nyt-välilehdeltä — ei vielä Loki-
+           välilehteä minne se kuuluisi lopulta, §6b, ei rakennettu). -->
+      <div class="section-title">🚩 Huoli</div>
+      <div class="huoli-pikalisays">
+        <input type="date" id="huoli-pvm-input">
+        <div class="huoli-vakavuus-rivi">
+          <button class="huoli-vakavuus-btn" data-vakavuus="1">🟡</button>
+          <button class="huoli-vakavuus-btn" data-vakavuus="2">🟠</button>
+          <button class="huoli-vakavuus-btn" data-vakavuus="3">🔴</button>
+          <button class="huoli-vakavuus-btn" data-vakavuus="4">🏴</button>
+        </div>
+      </div>
+      <p class="section-empty">Merkitse päivä jolta ennakoit kuormaa (esim. sisarusriitaa) vaikka kalenteri näyttää rauhalliselta — väri ja läheisyys vaikuttavat yhdessä tämän päivän opiskelutarjontaan.</p>
+
+      <hr class="divider">
+
+      <!-- Kortit (2026-08-17, siirretty Nyt-välilehdeltä — Katrin pyyntö:
+           "kortit osio pois", mutta hytti-kortti-view (yksittäisen kortin
+           näkymä) on tavoitettavissa VAIN täältä (rivin napautus) tai
+           Arkistosta, joten säilytetty kompaktina täällä eikä poistettu
+           kokonaan — muuten olemassa olevat kortit jäisivät pysyvästi
+           avaamattomiksi. Korvautuu kokonaan Lokilla, §6b, ei vielä. -->
+      <div id="hytti-kortit-osio">
+        <div class="section-title">🗂 Kortit</div>
+        <ul class="list" id="hytti-kortit-list"></ul>
+      </div>
+      <p class="section-empty" id="hytti-tyhja" style="display:none">Yksi kortti per kurssi, projekti tai tilaisuus. Kirjoita muistiinpanot riveiksi, merkkaa toimintaa vaativat tehtäviksi — ne kokoontuvat itsestään ylös. Pidä seuraava askel pienenä ja rumana: ei "kirjoita essee" vaan "avaa tiedosto ja kirjoita yksi ruma kappale". Ideat kuuluvat Laituriin — työn alla olevat tänne.</p>
+
+      <div class="hytti-tyyppi-valinta">
+        <button class="kalenteri-tila-btn hytti-tyyppi-btn active" data-tyyppi="jatkuva">Jatkuva</button>
+        <button class="kalenteri-tila-btn hytti-tyyppi-btn" data-tyyppi="paattyva">Päättyvä</button>
+      </div>
+      <p class="hytti-tyyppi-selite">Päättyvä = valmistuu ja arkistoituu. Jatkuva = elää pitkään.</p>
+
+      <div class="add-item">
+        <span class="prefix">›</span>
+        <input type="text" id="hytti-uusi-input" placeholder="uuden kortin nimi...">
+        <button id="hytti-uusi-btn">+</button>
+      </div>
+
+      <p class="section-link" id="hytti-arkisto-linkki" style="display:none">Arkisto</p>
     </div>
 
     <!-- Kokonaiskartta ("näkymä 2") — LUETTAVA vilkaisu, EI ohjaava. Oli oma

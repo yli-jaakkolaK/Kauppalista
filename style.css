@@ -892,6 +892,14 @@ h1 {
   transform: translateX(20px);
 }
 
+/* Hytin "Opiskelu näkyvissä" -kytkin (2026-08-17, Katrin pyyntö: "väri &
+   muotokieli sataman designiin sopiva") — sama .toggle-pohja, mutta
+   messinki ("kaikki kosketettava") iOS-vihreän sijaan. Skoopattu tähän
+   yhteen kytkimeen, ei muuteta yleistä .toggle-komponenttia. */
+.toggle.toggle-messinki input:checked + .toggle-track {
+  background: var(--messinki);
+}
+
 #home-list li {
   cursor: pointer;
 }
@@ -3197,55 +3205,6 @@ h1 {
   color: var(--accent-text);
   text-transform: uppercase;
   letter-spacing: 0.05em;
-}
-
-/* Aikaikkuna (2026-08-05, ks. muistiinpanot.md "Aikaikkuna") — "minulla on
-   N minuuttia" -pikanapit + tuloskortti, sama korostusrunko kuin Tänään-
-   kortilla mutta erottuva reuna ettei sekoitu siihen. */
-.opinto-ikkuna-napit {
-  display: flex;
-  gap: 8px;
-  margin: 8px 0;
-}
-.opinto-ikkuna-btn {
-  flex: 1;
-  font-family: 'Courier New', Courier, monospace;
-  font-size: 13px;
-  font-weight: bold;
-  padding: 10px 4px;
-  background: var(--ground);
-  border: 1px solid var(--border-dash);
-  border-radius: 6px;
-  color: var(--text);
-  cursor: pointer;
-}
-.opinto-ikkuna-btn:active {
-  border-color: var(--accent);
-  color: var(--accent-text);
-}
-.opinto-ikkuna-kortti {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  padding: 10px 12px;
-  margin-bottom: 8px;
-  border: 1px dashed var(--accent);
-  border-radius: 6px;
-}
-.opinto-ikkuna-ohje {
-  font-size: 13px;
-  color: var(--text);
-  margin: 0;
-}
-.opinto-ikkuna-prompti {
-  font-family: 'Courier New', Courier, monospace;
-  font-size: 12px;
-  color: var(--text);
-  background: var(--ground);
-  border: 1px solid var(--border-dash);
-  border-radius: 4px;
-  padding: 6px 8px;
-  resize: vertical;
 }
 
 .hytti-tyyppi-selite {

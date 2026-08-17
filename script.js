@@ -102,7 +102,10 @@ function vaihdaHyttiValilehti(id) {
   document.getElementById('hytti-tabi-nyt').style.display = id === 'nyt' ? 'block' : 'none';
   document.getElementById('hytti-tabi-reitti').style.display = id === 'reitti' ? 'block' : 'none';
   document.getElementById('hytti-tabi-kartta').style.display = id === 'kartta' ? 'block' : 'none';
-  if (id === 'reitti') lataaOpintoKurssit();
+  // Tehtävät/Sillat/Huoli/Kortit siirtyivät Nyt-välilehdeltä Reittiin
+  // (2026-08-17) — lataaHyttiPaanakyma() lataa kaikki neljä (plus kurssit
+  // uudelleen, harmiton päällekkäisyys lataaOpintoKurssit():n kanssa).
+  if (id === 'reitti') lataaHyttiPaanakyma();
   if (id === 'kartta') lataaOpintoKartta();
 }
 
@@ -2102,23 +2105,6 @@ function haeOpintoKestoMinuutteina(vaihe) {
   return haeAsetusNumero(OPINTO_KESTO_ASETUS_AVAIN[vaihe], OPINTO_KESTO_OLETUS[vaihe]);
 }
 
-// Valmis, suoraan kopioitava Copilot/AI-prompti (2026-08-05, Katrin
-// täsmennys: EI älykutsua täällä — pelkkää merkkijonojen yhdistelyä
-// olemassa olevasta datasta, käyttäjä vie tekstin itse haluamaansa AI-
-// työkaluun). Nimi + vaihe riittävät, ei vaadi materiaalia/kuvausta.
-const OPINTO_PROMPTI_VAIHEELLE = {
-  priming: function(nimi) { return 'Anna minulle 5 kysymystä joita voisin miettiä ennen aiheen "' + nimi + '" opiskelua (priming-vaihe, en ole vielä lukenut mitään). Kysymykset numeroituina.'; },
-  encoding: function(nimi) { return 'Selitä miten aiheen "' + nimi + '" osat liittyvät toisiinsa ja aiemmin opittuun, käsitekarttamaisesti jäsenneltynä (encoding-vaihe) — keskity YHTEYKSIIN, ei irrallisiin faktoihin. Max 10 minuutin lukuinen selitys.'; },
-  retrieval: function(nimi) { return 'Luo 3 harjoitustehtävää aiheesta "' + nimi + '", retrieval-tasolle sopivina (ei katso materiaalia, palauta muistista). Anna tehtävät numeroituina, kukin alle 5 minuuttia.'; },
-  reference: function(nimi) { return 'Kokoa lyhyt, tarkka faktalista/kaavakokoelma aiheesta "' + nimi + '" viitteeksi (reference-vaihe) — ei selityksiä, vain tarkat faktat.'; },
-  yllapito: function(nimi) { return 'Anna minulle 3 nopeaa kertauskysymystä aiheesta "' + nimi + '" jotka testaavat onko jotain päässyt unohtumaan (ylläpitovaihe). Kysymykset numeroituina.'; },
-  overlearning: function(nimi) { return 'Anna minulle yksi selvästi vaatimustasoa vaikeampi syventävä tehtävä tai kysymys aiheesta "' + nimi + '" (overlearning-vaihe, vapaaehtoinen syvennys).'; },
-};
-function rakennaOpintoPrompti(nimi, vaihe) {
-  const rakentaja = OPINTO_PROMPTI_VAIHEELLE[vaihe] || OPINTO_PROMPTI_VAIHEELLE.encoding;
-  return rakentaja(nimi);
-}
-
 function opintoTanaanPvm() {
   return paivamaaraISO(new Date());
 }
@@ -2593,105 +2579,15 @@ function naytaOpintoOhje(vaihe, kohde) {
   naytaVahvistus('🎯 ' + OPINTO_VAIHE_NIMET[vaihe], teksti, 'Selvä');
 }
 
-// === AIKAIKKUNA (2026-08-05, ks. muistiinpanot.md "Aikaikkuna") ===
-// "Minulla on N minuuttia" — kertaluontoinen kysely SAMALLA moottorilla
-// (TASO 1 + deadline + kuorma) kuin Tänään-osio, suodatettuna kestoarviolla.
-// EI tallennu opinto_paivan_askeleet-tauluun (ei ole "tänään-askel", vain
-// vilkaisu) — jos käyttäjä haluaa oikeasti tehdä sen, hän avaa kohteen
-// normaalisti ja käyttää ▶ Aloita -session-lokia siellä.
+// "Minulla on N minuuttia" -moottori (2026-08-05) — UI (§4:n vanha "Minulla
+// on aikaa" -osio) POISTETTU Nyt-välilehdeltä 2026-08-17, Boost (§4.8)
+// korvaa saman tarpeen paremmalla muotokielellä. Itse hakufunktio säilyy —
+// Boost (suoritaNytBoost) käyttää sitä edelleen samalla moottorilla
+// (TASO 1 + deadline + kuorma). EI tallennu opinto_paivan_askeleet-tauluun.
 async function etsiIkkunaanSopivaAskel(ikkunaMin) {
   const tulokset = await laskeOpintoPaivanAskeleet(1, null, null, ikkunaMin);
   return tulokset.length > 0 ? tulokset[0] : null;
 }
-
-async function kopioiLeikepoydalle(teksti, nappi) {
-  try {
-    await navigator.clipboard.writeText(teksti);
-    const alkuperainen = nappi.textContent;
-    nappi.textContent = 'Kopioitu ✓';
-    setTimeout(function() { nappi.textContent = alkuperainen; }, 1500);
-  } catch (e) {
-    naytaIlmoitus('Kopiointi ei onnistunut — valitse teksti käsin');
-  }
-}
-
-function piirraOpintoIkkunaTulos(ehdokas, ikkunaMin) {
-  const kontti = document.getElementById('opinto-ikkuna-tulos');
-  kontti.innerHTML = '';
-  kontti.style.display = 'block';
-
-  if (!ehdokas) {
-    const tyhja = document.createElement('p');
-    tyhja.className = 'section-empty';
-    tyhja.textContent = 'Ei ' + ikkunaMin + ' minuuttiin mahtuvaa tehtävää juuri nyt.';
-    kontti.appendChild(tyhja);
-    return;
-  }
-
-  const kohde = ehdokas.item;
-  const alaotsikko = ehdokas.tyyppi === 'aihe'
-    ? (kohde.opinto_kurssit ? kohde.opinto_kurssit.name : '')
-    : (kohde.lahde || '');
-
-  const kortti = document.createElement('div');
-  kortti.className = 'opinto-ikkuna-kortti';
-
-  const otsikko = document.createElement('div');
-  otsikko.className = 'opinto-tanaan-otsikko';
-  otsikko.textContent = kohde.name + (alaotsikko ? ' · ' + alaotsikko : '');
-  kortti.appendChild(otsikko);
-
-  const kohdeVaiheArvo = kohdeVaihe(kohde);
-  const meta = document.createElement('div');
-  meta.className = 'opinto-tanaan-vaihe';
-  meta.textContent = OPINTO_VAIHE_NIMET[kohdeVaiheArvo] + ' · noin ' + haeOpintoKestoMinuutteina(kohdeVaiheArvo) + ' min';
-  kortti.appendChild(meta);
-
-  const ohje = document.createElement('p');
-  ohje.className = 'opinto-ikkuna-ohje';
-  ohje.textContent = OPINTO_VAIHE_OHJE[kohdeVaiheArvo];
-  kortti.appendChild(ohje);
-
-  const promptiTeksti = rakennaOpintoPrompti(kohde.name, kohdeVaiheArvo);
-  const promptiLaatikko = document.createElement('textarea');
-  promptiLaatikko.className = 'opinto-ikkuna-prompti';
-  promptiLaatikko.readOnly = true;
-  promptiLaatikko.rows = 3;
-  promptiLaatikko.value = promptiTeksti;
-  kortti.appendChild(promptiLaatikko);
-
-  const kopioiNappi = document.createElement('button');
-  kopioiNappi.className = 'dialog-btn dialog-btn-cancel';
-  kopioiNappi.textContent = '📋 Kopioi Copilot-prompti';
-  kopioiNappi.addEventListener('click', function() { kopioiLeikepoydalle(promptiTeksti, kopioiNappi); });
-  kortti.appendChild(kopioiNappi);
-
-  kontti.appendChild(kortti);
-}
-
-document.querySelectorAll('.opinto-ikkuna-btn').forEach(function(btn) {
-  btn.addEventListener('click', async function() {
-    const ikkunaMin = Number(btn.dataset.min);
-    const alkuperainen = btn.textContent;
-    btn.textContent = '...';
-    // BUGIKORJAUS (2026-08-06, Katrin löytö "15 min jäi jumittamaan ruudulle"):
-    // jos etsiIkkunaanSopivaAskel() heittää poikkeuksen (verkko/DB-virhe),
-    // btn.textContent ei koskaan palautunut — nappi jäi pysyvästi "..."-
-    // tilaan eikä toinen napautus (esim. 30 min) enää tehnyt mitään koska
-    // sama koodipolku olisi kaatunut uudestaan. try/finally takaa että nappi
-    // palautuu AINA, virhe myös näkyy käyttäjälle sen sijaan että katoaisi
-    // hiljaa konsoliin.
-    try {
-      const ehdokas = await etsiIkkunaanSopivaAskel(ikkunaMin);
-      piirraOpintoIkkunaTulos(ehdokas, ikkunaMin);
-    } catch (e) {
-      console.error('Aikaikkunan haku epäonnistui:', e);
-      naytaIlmoitus('Ehdotuksen haku epäonnistui — yritä uudelleen');
-    } finally {
-      btn.textContent = alkuperainen;
-    }
-  });
-});
 
 // === SESSION-LOKI (2026-08-05, ks. sql/099, muistiinpanot.md "Session-
 // loki") === todellinen aktiivinen työaika, ▶ Aloita/⏸ Lopeta -pari. EI

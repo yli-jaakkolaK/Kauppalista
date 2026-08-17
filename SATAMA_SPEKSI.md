@@ -244,6 +244,8 @@ Nyt-kortista/lokista avautuva näkymä yhdelle tehtävälle. **Sisältö ylhää
 
 **Vaiheensiirtymän kehote näkyy kun solmu avataan**, ei istunnon lopussa (jo linjassa §7.4:n kanssa).
 
+**Laajennus 17.8.2026 — kehote tulee tietoiseksi kaikista käynnissä olevista kursseista.** Katrin vaatimus: yksittäinen solmu ei saa jumittaa 2 kuukautta kun muut kurssit etenevät — kehotteen pitää huomioida kaikki aktiiviset kurssit, ei vain sitä yhtä jota ollaan avaamassa. **Ei tarvita uutta rinnakkaista mekanismia:** `opinto_aiheet.tavoiteikkuna` (jo olemassa, jo seedattu esim. Algebra 2:lle, sql/100) on jo se yhteinen valuutta jolla eri kurssien aiheiden kiireellisyyttä voi verrata suoraan — päivämäärä on päivämäärä riippumatta kurssista. Kehotteen/jonon priorisointi laajenee lukemaan KAIKKIEN aktiivisten kurssien `tavoiteikkuna`-kenttiä yhdessä (ei kurssikohtaisena siilona), samalla painotuslogiikalla kuin §7.3:n painoarvot muutenkin — ei erillistä uutta laskentaa, sama mekanismi laajennettuna kurssirajan yli. **Tämä ratkaisee myös "muutama viikko etuajassa ennen luentoa" -toiveen:** koska `tavoiteikkuna` on jo asetettu ennakoivasti (ei luennon päivälle vaan sitä ennen), sen noudattaminen automaattisesti pitää opiskelun luentoja edellä — ei tarvita erillistä lukkarikone-teema-täsmäystä.
+
 ---
 
 ## 5. Reitti-välilehti
@@ -283,7 +285,7 @@ Päivät ovat **pystysarakkeita**, kussakin näkyy päivän mahdollinen kuorma.
 
 **Täydennykset 17.8.2026 (Katrin kuvaus koko Reitin rakenteesta):**
 
-> **RISTIRIITA yllä olevan kanssa, ei ratkaistu:** tämä kappale sanoo "päivät ovat pystysarakkeita." Katri kuvasi juuri Reitin yläosaksi **vaakaan menevän viikkokalenterin**. Nämä ovat eri asetteluja — kumpi on voimassa, tarvitaan päätös ennen rakentamista.
+> **Ei ristiriita, korjattu 17.8.2026 — oma virhe merkitä tämä ristiriidaksi.** "Päivät ovat pystysarakkeita" ja Katrin kuvaus ovat sama asetus: standardi iCal-viikkoruudukko. **7 päivää vierekkäin (vaakaan) yli viikon**, kukin päivä omana **pystysuuntaisena sarakkeena** jossa tunnit juoksevat ylhäältä alas, aamu ylimpänä. Koko viikko kerralla näkyvissä: luennot, opiskelusuunnitelma, hammaslääkäriajat ym. samassa ruudukossa, realistinen siirtymäaika paikasta toiseen mukaan laskettuna (Föli, §8.1). Tiedot suoraan lukkarikoneesta (luennot) — jo linjassa §5.1:n kanssa.
 
 Katrin kuvaus ylhäältä alas:
 
@@ -709,11 +711,13 @@ Perustelu: generaattorin tehtävää oikeasti painetaan, luentoa ei. Muotokielen
 
 **Omaa kanvaasia ei rakenneta.**
 
-- **Yksi taulu**, jonne rakennetaan **joka kurssille oma framework**
-- Kurssin eri solmuista rakennetaan **yhtä isoa käsitekarttaa koko kurssista**
-- **Kukin solmu avautuu siitä kohdasta jota on tarkoitus työstää**
-- Jokainen retrieval-kierros saa **oman tyhjän Framen** (sung-metodi §6d)
-- Muokkausloki toimii ajanoton varmistuksena (§4.3)
+**Kaksi taulua, päätetty 17.8.2026 (korvaa aiemman "yksi taulu kaikelle" -mallin):**
+
+- **Board A — Encoding + Overlearning.** Kaikki kurssit samalla taululla, kukin kurssi omana frameworkina/Framena. Kurssin eri solmuista rakennetaan yhtä isoa käsitekarttaa koko kurssista. Kukin solmu avautuu siitä kohdasta jota on tarkoitus työstää. Overlearning täydentää SAMAA kurssin Framea laajemmalla näkökulmalla (ei erillistä kohdetta, jo linjassa aiemman overlearning-päätöksen kanssa).
+- **Board B — Retrieval.** Kaikki kurssit samalla, mutta ERI taululla kuin encoding. Jokainen retrieval-kierros saa oman tyhjän Framen (sung-metodi §6d), nimeämiskäytäntö `{kurssi} · {solmu} · kierros {n}` jotta kierrokset pysyvät löydettävissä hakemalla kun niitä kertyy paljon (ei erillistä visuaalista ryhmittelyä tarvita boardin sisällä, nimeäminen riittää).
+- **Korjaus 17.8.2026 — Helmi EI ole Miro-board.** Aiempi "helmiboard on oma erillinen taulunsa" -kirjaus luki harhaanjohtavasti "taulu" kirjaimellisena Miro-boardina. Helmi toimii kokonaan Satamassa, käyttää samaa hiljattain päivitettyä jaettua editoria (§16.2/§6.3) kuin muukin teksti — ei Miro-upotusta, ei omaa boardia. Myöhemmin (ei nyt) tulee kerros joka yhdistää helmiä muihin teemoihin/helmiin — sekin rakennetaan Sataman omana rakenteena, ei Miron kautta, ellei erikseen toisin päätetä silloin.
+- **Miron ilmaistasolla on siis 3 boardia käytettävissä, tässä käytössä vain 2 (A, B).** Kolmas jätetään TIETOISESTI varaan — ei täytetä millään nyt, jos myöhemmin ilmenee hyvä käyttötarkoitus.
+- Muokkausloki toimii ajanoton varmistuksena (§4.3), luetaan kummastakin taulusta tarpeen mukaan.
 
 **Muokkaus tapahtuu Satamassa**, ei ulkoisessa Mirossa katselukuvana.
 
@@ -725,13 +729,13 @@ Perustelu: generaattorin tehtävää oikeasti painetaan, luentoa ei. Muotokielen
 
 - **Retrieval-kanvaasi: oma Frame per kierros.** Hytistä nappi → Miro sen solmun recall-Frameen → tallennus näkyy Hytissä. Jokainen kierros alkaa **täysin tyhjältä** — tyhjyys on free recallin pointti. Vanhoja ei poisteta: kierros 1 ja kierros 3 voi asettaa vierekkäin ja nähdä mitä on kertynyt.
 
-  **Vastaus Katrin 17.8. kysymykseen ("pitääkö rakentaa oma editori"):** ei tarvitse. Tämä Frame-per-kierros-malli ratkaisee juuri sen ongelman jota hän epäili — ei tarvitse manuaalisesti tyhjentää yhteistä taulua joka kierroksella, koska jokainen kierros SAA oman uuden Framen automaattisesti. Ei oma Satama-editori, ei toinen erillinen Miro-taulu jota pitäisi tyhjentää käsin — sama Miro-upotus, vain uusi Frame per kierros samalla kurssin taululla.
+  **Vastaus Katrin 17.8. kysymykseen ("pitääkö rakentaa oma editori"):** ei tarvitse. Tämä Frame-per-kierros-malli ratkaisee juuri sen ongelman jota hän epäili — ei tarvitse manuaalisesti tyhjentää yhteistä taulua joka kierroksella, koska jokainen kierros SAA oman uuden Framen automaattisesti. Ei oma Satama-editori — sama Miro-upotus, vain uusi Frame per kierros. (Tarkennus: taulu tässä on Board B, retrieval-taulu — ks. kaksi-taulu-päätös yllä.)
 - **Yksityisyys ratkeaa olemassa olevalla rakenteella.** Kohdevalinta ohjaa suoraan omaan hyttiin eikä toisen hyttiin ole näkymää — recall-kartta ei kulje jaetun näkymän kautta missään vaiheessa.
 - **Sisällöllisen vertailun raja:** Miron API palauttaa tekstilaatikoiden sisällön, joten äly näkee mitkä käsitteet muistettiin ja voi verrata materiaaliin. Se **ei näe piirroksia eikä symboleja**. Käytännössä riittää: kattavuus on se mitä siirtymäpäätökseen tarvitaan, ja rakenteen laadun käyttäjä täppää itse.
 
   **Tarkennus 17.8.2026 (Katrin havainto, tarkistettu Miron dokumentaatiosta):** yllä oleva "ei näe kartan rakennetta" on tarpeettoman varovainen. REST API v2:n jokainen item sisältää `position` (x/y) ja `geometry` (leveys/korkeus/kierto), ja connectorit palautetaan `startItem`/`endItem`-viittauksin — jos käyttäjä piirtää yhteysviivan kahden käsitteen välille, se on luettavissa API:sta, ei vain irrallinen tekstisisältö. Sijaintiklusterointi + connector-data antaisivat todellisen rakennesignaalin pelkän tekstivastaavuuden lisäksi. **Ei vielä hyödynnetty päätöksenteossa** — vaatisi oman harkinnan kuinka paljon tälle antaa painoa vs. käyttäjän oma täppäys. **Tunnettu varaus:** Miron yhteisöfoorumilla raportoitu bugi, jossa "card"-tyyppiset itemit eivät palauta position/geometry-tietoa REST API:n kautta — testattava oikealla item-tyypillä (teksti/sticky note vs. card) ennen kuin tähän nojataan.
 
-**Lisäys (relay 16.8.):** yksi jättiboard + Frame per kurssi on kurssidatalle; **helmiboard on oma erillinen taulunsa**, ei sekoiteta kurssien Frameihin. **Arkistointi on aikapohjaista** (§16.3:n "poistoa ei mietitä ennen kuin pari vuotta kurssin päättymisestä" -periaate koskee Miro-tauluja samoin) — ei ajankohtaista ennen kuin ensimmäinen kurssi on ollut valmis ~2 vuotta.
+**Lisäys (relay 16.8., päivitetty 17.8.):** kurssidatalle Board A + Board B (ks. kaksi-taulu-päätös yllä, korvaa alkuperäisen "yksi jättiboard" -kuvauksen). Helmi EI ole Miro-board (ks. korjaus yllä) — kolmas ilmaistason board pysyy tarkoituksella käyttämättömänä. **Arkistointi on aikapohjaista** (§16.3:n "poistoa ei mietitä ennen kuin pari vuotta kurssin päättymisestä" -periaate koskee Miro-tauluja samoin) — ei ajankohtaista ennen kuin ensimmäinen kurssi on ollut valmis ~2 vuotta.
 
 ### 10.2 Korjattavat viat
 
