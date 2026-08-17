@@ -3904,9 +3904,23 @@ sw.js v137 → v140.
 
 ---
 
+### Materiaalin lisäys korjattu: näkyvä tallennusnappi + monessa osassa liittäminen (2026-08-17)
+
+Katrin bugiraportti heti A5:n jälkeen: yritti lisätä kurssille tekstimuotoista materiaalia, mutta editorissa oli VAIN "📎 Liitä tiedosto" -nappi näkyvissä — tekstin liittämiselle ei näkynyt mitään tallennus-toimintoa (vaikka editorin sulkeminen ‹-nuolella oli jo aiemminkin tallentanut sisällön, se ei vain näyttänyt siltä mitenkään). Toinen, isompi puute: ei ollut järkevää tapaa liittää pitkää materiaalia monessa osassa ("kurssissa on 10 osaa, ei aina ehdi koko rimpsua kerralla") niin että tietää mistä jatkaa, ja äly saisi silti nähdä KAIKKI osat yhtenä kokonaisuutena solmuja ehdottaessaan — ei alkaisi tehdä ehdotuksia yhden osan perusteella.
+
+**1) Uusi "💾 Tallenna, lisää seuraava osa" -nappi** editorissa (näkyy vain kurssikontekstissa): tallentaa nykyisen tekstin omana `laituri`-rivinään, tyhjentää kentän, pitää editorin auki seuraavaa osaa varten. Editorin tallennuslogiikka eriytettiin jaetuksi `suoritaEditorinTallennus()`-funktioksi (laukaisusanan tunnistus + insert) jota sekä vanha sulje-nappi että uusi jatka-nappi käyttävät — ei kahta rinnakkaista tallennuspolkua. Sulje-nappi palaa nyt KURSSISIVULLE (haetaan tuore kurssirivi ennen paluuta) eikä enää geneeriseen Laituri-näkymään, jotta kasvava materiaalilista näkyy heti eikä tunnu siltä ettei osat kertyneet.
+
+**2) Älyn solmujako yleistetty rivijoukolle, ei enää yhdelle riville.** `pyydaMateriaaliJasennys`/`avaaMateriaaliJasennysDialogi`/`tallennaMateriaaliJasennys` (script.js) ottivat aiemmin AINA yhden `laituri`-rivin — jos kurssi oli liitetty 10 osassa, jokainen osa olisi pitänyt jäsentää ERIKSEEN omalla "Tarkista"-painalluksellaan, ja äly olisi nähnyt vain sen yhden osan kerrallaan. Kaikki kolme funktiota ottavat nyt rivijoukon (yhden rivin tapaus on vain taulukko jossa yksi alkio — Laiturin yleinen heuristiikka-triage, joka ei koske kursseja, pysyy ennallaan `[rivi]`-kutsuna). Kurssisivun materiaalilistalta poistettiin rivikohtainen "Tarkista"-nappi, tilalle yksi "🧩 Tarkista kaikki odottavat (N osaa)" -nappi joka yhdistää KAIKKI käsittelemättömät (⏳ odottaa) rivit vanhimmasta uusimpaan ("--- osa N ---" -väliotsikoin), lähettää ne yhtenä promptina, ja merkitsee ne kaikki `materiaali_kasitelty`:ksi kerralla hyväksynnän jälkeen. Prompti (`rakennaMateriaaliJasennysPrompti`) sai uuden ohjeen: jos materiaalissa on selkeä olemassa oleva otsikkojako, noudata sitä; muuten pilko järkeviksi kokonaisuuksiksi ikään kuin otsikoita ei olisi — sama sanamuoto jonka Katri itse ehdotti.
+
+**Ei vielä testattu oikealla laitteella.**
+
+sw.js v140 → v141.
+
+---
+
 ## Nykytila (päivitetty 2026-08-17, COPILOT.md-sääntö 4 — huom: aiempi "Nykytila ja seuraavat askeleet" -osio jäi tästä tiedostosta ylemmäs pitkän istunnon aikana kertyneiden uusien osioiden taakse, ei enää tiedoston lopussa; siirto omaksi erikseen tehtäväksi työksi, ei nyt)
 
-**Viimeksi tehty tässä istunnossa, kaikki commitoitu ja pushattu mainiin, `sw.js` nyt v140:** Laituri-uudistuksen (§16.5c) jälkeen: Teema/Vahdittu-näkyvyystoggeli + listan siirtonappi, kuormitustila-kytkimen sijoitus ruudun kulmaan, opiskelumoottorin OSA A -minimipolku (ohjematriisi, kurssin tavoite/hoitotaso/aikataulu, solmun tuntemus/perustussolmu/retrieval-kentät, A4 Tehtävänäkymä) + sung-metodi.md:n täysi korvaus + korjaukset, B1:n jumi-kesto, ja isoin: **A5 — koko Nyt-välilehti uudistettu** (§4:n minuuttiruudukko-aikataulutin, Boost, deadline-rivi, muut vaihtoehdot, Miro-koukku).
+**Viimeksi tehty tässä istunnossa, kaikki commitoitu ja pushattu mainiin, `sw.js` nyt v141:** Laituri-uudistuksen (§16.5c) jälkeen: Teema/Vahdittu-näkyvyystoggeli + listan siirtonappi, kuormitustila-kytkimen sijoitus ruudun kulmaan, opiskelumoottorin OSA A -minimipolku (ohjematriisi, kurssin tavoite/hoitotaso/aikataulu, solmun tuntemus/perustussolmu/retrieval-kentät, A4 Tehtävänäkymä) + sung-metodi.md:n täysi korvaus + korjaukset, B1:n jumi-kesto, **A5 — koko Nyt-välilehti uudistettu** (§4:n minuuttiruudukko-aikataulutin, Boost, deadline-rivi, muut vaihtoehdot, Miro-koukku), ja materiaalin lisäyksen korjaus (näkyvä tallennusnappi, monessa osassa liittäminen + älyn yhdistetty solmujako).
 
 **Migraatiot ajettu suoraan Supabaseen MCP:llä koko istunnon ajan** (117–128), ei jätetty ajamatta.
 
