@@ -969,7 +969,7 @@ document.getElementById('teema-poista-btn').addEventListener('click', async func
 // "Vahdittu lepo Varastossa") ===
 // "Anna arjen yrittää ensin" — muuten tavallinen tuotteet-lista (samat
 // rivit/täppäys kuin Muistilaput/Varasto), mutta kuittaamaton rivi nousee
-// ankkuriehdokkaaksi X päivän jälkeen (ks. api/muistutukset-laheta.js:n
+// ankkuriehdokkaaksi X päivän jälkeen (ks. api/_lib/muistutukset-laheta.js:n
 // uusi tarkistus). Tämä näkymä on VAIN sisällönhallinta + raja-asetus —
 // itse nosto tapahtuu palvelimella cronissa, ei täällä.
 function showVahdittuView() {
@@ -3253,7 +3253,7 @@ function rakennaSiltaPrompti(kurssit, aiheet) {
 // Per-kurssi-seuranta (2026-08-16, ks. sql/120, Katrin täsmennys): EI
 // toistuva viikkokello vaan "kerran per kurssin lisäys" -eskalaatio. Jokainen
 // ONNISTUNUT haku (käsin Nyt-välilehdeltä, kurssisivulta, tai palvelimen
-// auto-eskalaatio api/aly-nightly.js:ssä) kattaa AINA kaikki aktiiviset
+// auto-eskalaatio api/_lib/aly-nightly.js:ssä) kattaa AINA kaikki aktiiviset
 // kurssit yhtä aikaa — merkitään siis KAIKKI aktiiviset silta_katsottu_at:iin,
 // ei vain kutsujan omaa kurssia.
 async function merkitseSillatTarkistetuiksi() {
@@ -3272,7 +3272,7 @@ function piilotaSiltaOdotusIlmoitus() {
 // always as new course is added... other times should be just reminders, no
 // AI needed". Näytetään aina kun jokin aktiivinen kurssi ei ole vielä ollut
 // mukana yhdessäkään siltahaussa, riippumatta 7 päivän eskalaatiorajasta
-// (se koskee VAIN palvelimen automaattista AI-kutsua, ks. api/aly-nightly.js).
+// (se koskee VAIN palvelimen automaattista AI-kutsua, ks. api/_lib/aly-nightly.js).
 async function paivitaSiltaOdotusIlmoitus() {
   const el = document.getElementById('silta-odottaa-ilmoitus');
   if (!el) return;
@@ -3381,7 +3381,7 @@ async function etsiSiltojaKurssille(kurssi) {
   naytaSiltaEhdotukset(taman_kurssin, tulos.aiheKartta, tulos.kurssiKartta);
 }
 
-// Palvelimen auto-eskalaation (api/aly-nightly.js, ks. sql/119) tallentamat
+// Palvelimen auto-eskalaation (api/_lib/aly-nightly.js, ks. sql/119) tallentamat
 // ehdotukset — "äly ehdottaa, ihminen kuittaa" koskee myös automaattisesti
 // generoituja: SAMA esikatseludialogi, ei mitään kirjoiteta ennen tätä.
 // Voi olla useampi odottava rivi jos usea kurssi eskaloitui eri päivinä
@@ -5291,7 +5291,7 @@ function piirraKalenteriRivi(rivi) {
   // nimelle samalla periaatteella kuin Muistilaput/Kauppalista.
   // Synkatulla rivillä (ical_uid asetettu) EI näytetä poistoa lainkaan:
   // "yksi totuus, kaksi ikkunaa" -periaatteen mukaan poisto kuuluu tehdä
-  // iPhonen Kalenterissa, ja peilisääntö (siivoaPoistetut, api/caldav-sync.js)
+  // iPhonen Kalenterissa, ja peilisääntö (siivoaPoistetut, api/_lib/caldav-sync.js)
   // poistaa rivin täältä automaattisesti seuraavassa synkassa. Ilman tätä
   // rajausta poisto näytti poistavan tapahtuman "kokonaan", vaikka se vain
   // katosi Satamasta hetkeksi ja synkka olisi tuonut sen takaisin.
@@ -6009,7 +6009,7 @@ async function synkkaaICloud() {
   try {
     const { data: sessioData } = await db.auth.getSession();
     const token = sessioData.session ? sessioData.session.access_token : null;
-    const vastaus = await fetch('/api/caldav-sync', { headers: { Authorization: 'Bearer ' + token } });
+    const vastaus = await fetch('/api/cron?task=caldav', { headers: { Authorization: 'Bearer ' + token } });
     if (!vastaus.ok) {
       console.error('Kalenterin taustasynkka epäonnistui:', vastaus.status);
       return;
@@ -7646,7 +7646,7 @@ async function lataaAnkkurit() {
 // BUGIKORJAUS (2026-07-17, Bugi 27, ks. sql/063 ja design-periaate
 // "Suhteellinen aika jäädytetään kirjoitushetkeen" muistiinpanot.md:ssä):
 // käyttäjän oma hylkäys (× ehdokaskortilla, "Kumoa" Äly-lokista) ON vastaus
-// siinä missä yöajon hiljainen raukeaminenkin (ks. api/aly-nightly.js) —
+// siinä missä yöajon hiljainen raukeaminenkin (ks. api/_lib/aly-nightly.js) —
 // ilman tätä merkintää lähdemuru jäisi arvioitavaksi seuraavana yönä, ja
 // koska jäädytetty "huomenna"-hetki saattaa olla vielä sama kalenteripäivä
 // hylkäyshetkellä, se saattoi nousta ankkuriehdokkaaksi uudelleen vielä
@@ -7712,7 +7712,7 @@ function kalenterisiltaUrl(candidate) {
 // COPILOT.md "Koodikieli"). Three reactions: tick done (reuses the anchor
 // row's own semantics), take as mine (promotes it to a real anchor,
 // is_candidate -> false), or dismiss (deletes it — the underlying Laituri
-// note is NEVER touched, ks. safety invariant in api/aly-nightly.js).
+// note is NEVER touched, ks. safety invariant in api/_lib/aly-nightly.js).
 async function loadAnchorCandidates() {
   if (raahattavaRivi) return;
   // source ei enää rajata 'aly':ksi — is_candidate=true kattaa nyt kaksi
@@ -8018,7 +8018,7 @@ async function loadAnchorCandidates() {
 
     // Kalenterisilta (2026-07-18, ks. muistiinpanot.md) — vain ✨-koneehdokkaille
     // joilla on SEKÄ päivä ETTÄ kellonaika (= "selkeä ajanvaraus", sama
-    // tunnistus joka jo luo tämän ehdokkaan, ks. api/aly-nightly.js). Ei
+    // tunnistus joka jo luo tämän ehdokkaan, ks. api/_lib/aly-nightly.js). Ei
     // koskaan 💬-ihmisehdotuksille (niillä ei ole event_date/event_time,
     // eikä äly ole koskaan käsitellyt niiden ajankohtaa).
     if (candidate.event_date && candidate.event_time) {
@@ -9026,7 +9026,7 @@ document.getElementById('jatkorivi-tallenna').addEventListener('click', async fu
 
 // Kalenterisilta aikaistettu (2026-07-20, Katrin tarkennus, ks. muistiinpanot.md
 // "Kalenterisilta aikaistettu") — äly kirjoittaa TÄMÄN suoraan murun omalle
-// riville (laituri.ai_hetki_ehdotus, ks. api/aly-nightly.js ja
+// riville (laituri.ai_hetki_ehdotus, ks. api/_lib/aly-nightly.js ja
 // api/laituri-add.js) HETI kun "hetki" tunnistetaan, riippumatta ankkuri-
 // ehdokkaan omasta visible_from-viiveestä (ks. Bugi 28) — muuten ajanvaraus
 // näkyisi kalenterisiltana vasta lähellä kohdehetkeä. LISÄYS aikaiseen
@@ -9066,7 +9066,7 @@ function piirraHetkiSiltaKortti(rivi, li) {
 
 // "Yksi luukku" erä 1 — kauppatavaraehdotus (2026-07-19, ks. muistiinpanot.md
 // "Laiturin äly-lajittelu"). Äly kirjoittaa TÄMÄN suoraan murun omalle
-// riville (laituri.ai_kauppa_ehdotus — ks. api/aly-nightly.js ja
+// riville (laituri.ai_kauppa_ehdotus — ks. api/_lib/aly-nightly.js ja
 // api/laituri-add.js), EI candidate-rakennetta kuten hetki/ikkuna, koska
 // tuote joko hyväksytään tai ei — ei tarvitse odottaa/vanhentua. "Kolmiporras":
 // äly EI KOSKAAN siirrä mitään itse, tämä kortti on AINA vain ehdotus +
@@ -9137,7 +9137,7 @@ async function hyvaksyKauppaEhdotus(rivi, items) {
 // Hylkäys ei poista mitään — vain tyhjentää ehdotuskentän, muru jää
 // Laituriin täysin normaalina. Sama sisältö ei nouse uudelleen ennen kuin
 // käyttäjä muokkaa murua (ks. aly_evaluated-merkintä, tehty jo ehdotuksen
-// kirjoitushetkellä api/aly-nightly.js:ssä/api/laituri-add.js:ssä).
+// kirjoitushetkellä api/_lib/aly-nightly.js:ssä/api/laituri-add.js:ssä).
 async function hylkaaKauppaEhdotus(rivi) {
   const { error } = await db.from('laituri').update({ ai_kauppa_ehdotus: null }).eq('id', rivi.id);
   if (ilmoitaKirjoitusvirheesta(error, 'Kauppaehdotuksen hylkäys')) return;
@@ -9578,7 +9578,7 @@ document.getElementById('laituri-arkisto-toggle').addEventListener('click', func
 //
 // "Pysähtynyt" = tehokas viimeisin aktiviteetti (VIIMEISIN jatkorivi jos
 // sellainen on, muuten murun oma created_at — sama periaate kuin äly-yöajon
-// effectiveContent()/effectiveWrittenAt()-logiikassa api/aly-nightly.js:ssä,
+// effectiveContent()/effectiveWrittenAt()-logiikassa api/_lib/aly-nightly.js:ssä,
 // vain client-puolella tässä) on vanhempi kuin `luote_raja_paivia`-asetus
 // (oletus 14 pv, dataohjattu — sama "ei koodia" -periaate kuin muillakin
 // Sataman kynnysarvoilla).
@@ -12498,7 +12498,7 @@ window.addEventListener('focus', function() {
 // ominaisuuteen — perusta tuleville muistutuksille. VAPID_PUBLIC_KEY saa
 // näkyä tässä suoraan koodissa, koska julkinen avain on tarkoitettu
 // julkiseksi — vain yksityinen avain on salainen, se on vain Vercelin
-// ympäristömuuttujissa palvelinpuolella (api/push-test.js).
+// ympäristömuuttujissa palvelinpuolella (api/_lib/push-test.js).
 const VAPID_PUBLIC_KEY = 'BBnARMtYtTabRROSxmKux3RG3LBcWsWTBhFB805RJgUKcROtJFdX6mQfUa1U2jxXBDcHK4GgkI9ZkJ8o_udhspg';
 
 function urlBase64ToUint8Array(base64String) {
@@ -12603,7 +12603,7 @@ async function laheteTestipush() {
   try {
     const { data: sessioData } = await db.auth.getSession();
     const token = sessioData.session ? sessioData.session.access_token : null;
-    const response = await fetch('/api/push-test', {
+    const response = await fetch('/api/cron?task=push-test', {
       method: 'POST',
       headers: { Authorization: 'Bearer ' + token },
     });
@@ -12624,7 +12624,7 @@ async function laheteTestipush() {
 // === MUISTUTUKSET (2026-07-10) ===
 // Henkilökohtainen push-muistutus listan riville, kalenteritapahtumalle tai
 // ankkurille. Rakentuu push-infran päälle (VAPID_PUBLIC_KEY, push_tilaukset
-// yllä) — lähetys tapahtuu palvelimella (api/muistutukset-laheta.js), jota
+// yllä) — lähetys tapahtuu palvelimella (api/_lib/muistutukset-laheta.js), jota
 // kutsuu ulkoinen GitHub Actions -cron 5 min välein (ks. .github/workflows/).
 // Ks. muistiinpanot.md "Muistutukset"-osio täydelle suunnittelulle.
 
@@ -12844,7 +12844,7 @@ async function paivitaMuistutusLista() {
     // kuitata, se joko odottaa tai on jo lähtenyt). Kuittaus pysäyttää
     // tärähdyssarjan HETI: sent_at asetetaan tässä SAMALLA client-puolella
     // (ei vain acked_at) jotta rivi katoaa listasta heti eikä vasta
-    // seuraavalla ~5 min cron-kierroksella (ks. api/muistutukset-laheta.js,
+    // seuraavalla ~5 min cron-kierroksella (ks. api/_lib/muistutukset-laheta.js,
     // joka muuten tarkistaisi/päättäisi sen vasta seuraavalla ajolla).
     if (m.persistent) {
       const hoidettu = document.createElement('button');
@@ -12884,7 +12884,7 @@ async function lisaaMuistutus(remindAtDate) {
   // Sinnikäs muistutus (2026-07-19, ks. muistiinpanot.md "Sinnikäs
   // muistutus") — VAIN päämuistutukselle, EI koskaan valmistautumis-
   // tönäisylle (ks. alempana): remind_at toimii silloin KOHDEHETKENÄ, ei
-  // ensimmäisen tärähdyksen ajankohtana (ks. api/muistutukset-laheta.js).
+  // ensimmäisen tärähdyksen ajankohtana (ks. api/_lib/muistutukset-laheta.js).
   const sinnikasCheck = document.getElementById('muistutus-sinnikas-check');
   const paaMuistutusRivi = {
     user_id: currentUserId,
@@ -12940,7 +12940,7 @@ async function lisaaMuistutus(remindAtDate) {
 // Toistuva muistutus (2026-07-19, ks. muistiinpanot.md "Toistuva muistutus")
 // — ENSIMMÄISEN kerran lasketaan tässä client-puolella tavallisella
 // paikallisella Date-aritmetiikalla (EI wall-clock-to-UTC-temppua, joka on
-// vain palvelinpuolen api/muistutukset-laheta.js:ssä tarpeen koska Vercel
+// vain palvelinpuolen api/_lib/muistutukset-laheta.js:ssä tarpeen koska Vercel
 // ajaa UTC:ssa — selain pyörii jo käyttäjän omassa Helsinki-ajassa, ks.
 // aiempi aikakäsittely-auditti). Kaikki SEURAAVAT kerrat laskee cron.
 function ensimmainenViikonpaivaHetki(valitutPaivat, aikaStr) {
@@ -13033,7 +13033,7 @@ async function lisaaToistuvaMuistutus() {
   }
 
   // Toistuva + Valmistaudu (sallittu yhdistelmä, ks. muistiinpanot.md) —
-  // jokainen kerta saa oman esitönäisyn, ks. api/muistutukset-laheta.js
+  // jokainen kerta saa oman esitönäisyn, ks. api/_lib/muistutukset-laheta.js
   // jossa cron laskee lapsen etäisyyden UUDELLEEN joka kerta parentin
   // edetessä (etäisyys päätellään, ei talleteta erikseen).
   const valmistauduCheck = document.getElementById('muistutus-valmistaudu-check');
@@ -13144,7 +13144,7 @@ async function paivitaSovellusValimuisti() {
   window.location.reload();
 }
 
-// "Hae kalenteri nyt" — laukaisee /api/caldav-sync:n käsin, säästää
+// "Hae kalenteri nyt" — laukaisee /api/cron?task=caldav:n käsin, säästää
 // "odotellaan cronia" -ihmettelyn koska Vercel Hobby-cron ei ole käytössä
 // (ks. muistiinpanot.md "Kalenterisyötteet"-osio)
 async function synkkaaKalenteriNyt() {
@@ -13155,7 +13155,7 @@ async function synkkaaKalenteriNyt() {
   try {
     const { data: sessioData } = await db.auth.getSession();
     const token = sessioData.session ? sessioData.session.access_token : null;
-    const vastaus = await fetch('/api/caldav-sync', { headers: { Authorization: 'Bearer ' + token } });
+    const vastaus = await fetch('/api/cron?task=caldav', { headers: { Authorization: 'Bearer ' + token } });
     const tulos = await vastaus.json();
     if (!vastaus.ok) {
       naytaIlmoitus('Kalenterisynkka epäonnistui: ' + (tulos.error || vastaus.status));

@@ -62,7 +62,7 @@
 //   MUISTUTUKSET_CRON_SECRET   (reused from the reminders job — same
 //                                shared secret, one less thing to set up)
 
-const { isoDate, parseAiJson, buildClassifyPrompt, normalizeMatch, laskeHetkiNakyvyys, onkoHetkiMennytOhi } = require('./_lib/aly-classify');
+const { isoDate, parseAiJson, buildClassifyPrompt, normalizeMatch, laskeHetkiNakyvyys, onkoHetkiMennytOhi } = require('./aly-classify');
 
 const SUPABASE_URL = 'https://uctmxxeewoeydabuepye.supabase.co';
 const SUPABASE_KEY = process.env.SUPABASE_SERVICE_KEY;

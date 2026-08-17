@@ -22,7 +22,7 @@
 // — "Yksi luukku" erä 1): Siri-murulle ei sovi odottaa yöajoa asti (kaupan
 // tarvike ei odota yötä yli). Siksi TÄSSÄ endpointissa tehdään VÄLITTÖMÄSTI,
 // heti murun tallennuksen jälkeen, sama luokittelu yhdellä murulla mitä
-// api/aly-nightly.js tekee erässä — jaettu prompti/normalisointi tulee
+// api/_lib/aly-nightly.js tekee erässä — jaettu prompti/normalisointi tulee
 // api/_lib/aly-classify.js:stä (ks. sen oma header-kommentti "miksi jaettu
 // moduuli tässä yhdessä tapauksessa on OK"). Käytetään VAIN kun laukaisusana
 // EI osunut (!ehdotusSisalto) — "laukaisusana VOITTAA": jos rivi meni jo
@@ -37,7 +37,7 @@ const SUPABASE_KEY = process.env.SUPABASE_SERVICE_KEY;
 const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
 const DEFAULT_MODEL = 'claude-sonnet-4-6';
 const MAX_TOKENS = 600;
-// Sama oletus kuin api/aly-nightly.js:ssä (HETKI_ENNAKKO_PAIVAT_OLETUS) —
+// Sama oletus kuin api/_lib/aly-nightly.js:ssä (HETKI_ENNAKKO_PAIVAT_OLETUS) —
 // säädettävä ilman koodimuutosta asetukset-taulun avaimella
 // "hetki_ennakkopaivat", ks. laskeHetkiNakyvyys().
 const HETKI_ENNAKKO_PAIVAT_OLETUS = 0;
@@ -174,7 +174,7 @@ async function classifyImmediately(muru) {
 
     // Kalenterisilta aikaistettu (2026-07-20, Katrin tarkennus, ks.
     // muistiinpanot.md "Kalenterisilta aikaistettu") — sama varhaismerkintä
-    // kuin api/aly-nightly.js:ssä, HETI Siri-sanelun heti-luokittelun
+    // kuin api/_lib/aly-nightly.js:ssä, HETI Siri-sanelun heti-luokittelun
     // yhteydessä (ei odota ankkuriehdokkaan visible_from:ia). Riippumaton
     // ankkuriehdokkaan onnistumisesta, epäonnistuminen vain lokitetaan.
     if (category === 'hetki') {

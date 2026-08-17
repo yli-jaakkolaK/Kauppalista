@@ -54,3 +54,28 @@ REST API sisältyy Miron ilmaistasoon (tarkistettu miro.com/pricing 17.8.2026) �
 - REST API:sta luetaan Framen/itemien viimeisin muokkausaika istunnon lopetushetken vertailuun ("paluu Satamaan vai Miron muokkaus, kumpi tuoreempi").
 
 **Ei vielä päätetty, ei tämän erän piirissä:** position/connector-datan (todettu saatavilla, viesti aiemmin) käyttö vaiheensiirtymäpäätöksessä — rakennetaan ensin perusupotus, tämä on erillinen, myöhempi päätös.
+
+## Reitti-välilehden kalenterilogiikka ja UI — RAKENNETAAN NYT
+
+**Layout: standardi iCal-viikkoruudukko.** 7 päivää vierekkäin (vaakaan) yli viikon, kukin päivä omana pystysarakkeenaan jossa tunnit juoksevat ylhäältä alas, aamu ylimpänä. (Ei ristiriita §5.1:n "päivät ovat pystysarakkeita" -kirjauksen kanssa — sama asetus, väärinymmärretty ristiriidaksi aiemmin tässä keskustelussa, ks. korjaus.)
+
+**Sisältö samassa ruudukossa, koko viikko kerralla näkyvissä:**
+- Luennot (lukkarikoneesta)
+- Opiskelusuunnitelma
+- Muut menot (esim. hammaslääkäri, perhekalenterin tapahtumat)
+- **Toteutunut opiskelu jää näkyviin samaan ruudukkoon**, ei vain suunnitelma — tämä on päivän kertymän paikka (jo linjassa §5.1:n kanssa)
+- **Realistinen siirtymäaika paikasta toiseen**, Föli-pohjainen — **RIIPPUVUUS: vaatii oikean Föli-integraation (§8.1), joka EI ole vielä rakennettu (ei GTFS/SIRI-kutsuja koodissa, tarkistettu 17.8.).** Tämä pitää rakentaa ensin tai samassa yhteydessä, muuten siirtymäblokit jäävät paikkamerkeiksi.
+
+**Kalenterivärit — Katrin päätös 17.8., uudet tokenit `satama-design-kuvaus.md`:hen:**
+- Katrin oma = kirkas keltainen (EI `--sinappi`, selvästi erottuva siitä)
+- Juhan kalenteri = iCalin oma natiivi sininen, luetaan suoraan syötteestä — todennäköisesti ei tarvitse omaa Satama-tokenia ollenkaan
+- Yhteinen = kirkas vihreä (EI `--syvänne` — tiedostettu, hyväksytty riski: "oma väri + Juhan väri = yhteinen väri" -sekoituslogiikka, Katrin oma perustelu, ei virhe)
+- **Tarkat hex-arvot vielä vahvistamatta** — älä lyö lukkoon lopullisia sävyjä ilman erillistä pikatarkistusta Katrilta ennen julkaisua, sama periaate kuin muillakin uusilla väreillä (§4.1).
+
+**Alempana samalla välilehdellä (järjestys ylhäältä alas):**
+1. itslearningistä haetut tehtävät/palautukset/deadlinet (`opinto_deadlinet`, jo olemassa)
+   - Tiedostoliite riville: uusi `materiaali_deadline_id`-sarake `laituri`-tauluun, sama malli kuin `materiaali_kurssi_id` (ks. yllä kohta 12/erillinen osio)
+2. Kurssit (jo rakennettu, §16.4/§5.2, ei muutu)
+3. Kertausjono kunkin kurssin alla, täpättävä lista. Tavoiteväli 1/3/7/21 pv, suuntaa-antava — ei haittaa jos toteutuu vain 3 lyhyttä kertausta.
+
+**Suunnittelun kadenssi joka syöttää tätä näkymää (§7-lisäys, ei uusi UI vaan taustalogiikka):** kerran syksylle täysi suunnitelma, kahden viikon välein tarkistus, joka yö uudelleenlaskenta edellisen päivän toteuman perusteella.

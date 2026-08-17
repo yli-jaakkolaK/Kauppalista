@@ -1,7 +1,7 @@
 // Sää-välimuisti (2026-08-11, ks. Ruori-speksi §2) — hakee Open-Meteosta
 // (ilmainen, ei API-avainta, CC BY 4.0) ja välimuistittaa Supabaseen
 // (asetukset-taulu, sama avain-arvo-kaava kuin muillakin kevyillä
-// välimuisteilla, ks. api/aly-nightly.js:n getSetting/supabaseFetch).
+// välimuisteilla, ks. api/_lib/aly-nightly.js:n getSetting/supabaseFetch).
 // Kolme syytä palvelimen kautta eikä suoraan selaimesta: (1) välimuisti
 // jaettu kaikkien laitteiden/istuntojen kesken, (2) palveluntarjoajan voi
 // vaihtaa koskematta käyttöliittymään, (3) kohtuullinen käyttö.

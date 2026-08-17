@@ -34,7 +34,7 @@ const OLETUS_MAX_TOKENS = 500;
 const KATTO_MAX_TOKENS = 2000;
 
 // Tunnistaa kutsujan Supabase-istunnon access_token-arvon perusteella — sama
-// malli kuin api/push-test.js:ssä. Ilman validia tokenia 401 — avoin
+// malli kuin api/_lib/push-test.js:ssä. Ilman validia tokenia 401 — avoin
 // endpoint polttaisi Anthropic-saldoa kenelle tahansa netissä.
 async function haeKayttajaId(userToken) {
   const vastaus = await fetch(SUPABASE_URL + '/auth/v1/user', {

@@ -3,18 +3,26 @@ name: Muistutusten ja kalenterisynkan ajastin
 # Vercel Hobby-cron ei riitä (ajaa vain kerran vrk:ssa epätarkasti, ks.
 # muistiinpanot.md "Kalenterisyötteet"-osion "Vercel Cron ei ole käytössä").
 # GitHub Actions -scheduled workflow toimii ulkoisena 5 min -pingaajana
-# ilmaiseksi: kutsuu /api/muistutukset-laheta (lähettää erääntyneet
-# muistutukset), /api/caldav-sync (pitää kalenterisynkan tuoreena myös
-# silloin kun kukaan ei ole avannut sovellusta) ja /api/aly-nightly
+# ilmaiseksi: kutsuu /api/cron?task=muistutukset (lähettää erääntyneet
+# muistutukset), /api/cron?task=caldav (pitää kalenterisynkan tuoreena myös
+# silloin kun kukaan ei ole avannut sovellusta) ja /api/cron?task=aly-nightly
 # (E3-keskiportaan yöajo — ehdottaa ankkuriehdokkaita Laiturin muruista,
 # ks. muistiinpanot.md "E3-keskiporras" -osio). aly-nightly tekee itse
 # työtä vain kerran ~20h välein (tila asetukset-taulussa) vaikka tätä
 # workfow'ta pingataan 5 min välein — sama jaettu MUISTUTUKSET_CRON_SECRET
 # uudelleenkäytetty kaikilla kolmella reitillä, ei vaadi uutta salaisuutta.
-# /api/caldav-sync sai tämän vaatimuksen vasta 2026-07-20 RLS-/yksityisyys-
+# caldav sai tämän vaatimuksen vasta 2026-07-20 RLS-/yksityisyys-
 # auditoinnin jäljiltä (ks. muistiinpanot.md) — oli aiemmin täysin
 # autentikoimaton, mikä paljasti Hytti-scopen kalenteritietoa kenelle
 # tahansa URL:n löytävälle.
+#
+# Kolme aiemmin erillistä Vercel-funktiota (api/muistutukset-laheta.js,
+# api/caldav-sync.js, api/aly-nightly.js) yhdistettiin 2026-08-17 yhdeksi
+# konsolidoiduksi /api/cron.js-reitiksi (Vercel Hobby-tason 12 funktion
+# katto, ks. muistiinpanot.md) — toteutukset EIVÄT muuttuneet, vain
+# osoitteet (?task=-parametri korvaa erilliset URL-polut). Neljäs, aiemmin
+# erillinen käyttäjän itse laukaisema /api/push-test, yhdistyi samaan
+# tiedostoon (?task=push-test) mutta EI kulje tämän cronin kautta.
 #
 # HUOM: GitHub Actionsin cron-aikataulu on "parhaan yrityksen" periaatteella
 # — GitHub voi viivästyttää ajoa ruuhka-aikoina. Muistutusten ±5 min
@@ -31,10 +39,10 @@ jobs:
     steps:
       - name: Lähetä erääntyneet muistutukset
         run: |
-          curl -fsS "https://kauppalista-nine.vercel.app/api/muistutukset-laheta?avain=${{ secrets.MUISTUTUKSET_CRON_SECRET }}" || true
+          curl -fsS "https://kauppalista-nine.vercel.app/api/cron?task=muistutukset&avain=${{ secrets.MUISTUTUKSET_CRON_SECRET }}" || true
       - name: Synkkaa kalenteri
         run: |
-          curl -fsS "https://kauppalista-nine.vercel.app/api/caldav-sync?avain=${{ secrets.MUISTUTUKSET_CRON_SECRET }}" || true
+          curl -fsS "https://kauppalista-nine.vercel.app/api/cron?task=caldav&avain=${{ secrets.MUISTUTUKSET_CRON_SECRET }}" || true
       - name: Aja E3-keskiportaan yöajo (tekee itse vain kerran ~20h välein)
         run: |
-          curl -fsS "https://kauppalista-nine.vercel.app/api/aly-nightly?key=${{ secrets.MUISTUTUKSET_CRON_SECRET }}" || true
+          curl -fsS "https://kauppalista-nine.vercel.app/api/cron?task=aly-nightly&key=${{ secrets.MUISTUTUKSET_CRON_SECRET }}" || true
