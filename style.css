@@ -93,6 +93,24 @@
   --keski: 520ms;
   --hidas: 820ms;
   --fontti-loki: 'Courier Prime', ui-monospace, monospace;
+
+  /* Kalenterivärit — henkilöidentiteetti (2026-08-17, Katrin päätös,
+     osittain jo ajettu sql/061+sql/132:lla kalenteri_syotteet.vari-
+     kenttään). EI seuraa laitteen tummaa tilaa (kiinteät, samat identiteetit
+     molemmissa teemoissa) — sama periaate kuin --paperi/--muste yllä.
+     Katrin oma punainen (--kal-katri) mitattu lähes identtiseksi
+     --loki-vaaran kanssa (kontrasti 1,08:1) — TIETOINEN, HYVÄKSYTTY riski,
+     ei lisätä erillistä merkkiä toistaiseksi. --loki-vaara pysyy
+     koskemattomana, varattu yksinomaan huolilipulle/ristiriidalle (§5.1). */
+  --kal-katri: #D32F2F;
+  --kal-juha: #1976D2;
+  --kal-yhteinen: #8E44AD;
+  /* Sataman itse generoimat opiskelulohkot (Boost/opiskelusuunnitelma) —
+     EI syötteestä tuleva henkilöidentiteetti, oma neljäs kategoria.
+     Reunaviiva PAKOLLINEN (ei vain täyttöväri) — muuten lohko ei erotu
+     Kuormavahdin matalikko/karikko-taustasta. */
+  --kal-opiskelu: #E3A62F;
+  --kal-opiskelu-reunaviiva: 2px solid var(--muste);
 }
 
 body {
