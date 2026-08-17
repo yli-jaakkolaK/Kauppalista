@@ -211,6 +211,11 @@ function jasennaTapahtumat(icsTeksti, alkuRaja, loppuRaja) {
           // tapahtumaKattaaPaivan()) kohtelee NULLia samana kuin event_date.
           event_end_date: loppuAika.event_date !== pvmAika.event_date ? loppuAika.event_date : null,
           organizer: organizer,
+          // Föli-siirtymäblokkien pohjatyö (2026-08-17, sql/129) — ical.js:n
+          // ICAL.Event lukee tämän jo lähteen LOCATION-kentästä valmiiksi,
+          // vain tallennus puuttui aiemmin. Vapaamuotoinen teksti, täsmäys
+          // Föli-pysäkkeihin tehdään sovelluspuolella.
+          location: event.location || null,
         });
         return;
       }
@@ -246,6 +251,11 @@ function jasennaTapahtumat(icsTeksti, alkuRaja, loppuRaja) {
             event_end_time: loppuAika.event_time,
             event_end_date: loppuAika.event_date !== pvmAika.event_date ? loppuAika.event_date : null,
             organizer: organizer,
+            // Luetaan TÄMÄN esiintymän omasta (mahdollisesti korvatusta)
+            // komponentista, ei masterin event.location:ista — yksittäinen
+            // kerta on voitu siirtää eri paikkaan (samalla periaatteella
+            // kuin tila/otsikko-luku yllä).
+            location: tiedot.item.component.getFirstPropertyValue('location') || null,
           });
         }
         esiintyma = iteraattori.next();
@@ -360,6 +370,10 @@ function taydeksiTapahtumaksi(t) {
     event_end_time: t.event_end_time,
     event_end_date: t.event_end_date,
     ical_uid: t.uid,
+    // Föli-siirtymäblokkien pohjatyö (sql/129) — VAIN taysi-tilassa, sama
+    // periaate kuin nimi/osallistujat: vain_varattu-tilan tapahtuma ei saa
+    // vuotaa mitään yksityiskohtaa (ks. varattuTapahtumaksi()-kommentti alla).
+    location: t.location,
   };
 }
 

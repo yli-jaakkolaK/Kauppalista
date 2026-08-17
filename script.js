@@ -3948,6 +3948,134 @@ function onkoAjallisestiPaallekkainen(a, b) {
   return (paallekkaisLoppu - paallekkaisAlku) >= vahimmaisKesto;
 }
 
+// === FÖLI (2026-08-17, SATAMA_SPEKSI.md §8.1) ===
+// data.foli.fi on julkinen, ei rekisteröitymistä vaativa, ja lähettää
+// Access-Control-Allow-Origin: * — KAIKKI tämä toimii suoraan selaimesta,
+// EI tarvita uutta Vercel-funktiota (varmistettu suoraan kokeilemalla
+// 17.8.2026, ei oletettu). Riittää "järkevin pysäkki käyttäjän sijaintiin
+// perustuen" (spekin oma rajaus) — EI ovelta ovelle -reititystä, EI
+// useamman vaihdon yhdistelyä.
+//
+// Lähde vaadittu lisenssiehdoin (CC BY 4.0): "Lähde: Turun seudun
+// joukkoliikenteen liikennöinti- ja aikatauludata, Turun kaupungin
+// joukkoliikennetoimisto, data.foli.fi, CC BY 4.0."
+
+// Kotipysäkin oletus kun sijaintilupaa ei ole/saada (Katrin päätös
+// 17.8.2026): Marsukatu, PIISPANRISTILLE PÄIN — vahvistettu suoraan SIRI:n
+// destinationdisplay-kentistä ("Sorro-Piispanristi-Keskusta"), EI stop_id
+// 6010 joka on sama katu vastakkaiseen suuntaan (Naantali). Katrin toinen
+// tuttu pysäkki (Oskarinaukio, Kaarinan keskusta) ei ole tässä koodissa
+// erikseen — sijaintiin perustuva haku (lahinPysakki) löytää sen luonnostaan
+// kun ollaan lähempänä sitä, "95% jompikumpi näistä kahdesta" -tilanteessa.
+const FOLI_OLETUSPYSAKKI = '6011';
+
+const FOLI_PYSAKIT_KEY = 'kauppalista_foli_pysakit';
+const FOLI_PYSAKIT_MAX_IKA_MS = 24 * 3600000; // 1 vrk — "älä pollaa tiheästi" (§8.1), pysäkit eivät muutu usein
+
+// Koko pysäkkilista (~1600 kpl, nimi+koordinaatit) — välimuistitetaan
+// localStorageen 1 vrk:ksi. Käytetään sekä sijaintipohjaiseen lähimmän
+// pysäkin hakuun että kalenteritapahtuman location-tekstin täsmäykseen.
+async function haeFoliPysakit() {
+  try {
+    const tallennettu = JSON.parse(localStorage.getItem(FOLI_PYSAKIT_KEY) || 'null');
+    if (tallennettu && Date.now() - tallennettu.haettu < FOLI_PYSAKIT_MAX_IKA_MS) {
+      return tallennettu.pysakit;
+    }
+  } catch (e) { /* korruptoitunut välimuisti — haetaan tuoreena alla */ }
+
+  try {
+    const vastaus = await fetch('https://data.foli.fi/gtfs/stops');
+    if (!vastaus.ok) return null;
+    const pysakit = await vastaus.json();
+    try {
+      localStorage.setItem(FOLI_PYSAKIT_KEY, JSON.stringify({ haettu: Date.now(), pysakit: pysakit }));
+    } catch (e) { /* localStorage täynnä tms — jatketaan silti muistivaraisena */ }
+    return pysakit;
+  } catch (e) {
+    console.error('Föli-pysäkkien haku epäonnistui:', e.message);
+    return null;
+  }
+}
+
+function haversineMetria(lat1, lon1, lat2, lon2) {
+  const R = 6371000;
+  const toRad = function(d) { return d * Math.PI / 180; };
+  const dLat = toRad(lat2 - lat1), dLon = toRad(lon2 - lon1);
+  const a = Math.sin(dLat / 2) ** 2 + Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon / 2) ** 2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
+function lahinFoliPysakki(pysakit, lat, lon) {
+  let paras = null, parasEtaisyys = Infinity;
+  Object.keys(pysakit).forEach(function(id) {
+    const p = pysakit[id];
+    const d = haversineMetria(lat, lon, p.stop_lat, p.stop_lon);
+    if (d < parasEtaisyys) { parasEtaisyys = d; paras = id; }
+  });
+  return paras;
+}
+
+// Kalenteritapahtuman location-tekstin (sql/129, caldav-sync.js) täsmäys
+// pysäkin nimeen — pelkkä tekstihaku, EI älyä (kustannuskuri, Katrin oma
+// periaate: "äly vain siellä missä se oikeasti tuo lisäarvoa"). Palauttaa
+// ensimmäisen osuman, ei parhaan — riittävä koska sama rakennus/alue
+// mainitaan yleensä vain kerran pysäkkilistassa.
+function etsiFoliPysakkiNimella(pysakit, sijaintiTeksti) {
+  if (!sijaintiTeksti || !pysakit) return null;
+  const normalisoitu = sijaintiTeksti.toLowerCase();
+  let osuma = null;
+  Object.keys(pysakit).some(function(id) {
+    const nimi = (pysakit[id].stop_name || '').toLowerCase();
+    if (nimi && normalisoitu.indexOf(nimi) !== -1) { osuma = id; return true; }
+    return false;
+  });
+  return osuma;
+}
+
+// Selaimen sijainti (foreground, kertakysely) — EI taustaseurantaa: iOS
+// Safari PWA ei salli luotettavaa taustapaikannusta, eikä sitä pyydetty
+// (Katrin oma rajaus 17.8.2026: "at any given moment" tarkoitti käytännössä
+// "kun sovellus on auki"). Palauttaa null hiljaa jos lupaa ei ole/saada —
+// kutsuja käyttää silloin FOLI_OLETUSPYSAKKIÄ.
+function haeSelaimenSijainti() {
+  return new Promise(function(resolve) {
+    if (!navigator.geolocation) { resolve(null); return; }
+    navigator.geolocation.getCurrentPosition(
+      function(pos) { resolve({ lat: pos.coords.latitude, lon: pos.coords.longitude }); },
+      function() { resolve(null); },
+      { timeout: 5000, maximumAge: 300000 }
+    );
+  });
+}
+
+// Lähtöpysäkki juuri nyt: sijaintiluvalla LÄHIN pysäkki KOKO verkosta (ei
+// rajattu Katrin kahteen tuttuun — kattaa "joskus ihan muualla" -tilanteen
+// luonnostaan), ilman lupaa/dataa FOLI_OLETUSPYSAKKI.
+async function haeFoliLahtoPysakki() {
+  const pysakit = await haeFoliPysakit();
+  if (!pysakit) return FOLI_OLETUSPYSAKKI;
+  const sijainti = await haeSelaimenSijainti();
+  if (!sijainti) return FOLI_OLETUSPYSAKKI;
+  return lahinFoliPysakki(pysakit, sijainti.lat, sijainti.lon) || FOLI_OLETUSPYSAKKI;
+}
+
+// SIRI Stop Monitoring -haku yhdelle pysäkille — reaaliaikaiset ennustetut
+// lähtöajat (expecteddeparturetime, unix-aikaleima). EI välimuistiteta (§8.1
+// sanoo "älä pollaa tiheästi", mutta data ITSESSÄÄN on reaaliaikaista —
+// data.foli.fi:n oma palvelin jo välimuistittaa 15-30s, ks. sen dokumentaatio).
+async function haeFoliLahdot(pysakkiId) {
+  try {
+    const vastaus = await fetch('https://data.foli.fi/siri/sm/' + pysakkiId);
+    if (!vastaus.ok) return [];
+    const data = await vastaus.json();
+    if (data.status !== 'OK') return [];
+    return Array.isArray(data.result) ? data.result : [];
+  } catch (e) {
+    console.error('Föli-lähtöjen haku epäonnistui (pysäkki ' + pysakkiId + '):', e.message);
+    return [];
+  }
+}
+
 // "Rauhoitus-ikkuna" hytti-melulle (Ristiriitapaketti, kohta 3, 2026-07-17,
 // ks. muistiinpanot.md) — YKSINKERTAINEN absoluuttinen päivämääräväli, oma
 // pari asetuksia (rauhoitus_alku/rauhoitus_loppu, molemmat YYYY-MM-DD).
