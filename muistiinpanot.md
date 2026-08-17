@@ -3875,12 +3875,41 @@ sw.js v133 → v137 (v134/v136 välissä pieniä taustamuutoksia, ei omaa UI-muu
 
 ---
 
+### A5 — Nyt-välilehti kokonaan uudistettu (SATAMA_SPEKSI.md §4, 2026-08-17)
+
+Katri toimitti valmiin A5-speksin ("valmis vietäväksi Codelle") + mockupin (`nyt-valilehti-mockup-v1.html`, käyttää `satama-design-system.css`:ää joka EI ole linkitetty itse appiin — vain mockupeihin). Ennen rakentamista kaksi asiaa vaati selvennystä:
+
+1. **Miro-embed** (§4.9: tarvitaan encoding/retrieval-vaiheissa) vaatii Miron oman API-sovelluksen (OAuth-tunnukset) — ulkoinen tili jota Claude ei voi luoda itse, eikä §4.3:n oma AUKKO-merkintä ole vielä varmistanut Miron API:n tarkkuutta/kutsurajoja. Katrin päätös: rakenna kaikki muu nyt, Miro-osa myöhemmin. Tehtävänäkymään lisättiin selkeä koukku (`#opinto-tehtava-miro-koukku`, näkyy vain encoding/retrieval-vaiheissa, tekstinä että Miro ei vielä ole käytössä) — itse upotusta ei rakennettu.
+2. **Sijoittelujärjestys (§4.6)** vaatii kestoarvion jokaiselle opiskelupätkälle jotta sille voi laskea kellonajan — tälle ei näyttänyt olevan tietomallia. Katri valitsi "kiinteä oletus per PERO-vaihe". **Löytyi tarkistettaessa: tämä data ON JO OLEMASSA** (`haeOpintoKestoMinuutteina`/`OPINTO_KESTO_ASETUS_AVAIN`, rakennettu 2026-08-05 "Aikaikkuna"-ominaisuutta varten, kattaa kaikki kuusi PERO-vaihetta mukaan lukien reference/overlearning) — ei tarvinnut rakentaa uudestaan, vain löytää.
+
+**Katrin oma lisärajaus kesken rakentamisen:** "kalenterista vain ne asiat missä mun täytyy olla, ei Juhan kalenterimerkintöjä" — Nyt-lokin kalenterikysely suodattaa `kalenteri_tapahtumat.user_id = currentUserId` (client-tason näyttösuodatin, ei RLS-muutos — `kalenteri_tapahtumat`:n RLS on tarkoituksella avoin molemmille, sama kuin ennenkin).
+
+**Rakennettu — kokonaan uusi minuuttiruudukko-pohjainen päiväaikatauluttaja** (`piirraNytLoki`, script.js): sijoittelujärjestys tarkalleen §4.6:n mukaan — 1) Katrin omat kiinteät kalenteritapahtumat (eivät väisty) → 2) suojatut ikkunat (uusi `ateria_alku`-asetus + olemassa ollut `aterian_kesto_min`, sekä olemassa oleva `hytti_suljetut_ikkunat`/`hytti_opiskeluaika`) → 3) tämän päivän `opinto_paivan_askeleet`-solmut täyttävät loput kestoarvioidensa mukaan. Jos ateria ei mahdu oletusaikaan, etsitään ensimmäinen vapaa rako opiskeluikkunasta ("ateriaa ei jätetä pois", §4.5).
+
+**Ulkoasu:** vain opiskelupätkä saa ison `.nyt`-kortin (§4.1: "kalenterimerkinnät eivät ole kortteja vaan viivalla merkittyjä rivejä"), koko kortti painettava, ei erillistä aloita-nappia — tap avaa suoraan A4:n Tehtävänäkymän jonka ajanotto käynnistyy automaattisesti. Kiinteät menot omalla live-merkillään, ei himmennetty. Deadline-rivi (1-2 pv, `--vaara`, §7.3). Perustelurivi (§4.4, vain luotettavasti laskettavat ehdot toteutettu — silta-tyyppi; muut ehdot kuten "palautus 3-5pv"/"kevyt kuorma" jätetty pois ettei arvata väärin, spekin oma "jos ehto ei täyty, rivi jätetään pois" -sääntö). "Muut vaihtoehdot" -laajennettava lista. Boost (15/30/60/··, sama moottori kuin "Minulla on aikaa" mutta ohittaa päiväkaton) — "··" rakennettiin oikeasti natiivina `<select>`-rullavalitsimena (§4.8: "toteutukseltaan iOS-natiivi"), ei hätäisenä `prompt()`-dialogina.
+
+Design-system-komponentit (`.nyt`, `.nyt-loki`, `.boost`/`.min`, `.osio`, `.saadin`) portattu `satama-design-system.css`:stä `style.css`:aan käsin, koska design-system.css ei koskaan ollut linkitetty itse appiin. Vanhan Tänään-kortin orpo CSS (`.opinto-tanaan-kortti`/`-kehote`/`-napit`/`-tila`) poistettu.
+
+**Kaksi asiaa jotka poistuivat vahingossa uudessa mallissa, palautettu:** "En ehtinyt" (ei rangaistusta -periaate) — pieni tekstilinkki Nyt-kortin alla, ei riko "koko kortti painettava" -sääntöä koska ei ole ISO kosketuspinta. Tämän päivän askel merkitään nyt myös tehdyksi suoraan Tehtävänäkymän "✓ Merkitse tehdyksi" -napista (uusi `currentOpintoTehtavaPaivanAskel`-konteksti `avaaOpintoTehtava`:lle) — katoaa Nyt-lokista heti, riippumatta etenikö PERO-vaihe.
+
+**Oma katselmointi löysi kolme bugia ennen käyttäjätestausta** (ei kukaan raportoinut, aikataulusyistä ei ehditty koodata inkrementaalisesti testaten): "muut vaihtoehdot" kiinnittyi vahingossa lokin viimeiseen riviin eikä Nyt-kortin omaan kehykseen; Boost-rulla oli oikeasti `prompt()` vaikka kommentti väitti natiivia `<select>`:iä; "En ehtinyt" katosi kokonaan. Kaikki kolme korjattu samassa erässä.
+
+**Tietoisesti rajattu pois / tunnettu aukko:** taitosolmu-tyyppisillä (silta) Nyt-kortti-kohteilla ei enää ole MITÄÄN ajanoton käynnistystapaa (vanha ▶Aloita/⏸Lopeta-nappi poistui kokonaan uuden mallin myötä, taitosolmut eivät ole vielä siirtyneet A4:n Tehtävänäkymä-malliin — eri, vanhempi tietomuoto, `vaihe` ei `pero_vaihe`, ei retrieval_kierrokset ym. kenttiä). Kapea, harvinaisempi polku, mutta todellinen regressio — ei korjattu tässä erässä, tarvitsee joko taitosolmujen siirtämisen samaan malliin (iso työ) tai kevyemmän erillisen ratkaisun.
+
+**Nousemismuistutus** (§4.3, 2h-kynnys, erillinen ajanotosta) ei rakennettu — kokonaan puuttuva, itsenäinen pieni ominaisuus, ei ehditty tässä erässä.
+
+**Ei vielä testattu oikealla laitteella.** Erityisesti koko aikataulutuslogiikka (minuuttiruudukko, ateriansijoittelu, kellonaikojen laskenta) on rakennettu ja tarkastettu staattisesti muttei koskaan ajettu oikealla datalla selaimessa.
+
+sw.js v137 → v140.
+
+---
+
 ## Nykytila (päivitetty 2026-08-17, COPILOT.md-sääntö 4 — huom: aiempi "Nykytila ja seuraavat askeleet" -osio jäi tästä tiedostosta ylemmäs pitkän istunnon aikana kertyneiden uusien osioiden taakse, ei enää tiedoston lopussa; siirto omaksi erikseen tehtäväksi työksi, ei nyt)
 
-**Viimeksi tehty tässä istunnossa, kaikki commitoitu ja pushattu mainiin, `sw.js` nyt v137:** Laituri-uudistuksen (§16.5c) jälkeen: Teema/Vahdittu-näkyvyystoggeli + listan siirtonappi, kuormitustila-kytkimen sijoitus ruudun kulmaan, ja isoin: opiskelumoottorin OSA A -minimipolku (ohjematriisi, kurssin tavoite/hoitotaso/aikataulu, solmun tuntemus/perustussolmu/retrieval-kentät, uusi Tehtävänäkymä) + sung-metodi.md:n täysi korvaus 17.8.2026-versiolla ja siitä löytyneiden kahden asiasisältövirheen (Reference-parkkipaikka, GRIND-lyhenne) korjaus jo ajettuun ohjematriisi-seediin + retrieval-kirjoitusten yhdistäminen + B1:n jumi-kesto.
+**Viimeksi tehty tässä istunnossa, kaikki commitoitu ja pushattu mainiin, `sw.js` nyt v140:** Laituri-uudistuksen (§16.5c) jälkeen: Teema/Vahdittu-näkyvyystoggeli + listan siirtonappi, kuormitustila-kytkimen sijoitus ruudun kulmaan, opiskelumoottorin OSA A -minimipolku (ohjematriisi, kurssin tavoite/hoitotaso/aikataulu, solmun tuntemus/perustussolmu/retrieval-kentät, A4 Tehtävänäkymä) + sung-metodi.md:n täysi korvaus + korjaukset, B1:n jumi-kesto, ja isoin: **A5 — koko Nyt-välilehti uudistettu** (§4:n minuuttiruudukko-aikataulutin, Boost, deadline-rivi, muut vaihtoehdot, Miro-koukku).
 
-**Migraatiot ajettu suoraan Supabaseen MCP:llä koko istunnon ajan** (117–126), ei jätetty ajamatta.
+**Migraatiot ajettu suoraan Supabaseen MCP:llä koko istunnon ajan** (117–128), ei jätetty ajamatta.
 
-**Auki jäänyt:** Hytin kurssien/korttien otsikkovuoto-havainto (ei vahvistettu, ei staattisesti löydetty — tarvitsee Katrin live-toistokuvauksen). Kalenterin kuittaus omilla riveillä (vanha, ei tässä istunnossa käsitelty). A2:n "kurssitason teksti"/"detail coding" (rakennusjärjestys-dokumentti, ei pakollinen) ei rakennettu. **A5 (Nyt-näkymän uudistus) odottaa Katrin vastausta** siitä mitä nykyisessä Nyt-näkymässä on "ylimääräistä" (SATAMA_SPEKSI.md, jäi 16.8. tarkentamatta) — viimeinen OSA A:n viidestä kohdasta, ei aloitettu tästä syystä. Iso, tietoisesti rajattu ulkopuolelle: OSA B kokonaisuudessaan (12 kohtaa, yksi pieni poikkeus tehty: B1:n jumi-kesto).
+**Auki jäänyt:** Hytin kurssien/korttien otsikkovuoto-havainto (vanha, ei vahvistettu). Kalenterin kuittaus omilla riveillä (vanha). A2:n "kurssitason teksti"/"detail coding" (ei pakollinen) ei rakennettu. **Miro-embed** koko sovelluksessa (odottaa Katrin API-tunnuksia). **Nousemismuistutus** (§4.3) ei rakennettu. **Taitosolmujen ajanotto Nyt-lokista** katosi A5:n myötä eikä ole vielä korjattu (ks. yllä). OSA B muuten tietoisesti rajattu ulkopuolelle (yksi poikkeus: B1:n jumi-kesto).
 
-**Seuraava luonnollinen askel: elävä testaus.** Sekä Laituri-uudistus että koko uusi Tehtävänäkymä koskettavat dataa/käyttäytymistä joita ei ole vielä nähty oikealla laitteella — testaa ensin varovaisesti.
+**Seuraava luonnollinen askel: elävä testaus.** Laituri-uudistus, koko Tehtävänäkymä JA nyt myös koko uusi Nyt-välilehden aikataulutuslogiikka koskettavat merkittävästi käyttäytymistä jota ei ole vielä nähty oikealla laitteella/datalla — testaa varovaisesti, erityisesti aikataulutuksen kellonajat todellisella kalenterilla.
