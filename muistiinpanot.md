@@ -3831,12 +3831,50 @@ sw.js v130 → v131.
 
 ---
 
+### Teema/Vahdittu-näkyvyystoggeli + listan siirtonappi näkyväksi (2026-08-17)
+
+Kaksi pientä UX-korjausta samassa erässä. **Näkyvyystoggeli:** Teema/Vahdittu-tyyppisillä Varasto-listoilla ei ollut mitään tapaa vaihtaa niitä yksityiseksi — luotiin aina `visibility='shared'`, eikä sen jälkeen UI:ta muuttaa sitä. Lisätty sama 🔒/👥-nappi kuin normaali-tyyppisillä listoilla on jo `#settings-btn`:n kautta (`paivitaNakyvyysIkoni`-esikuva), uusi `paivitaTeemaNakyvyysNappi()`/vastaava Vahditulle. **Siirtonappi:** listan siirto Varasto↔Muistilaput oli piilossa listan sisällä asetukset-napin takana — Katrin oma havainto: "ei löytäisi/muistaisi intuitiivisesti mistä se tehdään". Lisätty näkyvä ⇄-nappi suoraan listayleiskatsauksen riville (vain normal-tyyppisille listoille, sama rajaus kuin vanhalla toiminnolla).
+
+sw.js v131 → v132.
+
+---
+
+### Kuormitustila-kytkin ruudun vasempaan yläkulmaan (2026-08-17)
+
+Katrin pyyntö: "etusivulla siirrä toggle ihan vasempaan yläkulmaan". Kytkin oli otsakkeen normaalissa virtauksessa ja kärsi bodyn täytteestä. `position:fixed`, sama periaate kuin alapalkilla (safe-area-turvattu, z-index 40) — irti virtauksesta, kiinni todelliseen ruudun kulmaan.
+
+sw.js v132 → v133.
+
+---
+
+### Opiskelumoottori OSA A — rakennusjärjestys-dokumentin minimipolku (2026-08-17)
+
+Katri toimitti ison "Sataman opiskelumoottori — rakennusjärjestys" -dokumentin (17.8.2026), joka jakaa opiskelumoottorin OSA A:han (viisi kohtaa jotka estävät kurssien käyttöönoton — A0 ohjematriisi, A1 kurssin luonti, A2 materiaalin sisääntulo, A3 solmun kentät, A4 Tehtävänäkymä, A5 Nyt-näkymä) ja OSA B:hen (12 kohtaa, tietoisesti myöhemmäksi). A2 mainitsi "Laituri/oma hytti/Juhan hytti" -kohdevalinnan — tämä oli ristiriidassa eilisen §16.5c:n kanssa (Hytti-kohde poistettu Laiturista tarkoituksella). Katri vahvisti kysyttäessä: §16.5c pätee, rakennusjärjestys-dokumentti oli vanhentunut siltä osin.
+
+**A0 — ohjematriisi seedidatana** (`ohjematriisi`-taulu, sql/122): PERO-vaihe × PACER-tietotyyppi → ohjeteksti. `lahde`-sarake ('S'/'A', myöhemmin laajennettu 'P'/'X':lla) kenttänä erikseen ohjetekstistä (sung-metodi.md:n oma arkkitehtuuripäätös, "datavetoisuus" — ohjeet ovat rivejä, ei koodiin kovakoodattuja enumeja).
+
+**A1 — kurssin tavoite/hoitotaso/aikataulu** (sql/123): kurssisivulle kaksi segmentoitua nappiriviä (tavoite: läpäisy/kunnollinen osaaminen/perusta jatkolle; hoitotaso: täysi/kevyt/vain deadlinet — ERI kenttiä, "miksi" vs. "kuinka paljon kapasiteettia juuri nyt") sekä vapaamuotoinen aikataulu-tekstikenttä ("N: aihe" per rivi → `opinto_kurssit.aikataulu`-jsonb). Tyhjä aikataulu = solmut jaetaan tasan jäljellä oleville viikoille (sovelluksen oletuskäytös, ei erillinen lippu).
+
+**A3 — solmun uudet kentät** (sql/123): `tuntemus` (0-4), `perustussolmu`, `retrieval_kierrokset`/`retrieval_tavoite`, `priming_kysymykset`, `priming_tehty`/`reference_tehty`. UI: Tehtävänäkymään tuntemus-säädin (5-nappia, näkyy vain priming-vaiheessa — "priming-vaiheen askel 0") ja perustussolmu-toggeli otsikkorivillä (sama kaava kuin näkyvyyskytkimillä).
+
+**A4 — Tehtävänäkymä** (`#opinto-tehtava-view`, uusi): avautuu napauttamalla aiheen nimeä kurssisivun listalta. Näyttää ohjematriisista haetun ohjeen (suodatettu `pero_vaihe`+`pacer_paatyyppi`:n, retrievalissa myös kierrosnumeron mukaan), priming-kysymysten kirjauksen/näytön, retrieval-kierroksen tilan, "✓ Merkitse tehdyksi" (etenee PERO-järjestyksessä; retrieval laskee kierroksia ennen etenemistä; reference-valmistuminen asettaa `kertausjonossa=true`), "En pääse alkuun" (kirjaa `opinto_jumi_merkinnat`-tauluun, sql/124, kevyt loki ilman omaa näkymää — "datan talteenotto alkaa heti, näkymä voi tulla myöhemmin"). Ajanotto käynnistyy/pysähtyy automaattisesti näkymän avautuessa/sulkeutuessa samaa `opinto_sessiot`-taulua käyttäen kuin manuaalinen ▶/⏸-pari muualla — EI näkyvää laskuria (rakennusjärjestys-dokumentin oma vaatimus: "Ei näkyvää edistymisviivaa. Ei laskuria jota pitää katsoa.").
+
+**sung-metodi.md korvattu kokonaan Katrin toimittamalla 17.8.2026-uudelleenkirjoituksella** (27 numeroitua osiota, merkinnät laajenivat `[S]`/`[A]`/`[P]`/`[X]`:ksi). Dokumentin oma §27 nimesi viisi korjausta, joista kaksi oli jo ehtinyt sql/122:n seediin ennen kuin Katri toimitti uuden lähteen: **Reference-vaihe** oli kuvattu virheellisesti karttaan tehtävänä tarkennuksena — oikea kehys on parkkipaikka, yksityiskohdat siirretään POIS pääkartalta eikä kirjata siihen; ja **encoding/conceptual-rivi** viittasi väärin kirjoitettuun "GRINDE"-lyhenteeseen, oikea on GRIND (Grouping/Relational/Interconnected/Nonverbal/Directional/Emphasized, ei "Reflective"). Korjattu sql/125:llä (ajettu Supabaseen), samalla tarkennettu priming/encoding-ohjeet sanatarkemmiksi uuden lähteen mukaan. Retrieval/overlearning-rivit eivät muuttuneet — ne pohjautuvat rakennusjärjestys-dokumentin omaan B3-taulukkoon, joka pysyi ennallaan.
+
+**Tietoisesti rajattu pois tästä erästä (OSA B, rakennusjärjestys-dokumentin oma priorisointi):** loki/datankeruunäkymä, päiväsuunnitelman generaattori, tikapuutila, kertausjono/SIR-näkymä, Miro-integraatio, flashcard-mekaniikka, jumin neljä diagnoosihaaraa (vain yleinen nudge-teksti nyt), taukomekaniikka, älyn vaihearvio, overlearning-näkymän tarkennus, kuormakatto. A5 (Nyt-näkymän uudistus) ei myöskään alkanut tässä erässä.
+
+**Ei vielä testattu oikealla laitteella** — erityisesti koko Tehtävänäkymän vaiheittainen eteneminen ja ajanoton automaattinen alku/loppu.
+
+sw.js v133 → v135 (v134 välissä ohjematriisi-taulun lisäyksen yhteydessä, ei omaa UI-muutosta).
+
+---
+
 ## Nykytila (päivitetty 2026-08-17, COPILOT.md-sääntö 4 — huom: aiempi "Nykytila ja seuraavat askeleet" -osio jäi tästä tiedostosta ylemmäs pitkän istunnon aikana kertyneiden uusien osioiden taakse, ei enää tiedoston lopussa; siirto omaksi erikseen tehtäväksi työksi, ei nyt)
 
-**Viimeksi tehty tässä istunnossa, kaikki commitoitu ja pushattu mainiin, `sw.js` nyt v131:** KONSEPTIKIRJA.md 4.12 (Varaston Muistikirja/aikaleimat), kolme peräkkäistä kurssimateriaalibugia (persistenssi, yksityisyysvuoto, jäsennysdialogin scroll), materiaalilistan uudistus + siltasolmujen tiedostoyhteys + aikapohjainen auto-eskalaatio, HYTTI_SPEKSI.md yhdistetty SATAMA_SPEKSI.md:hen ja poistettu (satama_speksi on nyt ainoa seurattava tiedosto), hytti_kortit poistettu Laiturin kohdevaihtoehdoista, ja isoin: koko Laituri-uudistus (§16.5c) — yhtenäinen kohdevalikko, näkyvyyden periytyminen, täysi välitön piilotus/valuminen, kurssimateriaalin oma käsitelty-kenttä, sää-virhekäsittely.
+**Viimeksi tehty tässä istunnossa, kaikki commitoitu ja pushattu mainiin, `sw.js` nyt v135:** Laituri-uudistuksen (§16.5c) jälkeen: Teema/Vahdittu-näkyvyystoggeli + listan siirtonappi, kuormitustila-kytkimen sijoitus ruudun kulmaan, ja isoin: opiskelumoottorin OSA A -minimipolku (ohjematriisi, kurssin tavoite/hoitotaso/aikataulu, solmun tuntemus/perustussolmu/retrieval-kentät, uusi Tehtävänäkymä) + sung-metodi.md:n täysi korvaus 17.8.2026-versiolla ja siitä löytyneiden kahden asiasisältövirheen (Reference-parkkipaikka, GRIND-lyhenne) korjaus jo ajettuun ohjematriisi-seediin.
 
-**Migraatiot ajettu suoraan Supabaseen MCP:llä koko istunnon ajan** (117–121), ei jätetty ajamatta.
+**Migraatiot ajettu suoraan Supabaseen MCP:llä koko istunnon ajan** (117–125), ei jätetty ajamatta.
 
-**Auki jäänyt:** Hytin kurssien/korttien otsikkovuoto-havainto (ei vahvistettu, ei staattisesti löydetty — tarvitsee Katrin live-toistokuvauksen). Kalenterin kuittaus omilla riveillä (vanha, ei tässä istunnossa käsitelty). Iso, tietoisesti rajattu ulkopuolelle: koko "Täydennykset Satama-speksiin" -Miro/GRRINDE/Boost-initiatiivi, dokumentoitu speksissä muttei rakennettu.
+**Auki jäänyt:** Hytin kurssien/korttien otsikkovuoto-havainto (ei vahvistettu, ei staattisesti löydetty — tarvitsee Katrin live-toistokuvauksen). Kalenterin kuittaus omilla riveillä (vanha, ei tässä istunnossa käsitelty). A2:n "kurssitason teksti"/"detail coding" (rakennusjärjestys-dokumentti, ei pakollinen) ei rakennettu. A5 (Nyt-näkymän uudistus) ei alkanut. Iso, tietoisesti rajattu ulkopuolelle: OSA B kokonaisuudessaan (12 kohtaa).
 
-**Seuraava luonnollinen askel: elävä testaus.** Erityisesti Laituri-uudistus koskettaa dataa varovaisesti (näkyvyys, piilotus, ketjun valuminen) — testaa ensin turvallisilla/vähäarvoisilla riveillä.
+**Seuraava luonnollinen askel: elävä testaus.** Sekä Laituri-uudistus että koko uusi Tehtävänäkymä koskettavat dataa/käyttäytymistä joita ei ole vielä nähty oikealla laitteella — testaa ensin varovaisesti.
