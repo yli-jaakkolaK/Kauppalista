@@ -2970,6 +2970,21 @@ function opintoPaivaaDeadlineen(aihe, kurssienDeadlinet, aiheidenDeadlinet, tana
 // haeOpintoKestoMinuutteina) ei mahdu ikkunaan — koskee myös TASO 1:tä
 // (jos ei mahdu aikaan, ei näytetä vaikka olisi kiireellinen — aikaikkunan
 // koko pointti on ettei näytetä mitään mikä ei mahdu).
+
+// Päivän tavoiteaskelmäärä (2026-08-18, Katrin pyyntö: "9.15-15.30 täytä
+// koko se aika, jotta ei tarvis tehdä illalla" — tietoinen käännös pois
+// aiemmasta "1-2 asiaa/pv" -oletuksesta, ks. suodataNakyvatAskeleet-
+// kommentin historia). EI muuta itse pisteytys/suodatuslogiikkaa —
+// raskaana päivänä kelpaavat silti VAIN kevyet vaiheet (opintoKuormaBonus
+// palauttaa -1000 raskaalle uudelle työlle, suodattuu pois automaattisesti),
+// joten katon nosto ei riko olemassa olevaa kuormasuojaa. Todellinen
+// sijoittelu (mahtuuko oikeasti tänään) tapahtuu piirraNytLoki:ssa, joka
+// JÄTTÄÄ POIS kaiken mikä ei mahdu vapaaseen aikaan — tämä on vain
+// yläraja kuinka montaa ehdokasta ylipäätään pyydetään, ei tae että
+// kaikki näytetään.
+function opintoPaivanTavoiteAskelmaara(kuormaTaso) {
+  return kuormaTaso === 'raskas' ? 3 : 8;
+}
 async function laskeOpintoPaivanAskeleet(maxAskeliaYlikirjoitus, poissuljetutAiheIdt, poissuljetutSolmuIdt, ikkunaMin) {
   // Henkselit-esto (2026-08-05, ks. muistiinpanot.md "Henkselit") — YKSI
   // choke point kaikille kolmelle kutsupaikalle (lataaOpintoPaivanAskeleet,
@@ -3027,7 +3042,7 @@ async function laskeOpintoPaivanAskeleet(maxAskeliaYlikirjoitus, poissuljetutAih
   const eilenJumitAiheIdt = new Set((eilenJumit || []).map(function(r) { return r.aihe_id; }));
 
   const kuormaTaso = await opintoPaivanKuorma();
-  const maxAskelia = maxAskeliaYlikirjoitus != null ? maxAskeliaYlikirjoitus : (kuormaTaso === 'raskas' ? 1 : 2);
+  const maxAskelia = maxAskeliaYlikirjoitus != null ? maxAskeliaYlikirjoitus : opintoPaivanTavoiteAskelmaara(kuormaTaso);
 
   // --- Siltojen ikkunapaino + kiireellisyyden leviäminen (KAIKILLE
   // solmuille, ei vain tänään valmiille — ks. siltaOmaPaino-kommentti) ---
@@ -3176,7 +3191,7 @@ async function tayttaOpintoPaivanAskeleet() {
   const rivit = nykyiset || [];
   const tarjollaMaara = rivit.filter(function(r) { return r.tila === 'tarjolla'; }).length;
   const kuormaTaso = await opintoPaivanKuorma();
-  const tavoiteMaara = kuormaTaso === 'raskas' ? 1 : 2;
+  const tavoiteMaara = opintoPaivanTavoiteAskelmaara(kuormaTaso);
   const puuttuu = tavoiteMaara - tarjollaMaara;
   if (puuttuu <= 0) return;
 
@@ -3259,12 +3274,11 @@ async function lopetaOpintoSessio(sessioId, alkoiAt) {
   lataaOpintoPaivanAskeleet();
 }
 
-// Häivytys (2026-08-05, täsmennetty 2026-08-06 oikean käytön perusteella):
-// tehty/ohitettu-kortti pysyy näkyvissä kunnes tehdyn_nakyvyys_maara UUTTA
-// askelta on tullut sen JÄLKEEN samana päivänä. Oletus 0 (Katrin korjaus
-// alkuperäiseen 3:een — hänen käyttötahdillaan, 1-2 asiaa päivässä, kolmen
-// uuden kertyminen olisi vienyt useita päiviä ja tuntunut jumiutumiselta):
-// heti kun jokin merkitään tehdyksi/ohitetuksi, se häviää näkyvistä VÄLITTÖMÄSTI
+// Häivytys (2026-08-05, täsmennetty 2026-08-06 oikean käytön perusteella,
+// päiväkatto nostettu 1-2:sta 8:aan 2026-08-18 — ks. opintoPaivanTavoite-
+// Askelmaara): tehty/ohitettu-kortti pysyy näkyvissä kunnes tehdyn_nakyvyys_
+// maara UUTTA askelta on tullut sen JÄLKEEN samana päivänä. Oletus 0: heti
+// kun jokin merkitään tehdyksi/ohitetuksi, se häviää näkyvistä VÄLITTÖMÄSTI
 // ja tayttaOpintoPaivanAskeleet() tuo tilalle uuden samalla hetkellä — ei
 // mitään "viimeisimmät N tehtyä" -jälkinäkymää. `jarjestetyt` on jo
 // created_at-järjestyksessä (ks. lataaOpintoPaivanAskeleet-kysely). Arvo
@@ -3438,18 +3452,6 @@ async function piirraNytLoki(askeleet) {
       lokiEl.appendChild(piirraNytLokiRivi(rivi));
     }
   });
-
-  // "Muut vaihtoehdot" — muut tänään tarjotut opiskelupätkät kuin se joka
-  // sai Nyt-kortin (uusi 17.8.2026, ei kysytä ennalta pudotusvalikkoa).
-  // Liitetään NIMENOMAAN Nyt-kortin omaan kehykseen, ei lokin viimeiseen
-  // riviin (joka voi olla mikä tahansa myöhempi kalenterimerkintä).
-  if (nytKortinKehys) {
-    const nytKohde = rivit[0];
-    const muutVaihtoehdot = opiskelupatkat.filter(function(p) { return p.askel.id !== nytKohde.askel.id; });
-    if (muutVaihtoehdot.length > 0) {
-      nytKortinKehys.appendChild(piirraNytVaihtoehdot(muutVaihtoehdot));
-    }
-  }
 }
 
 function piirraNytLokiRivi(rivi) {
@@ -3468,11 +3470,17 @@ function piirraNytLokiRivi(rivi) {
   } else {
     const kohde = rivi.kohde;
     const kurssi = rivi.askel.opinto_aiheet ? (kohde.opinto_kurssit ? kohde.opinto_kurssit.name : '') : (kohde.lahde || '');
-    el.className = 'nyt-loki-rivi matala';
+    // Napautettava (2026-08-18, Katrin pyyntö: "muut vaihtoehdot" -piilotettu
+    // lista poistettu yksinkertaisuuden vuoksi — jos ykköskortin aihe ei
+    // inspiroi, "En ehtinyt" ja napauta jotain jo NÄKYVISSÄ olevaa
+    // myöhempää riviä sen sijaan että avaisi erillisen laajennettavan
+    // listan). Täyden päivän täytön myötä näitä on nyt yleensä useampi.
+    el.className = 'nyt-loki-rivi matala napautettava';
     el.innerHTML =
       '<div class="nyt-loki-aika">' + kelloMinuuteista(rivi.alku) + '</div>' +
       '<div class="nyt-loki-teksti"><b>' + kohde.name + '</b>' +
       '<span class="pieni">' + kurssi + (kurssi ? ' · ' : '') + OPINTO_VAIHE_NIMET[rivi.vaihe] + '</span></div>';
+    el.addEventListener('click', function() { avaaNytKortinKohde(rivi); });
   }
   return el;
 }
@@ -3527,37 +3535,7 @@ function laskeNytPerustelu(rivi) {
   return null; // muut ehdot (palautus 3-5pv, kevyt kuorma) lasketaan piirraNytLoki:n kutsujassa tarvittaessa
 }
 
-function piirraNytVaihtoehdot(vaihtoehdot) {
-  const nappi = document.createElement('button');
-  nappi.type = 'button';
-  nappi.className = 'saadin nyt-vaihtoehdot-nappi';
-  nappi.style.marginTop = '10px';
-  nappi.textContent = 'muut vaihtoehdot';
-  const lista = document.createElement('div');
-  lista.className = 'nyt-vaihtoehdot-lista';
-  lista.style.display = 'none';
-  vaihtoehdot.forEach(function(v) {
-    const kohde = v.kohde;
-    const kurssi = v.askel.opinto_aiheet ? (kohde.opinto_kurssit ? kohde.opinto_kurssit.name : '') : (kohde.lahde || '');
-    const el = document.createElement('button');
-    el.type = 'button';
-    el.className = 'nyt-vaihtoehto';
-    el.innerHTML = '<b>' + kohde.name + '</b><span>' + kurssi + (kurssi ? ' · ' : '') + OPINTO_VAIHE_NIMET[v.vaihe] + '</span>';
-    el.addEventListener('click', function() { avaaNytKortinKohde(v); });
-    lista.appendChild(el);
-  });
-  nappi.addEventListener('click', function() {
-    const auki = lista.style.display !== 'none';
-    lista.style.display = auki ? 'none' : 'flex';
-    nappi.setAttribute('aria-pressed', String(!auki));
-  });
-  const kehys = document.createElement('div');
-  kehys.appendChild(nappi);
-  kehys.appendChild(lista);
-  return kehys;
-}
-
-// Kohteen avaus Nyt-lokista/vaihtoehdoista — aihe (opinto_aiheet) avaa uuden
+// Kohteen avaus Nyt-lokista — aihe (opinto_aiheet) avaa uuden
 // A4-Tehtävänäkymän (§4.9, automaattinen ajanotto). Taitosolmu (silta) EI
 // vielä ole siirretty samaan malliin (eri, vanhempi tietomuoto — ei
 // pero_vaihe/pacer_paatyyppi/retrieval_kierrokset-kenttiä, ks. sql/092) —
