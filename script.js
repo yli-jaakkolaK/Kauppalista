@@ -1869,8 +1869,10 @@ document.getElementById('opinto-tehtava-valmis-btn').addEventListener('click', a
 document.getElementById('opinto-tehtava-jumi-btn').addEventListener('click', async function() {
   const aihe = currentOpintoAihe;
   if (!aihe) return;
+  const aikaKaytettyS = opintoTehtavaAlkoiAt ? Math.round((Date.now() - new Date(opintoTehtavaAlkoiAt).getTime()) / 1000) : null;
   const { error } = await db.from('opinto_jumi_merkinnat').insert({
     owner_id: currentUserId, aihe_id: aihe.id, pero_vaihe: aihe.pero_vaihe, pacer_tyyppi: aihe.pacer_paatyyppi,
+    aika_kaytetty_s: aikaKaytettyS,
   });
   if (error) console.error('Jumi-merkinnän tallennus epäonnistui:', error);
   const vastaus = document.getElementById('opinto-tehtava-jumi-vastaus');
