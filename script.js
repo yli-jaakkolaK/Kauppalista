@@ -1819,29 +1819,30 @@ document.getElementById('opinto-tehtava-valmis-btn').addEventListener('click', a
   if (!aihe) return;
   const nytIso = new Date().toISOString();
 
-  if (aihe.pero_vaihe === 'retrieval') {
-    const uusiKierrokset = (aihe.retrieval_kierrokset || 0) + 1;
-    if (uusiKierrokset < aihe.retrieval_tavoite) {
-      const { error } = await db.from('opinto_aiheet').update({ retrieval_kierrokset: uusiKierrokset, viimeksi_kosketettu: nytIso }).eq('id', aihe.id);
-      if (ilmoitaKirjoitusvirheesta(error, 'Kierroksen tallennus')) return;
-      aihe.retrieval_kierrokset = uusiKierrokset;
-      naytaIlmoitus('Kierros ' + uusiKierrokset + ' / ' + aihe.retrieval_tavoite + ' tehty');
-      paivitaOpintoTehtavaKierros();
-      await paivitaOpintoTehtavaOhje();
-      return;
-    }
-    // Tavoitemäärä täynnä — etenee seuraavaan vaiheeseen kuten muutkin.
-    const { error } = await db.from('opinto_aiheet').update({ retrieval_kierrokset: uusiKierrokset, viimeksi_kosketettu: nytIso }).eq('id', aihe.id);
-    if (ilmoitaKirjoitusvirheesta(error, 'Kierroksen tallennus')) return;
-    aihe.retrieval_kierrokset = uusiKierrokset;
-  }
-
   if (aihe.pero_vaihe === 'overlearning') {
     naytaIlmoitus('Merkitty — syventäminen on vapaaehtoista, voit palata milloin vain');
     return;
   }
 
   const paivitys = { viimeksi_kosketettu: nytIso };
+
+  if (aihe.pero_vaihe === 'retrieval') {
+    const uusiKierrokset = (aihe.retrieval_kierrokset || 0) + 1;
+    paivitys.retrieval_kierrokset = uusiKierrokset;
+    if (uusiKierrokset < aihe.retrieval_tavoite) {
+      // Ei vielä tavoitteessa — yksi kirjoitus, ei vaiheenvaihtoa.
+      const { error } = await db.from('opinto_aiheet').update(paivitys).eq('id', aihe.id);
+      if (ilmoitaKirjoitusvirheesta(error, 'Kierroksen tallennus')) return;
+      Object.assign(aihe, paivitys);
+      naytaIlmoitus('Kierros ' + uusiKierrokset + ' / ' + aihe.retrieval_tavoite + ' tehty');
+      paivitaOpintoTehtavaKierros();
+      await paivitaOpintoTehtavaOhje();
+      return;
+    }
+    // Tavoitemäärä täynnä — kierroslaskuri ja vaiheenvaihto samassa kirjoituksessa
+    // (ei kahta erillistä round-trippia, ettei uusinta-yritys virheen jälkeen
+    // pääse laskemaan kierrosta kahdesti).
+  }
   if (aihe.pero_vaihe === 'priming') paivitys.priming_tehty = true;
   if (aihe.pero_vaihe === 'reference') { paivitys.reference_tehty = true; paivitys.kertausjonossa = true; }
 
