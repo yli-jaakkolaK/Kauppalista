@@ -1719,10 +1719,84 @@ async function paivitaOpintoTehtavaOhje() {
 }
 
 // §4.9: "Miro-embed vain kun sitä tarvitaan, esim. encoding ja retrieval."
-// Paikka on olemassa, itse upotus odottaa Miron API-tunnuksia.
-function paivitaOpintoTehtavaMiroKoukku() {
-  const vaihe = currentOpintoAihe.pero_vaihe;
-  document.getElementById('opinto-tehtava-miro-koukku').style.display = (vaihe === 'encoding' || vaihe === 'retrieval') ? 'block' : 'none';
+// Board A (encoding+overlearning, kurssikohtainen Frame) / Board B
+// (retrieval, kierroskohtainen Frame) — ks. sql/130/131, api/miro.js.
+// Ei estä muuta näkymän avautumista jos Miro-osa epäonnistuu (esim. Frame-
+// luonti kaatuu verkkovirheeseen) — kutsutaan ilman awaitia avaaOpintoTehtava
+// -funktiosta, päivittää vain oman kehyksensä kun/jos valmistuu.
+async function paivitaOpintoTehtavaMiroKoukku() {
+  const aihe = currentOpintoAihe;
+  const vaihe = aihe.pero_vaihe;
+  const kehys = document.getElementById('opinto-tehtava-miro-koukku');
+  if (vaihe !== 'encoding' && vaihe !== 'overlearning' && vaihe !== 'retrieval') {
+    kehys.style.display = 'none';
+    kehys.innerHTML = '';
+    return;
+  }
+  kehys.style.display = 'block';
+  kehys.innerHTML = '<p class="selite">Ladataan kanvaasia…</p>';
+
+  try {
+    const boardId = vaihe === 'retrieval' ? haeAsetusTeksti('miro_board_b_id', null) : haeAsetusTeksti('miro_board_a_id', null);
+    const frameId = vaihe === 'retrieval' ? await haeTaiLuoRetrievalMiroFrame(aihe) : await haeTaiLuoKurssinMiroFrame(aihe);
+    if (!boardId || !frameId) throw new Error('Board tai Frame puuttuu');
+    // Vain currentOpintoAihe on yhä sama kanvaasi auki (käyttäjä ei ole
+    // ehtinyt navigoida pois odottaessa) — muuten vanha lataus kirjoittaisi
+    // uuden näkymän päälle.
+    if (currentOpintoAihe !== aihe) return;
+    kehys.innerHTML = '<iframe class="opinto-miro-iframe" src="https://miro.com/app/live-embed/' + encodeURIComponent(boardId) + '/?moveToWidget=' + encodeURIComponent(frameId) + '&embedAutoplay=true" frameborder="0" allow="fullscreen" allowfullscreen></iframe>';
+  } catch (e) {
+    console.error('Miro-kanvaasin lataus epäonnistui:', e.message);
+    if (currentOpintoAihe !== aihe) return;
+    kehys.innerHTML = '<p class="section-empty">Kanvaasin lataus epäonnistui — voit silti jatkaa paperilla.</p>';
+  }
+}
+
+// Board A: YKSI Frame per kurssi, luodaan kerran ja pysyy koko kurssin ajan
+// (§10.1: "kukin solmu avautuu siitä kohdasta jota on tarkoitus työstää"
+// samalla jaetulla Framella).
+async function haeTaiLuoKurssinMiroFrame(aihe) {
+  const { data: kurssi, error } = await db.from('opinto_kurssit').select('id, name, miro_frame_id').eq('id', aihe.kurssi_id).single();
+  if (error || !kurssi) throw new Error('Kurssin haku epäonnistui Miro-framea varten');
+  if (kurssi.miro_frame_id) return kurssi.miro_frame_id;
+
+  const frameId = await luoMiroFrame('a', kurssi.name);
+  const { error: tallennusError } = await db.from('opinto_kurssit').update({ miro_frame_id: frameId }).eq('id', kurssi.id);
+  if (tallennusError) console.error('Kurssin Miro-framen tallennus epäonnistui (frame silti luotu, käytetään tätä kertaa):', tallennusError);
+  return frameId;
+}
+
+// Board B: Frame per retrieval-kierros — "jokainen kierros alkaa täysin
+// tyhjältä" (sung-metodi §6d). Kierrosta ei ole omana rivinään, joten
+// miro_retrieval_frame_kierros muistaa MILLE kierrosnumerolle tallennettu
+// frame_id kuuluu; jos retrieval_kierrokset on edennyt sen ohi, vanha ei
+// enää täsmää ja uusi Frame luodaan.
+async function haeTaiLuoRetrievalMiroFrame(aihe) {
+  const nykyinenKierros = opintoNykyinenKierros(aihe);
+  if (aihe.miro_retrieval_frame_id && aihe.miro_retrieval_frame_kierros === nykyinenKierros) {
+    return aihe.miro_retrieval_frame_id;
+  }
+  const { data: kurssi } = await db.from('opinto_kurssit').select('name').eq('id', aihe.kurssi_id).single();
+  const otsikko = (kurssi ? kurssi.name : '') + ' · ' + aihe.name + ' · kierros ' + nykyinenKierros;
+  const frameId = await luoMiroFrame('b', otsikko);
+  const { error } = await db.from('opinto_aiheet').update({ miro_retrieval_frame_id: frameId, miro_retrieval_frame_kierros: nykyinenKierros }).eq('id', aihe.id);
+  if (error) console.error('Retrieval-Miro-framen tallennus epäonnistui (frame silti luotu, käytetään tätä kertaa):', error);
+  aihe.miro_retrieval_frame_id = frameId;
+  aihe.miro_retrieval_frame_kierros = nykyinenKierros;
+  return frameId;
+}
+
+async function luoMiroFrame(board, otsikko) {
+  const { data: sessioData } = await db.auth.getSession();
+  const token = sessioData.session ? sessioData.session.access_token : null;
+  const vastaus = await fetch('/api/miro?action=create-frame', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
+    body: JSON.stringify({ board: board, title: otsikko }),
+  });
+  const data = await vastaus.json();
+  if (!vastaus.ok) throw new Error(data.error || 'Framen luonti epäonnistui');
+  return data.id;
 }
 
 // Priming-vaiheessa kirjoitetaan kysymykset; encoding-vaiheesta eteenpäin

@@ -200,6 +200,63 @@ async function kasitteleSetupBoards(req, res) {
   }
 }
 
+// Kirjautuneen käyttäjän tunnistus (sama malli kuin api/_lib/push-test.js:n
+// haeKayttajaId) — create-frame kutsutaan normaalin sovelluskäytön aikana
+// (Tehtävänäkymän avaus), ei admin-salaisuudella kuten setup-boards. Kumpi
+// tahansa kirjautunut käyttäjä (Katri/Juha) saa luoda Frameja — ei
+// omistajarajattua dataa, sama jaettu Miro-tila molemmille.
+async function haeKayttajaId(userToken) {
+  const vastaus = await fetch(SUPABASE_URL + '/auth/v1/user', {
+    headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + userToken },
+  });
+  if (!vastaus.ok) return null;
+  const data = await vastaus.json();
+  return data.id || null;
+}
+
+// Luo uuden Framen Board A:lle tai B:lle. EI idempotentti itsessään —
+// kutsujan (script.js) vastuulla tarkistaa onko frame_id jo olemassa
+// oikealle kohteelle (kurssi Board A:lla, kierrosnumero Board B:llä) ennen
+// kutsua, koska "onko olemassa" -logiikka riippuu kummasta boardista on
+// kyse (kurssi- vs. kierrosnumero-avain) — ei yhtä yhteistä sääntöä.
+async function kasitteleCreateFrame(req, res) {
+  if (req.method !== 'POST') {
+    return res.status(405).json({ error: 'POST vaaditaan' });
+  }
+  const authHeader = req.headers.authorization || '';
+  const token = authHeader.replace(/^Bearer\s+/i, '');
+  const userId = token ? await haeKayttajaId(token) : null;
+  if (!userId) {
+    return res.status(401).json({ error: 'Ei kirjautunut' });
+  }
+
+  const body = req.body || {};
+  const boardAvain = body.board === 'b' ? 'miro_board_b_id' : body.board === 'a' ? 'miro_board_a_id' : null;
+  const otsikko = (body.title || '').trim();
+  if (!boardAvain || !otsikko) {
+    return res.status(400).json({ error: 'body.board ("a" tai "b") ja body.title vaaditaan' });
+  }
+
+  const boardIdRes = await supabaseFetch('asetukset?select=value&key=eq.' + boardAvain);
+  const boardIdRivit = await boardIdRes.json();
+  const boardId = Array.isArray(boardIdRivit) && boardIdRivit[0] ? boardIdRivit[0].value : null;
+  if (!boardId) {
+    return res.status(500).json({ error: 'Board ' + body.board + ' ei ole vielä olemassa — aja ensin ?action=setup-boards' });
+  }
+
+  try {
+    const luontiRes = await miroFetch('/boards/' + boardId + '/frames', {
+      method: 'POST',
+      body: JSON.stringify({ data: { title: otsikko }, position: { x: 0, y: 0 } }),
+    });
+    const data = await luontiRes.json();
+    if (!luontiRes.ok) throw new Error(JSON.stringify(data));
+    return res.status(200).json({ success: true, id: data.id });
+  } catch (e) {
+    return res.status(500).json({ error: 'Framen luonti epäonnistui: ' + e.message });
+  }
+}
+
 async function kasitteleCallback(req, res) {
   const koodi = (req.query || {}).code;
   const virhe = (req.query || {}).error;
@@ -265,6 +322,7 @@ function escapeHtml(s) {
 const ACTIONS = {
   callback: kasitteleCallback,
   'setup-boards': kasitteleSetupBoards,
+  'create-frame': kasitteleCreateFrame,
 };
 
 module.exports = async function handler(req, res) {
