@@ -3573,10 +3573,19 @@ h1 {
 
 /* Kuormitustila-kytkin — itse painettava pinta (--r-kosketettava), ei
    erillistä laatikkoa/tekstiä. Pois päältä: lämmin lasi + messinkikehys.
-   Päällä: koko kytkin --vaara, nuppi vaalea. */
+   Päällä: koko kytkin --vaara, nuppi vaalea.
+   Kiinnitetty ruudun vasempaan yläkulmaan (2026-08-17, Katrin pyyntö) —
+   irti .otsake-ylarivin normaalista virtauksesta ja bodyn 48px/20px-
+   täytteestä, samalla position:fixed-periaatteella kuin .alapalkki
+   (z-index 40, safe-area-turvattu samaan tapaan kuin alapalkin
+   env(safe-area-inset-bottom)). */
 .ruori .kuormakytkin {
+  position: fixed;
+  top: calc(8px + env(safe-area-inset-top, 0px));
+  left: calc(8px + env(safe-area-inset-left, 0px));
+  z-index: 40;
   flex: none; width: 52px; height: 30px; border-radius: 13px; padding: 3px;
-  cursor: pointer; font-family: inherit; position: relative;
+  cursor: pointer; font-family: inherit;
   border: 1px solid rgba(156, 122, 67, .5);
   background: linear-gradient(165deg, rgba(255, 252, 244, .72), rgba(234, 230, 220, .28));
   backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
