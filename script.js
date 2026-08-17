@@ -2897,9 +2897,11 @@ async function piirraNytLoki(askeleet) {
 
   if (rivit.length === 0) { lokiEl.innerHTML = ''; return; }
 
+  let nytKortinKehys = null;
   rivit.forEach(function(rivi, index) {
     if (index === 0 && rivi.tyyppi === 'opiskelu') {
-      lokiEl.appendChild(piirraNytKortti(rivi));
+      nytKortinKehys = piirraNytKortti(rivi);
+      lokiEl.appendChild(nytKortinKehys);
     } else {
       lokiEl.appendChild(piirraNytLokiRivi(rivi));
     }
@@ -2907,10 +2909,14 @@ async function piirraNytLoki(askeleet) {
 
   // "Muut vaihtoehdot" — muut tänään tarjotut opiskelupätkät kuin se joka
   // sai Nyt-kortin (uusi 17.8.2026, ei kysytä ennalta pudotusvalikkoa).
-  const nytKohde = rivit[0] && rivit[0].tyyppi === 'opiskelu' ? rivit[0] : null;
-  const muutVaihtoehdot = opiskelupatkat.filter(function(p) { return !nytKohde || p.askel.id !== nytKohde.askel.id; });
-  if (muutVaihtoehdot.length > 0 && nytKohde) {
-    lokiEl.lastElementChild.appendChild(piirraNytVaihtoehdot(muutVaihtoehdot));
+  // Liitetään NIMENOMAAN Nyt-kortin omaan kehykseen, ei lokin viimeiseen
+  // riviin (joka voi olla mikä tahansa myöhempi kalenterimerkintä).
+  if (nytKortinKehys) {
+    const nytKohde = rivit[0];
+    const muutVaihtoehdot = opiskelupatkat.filter(function(p) { return p.askel.id !== nytKohde.askel.id; });
+    if (muutVaihtoehdot.length > 0) {
+      nytKortinKehys.appendChild(piirraNytVaihtoehdot(muutVaihtoehdot));
+    }
   }
 }
 
@@ -2965,6 +2971,18 @@ function piirraNytKortti(rivi) {
     p.textContent = perustelu;
     wrap.appendChild(p);
   }
+
+  // "En ehtinyt" — säilytetty vanhasta kortista, ei mainittu §4:ssä mutta
+  // ei myöskään poistettu; sama "ei rangaistusta, ei kertymää" -periaate
+  // kuin ennen (merkitseOpintoAskel). Tekstilinkki, ei nappi, ettei riko
+  // "koko kortti on painettava" -sääntöä toisella isolla kosketuspinnalla.
+  const ohita = document.createElement('p');
+  ohita.className = 'selite';
+  ohita.textContent = 'En ehdi tähän tänään';
+  ohita.style.cursor = 'pointer';
+  ohita.style.textDecoration = 'underline';
+  ohita.addEventListener('click', function() { merkitseOpintoAskel(rivi.askel, 'ohitettu'); });
+  wrap.appendChild(ohita);
 
   return wrap;
 }
@@ -3059,13 +3077,20 @@ async function suoritaNytBoost(min) {
   };
 }
 function avaaNytBoostRulla() {
-  // iOS-natiivi <select>, sama periaate kuin muualla sovelluksessa käytetty
-  // rullavalitsin (ks. script.js:n Toistuva muistutus -kenttä) — ei
-  // hand-rolled kosketusvieritintä, ks. §4.8 "toteutukseltaan iOS-natiivi".
-  const valittu = prompt('Kuinka monta minuuttia? (' + NYT_BOOST_RULLA_ARVOT.join(', ') + ')', '25');
-  const min = parseInt(valittu, 10);
-  if (!min || min < 1) return;
-  suoritaNytBoost(min);
+  // Natiivi <select>, sama periaate kuin muualla sovelluksessa käytetty
+  // rullavalitsin (Toistuva muistutus -kenttä) — ei hand-rolled kosketus-
+  // vieritintä, ks. §4.8 "toteutukseltaan iOS-natiivi".
+  const rulla = document.getElementById('nyt-boost-rulla');
+  if (rulla.options.length === 0) {
+    NYT_BOOST_RULLA_ARVOT.forEach(function(m) {
+      const optio = document.createElement('option');
+      optio.value = m;
+      optio.textContent = m + ' min';
+      rulla.appendChild(optio);
+    });
+    rulla.addEventListener('change', function() { suoritaNytBoost(parseInt(rulla.value, 10)); });
+  }
+  rulla.style.display = rulla.style.display === 'none' ? 'block' : 'none';
 }
 
 // "En ehtinyt" -kuittaus EI kosketa kohteen vaihe-/SR-tilaa mitenkään — sama
