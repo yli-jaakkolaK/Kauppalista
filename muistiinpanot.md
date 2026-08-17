@@ -3962,16 +3962,38 @@ sw.js v142 → v144.
 
 ---
 
+### Miro-integraatio: OAuth-callback, Board A/B, Frame-luonti, Live Embed (2026-08-17)
+
+Katrin oma huomio (relayattu "Codelta"): OAuth-koodin vaihto tokeneiksi VAATII palvelimen — Katri ei olisi voinut viedä asennusta loppuun ilman että callback-endpoint on olemassa ensin. Rakennettu järjestyksessä:
+
+**1) `api/miro.js` (uusi, konsolidoitu — ei useita api/miro-*.js-tiedostoja, sama Vercel Hobby-tason 12 funktion katto -periaate kuin `api/cron.js`:llä).** `?action=callback` ottaa vastaan Miron OAuth-redirectin, vaihtaa koodin tokeneiksi.
+
+**2) Tokenien pysyvä säilytys.** Miron `refresh_token` KIERTYY (rotate) joka käytöllä — staattiset Vercel-ympäristömuuttujat eivät riitä. Uusi `miro_tokens`-taulu (sql/130, RLS päällä ILMAN YHTÄÄN policya — vain service-role pääsee käsiksi, MOLEMMAT kirjautuneet käyttäjät suljettu ulos, eri malli kuin `asetukset`). Alkuperäinen suunnitelma ("näytä tokenit ruudulla, kopioi Verceliin käsin") osoittautui hauraaksi ensimmäisessä oikeassa kokeilussa (ks. kohta 4) — korjattu kirjoittamaan suoraan tauluun.
+
+**3) Board-setup toimii, todistettu livenä.** `?action=setup-boards&avain=...` loi Board A:n (encoding+overlearning) ja Board B:n (retrieval), board_id:t `asetukset`-taulussa (ei salaisuuksia, turvallinen sijainti).
+
+**4) Ensimmäinen kokeilu paljasti kaksi todellista ongelmaa, molemmat korjattu:**
+   - `insufficientPermissions: boards:write` — Katrin Miro-sovelluksen scope-asetuksista puuttui `boards:write` kokonaan. Miron oma sääntö: token kantaa myöntämishetken scope-joukon, jälkikäteen tehty scope-korjaus EI korjaa jo myönnettyä tokenia — vaatii aina uuden valtuutuksen. Ohje päivitetty tarkistamaan scope ENNEN ensimmäistä valtuutusta.
+   - Katri sai tokenit Miron OMASTA "Install app and get OAuth token" -napista (dashboard-oikotie), ei koskaan minun antamani `miro.com/oauth/authorize`-linkin kautta — callback ei siis koskaan nähnyt niitä. Katri liitti tokenit suoraan chattiin (live-salaisuuksia, kirjattu tähän ettei toistu turhaan): tallennettu suoraan `miro_tokens`-tauluun MCP:llä `expires_at`=heti-vanhentunut, jotta ensimmäinen oikea kutsu pakotti virkistyksen ja todisti koko refresh-ketjun toimivaksi samalla.
+
+**5) Frame-luonti + Live Embed (sql/131, `?action=create-frame`, käyttäjän oma Bearer-token, ei admin-salaisuus).** `opinto_kurssit.miro_frame_id` — yksi Frame per kurssi Board A:lla, pysyy koko kurssin ajan. `opinto_aiheet.miro_retrieval_frame_id`/`miro_retrieval_frame_kierros` — Frame per retrieval-kierros Board B:llä; koska kierrosta ei ole omana rivinään, kierrosnumero muistetaan jotta tiedetään milloin vanha Frame ei enää täsmää. `paivitaOpintoTehtavaMiroKoukku()` renderöi Miron Live Embed -iframen (`miro.com/app/live-embed/{board}/?moveToWidget={frame}`) Tehtävänäkymään encoding/overlearning/retrieval-vaiheissa.
+
+**AUKKO, ei vielä testattu oikealla laitteella:** toimiiko muokkaus iframe-upotuksessa suoraan kun Katri on kirjautunut Miroon samassa selaimessa, vai vaatiiko se erillisen kirjautumisen iframen sisällä ensimmäisellä kerralla — dokumentin oma nimenomainen huomio ("Coden pitää kokeilla oikeasti eikä olettaa"), ei vielä kokeiltu.
+
+sw.js v144 → v145.
+
+---
+
 ## Nykytila (päivitetty 2026-08-17, COPILOT.md-sääntö 4 — huom: aiempi "Nykytila ja seuraavat askeleet" -osio jäi tästä tiedostosta ylemmäs pitkän istunnon aikana kertyneiden uusien osioiden taakse, ei enää tiedoston lopussa; siirto omaksi erikseen tehtäväksi työksi, ei nyt)
 
-**Viimeksi tehty tässä istunnossa, kaikki commitoitu ja pushattu mainiin, `sw.js` nyt v144:** Laituri-uudistuksen (§16.5c) jälkeen: Teema/Vahdittu-näkyvyystoggeli + listan siirtonappi, kuormitustila-kytkimen sijoitus ruudun kulmaan, opiskelumoottorin OSA A -minimipolku (ohjematriisi, kurssin tavoite/hoitotaso/aikataulu, solmun tuntemus/perustussolmu/retrieval-kentät, A4 Tehtävänäkymä) + sung-metodi.md:n täysi korvaus + korjaukset, B1:n jumi-kesto, **A5 — koko Nyt-välilehti uudistettu** (§4:n minuuttiruudukko-aikataulutin, Boost, deadline-rivi, muut vaihtoehdot, Miro-koukku), materiaalin lisäyksen korjaus (näkyvä tallennusnappi, monessa osassa liittäminen + älyn yhdistetty solmujako), **Nyt/Reitti-uudelleenjärjestely** (Tehtävät/Sillat/Huoli/Kortit pois Nyt-sivulta), **4→1 Vercel-funktiokonsolidointi** (11/12 → 8/12), ja **Föli-integraation pohjatyö** (sijainnin talteenotto + client-puolen pysäkki/SIRI-moduuli, ei vielä UI:ssa käytössä).
+**Viimeksi tehty tässä istunnossa, kaikki commitoitu ja pushattu mainiin, `sw.js` nyt v145:** Laituri-uudistuksen (§16.5c) jälkeen: Teema/Vahdittu-näkyvyystoggeli + listan siirtonappi, kuormitustila-kytkimen sijoitus ruudun kulmaan, opiskelumoottorin OSA A -minimipolku, sung-metodi.md:n täysi korvaus + korjaukset, B1:n jumi-kesto, **A5 — koko Nyt-välilehti uudistettu**, materiaalin lisäyksen korjaus, **Nyt/Reitti-uudelleenjärjestely**, **4→1 Vercel-funktiokonsolidointi** (11/12 → 8/12, sittemmin 9/12 Miron myötä), **Föli-integraation pohjatyö**, ja **koko Miro-integraatio päästä päähän** (OAuth-callback, tokenien pysyvä säilytys, Board A/B, Frame-luonti, Live Embed Tehtävänäkymässä) — board-setup todistetusti toimiva livenä, embed itsessään ei vielä testattu.
 
-**Odottaa Katria:** (1) Miron kertaluonteinen OAuth-askel (developers.miro.com) ennen kuin palvelinpuolen Miro-proxya voi rakentaa — pitää toteuttaa yhtenä konsolidoituna `api/miro.js`-endpointtina, tilaa on nyt runsaasti (8/12). (2) Kalenterivärien hex-koodit (oma keltainen, yhteinen vihreä) — viimeisin kysymys jäi teknisen virheen takia vastaamatta, kysyttävä uudelleen.
+**Odottaa Katria:** (1) Kalenterivärien hex-koodit (oma keltainen, yhteinen vihreä) — kysytty kahdesti, ei vielä vastattu. (2) Elävä testi: avaa jokin encoding/overlearning/retrieval-vaiheen solmu Tehtävänäkymästä ja kokeile toimiiko Miro-kanvaasin muokkaus iframen sisällä suoraan.
 
-**Auki jäänyt / seuraavaksi:** viikkokalenteriruudukko itse (Reitti-välilehti, käyttää Föli-pohjatyötä + kalenteriväreja kun molemmat valmiit), kurssirajat ylittävä vaiheensiirtymäkehote (§7.4-laajennus), Retrieval Frame-per-kierros + koko Miro-integraatio, deadline-rivin tiedostoliite (`materiaali_deadline_id`). "Kertausmatikka"-epäily jäi auki, ei vahvistettu bugiksi. Vapaatekstisten tehtävien "vinkki jonojärjestykseen" -idea jätettiin tietoisesti rakentamatta.
+**Auki jäänyt / seuraavaksi:** viikkokalenteriruudukko itse (Reitti-välilehti, käyttää Föli-pohjatyötä + kalenteriväreja kun molemmat valmiit), kurssirajat ylittävä vaiheensiirtymäkehote (§7.4-laajennus), deadline-rivin tiedostoliite (`materiaali_deadline_id`), Miron muokkausloki ajanoton varmistukseen (§4.3, ei vielä rakennettu — Frame/itemien `modifiedAt`-luku on olemassa Miron API:ssa, ei vielä kytketty). "Kertausmatikka"-epäily jäi auki, ei vahvistettu bugiksi. Vapaatekstisten tehtävien "vinkki jonojärjestykseen" -idea jätettiin tietoisesti rakentamatta.
 
-**Migraatiot ajettu suoraan Supabaseen MCP:llä koko istunnon ajan** (117–129), ei jätetty ajamatta.
+**Migraatiot ajettu suoraan Supabaseen MCP:llä koko istunnon ajan** (117–131), ei jätetty ajamatta.
 
-**Auki jäänyt:** Hytin kurssien/korttien otsikkovuoto-havainto (vanha, ei vahvistettu). Kalenterin kuittaus omilla riveillä (vanha). A2:n "kurssitason teksti"/"detail coding" (ei pakollinen) ei rakennettu. **Miro-embed** koko sovelluksessa (odottaa Katrin API-tunnuksia). **Nousemismuistutus** (§4.3) ei rakennettu. **Taitosolmujen ajanotto Nyt-lokista** katosi A5:n myötä eikä ole vielä korjattu (ks. yllä). OSA B muuten tietoisesti rajattu ulkopuolelle (yksi poikkeus: B1:n jumi-kesto).
+**Auki jäänyt:** Hytin kurssien/korttien otsikkovuoto-havainto (vanha, ei vahvistettu). Kalenterin kuittaus omilla riveillä (vanha). A2:n "kurssitason teksti"/"detail coding" (ei pakollinen) ei rakennettu. **Nousemismuistutus** (§4.3) ei rakennettu. **Taitosolmujen ajanotto Nyt-lokista** katosi A5:n myötä eikä ole vielä korjattu. OSA B muuten tietoisesti rajattu ulkopuolelle (yksi poikkeus: B1:n jumi-kesto).
 
-**Seuraava luonnollinen askel: elävä testaus.** Laituri-uudistus, koko Tehtävänäkymä JA nyt myös koko uusi Nyt-välilehden aikataulutuslogiikka koskettavat merkittävästi käyttäytymistä jota ei ole vielä nähty oikealla laitteella/datalla — testaa varovaisesti, erityisesti aikataulutuksen kellonajat todellisella kalenterilla.
+**Seuraava luonnollinen askel: elävä testaus.** Laituri-uudistus, koko Tehtävänäkymä (nyt myös Miro-upotuksineen), koko uusi Nyt-välilehden aikataulutuslogiikka JA Miro-integraatio koskettavat merkittävästi käyttäytymistä jota ei ole vielä nähty oikealla laitteella/datalla — testaa varovaisesti.
