@@ -335,14 +335,22 @@
     </div>
     <div id="opinto-ikkuna-tulos" style="display:none"></div>
 
-    <!-- Opintopolku VAIHE 2 (2026-07-21, ks. muistiinpanot.md "Opintopolku
-         VAIHE 2" / KONSEPTIKIRJA.md 4.11) — arjen ohjaava ikkuna ("näkymä 1"),
-         kolmen voiman moottorin tarjoamat 1-2 askelta tälle päivälle. EI
-         kurssivalikkoa, EI koko työlistaa — vain tämän päivän askeleet.
-         Näkyy VAIN kun moottori on tarjonnut jotain (ei koskaan tyhjänä pörise). -->
+    <!-- Nyt-välilehti (SATAMA_SPEKSI.md §4, uudistettu 17.8.2026) — päivän
+         loki ylimpänä (kalenteri Katrin omilta tapahtumilta + suojatut
+         ikkunat + moottorin valitsemat opiskelupätkät samassa aikajärjes-
+         tyksessä), käynnissä/seuraava kohta korostettuna .nyt-korttina
+         KESKELLÄ lokia (ei erillinen elementti), perustelurivi, "muut
+         vaihtoehdot", Boost alimpana. Korvaa vanhan erillisen kortti+painike
+         -rakenteen (§4.1: "sanoi saman asian kahdesti"). Näkyy VAIN kun
+         moottori on tarjonnut jotain tälle päivälle. -->
     <div id="opinto-tanaan-osio" style="display:none">
-      <div class="section-title">🎯 Tänään opiskelussa</div>
-      <ul class="list" id="opinto-tanaan-lista"></ul>
+      <p class="nyt-deadline" id="nyt-deadline-rivi" style="display:none"></p>
+      <div class="nyt-loki" id="nyt-loki"></div>
+      <div class="osio">
+        <div class="osio-nimi">Boost</div>
+        <div class="nyt-boost" id="nyt-boost"></div>
+        <p class="selite" id="nyt-boost-tulos" style="display:none"></p>
+      </div>
     </div>
 
     <!-- Huolilippu (2026-08-04, ks. muistiinpanot.md "Huolilippu") — kevyt
@@ -560,12 +568,14 @@
     </div>
   </div>
 
-  <!-- Tehtävänäkymä (opiskelumoottori OSA A4, 2026-08-17) — avautuu solmua
-       napauttaessa. Ohje ensin, sitten materiaalit, ajanotto käynnistyy
-       automaattisesti taustalla ilman näkyvää laskuria (rakennusjärjestys-
-       dokumentti A4/B-osan Ajanotto: "Ei näkyvää edistymisviivaa"). Miro-
-       kanvaasi TIETOISESTI rajattu pois (B6, ei OSA A:ta) — paperi/kuva
-       riittää tässä vaiheessa. -->
+  <!-- Tehtävänäkymä (opiskelumoottori OSA A4, 2026-08-17; sisältöjärjestys
+       tarkennettu §4.9:ään 17.8.2026: ohje → ohjelista täpättävänä → Miro
+       (vain encoding/retrieval) → materiaalit). Ajanotto käynnistyy
+       automaattisesti taustalla ilman näkyvää laskuria (§4.3: "Ei näkyvää
+       edistymisviivaa"). Miron LIVE-upotus vaatii Miron oman API-sovelluksen
+       (OAuth-tunnukset) joita ei vielä ole — Katrin päätös 17.8.2026: koko
+       muu näkymä rakennetaan nyt, Miro-osa myöhemmin kun tunnukset on
+       hankittu. #opinto-tehtava-miro-koukku on se paikka. -->
   <div class="container" id="opinto-tehtava-view" style="display:none">
     <div class="list-header">
       <button class="back-btn" id="opinto-tehtava-back-btn">‹</button>
@@ -594,6 +604,12 @@
     <div class="section-title">📋 Ohje</div>
     <ul class="list" id="opinto-tehtava-ohje-lista"></ul>
     <p class="section-empty" id="opinto-tehtava-ohje-tyhja" style="display:none">Aseta ensin PACER-tyyppi kurssin aihelistalta, niin ohje ilmestyy tähän.</p>
+
+    <!-- Miro-koukku (§4.9: "Miro-embed vain kun sitä tarvitaan, esim.
+         encoding ja retrieval") — paikka olemassa, itse upotus odottaa
+         Miron API-tunnuksia (ei rakennettu 17.8.2026, ks. yllä oleva
+         kommentti). Näytetään vain encoding/retrieval-vaiheissa. -->
+    <p class="section-empty" id="opinto-tehtava-miro-koukku" style="display:none">🗺️ Kanvaasi (Miro) — ei vielä käytössä tässä versiossa. Käytä paperia/kuvaa, muokkaus Satamassa tulee kun Miro-tunnukset on hankittu.</p>
 
     <!-- Priming: kysymykset kirjataan tähän, nousevat esiin encodingissa
          (sung-metodi.md §6: "3 kysymystä joihin haluat vastauksen"). -->
@@ -1040,6 +1056,10 @@
          — Vaihe 1a: pelkkä tallennus/hallinta, generaattori (Vaihe 3) ei
          vielä lue näitä mihinkään. -->
     <div class="section-title">🕐 Hytin ikkunat</div>
+    <div class="settings-row">
+      <span>Aterian alku</span>
+      <input type="time" class="settings-numero-input" id="aterian-alku-input">
+    </div>
     <div class="settings-row">
       <span>Aterian kesto (min)</span>
       <input type="number" class="settings-numero-input" id="aterian-kesto-input" min="1" step="1">

@@ -3182,20 +3182,10 @@ h1 {
 }
 
 /* Opintopolku VAIHE 2 (2026-07-21, ks. muistiinpanot.md "Opintopolku VAIHE 2")
-   — arjen ohjaava ikkuna, samantyylinen kortti kuin muut huomiolaatikot
-   (esim. .hytti-seuraava-askel-laatikko) mutta oma korostusväri jottei
-   sekoitu Hytin muuhun sisältöön. */
-.list li.opinto-tanaan-kortti {
-  display: flex;
-  flex-direction: column;
-  align-items: stretch;
-  gap: 6px;
-  padding: 10px 12px;
-  margin: -1px 0 8px;
-  border: 1px solid var(--accent);
-  border-radius: 6px;
-}
-
+   — otsikko/vaihe-tyylit, jaettu "Minulla on aikaa" -tuloskortin kanssa
+   (piirraOpintoIkkunaTulos). Vanha kortti/napit/kehote-rakenne poistettu
+   17.8.2026 kun Nyt-välilehti uudistettiin (SATAMA_SPEKSI.md §4) — ne
+   korvattiin .nyt-luokilla, ks. tämän tiedoston loppu. */
 .opinto-tanaan-otsikko {
   font-size: 15px;
   color: var(--text);
@@ -3207,34 +3197,6 @@ h1 {
   color: var(--accent-text);
   text-transform: uppercase;
   letter-spacing: 0.05em;
-}
-
-/* PACER-kehote (2026-08-05, ks. HYTTI_SPEKSI §8) — tietoisesti pieni/hillitty,
-   ei pilleri/badge — tämä on tekstirivi joka selittää mitä "✓ Tehty" tekee,
-   ei uusi visuaalinen huomiopiste. */
-.opinto-tanaan-kehote {
-  font-size: 12px;
-  color: var(--muted);
-  font-style: italic;
-  margin-top: 2px;
-}
-
-.opinto-tanaan-napit {
-  display: flex;
-  gap: 6px;
-  margin-top: 4px;
-}
-
-.opinto-tanaan-napit .dialog-btn {
-  flex: 1;
-  font-size: 11px;
-  padding: 8px 4px;
-}
-
-.opinto-tanaan-tila {
-  font-size: 13px;
-  color: var(--muted);
-  margin-top: 4px;
 }
 
 /* Aikaikkuna (2026-08-05, ks. muistiinpanot.md "Aikaikkuna") — "minulla on
@@ -3955,3 +3917,102 @@ h1 {
   transform: scale(1.02);
   position: relative; z-index: 1;
 }
+
+/* ==========================================================================
+   NYT-VÄLILEHTI (§4, SATAMA_SPEKSI.md, 2026-08-17) — portattu
+   satama-design-system.css:stä + nyt-valilehti-mockup-v1.html:stä, koska
+   design-system.css ei ole linkitetty tähän appiin (vain mockupeissa).
+   ========================================================================== */
+.osio { margin: 0 0 32px; }
+.osio-nimi {
+  font-size: 11px; letter-spacing: .28em; text-transform: uppercase;
+  color: var(--vaimea); margin: 0 0 12px;
+  display: flex; align-items: center; gap: 10px;
+}
+.osio-nimi::after { content: ''; flex: 1; height: 1px; background: var(--hius); }
+.selite { font-size: 12.5px; color: var(--vaimea); margin: 8px 0 0; line-height: 1.6; }
+
+/* Deadline-rivi (§7.3/§4.1) — vain --vaara-väri saa esiintyä täällä,
+   päätetty 17.8.2026, ei muualla kalenterivärikysymyksessä. */
+.nyt-deadline {
+  font-weight: 700; font-size: 13.5px; margin: 0 0 14px;
+  padding: 8px 0 8px 12px; border-left: 2px solid var(--vaara); color: var(--vaara);
+}
+
+/* Päivän loki — kalenteritapahtumat + Nyt-kortti samassa aikajärjestyksessä
+   virrassa (§4.1: "kalenterimerkinnät eivät ole kortteja vaan viivalla
+   merkittyjä rivejä lokissa"). */
+.nyt-loki { margin: 0 0 24px; }
+.nyt-loki-rivi { display: flex; gap: 12px; padding: 10px 2px; border-bottom: 1px solid var(--hius); align-items: baseline; }
+.nyt-loki-rivi.matala { color: var(--vaimea); }
+.nyt-loki-rivi.matala .nyt-loki-teksti b { font-weight: 700; color: var(--vaimea); }
+.nyt-loki-rivi.live .nyt-loki-teksti b { font-weight: 700; color: var(--muste); }
+.nyt-loki-aika { font-size: 15px; font-weight: 700; flex: none; width: 44px; letter-spacing: -.02em; }
+.nyt-loki-teksti { flex: 1; min-width: 0; font-size: 15px; }
+.nyt-loki-teksti .pieni { display: block; margin-top: 1px; font-size: 12.5px; color: var(--vaimea); }
+.nyt-live-merkki {
+  display: inline-flex; align-items: center; gap: 5px; font-size: 10.5px;
+  letter-spacing: .14em; text-transform: uppercase; color: var(--muste); font-weight: 700;
+}
+.nyt-live-piste { width: 7px; height: 7px; border-radius: 50%; background: var(--muste); flex: none; }
+
+/* Nyt-kortti — koko kortti painettava, EI erillistä aloita-nappia (§4.1).
+   Vasen reuna messinki = "tästä painetaan", ei syvänne (syvänne on varattu
+   yksinomaan "hallussa"-merkitykselle, korjattu 17.8.2026). */
+.nyt-kohta { margin: 12px 0 20px; }
+.nyt {
+  display: block; width: 100%; text-align: left; font-family: inherit; color: inherit; cursor: pointer;
+  position: relative; overflow: hidden;
+  background: rgba(255, 253, 248, .5);
+  border: 1px solid var(--hius-vahva);
+  border-radius: var(--r-luettava);
+  padding: 15px 17px 14px 20px;
+  transition: transform var(--keski) var(--kelluu), box-shadow var(--keski) var(--kelluu), background var(--keski) var(--kelluu);
+}
+.nyt::before { content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 3px; background: var(--messinki); }
+.nyt:hover, .nyt:focus-visible { transform: translateY(-2px); background: rgba(255, 253, 248, .78); box-shadow: 0 6px 18px rgba(34, 31, 26, .11); }
+.nyt:active { transform: translateY(0) scale(.994); }
+.nyt:focus-visible { outline: 2px solid var(--sinappi); outline-offset: 3px; }
+.nyt-ylarivi { display: flex; align-items: flex-start; gap: 14px; }
+.nyt-kurssi { font-size: 12.5px; color: var(--vaimea); letter-spacing: .04em; margin-bottom: 2px; }
+.nyt-solmu { font-size: 19px; font-weight: 700; letter-spacing: -.01em; line-height: 1.25; }
+.nyt-aika { font-size: 30px; font-weight: 700; letter-spacing: -.03em; line-height: 1; padding-top: 2px; flex: none; }
+.nyt-alarivi { display: flex; align-items: center; gap: 10px; margin-top: 12px; padding-top: 11px; border-top: 1px dotted var(--hius-vahva); }
+.nyt-vaihe { font-size: 11px; letter-spacing: .2em; text-transform: uppercase; color: var(--syvanne); font-weight: 700; }
+.nyt-alarivi .pieni { margin-left: auto; font-size: 12.5px; color: var(--vaimea); }
+
+/* "Muut vaihtoehdot" (uusi 17.8.2026, ei aiemmin speksattu) — kompakti,
+   avautuessaan itse kosketettavia laatikoita, ei vaimeaa listaa. Riittävä
+   padding ettei r-kosketettava näytä täydeltä pilliltä pienellä napilla. */
+.nyt-vaihtoehdot-nappi { padding: 12px 18px; }
+.nyt-vaihtoehdot-lista { margin: 10px 0 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 8px; }
+.nyt-vaihtoehto {
+  display: block; width: 100%; text-align: left; font-family: inherit; color: var(--muste); cursor: pointer;
+  font-size: 13.5px; padding: 12px 16px; border-radius: var(--r-kosketettava);
+  border: 1px solid rgba(156, 122, 67, .5);
+  background: linear-gradient(165deg, rgba(255, 252, 244, .72), rgba(234, 230, 220, .28));
+  backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .65);
+  transition: all var(--keski) var(--kelluu);
+}
+.nyt-vaihtoehto:hover, .nyt-vaihtoehto:focus-visible { transform: translateY(-2px); }
+.nyt-vaihtoehto b { display: block; font-weight: 700; }
+.nyt-vaihtoehto span { display: block; font-size: 11.5px; color: var(--vaimea); margin-top: 2px; }
+
+/* Boost — kiinteät napit, EI liukusäädintä (§4.8). */
+.nyt-boost { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+.nyt-boost .min {
+  position: relative; border: 1px solid var(--hius-vahva); border-radius: var(--r-kosketettava);
+  background: linear-gradient(165deg, rgba(255, 252, 244, .7), rgba(234, 230, 220, .25));
+  backdrop-filter: blur(7px); -webkit-backdrop-filter: blur(7px);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .6);
+  padding: 13px 4px 10px; cursor: pointer; font-family: inherit; color: var(--muste);
+  transition: transform var(--keski) var(--kelluu), box-shadow var(--keski) var(--kelluu), border-color var(--keski) var(--kelluu);
+}
+.nyt-boost .min b { display: block; font-size: 25px; font-weight: 700; letter-spacing: -.04em; line-height: 1; }
+.nyt-boost .min span { display: block; font-size: 10px; letter-spacing: .16em; color: var(--vaimea); margin-top: 4px; }
+.nyt-boost .min:hover, .nyt-boost .min:focus-visible { transform: translateY(-3px); box-shadow: inset 0 1px 0 rgba(255, 255, 255, .7), 0 6px 16px rgba(34, 31, 26, .13); }
+.nyt-boost .min:active { transform: translateY(-1px) scale(.97); }
+
+.nouse { animation: nyt-nouse var(--hidas) var(--kelluu) both; }
+@keyframes nyt-nouse { from { opacity: 0; transform: translateY(15px); } to { opacity: 1; transform: translateY(0); } }

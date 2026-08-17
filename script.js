@@ -1588,12 +1588,21 @@ function showOpintoTehtavaView() {
 let currentOpintoAihe = null;
 let opintoTehtavaSessioId = null;
 let opintoTehtavaAlkoiAt = null;
+// Nyt-lokista avattaessa (2026-08-17, §4) välitetään myös tämän päivän
+// opinto_paivan_askeleet-rivi mukana — "✓ Merkitse tehdyksi" merkitsee sen
+// tehdyksi (katoaa Nyt-lokista, §4.1 "tehty kohta katoaa kokonaan"), riippu-
+// matta siirtyikö PERO-vaihe eteenpäin. Reitti-sivulta avattaessa (ei
+// paivanAskel-parametria) tätä ei kosketeta — sillä ei ole tämän päivän
+// askelriviä.
+let currentOpintoTehtavaPaivanAskel = null;
 
-async function avaaOpintoTehtava(aihe) {
+async function avaaOpintoTehtava(aihe, paivanAskel) {
   currentOpintoAihe = aihe;
+  currentOpintoTehtavaPaivanAskel = paivanAskel || null;
   showOpintoTehtavaView();
   paivitaOpintoTehtavaOtsikko();
   await paivitaOpintoTehtavaOhje();
+  paivitaOpintoTehtavaMiroKoukku();
   paivitaOpintoTehtavaPriming();
   paivitaOpintoTehtavaTuntemus();
   paivitaOpintoTehtavaKierros();
@@ -1631,7 +1640,12 @@ async function suljeOpintoTehtava() {
     opintoTehtavaAlkoiAt = null;
   }
   currentOpintoAihe = null;
-  if (currentOpintoKurssi) {
+  const avattuNytLokista = !!currentOpintoTehtavaPaivanAskel;
+  currentOpintoTehtavaPaivanAskel = null;
+  if (avattuNytLokista) {
+    showHyttiView('nyt');
+    await lataaOpintoPaivanAskeleet();
+  } else if (currentOpintoKurssi) {
     showOpintoKurssiView();
     await lataaOpintoAiheet();
   } else {
@@ -1694,6 +1708,13 @@ async function paivitaOpintoTehtavaOhje() {
     li.appendChild(teksti);
     listEl.appendChild(li);
   });
+}
+
+// §4.9: "Miro-embed vain kun sitä tarvitaan, esim. encoding ja retrieval."
+// Paikka on olemassa, itse upotus odottaa Miron API-tunnuksia.
+function paivitaOpintoTehtavaMiroKoukku() {
+  const vaihe = currentOpintoAihe.pero_vaihe;
+  document.getElementById('opinto-tehtava-miro-koukku').style.display = (vaihe === 'encoding' || vaihe === 'retrieval') ? 'block' : 'none';
 }
 
 // Priming-vaiheessa kirjoitetaan kysymykset; encoding-vaiheesta eteenpäin
@@ -1818,6 +1839,16 @@ document.getElementById('opinto-tehtava-valmis-btn').addEventListener('click', a
   const aihe = currentOpintoAihe;
   if (!aihe) return;
   const nytIso = new Date().toISOString();
+
+  // Nyt-lokin päivän askel merkitään tehdyksi heti kun jotain työtä on
+  // tehty tälle solmulle tänään — riippumatta siirtyykö PERO-vaihe eteenpäin
+  // (esim. yksi retrieval-kierros riittää, ei tarvitse koko vaihetta
+  // valmiiksi). Katoaa Nyt-lokista (§4.1). Ei koske Reitti-sivulta avattuja.
+  if (currentOpintoTehtavaPaivanAskel) {
+    const { error: askelError } = await db.from('opinto_paivan_askeleet')
+      .update({ tila: 'tehty' }).eq('id', currentOpintoTehtavaPaivanAskel.id);
+    if (askelError) console.error('Päivän askeleen kuittaus epäonnistui:', askelError);
+  }
 
   if (aihe.pero_vaihe === 'overlearning') {
     naytaIlmoitus('Merkitty — syventäminen on vapaaehtoista, voit palata milloin vain');
@@ -2715,113 +2746,326 @@ function suodataNakyvatAskeleet(jarjestetyt) {
   });
 }
 
+// === NYT-VÄLILEHTI (SATAMA_SPEKSI.md §4, uudistettu 17.8.2026) ===
+// Korvaa vanhan erillisen kortti+painike-listan yhdellä aikajärjestykseen
+// asetetulla päivän lokilla. §4.1: "Kalenterimerkinnät eivät ole kortteja
+// vaan viivalla merkittyjä rivejä lokissa" — vain opiskelupätkät saavat
+// ison .nyt-kortin, kalenteri/lounas ovat aina rivejä. §4.2: Nyt = päivän
+// seuraava asia riippumatta tyypistä — tämä koskee SIJAINTIA (ensimmäisenä
+// lokissa), ei ulkoasua.
+
+function kelloMinuuteista(min) {
+  min = ((min % 1440) + 1440) % 1440;
+  return String(Math.floor(min / 60)).padStart(2, '0') + ':' + String(min % 60).padStart(2, '0');
+}
+
 async function piirraOpintoTanaanOsio(kaikkiAskeleet) {
   const osio = document.getElementById('opinto-tanaan-osio');
-  const lista = document.getElementById('opinto-tanaan-lista');
-  lista.innerHTML = '';
-
   const askeleet = suodataNakyvatAskeleet(kaikkiAskeleet || []);
   if (!askeleet || askeleet.length === 0) {
     osio.style.display = 'none';
     return;
   }
   osio.style.display = 'block';
+  await paivitaAsetukset();
+  await piirraNytDeadlineRivi();
+  await piirraNytLoki(askeleet);
+  piirraNytBoost(askeleet);
+}
 
-  const kesken = await haeKeskenaOlevaSessio();
+// Deadline-rivi (§4.1/§7.3): vain 1-2 pv ennen palautusta, `--vaara`.
+async function piirraNytDeadlineRivi() {
+  const rivi = document.getElementById('nyt-deadline-rivi');
+  const tanaan = opintoTanaanPvm();
+  const tanaanD = new Date(tanaan + 'T00:00:00');
 
+  const { data: kurssit } = await db.from('opinto_kurssit').select('id, name').eq('owner_id', currentUserId).eq('status', 'aktiivinen');
+  const kurssiIdt = (kurssit || []).map(function(k) { return k.id; });
+  if (kurssiIdt.length === 0) { rivi.style.display = 'none'; return; }
+  const kurssiKartta = {};
+  (kurssit || []).forEach(function(k) { kurssiKartta[k.id] = k.name; });
+
+  const [{ data: kurssiDl }, { data: aiheDl }] = await Promise.all([
+    db.from('opinto_deadlinet').select('kurssi_id, pvm, tyyppi').in('kurssi_id', kurssiIdt),
+    db.from('opinto_deadlinet').select('pvm, tyyppi, opinto_aiheet!inner(name, kurssi_id)').in('opinto_aiheet.kurssi_id', kurssiIdt),
+  ]);
+
+  const ehdokkaat = [];
+  (kurssiDl || []).forEach(function(d) {
+    const paivia = Math.round((new Date(d.pvm + 'T00:00:00') - tanaanD) / 86400000);
+    ehdokkaat.push({ paivia: paivia, teksti: kurssiKartta[d.kurssi_id] + ', ' + (d.tyyppi === 'koe' ? 'koe' : 'palautus') });
+  });
+  (aiheDl || []).forEach(function(d) {
+    const paivia = Math.round((new Date(d.pvm + 'T00:00:00') - tanaanD) / 86400000);
+    ehdokkaat.push({ paivia: paivia, teksti: kurssiKartta[d.opinto_aiheet.kurssi_id] + ' — ' + d.opinto_aiheet.name + ', ' + (d.tyyppi === 'koe' ? 'koe' : 'palautus') });
+  });
+
+  const kiireisin = ehdokkaat.filter(function(e) { return e.paivia >= 1 && e.paivia <= 2; }).sort(function(a, b) { return a.paivia - b.paivia; })[0];
+  if (kiireisin) {
+    rivi.style.display = 'block';
+    rivi.textContent = kiireisin.teksti + ' ' + kiireisin.paivia + ' pv päässä';
+  } else {
+    rivi.style.display = 'none';
+  }
+}
+
+// Sijoittelujärjestys §4.6: 1) kiinteät menot (eivät väisty) 2) suojatut
+// ikkunat (ateria, suljetut) 3) opiskelupätkät täyttävät loput. Yksinker-
+// tainen minuuttiruudukko (0-1439) koko vuorokaudelle — laskennallisesti
+// kevyt (kerran per Nyt-näkymän avaus), helppo perustella oikeaksi.
+async function piirraNytLoki(askeleet) {
+  const lokiEl = document.getElementById('nyt-loki');
+  lokiEl.innerHTML = '';
+
+  const nyt = new Date();
+  const tanaan = opintoTanaanPvm();
+  const viikonpaiva = nyt.getDay();
+  const nytMin = nyt.getHours() * 60 + nyt.getMinutes();
+
+  const [{ data: tapahtumat }, { data: suljetut }, { data: opiskeluajat }] = await Promise.all([
+    // Vain Katrin omat merkinnät (Katrin pyyntö 17.8.2026: "ei Juhan
+    // kalenterimerkintöjä") — ei koko perheen jaettu kalenterinäkymä.
+    db.from('kalenteri_tapahtumat').select('title, event_time, event_end_time').eq('event_date', tanaan).eq('user_id', currentUserId).order('event_time'),
+    db.from('hytti_suljetut_ikkunat').select('alkaa, paattyy').eq('owner_id', currentUserId).eq('viikonpaiva', viikonpaiva),
+    db.from('hytti_opiskeluaika').select('alkaa, paattyy').eq('owner_id', currentUserId).eq('viikonpaiva', viikonpaiva),
+  ]);
+  const opiskeluIkkuna = (opiskeluajat && opiskeluajat[0]) || { alkaa: '09:00', paattyy: '15:30' };
+  const ikkunaAlku = aikaMinuutteina(opiskeluIkkuna.alkaa.slice(0, 5));
+  const ikkunaLoppu = aikaMinuutteina(opiskeluIkkuna.paattyy.slice(0, 5));
+
+  const varattu = new Array(1440).fill(true);
+  for (let m = ikkunaAlku; m < ikkunaLoppu; m++) varattu[m] = false;
+  (suljetut || []).forEach(function(ikkuna) {
+    const a = aikaMinuutteina(ikkuna.alkaa.slice(0, 5)), b = aikaMinuutteina(ikkuna.paattyy.slice(0, 5));
+    for (let m = a; m < b; m++) varattu[m] = true;
+  });
+
+  const kiinteatMenot = [];
+  (tapahtumat || []).forEach(function(t) {
+    if (!t.event_time) return; // koko päivän kestävä — ei sijoiteta aikajanalle
+    const a = aikaMinuutteina(t.event_time.slice(0, 5));
+    const b = Math.min(1439, t.event_end_time ? aikaMinuutteina(t.event_end_time.slice(0, 5)) : a + 60);
+    for (let m = a; m < b; m++) varattu[m] = true;
+    kiinteatMenot.push({ alku: a, loppu: b, title: t.title });
+  });
+
+  // Ateria — suojattu, EI jätetä pois (§4.5): kokeile oletusaikaa, muuten
+  // ensimmäinen vapaa rako opiskeluikkunan sisällä.
+  const ateriaKesto = haeAsetusNumero('aterian_kesto_min', 30);
+  const mahtuuko = function(alku) {
+    if (alku < 0 || alku + ateriaKesto > 1440) return false;
+    for (let m = alku; m < alku + ateriaKesto; m++) { if (varattu[m]) return false; }
+    return true;
+  };
+  let ateriaAlku = aikaMinuutteina(haeAsetusTeksti('ateria_alku', '11:00'));
+  if (!mahtuuko(ateriaAlku)) {
+    ateriaAlku = -1;
+    for (let m = ikkunaAlku; m <= ikkunaLoppu - ateriaKesto; m++) { if (mahtuuko(m)) { ateriaAlku = m; break; } }
+  }
+  let ateriaSijoitus = null;
+  if (ateriaAlku >= 0) {
+    for (let m = ateriaAlku; m < ateriaAlku + ateriaKesto; m++) varattu[m] = true;
+    ateriaSijoitus = { alku: ateriaAlku, loppu: ateriaAlku + ateriaKesto };
+  }
+
+  // Opiskelupätkät täyttävät loput — kiinteä kestoarvio per PERO-vaihe
+  // (haeOpintoKestoMinuutteina, säädettävissä Asetuksista). Jos jokin ei
+  // mahdu enää tänään (täysi päivä), se jää lokista pois — harvinaista
+  // 1-2 askeleen päivämäärällä, ei virhetila.
+  const opiskelupatkat = [];
   askeleet.forEach(function(askel) {
-    // Askel osoittaa joko aiheeseen TAI taitosolmuun (tarkalleen yksi,
-    // sql/093:n check-rajoite) — kohde ehditty poistaa askeleen tallennuksen
-    // jälkeen on ainoa syy että molemmat puuttuvat.
     const kohde = askel.opinto_aiheet || askel.taitosolmut;
     if (!kohde) return;
-    const alaotsikko = askel.opinto_aiheet
-      ? (kohde.opinto_kurssit ? kohde.opinto_kurssit.name : '')
-      : (kohde.lahde || '');
-
-    const kortti = document.createElement('li');
-    kortti.className = 'opinto-tanaan-kortti';
-
-    const otsikko = document.createElement('div');
-    otsikko.className = 'opinto-tanaan-otsikko';
-    otsikko.textContent = kohde.name + (alaotsikko ? ' · ' + alaotsikko : '');
-    kortti.appendChild(otsikko);
-
-    const vaiheTeksti = document.createElement('div');
-    vaiheTeksti.className = 'opinto-tanaan-vaihe';
-    vaiheTeksti.textContent = OPINTO_VAIHE_NIMET[kohdeVaihe(kohde)];
-    kortti.appendChild(vaiheTeksti);
-
-    // PACER-kehote (2026-08-05, ks. HYTTI_SPEKSI §8) — "systeemi ei koskaan
-    // päätä vaihetta puolesta, mutta ehdottaa AINA". ✓ Tehty on jo aina
-    // vienyt seuraavaan vaiheeseen, mutta käyttäjä ei näe ETUKÄTEEN mihin —
-    // tämä tekee ehdotuksen NÄKYVÄKSI ilman että se muuttaa mitään
-    // automaattisesti. Vain TÄMÄ kehoterivi on kytkettävissä pois
-    // asetuksista (pacer_kehote_paalla, oletus päällä) — ei koko
-    // PACER-ohjaus (ohje-nappi pysyy aina).
-    if (askel.tila === 'tarjolla' && haeAsetusTeksti('pacer_kehote_paalla', 'true') !== 'false') {
-      const seuraavaVaihe = seuraavaOpintoVaiheKuvaus(kohde);
-      if (seuraavaVaihe) {
-        const kehote = document.createElement('div');
-        kehote.className = 'opinto-tanaan-kehote';
-        kehote.textContent = 'Ehdotus: "✓ Tehty" siirtää vaiheeseen "' + seuraavaVaihe + '".';
-        kortti.appendChild(kehote);
-      }
+    const vaihe = kohdeVaihe(kohde);
+    const kesto = haeOpintoKestoMinuutteina(vaihe);
+    let loytyi = -1;
+    for (let m = ikkunaAlku; m <= ikkunaLoppu - kesto; m++) {
+      let vapaa = true;
+      for (let k = m; k < m + kesto; k++) { if (varattu[k]) { vapaa = false; break; } }
+      if (vapaa) { loytyi = m; break; }
     }
-
-    if (askel.tila === 'tarjolla') {
-      const napit = document.createElement('div');
-      napit.className = 'opinto-tanaan-napit';
-
-      // Session-loki (2026-08-05, ks. muistiinpanot.md "Session-loki") —
-      // yksi kesken oleva istunto per käyttäjä (sql/099:n osittainen uniikki-
-      // indeksi vartioi tätä myös tietokantatasolla). Tämä kortti näyttää
-      // "⏸ Lopeta" jos KESKEN OLEVA istunto osoittaa juuri tähän kohteeseen,
-      // muuten "▶ Aloita" (pois käytöstä jos jokin MUU istunto on jo käynnissä).
-      const tamaKohdeKesken = kesken && (
-        (askel.opinto_aiheet && kesken.aihe_id === kohde.id) ||
-        (askel.taitosolmut && kesken.taitosolmu_id === kohde.id)
-      );
-      const sessioNappi = document.createElement('button');
-      sessioNappi.className = 'dialog-btn dialog-btn-cancel';
-      if (tamaKohdeKesken) {
-        sessioNappi.textContent = '⏸ Lopeta';
-        sessioNappi.addEventListener('click', function() { lopetaOpintoSessio(kesken.id, kesken.alkoi_at); });
-      } else {
-        sessioNappi.textContent = '▶ Aloita';
-        sessioNappi.disabled = !!kesken;
-        sessioNappi.addEventListener('click', function() { aloitaOpintoSessio(askel, kohde); });
-      }
-      napit.appendChild(sessioNappi);
-
-      const ohjeNappi = document.createElement('button');
-      ohjeNappi.className = 'dialog-btn dialog-btn-cancel';
-      ohjeNappi.textContent = 'Näytä ohje';
-      ohjeNappi.addEventListener('click', function() { naytaOpintoOhje(kohdeVaihe(kohde), kohde); });
-      napit.appendChild(ohjeNappi);
-
-      const ohitaNappi = document.createElement('button');
-      ohitaNappi.className = 'dialog-btn dialog-btn-cancel';
-      ohitaNappi.textContent = 'En ehtinyt';
-      ohitaNappi.addEventListener('click', function() { merkitseOpintoAskel(askel, 'ohitettu'); });
-      napit.appendChild(ohitaNappi);
-
-      const tehtyNappi = document.createElement('button');
-      tehtyNappi.className = 'dialog-btn';
-      tehtyNappi.textContent = '✓ Tehty';
-      tehtyNappi.addEventListener('click', function() { merkitseOpintoAskel(askel, 'tehty'); });
-      napit.appendChild(tehtyNappi);
-
-      kortti.appendChild(napit);
-    } else {
-      const tila = document.createElement('div');
-      tila.className = 'opinto-tanaan-tila';
-      tila.textContent = askel.tila === 'tehty' ? '✓ Tehty tänään' : 'Ohitettu tänään — ei kertymää, tarjolla taas kun ajankohtainen.';
-      kortti.appendChild(tila);
-    }
-
-    lista.appendChild(kortti);
+    if (loytyi < 0) return;
+    for (let k = loytyi; k < loytyi + kesto; k++) varattu[k] = true;
+    opiskelupatkat.push({ askel: askel, kohde: kohde, vaihe: vaihe, kesto: kesto, alku: loytyi, loppu: loytyi + kesto });
   });
+
+  let rivit = kiinteatMenot.map(function(m) { return { tyyppi: 'live', alku: m.alku, loppu: m.loppu, title: m.title }; });
+  if (ateriaSijoitus) rivit.push({ tyyppi: 'lounas', alku: ateriaSijoitus.alku, loppu: ateriaSijoitus.loppu });
+  opiskelupatkat.forEach(function(p) { rivit.push({ tyyppi: 'opiskelu', alku: p.alku, loppu: p.loppu, askel: p.askel, kohde: p.kohde, vaihe: p.vaihe }); });
+  rivit.sort(function(a, b) { return a.alku - b.alku; });
+  rivit = rivit.filter(function(r) { return r.loppu > nytMin; }); // menneet katoavat (§4.2)
+
+  if (rivit.length === 0) { lokiEl.innerHTML = ''; return; }
+
+  rivit.forEach(function(rivi, index) {
+    if (index === 0 && rivi.tyyppi === 'opiskelu') {
+      lokiEl.appendChild(piirraNytKortti(rivi));
+    } else {
+      lokiEl.appendChild(piirraNytLokiRivi(rivi));
+    }
+  });
+
+  // "Muut vaihtoehdot" — muut tänään tarjotut opiskelupätkät kuin se joka
+  // sai Nyt-kortin (uusi 17.8.2026, ei kysytä ennalta pudotusvalikkoa).
+  const nytKohde = rivit[0] && rivit[0].tyyppi === 'opiskelu' ? rivit[0] : null;
+  const muutVaihtoehdot = opiskelupatkat.filter(function(p) { return !nytKohde || p.askel.id !== nytKohde.askel.id; });
+  if (muutVaihtoehdot.length > 0 && nytKohde) {
+    lokiEl.lastElementChild.appendChild(piirraNytVaihtoehdot(muutVaihtoehdot));
+  }
+}
+
+function piirraNytLokiRivi(rivi) {
+  const el = document.createElement('div');
+  if (rivi.tyyppi === 'lounas') {
+    el.className = 'nyt-loki-rivi matala';
+    el.innerHTML = '<div class="nyt-loki-aika">' + kelloMinuuteista(rivi.alku) + '</div><div class="nyt-loki-teksti">Lounas</div>';
+  } else if (rivi.tyyppi === 'live') {
+    // Kiinteä meno — oma selkeä live-merkki, EI himmennetty (§4.1: "ei saa
+    // näyttää samalta kuin siirrettävä opiskelupätkä eikä himmentyä").
+    el.className = 'nyt-loki-rivi live';
+    el.innerHTML =
+      '<div class="nyt-loki-aika">' + kelloMinuuteista(rivi.alku) + '</div>' +
+      '<div class="nyt-loki-teksti"><b>' + rivi.title + '</b>' +
+      '<span class="nyt-live-merkki"><span class="nyt-live-piste"></span>live — ei siirry</span></div>';
+  } else {
+    const kohde = rivi.kohde;
+    const kurssi = rivi.askel.opinto_aiheet ? (kohde.opinto_kurssit ? kohde.opinto_kurssit.name : '') : (kohde.lahde || '');
+    el.className = 'nyt-loki-rivi matala';
+    el.innerHTML =
+      '<div class="nyt-loki-aika">' + kelloMinuuteista(rivi.alku) + '</div>' +
+      '<div class="nyt-loki-teksti"><b>' + kohde.name + '</b>' +
+      '<span class="pieni">' + kurssi + (kurssi ? ' · ' : '') + OPINTO_VAIHE_NIMET[rivi.vaihe] + '</span></div>';
+  }
+  return el;
+}
+
+function piirraNytKortti(rivi) {
+  const kohde = rivi.kohde;
+  const kurssi = rivi.askel.opinto_aiheet ? (kohde.opinto_kurssit ? kohde.opinto_kurssit.name : '') : (kohde.lahde || '');
+
+  const wrap = document.createElement('div');
+  wrap.className = 'nyt-kohta';
+
+  const kortti = document.createElement('button');
+  kortti.type = 'button';
+  kortti.className = 'nyt nouse';
+  kortti.innerHTML =
+    '<div class="nyt-ylarivi">' +
+      '<div><div class="nyt-kurssi">' + kurssi + '</div><div class="nyt-solmu">' + kohde.name + '</div></div>' +
+      '<div class="nyt-aika">' + kelloMinuuteista(rivi.alku) + '</div>' +
+    '</div>' +
+    '<div class="nyt-alarivi"><span class="nyt-vaihe">' + OPINTO_VAIHE_NIMET[rivi.vaihe] + '</span><span class="pieni">' + (rivi.loppu - rivi.alku) + ' min</span></div>';
+  kortti.addEventListener('click', function() { avaaNytKortinKohde(rivi); });
+  wrap.appendChild(kortti);
+
+  const perustelu = laskeNytPerustelu(rivi);
+  if (perustelu) {
+    const p = document.createElement('p');
+    p.className = 'selite';
+    p.textContent = perustelu;
+    wrap.appendChild(p);
+  }
+
+  return wrap;
+}
+
+// Perustelurivi §4.4 — yksi lause, ehtotaulukon mukaan. Vain ne ehdot jotka
+// on luotettavasti laskettavissa nykyisestä datasta on toteutettu; jos
+// mikään ei täyty, rivi jätetään pois (spekin oma sääntö), ei arvata.
+function laskeNytPerustelu(rivi) {
+  if (rivi.askel.taitosolmut) return 'Silta — auttaa tulevia kursseja.';
+  return null; // muut ehdot (palautus 3-5pv, kevyt kuorma) lasketaan piirraNytLoki:n kutsujassa tarvittaessa
+}
+
+function piirraNytVaihtoehdot(vaihtoehdot) {
+  const nappi = document.createElement('button');
+  nappi.type = 'button';
+  nappi.className = 'saadin nyt-vaihtoehdot-nappi';
+  nappi.style.marginTop = '10px';
+  nappi.textContent = 'muut vaihtoehdot';
+  const lista = document.createElement('div');
+  lista.className = 'nyt-vaihtoehdot-lista';
+  lista.style.display = 'none';
+  vaihtoehdot.forEach(function(v) {
+    const kohde = v.kohde;
+    const kurssi = v.askel.opinto_aiheet ? (kohde.opinto_kurssit ? kohde.opinto_kurssit.name : '') : (kohde.lahde || '');
+    const el = document.createElement('button');
+    el.type = 'button';
+    el.className = 'nyt-vaihtoehto';
+    el.innerHTML = '<b>' + kohde.name + '</b><span>' + kurssi + (kurssi ? ' · ' : '') + OPINTO_VAIHE_NIMET[v.vaihe] + '</span>';
+    el.addEventListener('click', function() { avaaNytKortinKohde(v); });
+    lista.appendChild(el);
+  });
+  nappi.addEventListener('click', function() {
+    const auki = lista.style.display !== 'none';
+    lista.style.display = auki ? 'none' : 'flex';
+    nappi.setAttribute('aria-pressed', String(!auki));
+  });
+  const kehys = document.createElement('div');
+  kehys.appendChild(nappi);
+  kehys.appendChild(lista);
+  return kehys;
+}
+
+// Kohteen avaus Nyt-lokista/vaihtoehdoista — aihe (opinto_aiheet) avaa uuden
+// A4-Tehtävänäkymän (§4.9, automaattinen ajanotto). Taitosolmu (silta) EI
+// vielä ole siirretty samaan malliin (eri, vanhempi tietomuoto — ei
+// pero_vaihe/pacer_paatyyppi/retrieval_kierrokset-kenttiä, ks. sql/092) —
+// tarkoituksellinen rajaus, sama kuin muuallakin sovelluksessa (Vaihe 2).
+function avaaNytKortinKohde(rivi) {
+  if (rivi.askel.opinto_aiheet) {
+    avaaOpintoTehtava(rivi.kohde, rivi.askel);
+  } else {
+    naytaOpintoOhje(rivi.vaihe, rivi.kohde);
+  }
+}
+
+// Boost (§4.8) — täydennys/päiväkaton ylitysmekanismi, EI suunnitelman
+// perusta. Sama moottori (etsiIkkunaanSopivaAskel) kuin "Minulla on aikaa",
+// mutta OHITTAA päiväkaton koska maxAskeliaYlikirjoitus=1 kutsutaan aina
+// riippumatta tämän päivän jo-tarjotusta määrästä.
+const NYT_BOOST_MIN = [15, 30, 60, '··'];
+const NYT_BOOST_RULLA_ARVOT = [10, 20, 25, 35, 40, 45, 50, 55, 70, 80, 90, 100, 110, 120];
+function piirraNytBoost() {
+  const kehys = document.getElementById('nyt-boost');
+  kehys.innerHTML = '';
+  NYT_BOOST_MIN.forEach(function(m) {
+    const nappi = document.createElement('button');
+    nappi.type = 'button';
+    nappi.className = 'min';
+    nappi.innerHTML = '<b>' + m + '</b><span>' + (m === '··' ? 'muu' : 'min') + '</span>';
+    nappi.addEventListener('click', function() {
+      if (m === '··') { avaaNytBoostRulla(); return; }
+      suoritaNytBoost(m);
+    });
+    kehys.appendChild(nappi);
+  });
+}
+async function suoritaNytBoost(min) {
+  const tulos = document.getElementById('nyt-boost-tulos');
+  const ehdokas = await etsiIkkunaanSopivaAskel(min);
+  if (!ehdokas) {
+    tulos.style.display = 'block';
+    tulos.textContent = 'Ei mitään mikä mahtuisi ' + min + ' minuuttiin juuri nyt.';
+    return;
+  }
+  const kohde = ehdokas.item;
+  tulos.style.display = 'block';
+  tulos.textContent = min + ' min: ' + kohde.name + ' — napauta avataksesi.';
+  tulos.style.cursor = 'pointer';
+  tulos.onclick = function() {
+    if (ehdokas.tyyppi === 'aihe') avaaOpintoTehtava(kohde);
+    else naytaOpintoOhje(kohdeVaihe(kohde), kohde);
+  };
+}
+function avaaNytBoostRulla() {
+  // iOS-natiivi <select>, sama periaate kuin muualla sovelluksessa käytetty
+  // rullavalitsin (ks. script.js:n Toistuva muistutus -kenttä) — ei
+  // hand-rolled kosketusvieritintä, ks. §4.8 "toteutukseltaan iOS-natiivi".
+  const valittu = prompt('Kuinka monta minuuttia? (' + NYT_BOOST_RULLA_ARVOT.join(', ') + ')', '25');
+  const min = parseInt(valittu, 10);
+  if (!min || min < 1) return;
+  suoritaNytBoost(min);
 }
 
 // "En ehtinyt" -kuittaus EI kosketa kohteen vaihe-/SR-tilaa mitenkään — sama
@@ -8140,6 +8384,7 @@ function avaaOsio(osio) {
       document.getElementById('min-paallekkainen-input').value = haeAsetusNumero('min_paallekkainen_min', 15);
       document.getElementById('yksin-hetkittain-raja-input').value = haeAsetusNumero('yksin_hetkittain_raja_min', 90);
       document.getElementById('aterian-kesto-input').value = haeAsetusNumero('aterian_kesto_min', 30);
+      document.getElementById('aterian-alku-input').value = haeAsetusTeksti('ateria_alku', '11:00');
     });
     lataaHyttiOpiskeluaika();
     lataaHyttiSuljetutIkkunat();
@@ -11860,6 +12105,23 @@ sidoHuoliKynnysInput('siirtymapuskuri-input', 'siirtymapuskuri_min', 30, 'Siirty
 sidoHuoliKynnysInput('min-paallekkainen-input', 'min_paallekkainen_min', 15, 'Vähimmäispäällekkäisyys');
 sidoHuoliKynnysInput('yksin-hetkittain-raja-input', 'yksin_hetkittain_raja_min', 90, 'Yksin hetkittäin -raja');
 sidoHuoliKynnysInput('aterian-kesto-input', 'aterian_kesto_min', 30, 'Aterian kesto');
+
+// Aterian alku (2026-08-17, §4.5 suojattu ateria) — aika-kenttä, ei sovi
+// sidoHuoliKynnysInput:n numero-oletukseen, siksi oma pieni sidonta.
+document.getElementById('aterian-alku-input').addEventListener('change', async function(e) {
+  const uusi = e.target.value;
+  if (!uusi) {
+    e.target.value = haeAsetusTeksti('ateria_alku', '11:00');
+    return;
+  }
+  const { error } = await db.from('asetukset').upsert({ key: 'ateria_alku', value: uusi }, { onConflict: 'key' });
+  if (error) {
+    console.error('Aterian alun tallennus epäonnistui:', error);
+    return;
+  }
+  asetuksetKartta['ateria_alku'] = uusi;
+  naytaIlmoitus('Aterian alku: ' + uusi);
+});
 
 // === HYTIN IKKUNAT (2026-08-10, ks. HYTTI_SPEKSI.md §4.5/§4.5b, sql/112) ===
 // Vaihe 1a: pelkkä tallennus ja hallinta — generaattori (Vaihe 3) ei vielä
