@@ -582,7 +582,7 @@ async function vaihdaAnkkurointiYleinen(source, id, content, jalkeenPaivitys) {
   }
   // Laiturin murut EIVÄT ole pysyvä lista kuten Muistilaput/Kalenteri —
   // Laituri on sisääntulo/triage-pino, ja nostaminen ankkuriksi ON
-  // nimenomaan pinosta poistamista (2026-08-19, Katrin pyyntö: "jos nostaa
+  // nimenomaan pinosta poistamista (2026-08-18, Katrin pyyntö: "jos nostaa
   // jotain laiturista ankkuriksi sen pitäisi kadota laiturista"). Käyttää
   // samaa piilota_laiturista-lippua kuin muutkin Laiturista-piilotusreitit
   // (koti-valuminen, materiaalin sijoitus, ks. lataaLaituri:n
@@ -2990,6 +2990,26 @@ function opintoEilenTehtyPaino(id, eilenTehdytIdt) {
   return eilenTehdytIdt.has(id) ? -30 : 0;
 }
 
+// Ikkunan hyödyntämisbonus (2026-08-18, Katrin havainto Boost-napeista:
+// "boost is locked in one theme only minutes change, isn't it so that if
+// you have 60min would be best tackle different job than in 15min"). Ennen
+// tätä ikkunaMin toimi VAIN kattona (ks. aiheEhdokkaat/solmuEhdokkaat-
+// suodatus) — kaikki ikkunaan mahtuvat kohteet olivat pisteytyksessä
+// samanarvoisia riippumatta siitä käyttikö kohde 15 vai 60 minuuttia
+// ikkunasta, joten sama lyhyt kohde (esim. 15min retrieval) saattoi voittaa
+// pisteillä JOKA ikkunakoolla eikä 60min-ikkuna koskaan päätynyt eri,
+// isompaan tekemiseen (esim. 45min encoding) vaikka aikaa olisi riittänyt.
+// Pieni bonus (max 12) joka kasvaa sitä mukaa kun kohde käyttää suuremman
+// osan ikkunasta — tarkoituksella PIENI verrattuna deadline-painoihin
+// (opintoDeadlinePaino voi olla satoja pisteitä), jotta oikea kiireellisyys
+// voittaa aina, mutta muuten samanarvoisten ehdokkaiden välillä isompi
+// ikkuna suosii isompaa tekemistä pelkän "mahtuuko" sijaan. Ei vaikuta
+// tavalliseen päivän täyttöön (ikkunaMin=null silloin, bonus 0).
+function opintoIkkunaSopivuusBonus(kohteenKestoMin, ikkunaMin) {
+  if (!ikkunaMin) return 0;
+  return Math.round((Math.min(kohteenKestoMin, ikkunaMin) / ikkunaMin) * 12);
+}
+
 // Jumi-merkintä (sung-metodi.md §8, "En pääse alkuun") tarkoittaa "yritin,
 // en päässyt eteenpäin" — EI "vältä tätä". Pieni POSITIIVINEN paino eilisen
 // jumin jälkeen pitää aiheen näkyvillä sen sijaan että pisteytys hautaisi
@@ -3302,12 +3322,14 @@ async function laskeOpintoPaivanAskeleet(maxAskeliaYlikirjoitus, poissuljetutAih
       const kovaPaino = opintoDeadlinePaino(a, kurssienDeadlinet, aiheidenDeadlinet, tanaan);
       const pehmeaPaino = opintoDeadlinePainoSolmu(a, tanaan);
       const pisteet = Math.max(kovaPaino, pehmeaPaino) + opintoKuormaBonus(a.pero_vaihe, kuormaTaso)
-        + opintoEilenTehtyPaino(a.id, eilenTehdytAiheIdt) + opintoJumiPaino(a.id, eilenJumitAiheIdt);
+        + opintoEilenTehtyPaino(a.id, eilenTehdytAiheIdt) + opintoJumiPaino(a.id, eilenJumitAiheIdt)
+        + opintoIkkunaSopivuusBonus(haeOpintoKestoMinuutteina(a.pero_vaihe), ikkunaMin);
       return { tyyppi: 'aihe', item: a, pisteet: pisteet };
     });
   const solmuEhdokkaat = taitosolmuKandidaatit.map(function(s) {
     const pisteet = (lopullisetSiltaPainot.get(s.id) || 0) + opintoKuormaBonus(s.vaihe, kuormaTaso)
-      + opintoEilenTehtyPaino(s.id, eilenTehdytSolmuIdt);
+      + opintoEilenTehtyPaino(s.id, eilenTehdytSolmuIdt)
+      + opintoIkkunaSopivuusBonus(haeOpintoKestoMinuutteina(s.vaihe), ikkunaMin);
     return { tyyppi: 'taitosolmu', item: s, pisteet: pisteet };
   });
 
@@ -8379,7 +8401,7 @@ document.querySelectorAll('.silta-ikoni').forEach(function(el) { el.innerHTML = 
 // 24x24-viewBoxissa (aurinko pilven takaa kurkistaen, pilvi+viiva-sade,
 // pilvi+hiutale, pilvi+salama) — sama rakenne kuin tunnetuilla sääpalveluilla
 // (yr.no, Apple Sää, Ilmatieteenlaitos), ei enää oma sommittelu.
-// Värit "virallisten" säämerkkien tapaan (2026-08-19, Katrin palaute:
+// Värit "virallisten" säämerkkien tapaan (2026-08-18, Katrin palaute:
 // aiempi versio oli tasan yksivärinen currentColor-ääriviiva joka ei
 // näyttänyt oikealta säämerkiltä — oikeat sääpalvelut käyttävät aina väriä,
 // aurinko keltainen/kultainen, pilvi harmaa, sade/lumi sininen, salama
@@ -8436,7 +8458,7 @@ function saaIkoniAvainKoodille(koodi) {
   if (koodi >= 95 && koodi <= 99) return 'thunder';
   return 'cloud';
 }
-// Sadetodennäköisyyden kynnys — 19 -> 20 (2026-08-19, Katrin pyyntö: "if
+// Sadetodennäköisyyden kynnys — 19 -> 20 (2026-08-18, Katrin pyyntö: "if
 // there is 20% or more propability of rain mark it") — sama kynnys sekä
 // sadeprosentin näyttämiselle tuntiriveillä ETTÄ ikonin pudotukselle
 // sadekuvakkeesta pilviseen vastineeseen alla (2026-08-11, elävä testaus:
@@ -9339,16 +9361,16 @@ async function loadAnchorCandidates() {
       return;
     }
 
-    const checkButton = document.createElement('button');
-    checkButton.textContent = '○';
-    checkButton.className = 'check-btn';
-    checkButton.addEventListener('click', async function() {
+    // ○-kuittaus siirretty ⋯-valikkoon alla (2026-08-18, Katrin pyyntö:
+    // "äly suggestions should have similar 3 dots as anchors and
+    // everything else hides behind it except anchor rised or not") — ei
+    // enää omana nappinaan sisältörivillä.
+    const merkitseValmiiksi = async function() {
       tuntopalauteValmis();
       const { error } = await db.from('ankkurit').update({ done: true, done_at: new Date().toISOString() }).eq('id', candidate.id);
       ilmoitaKirjoitusvirheesta(error, 'Ankkuriehdokkaan merkintä');
       loadAnchorCandidates();
-    });
-    sisaltoRivi.appendChild(checkButton);
+    };
 
     // BUGIKORJAUS (2026-07-17, "Ankkurin muokkaus puuttuu"): ✨-ehdokkaan
     // muokkaus = "ota omiin + muokattu" — pelkkä tekstin korjaus on jo
@@ -9419,68 +9441,84 @@ async function loadAnchorCandidates() {
       loadAnchorCandidates();
       lataaAnkkurit();
     });
-    napitRivi.appendChild(acceptButton);
 
+    // Loput toiminnot ⋯-valikkoon (2026-08-18, Katrin pyyntö — ks. yllä
+    // merkitseValmiiksi-kommentti): ainoa aina näkyvä toiminto on ⚓-nappi,
+    // sama kaksoispino (.ankkuri-toiminnot) kuin oikealla ankkurilla.
+    const ehdokasValikko = [
+      { label: '○ Merkitse valmiiksi', onClick: merkitseValmiiksi },
+    ];
     // Kalenterisilta (2026-07-18, ks. muistiinpanot.md) — vain ✨-koneehdokkaille
     // joilla on SEKÄ päivä ETTÄ kellonaika (= "selkeä ajanvaraus", sama
     // tunnistus joka jo luo tämän ehdokkaan, ks. api/_lib/aly-nightly.js). Ei
     // koskaan 💬-ihmisehdotuksille (niillä ei ole event_date/event_time,
     // eikä äly ole koskaan käsitellyt niiden ajankohtaa).
     if (candidate.event_date && candidate.event_time) {
-      const kalenteriNappi = document.createElement('a');
-      kalenteriNappi.textContent = '➕ Lisää kalenteriin';
-      kalenteriNappi.className = 'dialog-btn dialog-btn-cancel';
-      kalenteriNappi.title = 'Avaa valmiiksi täytettynä puhelimen omaan Kalenteriin';
-      kalenteriNappi.href = kalenterisiltaUrl(candidate);
-      napitRivi.appendChild(kalenteriNappi);
+      ehdokasValikko.push({
+        label: '➕ Lisää kalenteriin',
+        onClick: function() { window.location.href = kalenterisiltaUrl(candidate); },
+      });
     }
-
     // "Siirrä myöhemmäksi" — nyt KAIKILLE ehdokkaille (✨ ja 💬), ks.
-    // "💬-ehdotuksen elinkaari": tarve siirtää ei rajoitu ihmisehdotuksiin.
-    napitRivi.appendChild(siirraNappi(candidate.id, loadAnchorCandidates, candidate.source === 'ehdotus'));
-
+    // "💬-ehdotuksen elinkaira": tarve siirtää ei rajoitu ihmisehdotuksiin.
+    // Sama logiikka kuin siirraNappi()-apurissa (script.js:n muut kutsupaikat),
+    // ei omaa DOM-nappia täällä koska ⋯-valikko rakentaa napit itse.
+    ehdokasValikko.push({
+      label: '⏭ Siirrä myöhemmäksi',
+      onClick: async function() {
+        const vastaus = prompt('Nouse uudelleen kuinka monen tunnin päästä?', '24');
+        if (vastaus === null) return;
+        const tunteja = parseInt(vastaus, 10);
+        if (!tunteja || tunteja < 1) return;
+        const uusiHetki = new Date();
+        uusiHetki.setHours(uusiHetki.getHours() + tunteja);
+        const { error } = await db.from('ankkurit').update({ visible_from: uusiHetki.toISOString() }).eq('id', candidate.id);
+        ilmoitaKirjoitusvirheesta(error, 'Ankkurin siirto');
+        loadAnchorCandidates();
+      },
+    });
     // BUGIKORJAUS (2026-07-14, "Ankkurien hätäkorjaus"): sama 5s kumottava
     // toast kuin varsinaisilla ankkureilla, konsistenssin vuoksi ("jokainen
     // ankkurin poistava ele") — vaikka ehdokkaan lähdemuru on jo turvassa
     // Laiturissa (ks. aly_log-linkki), pelkkä yksi yhteinen malli on
     // helpompi muistaa kuin kaksi eri sääntöä.
-    const dismissButton = document.createElement('button');
-    dismissButton.textContent = candidate.source === 'ehdotus' ? '× Hylkää' : '×';
-    dismissButton.className = 'delete-btn';
-    dismissButton.title = 'Poista ehdotus';
-    dismissButton.addEventListener('click', function() {
-      li.style.opacity = '0.3';
-      dismissButton.disabled = true;
-      naytaKumottavaIlmoitus(
-        'Ehdotus poistettu',
-        async function() {
-          const { error } = await db.from('ankkurit').delete().eq('id', candidate.id);
-          // Jos poisto epäonnistuu, ehdokas on TODELLISUUDESSA yhä olemassa —
-          // merkitseAlyMuruKasitellyksi() ei saa suorittua tässä tilassa, se
-          // estäisi murun uudelleenarvioinnin ikuisesti vaikka ehdokas jäi elämään.
-          if (ilmoitaKirjoitusvirheesta(error, 'Ankkuriehdokkaan poisto')) return;
-          // aly_log koskee vain koneehdotuksia (source='aly') — ihmislähtöisellä
-          // ehdotuksella ei ole aly_log-riviä, eikä lähettäjälle koskaan
-          // raportoida hylkäystä (ks. muistiinpanot.md "Ankkurin ehdottaminen
-          // toiselle" -turvasäännöt), joten tälle sourcelle ei ole mitään
-          // päivitettävää täällä.
-          if (candidate.source === 'aly') {
-            const { error: logError } = await db.from('aly_log').update({ undone_at: new Date().toISOString(), undo_reason: 'dismissed' }).eq('anchor_id', candidate.id).is('undone_at', null);
-            if (logError) console.error('Äly-lokin merkintä hylkäyksestä epäonnistui:', logError);
-            // Bugi 27 -korjaus (ks. sql/063): hylkäys on lopullinen vastaus,
-            // ei jätä murua odottamaan uutta yöajon arviointia.
-            await merkitseAlyMuruKasitellyksi(candidate.source_ref);
-          }
-          loadAnchorCandidates();
-        },
-        function() {
-          li.style.opacity = '';
-          dismissButton.disabled = false;
-        }
-      );
+    ehdokasValikko.push({
+      label: candidate.source === 'ehdotus' ? '× Hylkää' : '× Poista ehdotus',
+      danger: true,
+      onClick: function() {
+        li.style.opacity = '0.3';
+        naytaKumottavaIlmoitus(
+          'Ehdotus poistettu',
+          async function() {
+            const { error } = await db.from('ankkurit').delete().eq('id', candidate.id);
+            // Jos poisto epäonnistuu, ehdokas on TODELLISUUDESSA yhä olemassa —
+            // merkitseAlyMuruKasitellyksi() ei saa suorittua tässä tilassa, se
+            // estäisi murun uudelleenarvioinnin ikuisesti vaikka ehdokas jäi elämään.
+            if (ilmoitaKirjoitusvirheesta(error, 'Ankkuriehdokkaan poisto')) return;
+            // aly_log koskee vain koneehdotuksia (source='aly') — ihmislähtöisellä
+            // ehdotuksella ei ole aly_log-riviä, eikä lähettäjälle koskaan
+            // raportoida hylkäystä (ks. muistiinpanot.md "Ankkurin ehdottaminen
+            // toiselle" -turvasäännöt), joten tälle sourcelle ei ole mitään
+            // päivitettävää täällä.
+            if (candidate.source === 'aly') {
+              const { error: logError } = await db.from('aly_log').update({ undone_at: new Date().toISOString(), undo_reason: 'dismissed' }).eq('anchor_id', candidate.id).is('undone_at', null);
+              if (logError) console.error('Äly-lokin merkintä hylkäyksestä epäonnistui:', logError);
+              // Bugi 27 -korjaus (ks. sql/063): hylkäys on lopullinen vastaus,
+              // ei jätä murua odottamaan uutta yöajon arviointia.
+              await merkitseAlyMuruKasitellyksi(candidate.source_ref);
+            }
+            loadAnchorCandidates();
+          },
+          function() { li.style.opacity = ''; }
+        );
+      },
     });
-    napitRivi.appendChild(dismissButton);
-    li.appendChild(napitRivi);
+
+    const toiminnot = document.createElement('div');
+    toiminnot.className = 'ankkuri-toiminnot';
+    toiminnot.appendChild(acceptButton);
+    toiminnot.appendChild(createOverflowButton(li, ehdokasValikko));
+    li.appendChild(toiminnot);
 
     listEl.appendChild(li);
   });
@@ -10572,15 +10610,26 @@ async function haeKotiKohteet() {
 // Korvaa VANHAN erillisen "koti"-valikon (avaaKotiValikko) JA erillisen
 // "sijoita"-valikon (avaaSijoitaValikko) yhdellä valikolla — Katrin sana:
 // "kaikella on yksi koti" koskee myös itse valikkoa, ei vain dataa. Kolme
-// riviä: Varasto / Muistilaput / Poista, EI Hytti-kohdetta (kurssimateriaali
+// riviä: Varasto / Muistilaput / Arkistoi, EI Hytti-kohdetta (kurssimateriaali
 // kulkee omaa reittiään, helmi vain Hytin omasta kontekstista, "ehdota
 // Juhalle" hoitaa loput — ks. §16.5b). Sama paikka kuin ennen: ⋯-rivivalikko
 // (openRowMenu), ei oma nappinsa.
+// Kolmas rivi oli alunperin "🗑 Poista" (poistaLaiturinMuru, pysyvä poisto),
+// vaihdettu "🗄 Arkistoi":ksi (2026-08-18/19, Katri: "archieve" vastauksena
+// kysymykseen kumpi tämä oikeasti oli) — sama palautettavissa oleva
+// arkistoiLaituriRivi() jota YLÄPUOLISEN ⋯-valikon oma "🗄 Arkistoi"-rivi jo
+// käyttää (ks. alempana script.js:ssä) — tarkoituksellinen KAKSI reittiä
+// samaan tointoon (nopea suora oikotie ⋯:stä JA tämä, kun käyttäjä on jo
+// kohdevalinnassa eikä halua perua sitä), ei duplikaattivirhe. HUOM
+// Katrille: poistaLaiturinMuru() (pysyvä, ei-palautettavissa oleva poisto)
+// ei ole enää minkään napin takana — jätetty koodiin koskemattomana siltä
+// varalta että pysyvä poisto halutaan myöhemmin esim. Arkisto-näkymän
+// omaksi napiksi.
 async function avaaKohdeValikko(rivi, li) {
   openRowMenu(li, [
     { label: '📦 Varasto', onClick: function() { avaaKohdeAlivalikko(rivi, li, 'varasto'); } },
     { label: '🗒️ Muistilaput', onClick: function() { avaaKohdeAlivalikko(rivi, li, 'muistilaput'); } },
-    { label: '🗑 Poista', danger: true, onClick: function() { poistaLaiturinMuru(rivi); } },
+    { label: '🗄 Arkistoi', onClick: function() { arkistoiLaituriRivi(rivi); } },
   ]);
 }
 
@@ -12469,7 +12518,7 @@ function openRowMenu(li, items) {
   li.appendChild(menu);
   openRowMenuEl = menu;
   // Valikko avautuu oletuksena RIVIN ALLE (.row-menu, top:100%) — lähellä
-  // näytön alareunaa (2026-08-19, Katrin löydös: Laiturin alimpien murujen
+  // näytön alareunaa (2026-08-18, Katrin löydös: Laiturin alimpien murujen
   // kohdevalikko ei mahtunut auki, osa kohdista jäi ruudun/kiinteän
   // alapalkin alle eikä niitä pystynyt painamaan) tämä työntää valikon
   // osittain näkymättömiin. Käännetään RIVIN YLÄPUOLELLE jos alapuolella ei
