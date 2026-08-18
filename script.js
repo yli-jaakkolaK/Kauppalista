@@ -2394,10 +2394,21 @@ function deriveDayLoadLevel(ajallistenMaara, huoliPaino) {
 
 async function opintoPaivanKuorma(kohdePvm) {
   const tanaan = kohdePvm || opintoTanaanPvm();
-  const { count } = await db.from('kalenteri_tapahtumat').select('id', { count: 'exact', head: true })
+  // KORJATTU 2026-08-18: laski aiemmin KAIKKI päivän kellonaikamenot
+  // riippumatta kenen kalenterissa ne ovat — Katrin täsmennys (ks.
+  // piirraNytLoki-osion henkilö-suodatin) on että Juhan omassa
+  // kalenterissa oleva meno ei ole hänen kuormaansa. Sama suodatin tähän,
+  // muuten kuormataso (ja siten PACER-vaihesuositus/tavoiteaskelmäärä)
+  // vääristyi menoista jotka eivät oikeasti koske Katria.
+  const { data: tapahtumat } = await db.from('kalenteri_tapahtumat')
+    .select('event_time, kalenteri_syotteet!inner(henkilo)')
     .eq('event_date', tanaan).not('event_time', 'is', null);
+  const omienMaara = (tapahtumat || []).filter(function(t) {
+    const h = t.kalenteri_syotteet ? t.kalenteri_syotteet.henkilo : null;
+    return h === omaHenkilo || h === null;
+  }).length;
   const huoliPaino = await huolienPaivanPaino(tanaan);
-  return deriveDayLoadLevel(count || 0, huoliPaino);
+  return deriveDayLoadLevel(omienMaara, huoliPaino);
 }
 
 // === REITIN VIIKKOKALENTERI (SATAMA_SPEKSI.md §5.1, 2026-08-17) ===

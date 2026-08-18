@@ -4254,6 +4254,10 @@ sw.js v160 → v161.
 
 sw.js v161 → v162.
 
+**Toinen jälkikorjaus samana päivänä: `opintoPaivanKuorma()` laski VÄÄRIÄ menoja kuormaksi.** Katri: "try to crave in as many minutes of studying as you can" — tutkittaessa miten tavoiteaskelmäärä/PACER-vaihesuositus reagoi tiivistyneeseen päivään, löytyi ERI bugi kuin aiemmat: `opintoPaivanKuorma()` laski kuormatasoon KAIKKI päivän kellonaikamenot `kalenteri_tapahtumat`-taulusta suodattamatta henkilön mukaan lainkaan — siis myös Juhan omat menot (Sulkapallo, Perhetyö meillä), jotka Katri on tässä samassa istunnossa nimenomaisesti sanonut ettei koske häntä. Tämä on ERI funktio kuin `piirraNytLoki`:n aiemmin korjattu suodatin — sama juurisyy (puuttuva henkilö-rajaus), eri koodikohta, ei löytynyt aiemmin koska mikään ei erikseen pyytänyt tarkistamaan kuormalaskentaa. Korjattu samalla `kalenteri_syotteet!inner(henkilo)`-suodattimella kuin muualla. Vaikutus tälle päivälle: aiemmin 4 tapahtumaa (kaikki) → 'keski'-taso, korjattuna 2 tapahtumaa (vain omat+jaetut) → 'kevyt'-taso — eri PACER-vaihesuositus (§7.3-taulukko) ja hieman eri pisteytysbonus per ehdokas.
+
+sw.js v162 → v163.
+
 ---
 
 ## Nykytila (päivitetty 2026-08-18, COPILOT.md-sääntö 4 — huom: aiempi "Nykytila ja seuraavat askeleet" -osio jäi tästä tiedostosta ylemmäs pitkän istunnon aikana kertyneiden uusien osioiden taakse, ei enää tiedoston lopussa; siirto omaksi erikseen tehtäväksi työksi, ei nyt)
