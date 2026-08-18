@@ -3525,16 +3525,15 @@ async function piirraNytLoki(askeleet) {
   const nytMin = nyt.getHours() * 60 + nyt.getMinutes();
 
   const [{ data: tapahtumat }, { data: suljetut }, { data: opiskeluajat }] = await Promise.all([
-    // Katrin omat + jaettu perhekalenteri, EI Juhan oma (Katrin pyyntö
-    // 17.8.2026: "ei Juhan kalenterimerkintöjä"). KORJATTU 2026-08-18:
-    // suodatti aiemmin kalenteri_tapahtumat.user_id:llä — tarkistettu
-    // suoraan kannasta että tämä sarake on käytännössä AINA tyhjä (sama
-    // "organizer on tyhjä" -ilmiö joka on jo dokumentoitu Kalenterisyötteet-
-    // osiossa), joten suodatus ei koskaan täsmännyt mihinkään — Katrin OMAT
-    // kiinteät menot (esim. huomisen "Aamos kylässä"/"Suunnistus") eivät
-    // koskaan näkyneet Nyt-lokin sijoittelussa, jolloin opiskelupätkä olisi
-    // voitu sijoittaa suoraan niiden päälle. Oikea suodatin on liitetyn
-    // syötteen henkilo (null = jaettu perhekalenteri, kuuluu myös Katrille).
+    // KORJATTU 2026-08-18: suodatti aiemmin kalenteri_tapahtumat.user_id:llä
+    // — tarkistettu suoraan kannasta että tämä sarake on käytännössä AINA
+    // tyhjä, joten suodatus ei koskaan täsmännyt mihinkään: kiinteät menot
+    // eivät koskaan näkyneet Nyt-lokin sijoittelussa. Oikea suodatin on
+    // liitetyn syötteen henkilo. Katrin täsmennys samana päivänä: Juhan
+    // OMASSA kalenterissa oleva meno (esim. "Sulkapallo", "Perhetyö meillä")
+    // EI koske Katria vaikka olisikin perhetapahtuma — ratkaiseva on kumman
+    // kalenterissa se on, ei tapahtuman scope. Vain jaettu perhekalenteri
+    // (henkilo=null) tai Katrin oma (henkilo=katri) laskee hänen esteekseen.
     db.from('kalenteri_tapahtumat').select('title, event_time, event_end_time, kalenteri_syotteet!inner(henkilo)').eq('event_date', tanaan).order('event_time'),
     db.from('hytti_suljetut_ikkunat').select('alkaa, paattyy').eq('owner_id', currentUserId).eq('viikonpaiva', viikonpaiva),
     db.from('hytti_opiskeluaika').select('alkaa, paattyy').eq('owner_id', currentUserId).eq('viikonpaiva', viikonpaiva),
@@ -3569,6 +3568,16 @@ async function piirraNytLoki(askeleet) {
     for (let m = Math.max(0, a - siirtymaPuskuri); m < Math.min(1440, b + siirtymaPuskuri); m++) varattu[m] = true;
     kiinteatMenot.push({ alku: a, loppu: b, title: t.title });
   });
+
+  // Föli-siirtymät (2026-08-18, Katrin pyyntö: "joka bussimatka lasketaan
+  // kalenteritapahtumaksi") — vain tapahtumille joilla on TUNNETTU matka
+  // (etsiTunnettuFoliMatka), esim. sijaintiton "meillä"-tapahtuma ei koskaan
+  // laukaise tätä. Varaa ruudukosta todellisen SIRI-lähdön mukaisen ajan.
+  const siirtymat = [];
+  const siirtymaLuettelot = await Promise.all(
+    omatTapahtumat.map(function(t) { return haeFoliSiirtymatTapahtumalle(t, tanaan, varattu); })
+  );
+  siirtymaLuettelot.forEach(function(lista) { lista.forEach(function(r) { siirtymat.push(r); }); });
 
   // Ateria — suojattu, EI jätetä pois (§4.5): kokeile oletusaikaa, muuten
   // ensimmäinen vapaa rako opiskeluikkunan sisällä.
@@ -3611,6 +3620,7 @@ async function piirraNytLoki(askeleet) {
   });
 
   let rivit = kiinteatMenot.map(function(m) { return { tyyppi: 'live', alku: m.alku, loppu: m.loppu, title: m.title }; });
+  siirtymat.forEach(function(s) { rivit.push(s); });
   if (ateriaSijoitus) rivit.push({ tyyppi: 'lounas', alku: ateriaSijoitus.alku, loppu: ateriaSijoitus.loppu });
   opiskelupatkat.forEach(function(p) { rivit.push({ tyyppi: 'opiskelu', alku: p.alku, loppu: p.loppu, askel: p.askel, kohde: p.kohde, vaihe: p.vaihe }); });
   rivit.sort(function(a, b) { return a.alku - b.alku; });
@@ -3642,6 +3652,18 @@ function piirraNytLokiRivi(rivi) {
       '<div class="nyt-loki-aika">' + kelloMinuuteista(rivi.alku) + '</div>' +
       '<div class="nyt-loki-teksti"><b>' + rivi.title + '</b>' +
       '<span class="nyt-live-merkki"><span class="nyt-live-piste"></span>live — ei siirry</span></div>';
+  } else if (rivi.tyyppi === 'siirtyma') {
+    el.className = 'nyt-loki-rivi live siirtyma';
+    el.innerHTML =
+      '<div class="nyt-loki-aika">' + kelloMinuuteista(rivi.alku) + '</div>' +
+      '<div class="nyt-loki-teksti"><b>🚌 ' + rivi.linja + ' → ' + rivi.kohde + '</b>' +
+      '<span class="nyt-live-merkki"><span class="nyt-live-piste"></span>' + (rivi.suunta === 'paluu' ? 'paluumatka' : 'menomatka') + '</span></div>';
+  } else if (rivi.tyyppi === 'siirtyma-tuntematon') {
+    el.className = 'nyt-loki-rivi live siirtyma siirtyma-arvio';
+    el.innerHTML =
+      '<div class="nyt-loki-aika">n. ' + kelloMinuuteista(rivi.alku) + '</div>' +
+      '<div class="nyt-loki-teksti"><b>🚌 Bussi</b>' +
+      '<span class="pieni">tarkentuu lähempänä lähtöä</span></div>';
   } else {
     const kohde = rivi.kohde;
     const kurssi = rivi.askel.opinto_aiheet ? (kohde.opinto_kurssit ? kohde.opinto_kurssit.name : '') : (kohde.lahde || '');
@@ -4902,7 +4924,16 @@ async function haeFoliPysakit() {
   } catch (e) { /* korruptoitunut välimuisti — haetaan tuoreena alla */ }
 
   try {
-    const vastaus = await fetch('https://data.foli.fi/gtfs/stops');
+    // KORJATTU 2026-08-18: /gtfs/stops palauttaa nykyään hakemisto-
+    // olion ({datasets, latest, go}) eikä enää suoraan pysäkkidataa —
+    // tarkistettu suoraan livenä API:sta. Oikea data on go-kentän
+    // osoittamassa versioidussa polussa. Koko Föli-ominaisuus oli tämän
+    // takia hiljaa rikki siitä asti kun se rakennettiin (17.8.).
+    const hakemisto = await fetch('https://data.foli.fi/gtfs/stops');
+    if (!hakemisto.ok) return null;
+    const meta = await hakemisto.json();
+    if (!meta.go) return null;
+    const vastaus = await fetch('https:' + meta.go);
     if (!vastaus.ok) return null;
     const pysakit = await vastaus.json();
     try {
@@ -4992,6 +5023,100 @@ async function haeFoliLahdot(pysakkiId) {
     console.error('Föli-lähtöjen haku epäonnistui (pysäkki ' + pysakkiId + '):', e.message);
     return [];
   }
+}
+
+// === TUNNETUT MATKAT (2026-08-18, Katrin täsmennykset) === EI geokoodausta
+// eikä pysäkin arvausta osoitetekstistä — tarkistettu suoraan livenä 18.8.
+// ettei Marsukatu-Kupittaa-välillä ole suoraa (vaihdotonta) ajovuoroa, joten
+// SIRI:stä ei voi laskea luotettavaa kokonaiskestoa vaihdolliselle matkalle
+// (§8.1:n oma rajaus: "ei ovelta ovelle -reititystä"). Sen sijaan Katrin oma
+// kokemusperäinen kesto pysäkkiparille + hänen pyytämänsä hosumispuskuri.
+// EI tekoälyä tässä — pelkkää suoraa API-dataa ja laskentaa (Katrin pyyntö).
+// Uusi tunnettu matka lisätään tähän listaan sitä mukaa kun niitä tulee.
+const FOLI_TUNNETUT_MATKAT = [
+  {
+    tunnistin: 'joukahaisenkatu', // tapahtuman location-tekstin osamerkkijono (pieninä kirjaimina)
+    kotiPysakki: '6011', // Marsukatu
+    kohdePysakit: ['499', '130', '134', '162', '1685'], // Kupittaan jäähalli / Uudenmaantulli
+    kestoMin: 45,
+    hosumisPuskuriMin: 10,
+  },
+];
+
+function etsiTunnettuFoliMatka(tapahtuma) {
+  if (!tapahtuma.location) return null; // ei sijaintia = ei matkaa (esim. "meillä")
+  const teksti = tapahtuma.location.toLowerCase();
+  return FOLI_TUNNETUT_MATKAT.find(function(m) { return teksti.indexOf(m.tunnistin) !== -1; }) || null;
+}
+
+// Viimeinen TODELLINEN (SIRI-reaaliaikainen) lähtö kotipysäkiltä joka vielä
+// ehtii perille ennen tapahtuman alkua (kesto + hosumispuskuri huomioiden).
+// Palauttaa null jos SIRI ei (vielä) näytä yhtään riittävän aikaista lähtöä
+// — se ei tarkoita ettei bussia olisi, vain ettei se ole vielä reaaliaika-
+// listassa (kaukaisempi lähtö tarkentuu lähempänä).
+async function haeFoliLahtoEnnenTapahtumaa(tapahtumaAlkuMs, matka) {
+  const lahdot = await haeFoliLahdot(matka.kotiPysakki);
+  const viimeinenSallittu = tapahtumaAlkuMs - (matka.kestoMin + matka.hosumisPuskuriMin) * 60000;
+  let paras = null;
+  lahdot.forEach(function(l) {
+    const lahtoMs = l.expecteddeparturetime * 1000;
+    if (lahtoMs <= viimeinenSallittu && (!paras || lahtoMs > paras.lahtoMs)) {
+      paras = { lahtoMs: lahtoMs, linja: l.lineref, kohde: l.destinationdisplay };
+    }
+  });
+  if (!paras) return null;
+  return { lahtoMs: paras.lahtoMs, saapumisMs: paras.lahtoMs + matka.kestoMin * 60000, linja: paras.linja, kohde: paras.kohde };
+}
+
+// Ensimmäinen todellinen lähtö jommaltakummalta kohdepysäkiltä tapahtuman
+// päättymisen jälkeen — paluumatka.
+async function haeFoliPaluuTapahtumanJalkeen(tapahtumaLoppuMs, matka) {
+  const kaikki = await Promise.all(matka.kohdePysakit.map(haeFoliLahdot));
+  const lahdot = [].concat.apply([], kaikki);
+  let paras = null;
+  lahdot.forEach(function(l) {
+    const lahtoMs = l.expecteddeparturetime * 1000;
+    if (lahtoMs >= tapahtumaLoppuMs && (!paras || lahtoMs < paras.lahtoMs)) {
+      paras = { lahtoMs: lahtoMs, linja: l.lineref, kohde: l.destinationdisplay };
+    }
+  });
+  if (!paras) return null;
+  return { lahtoMs: paras.lahtoMs, saapumisMs: paras.lahtoMs + matka.kestoMin * 60000, linja: paras.linja, kohde: paras.kohde };
+}
+
+// Menon + paluun siirtymäpalikat yhdelle kalenteritapahtumalle, minuutti-
+// ruudukkoon merkittynä (varattu, sivuvaikutuksena) ja rivilistana
+// palautettuna. "Ei vielä tiedossa" -tapauksessa EI varata ruudukosta
+// mitään (ei keksitä kestoa) — näytetään vain karkea arvio ajankohdasta.
+async function haeFoliSiirtymatTapahtumalle(tapahtuma, paivanIso, varattu) {
+  const matka = etsiTunnettuFoliMatka(tapahtuma);
+  if (!matka || !tapahtuma.event_time) return [];
+  const paivaMs = new Date(paivanIso + 'T00:00:00').getTime();
+  const alkuMs = paivaMs + aikaMinuutteina(tapahtuma.event_time.slice(0, 5)) * 60000;
+  const loppuMs = tapahtuma.event_end_time ? paivaMs + aikaMinuutteina(tapahtuma.event_end_time.slice(0, 5)) * 60000 : alkuMs + 3600000;
+
+  const [meno, paluu] = await Promise.all([
+    haeFoliLahtoEnnenTapahtumaa(alkuMs, matka),
+    haeFoliPaluuTapahtumanJalkeen(loppuMs, matka),
+  ]);
+
+  const rivit = [];
+  if (meno) {
+    const a = Math.max(0, Math.round((meno.lahtoMs - paivaMs) / 60000));
+    const b = Math.min(1439, Math.round((meno.saapumisMs - paivaMs) / 60000));
+    for (let m = a; m < b; m++) varattu[m] = true;
+    rivit.push({ tyyppi: 'siirtyma', alku: a, loppu: b, linja: meno.linja, kohde: meno.kohde, suunta: 'meno' });
+  } else {
+    const arvioAlku = aikaMinuutteina(tapahtuma.event_time.slice(0, 5)) - matka.kestoMin - matka.hosumisPuskuriMin;
+    rivit.push({ tyyppi: 'siirtyma-tuntematon', alku: arvioAlku, loppu: arvioAlku, suunta: 'meno' });
+  }
+  if (paluu) {
+    const a = Math.max(0, Math.round((paluu.lahtoMs - paivaMs) / 60000));
+    const b = Math.min(1439, Math.round((paluu.saapumisMs - paivaMs) / 60000));
+    for (let m = a; m < b; m++) varattu[m] = true;
+    rivit.push({ tyyppi: 'siirtyma', alku: a, loppu: b, linja: paluu.linja, kohde: paluu.kohde, suunta: 'paluu' });
+  }
+  return rivit;
 }
 
 // "Rauhoitus-ikkuna" hytti-melulle (Ristiriitapaketti, kohta 3, 2026-07-17,

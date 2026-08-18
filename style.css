@@ -4216,6 +4216,15 @@ h1 {
   opacity: .78;
 }
 
+/* Föli-siirtymärivit (2026-08-18) — samat live-tunnukset kuin kiinteillä
+   menoilla, mutta "tuntematon" (SIRI ei vielä näytä kaukaista lähtöä)
+   saa saman himmeä+katkoviiva-käsittelyn kuin huomisen esikatselu, koska
+   sekin on arvio eikä varmistettu tieto. */
+.nyt-loki-rivi.siirtyma-arvio {
+  border-bottom-style: dashed;
+  opacity: .78;
+}
+
 /* Deadline-rivi (§7.3/§4.1) — vain --vaara-väri saa esiintyä täällä,
    päätetty 17.8.2026, ei muualla kalenterivärikysymyksessä. */
 .nyt-deadline {
