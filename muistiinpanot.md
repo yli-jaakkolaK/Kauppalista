@@ -4258,6 +4258,10 @@ sw.js v161 → v162.
 
 sw.js v162 → v163.
 
+**Kolmas jälkikorjaus samana päivänä: bussimatka lisää kuormaa oman kuormaan.** Katri vahvisti henkilö-suodattimen olevan oikein ("not regardless whose events are, you don't count for me if juha is going somewhere") ja lisäsi uuden säännön: "if i need to use bus add 1 to calendar event count just for using bus besides events that are already in calendar." Bussimatka itsessään on logistista kuormaa kalenterimenon PÄÄLLE, ei vain se tapahtuma jonka takia matka tehdään. `opintoPaivanKuorma()`: +1 päivän kuormalaskentaan per tapahtuma jolla on tunnettu Föli-matka (`etsiTunnettuFoliMatka`) — ei per bussietappi (meno+paluu = yksi lisäkuorma, ei kaksi).
+
+sw.js v163 → v164.
+
 ---
 
 ## Nykytila (päivitetty 2026-08-18, COPILOT.md-sääntö 4 — huom: aiempi "Nykytila ja seuraavat askeleet" -osio jäi tästä tiedostosta ylemmäs pitkän istunnon aikana kertyneiden uusien osioiden taakse, ei enää tiedoston lopussa; siirto omaksi erikseen tehtäväksi työksi, ei nyt)

@@ -2401,12 +2401,19 @@ async function opintoPaivanKuorma(kohdePvm) {
   // muuten kuormataso (ja siten PACER-vaihesuositus/tavoiteaskelmäärä)
   // vääristyi menoista jotka eivät oikeasti koske Katria.
   const { data: tapahtumat } = await db.from('kalenteri_tapahtumat')
-    .select('event_time, kalenteri_syotteet!inner(henkilo)')
+    .select('event_time, location, kalenteri_syotteet!inner(henkilo)')
     .eq('event_date', tanaan).not('event_time', 'is', null);
-  const omienMaara = (tapahtumat || []).filter(function(t) {
+  const omat = (tapahtumat || []).filter(function(t) {
     const h = t.kalenteri_syotteet ? t.kalenteri_syotteet.henkilo : null;
     return h === omaHenkilo || h === null;
-  }).length;
+  });
+  // Bussilla kulkeminen on omaa kuormaansa kalenterimenon lisäksi (Katrin
+  // pyyntö 18.8.: "if i need to use bus add 1 to calendar event count just
+  // for using bus besides events that are already in calendar"). +1 per
+  // tapahtuma jolla on TUNNETTU Föli-matka — ei per bussietappi, meno+paluu
+  // yhdessä on yksi lisäkuorma.
+  const bussiLisa = omat.filter(function(t) { return !!etsiTunnettuFoliMatka(t); }).length;
+  const omienMaara = omat.length + bussiLisa;
   const huoliPaino = await huolienPaivanPaino(tanaan);
   return deriveDayLoadLevel(omienMaara, huoliPaino);
 }
