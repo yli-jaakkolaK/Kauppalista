@@ -4205,6 +4205,17 @@ h1 {
 .osio-nimi::after { content: ''; flex: 1; height: 1px; background: var(--hius); }
 .selite { font-size: 12.5px; color: var(--vaimea); margin: 8px 0 0; line-height: 1.6; }
 
+/* Huomisen esikatselu (2026-08-18) — TIETOISESTI eri ulkoasu kuin tämän
+   päivän todellinen loki (katkoviivareunus, vaimeampi), ei koskaan saa
+   näyttää yhtä todelta kuin toteutunut/varma data — ks. "ei fake dataa"
+   -periaate. */
+#nyt-huomenna { margin-top: 24px; }
+.nyt-huomenna-otsikko { color: var(--vaimea); }
+.nyt-loki-rivi.huomenna {
+  border-bottom-style: dashed;
+  opacity: .78;
+}
+
 /* Deadline-rivi (§7.3/§4.1) — vain --vaara-väri saa esiintyä täällä,
    päätetty 17.8.2026, ei muualla kalenterivärikysymyksessä. */
 .nyt-deadline {

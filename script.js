@@ -120,7 +120,7 @@ function vaihdaHyttiValilehti(id) {
   // kahdesti peräkkäin ilman että kumpikaan tyhjensi toisen jälkeä oikeassa
   // järjestyksessä — klassinen "kaksi rinnakkaista tyhjennä+täytä-kutsua"
   // -kilpa-ajo (Katrin raportoimat tuplat Nyt-sivulla).
-  if (id === 'nyt') { paivitaHyttiTyoVapaaLabel(); lataaHyttiTanaanKaista(); lataaOpintoPaivanAskeleet(); }
+  if (id === 'nyt') { paivitaHyttiTyoVapaaLabel(); lataaHyttiTanaanKaista(); lataaOpintoPaivanAskeleet(); naytaHuomisenEsikatselu(); }
   if (id === 'reitti') lataaHyttiPaanakyma();
   if (id === 'loki') lataaLoki();
   if (id === 'kartta') lataaOpintoKartta();
@@ -2325,6 +2325,15 @@ function opintoEilinenPvm() {
   return paivamaaraISO(new Date(Date.now() - 86400000));
 }
 
+// Yleinen "päivä ennen X" (2026-08-18, ks. laskeOpintoPaivanAskeleet:n
+// kohdePvm-parametri) — opintoEilinenPvm() on aina suhteessa OIKEAAN
+// tähän hetkeen, mutta huomisen esikatselussa "eilinen" tarkoittaa TÄNÄÄN,
+// ei kahta päivää sitten. Otetaan mikä tahansa ISO-päivä ja palautetaan
+// sitä edeltävä.
+function paivaaEnnen(pvmIso) {
+  return paivamaaraISO(new Date(new Date(pvmIso + 'T00:00:00').getTime() - 86400000));
+}
+
 // KUORMA rajoittaa: sama Kuormavahdin "kellonaikameno"-määritelmä ja
 // paivan_menoraja-asetus kuin muualla sovelluksessa (ks. laskeMenoja(),
 // haeAsetusNumero('paivan_menoraja', 5)) — ei uutta kynnysarvoa keksitty.
@@ -2354,13 +2363,13 @@ function computeConcernWeightForDate(isoPvm, huolet) {
   }, 0);
 }
 
-async function huolienPaivanPaino() {
+async function huolienPaivanPaino(kohdePvm) {
   const { data: huolet, error } = await db.from('paivan_huolet').select('pvm, vakavuus');
   if (error) {
     console.error('Huolilippujen haku epäonnistui:', error);
     return 0;
   }
-  return computeConcernWeightForDate(opintoTanaanPvm(), huolet);
+  return computeConcernWeightForDate(kohdePvm || opintoTanaanPvm(), huolet);
 }
 
 // Puhdas kynnyslogiikka irrotettu tästä samasta syystä kuin yllä
@@ -2383,11 +2392,11 @@ function deriveDayLoadLevel(ajallistenMaara, huoliPaino) {
   return taso;
 }
 
-async function opintoPaivanKuorma() {
-  const tanaan = opintoTanaanPvm();
+async function opintoPaivanKuorma(kohdePvm) {
+  const tanaan = kohdePvm || opintoTanaanPvm();
   const { count } = await db.from('kalenteri_tapahtumat').select('id', { count: 'exact', head: true })
     .eq('event_date', tanaan).not('event_time', 'is', null);
-  const huoliPaino = await huolienPaivanPaino();
+  const huoliPaino = await huolienPaivanPaino(tanaan);
   return deriveDayLoadLevel(count || 0, huoliPaino);
 }
 
@@ -3103,7 +3112,13 @@ function opintoPaivaaDeadlineen(aihe, kurssienDeadlinet, aiheidenDeadlinet, tana
 function opintoPaivanTavoiteAskelmaara(kuormaTaso) {
   return kuormaTaso === 'raskas' ? 3 : 8;
 }
-async function laskeOpintoPaivanAskeleet(maxAskeliaYlikirjoitus, poissuljetutAiheIdt, poissuljetutSolmuIdt, ikkunaMin) {
+// kohdePvm (2026-08-18, ks. muistiinpanot.md "Huomisen esikatselu") —
+// valinnainen ISO-päivä, oletus tänään (opintoTanaanPvm()) jos ei annettu.
+// Mahdollistaa SAMAN moottorin ajamisen "kuin se olisi kohdePvm" ilman
+// rinnakkaista laskukonetta — kaikki päivämäärään sidotut osat (kuorma,
+// eilinen/jumi-haku, deadline-etäisyys) käyttävät tätä, eivät kovakoodattua
+// "oikeaa nyt":ää.
+async function laskeOpintoPaivanAskeleet(maxAskeliaYlikirjoitus, poissuljetutAiheIdt, poissuljetutSolmuIdt, ikkunaMin, kohdePvm) {
   // Henkselit-esto (2026-08-05, ks. muistiinpanot.md "Henkselit") — YKSI
   // choke point kaikille kolmelle kutsupaikalle (lataaOpintoPaivanAskeleet,
   // tayttaOpintoPaivanAskeleet, etsiIkkunaanSopivaAskel), ks. Henkselit-speksi
@@ -3112,7 +3127,7 @@ async function laskeOpintoPaivanAskeleet(maxAskeliaYlikirjoitus, poissuljetutAih
   if (omaHenkilo && henkselitEstaaHytin(omaHenkilo) && await onkoOmaHenkselitAktiivinenNyt()) {
     return [];
   }
-  const tanaan = opintoTanaanPvm();
+  const tanaan = kohdePvm || opintoTanaanPvm();
 
   const [{ data: aiheet, error: aiheError }, { data: solmut, error: solmutError }, { data: kaaret, error: kaaretError }, { data: viittausRivit, error: viittausError }] = await Promise.all([
     db.from('opinto_aiheet').select('*, opinto_kurssit!inner(owner_id, name, status)').eq('opinto_kurssit.owner_id', currentUserId).eq('opinto_kurssit.status', 'aktiivinen'),
@@ -3144,7 +3159,7 @@ async function laskeOpintoPaivanAskeleet(maxAskeliaYlikirjoitus, poissuljetutAih
   const kurssiIdt = Array.from(new Set(kaikkiAiheet.map(function(a) { return a.kurssi_id; })));
   const aiheIdt = kaikkiAiheet.map(function(a) { return a.id; });
 
-  const eilen = opintoEilinenPvm();
+  const eilen = paivaaEnnen(tanaan);
   const [{ data: kurssiDl }, { data: aiheDl }, { data: eilenAskeleet }, { data: eilenJumit }] = await Promise.all([
     db.from('opinto_deadlinet').select('kurssi_id, pvm').in('kurssi_id', kurssiIdt.length ? kurssiIdt : [-1]),
     db.from('opinto_deadlinet').select('aihe_id, pvm').in('aihe_id', aiheIdt.length ? aiheIdt : [-1]),
@@ -3159,7 +3174,7 @@ async function laskeOpintoPaivanAskeleet(maxAskeliaYlikirjoitus, poissuljetutAih
   const eilenTehdytSolmuIdt = new Set((eilenAskeleet || []).filter(function(r) { return r.taitosolmu_id; }).map(function(r) { return r.taitosolmu_id; }));
   const eilenJumitAiheIdt = new Set((eilenJumit || []).map(function(r) { return r.aihe_id; }));
 
-  const kuormaTaso = await opintoPaivanKuorma();
+  const kuormaTaso = await opintoPaivanKuorma(tanaan);
   const maxAskelia = maxAskeliaYlikirjoitus != null ? maxAskeliaYlikirjoitus : opintoPaivanTavoiteAskelmaara(kuormaTaso);
 
   // --- Siltojen ikkunapaino + kiireellisyyden leviäminen (KAIKILLE
@@ -3631,6 +3646,127 @@ function piirraNytLokiRivi(rivi) {
     el.addEventListener('click', function() { avaaNytKortinKohde(rivi); });
   }
   return el;
+}
+
+// === HUOMISEN ESIKATSELU (2026-08-18, Katrin pyyntö: "leikitään et tää
+// päivä mikä täs näkyy olis huominen, niin miten laittaisit sen käyt kattoo
+// kalenterista ja lasket bufferit ym ja laitat sopivat opiskeluslotit") ===
+// SAMA moottori (laskeOpintoPaivanAskeleet, kohdePvm=huomenna) ja SAMA
+// minuuttiruudukko-sijoittelutekniikka kuin piirraNytLoki:ssa — EI
+// rinnakkaista laskukonetta. Ei tallenna mitään opinto_paivan_askeleet-
+// tauluun (se on sidottu tämän päivän pvm:ään) — puhdas esikatselu,
+// TIETOISESTI väliaikainen: huomisen todellinen jono lasketaan uudelleen
+// huomenna sen mukaan mitä tänään oikeasti ehditään, joten tämä VOI näyttää
+// eri asian kuin mitä huomenna oikeasti tapahtuu.
+async function naytaHuomisenEsikatselu() {
+  const kehys = document.getElementById('nyt-huomenna');
+  if (!kehys || !currentUserId) return;
+
+  const huominenD = new Date();
+  huominenD.setDate(huominenD.getDate() + 1);
+  const huominenIso = paivamaaraISO(huominenD);
+  const viikonpaiva = huominenD.getDay();
+
+  const [{ data: tapahtumat }, { data: suljetut }, { data: opiskeluajat }] = await Promise.all([
+    db.from('kalenteri_tapahtumat').select('title, event_time, event_end_time').eq('event_date', huominenIso).eq('user_id', currentUserId).order('event_time'),
+    db.from('hytti_suljetut_ikkunat').select('alkaa, paattyy').eq('owner_id', currentUserId).eq('viikonpaiva', viikonpaiva),
+    db.from('hytti_opiskeluaika').select('alkaa, paattyy').eq('owner_id', currentUserId).eq('viikonpaiva', viikonpaiva),
+  ]);
+  const opiskeluIkkuna = (opiskeluajat && opiskeluajat[0]) || { alkaa: '09:00', paattyy: '15:30' };
+  const ikkunaAlku = aikaMinuutteina(opiskeluIkkuna.alkaa.slice(0, 5));
+  const ikkunaLoppu = aikaMinuutteina(opiskeluIkkuna.paattyy.slice(0, 5));
+
+  const varattu = new Array(1440).fill(true);
+  for (let m = ikkunaAlku; m < ikkunaLoppu; m++) varattu[m] = false;
+  (suljetut || []).forEach(function(ikkuna) {
+    const a = aikaMinuutteina(ikkuna.alkaa.slice(0, 5)), b = aikaMinuutteina(ikkuna.paattyy.slice(0, 5));
+    for (let m = a; m < b; m++) varattu[m] = true;
+  });
+
+  const siirtymaPuskuri = haeAsetusNumero('siirtymapuskuri_min', 30);
+  const kiinteatMenot = [];
+  (tapahtumat || []).forEach(function(t) {
+    if (!t.event_time) return;
+    const a = aikaMinuutteina(t.event_time.slice(0, 5));
+    const b = Math.min(1439, t.event_end_time ? aikaMinuutteina(t.event_end_time.slice(0, 5)) : a + 60);
+    for (let m = Math.max(0, a - siirtymaPuskuri); m < Math.min(1440, b + siirtymaPuskuri); m++) varattu[m] = true;
+    kiinteatMenot.push({ alku: a, loppu: b, title: t.title });
+  });
+
+  const ateriaKesto = haeAsetusNumero('aterian_kesto_min', 30);
+  const mahtuuko = function(alku) {
+    if (alku < 0 || alku + ateriaKesto > 1440) return false;
+    for (let m = alku; m < alku + ateriaKesto; m++) { if (varattu[m]) return false; }
+    return true;
+  };
+  let ateriaAlku = aikaMinuutteina(haeAsetusTeksti('ateria_alku', '11:00'));
+  if (!mahtuuko(ateriaAlku)) {
+    ateriaAlku = -1;
+    for (let m = ikkunaAlku; m <= ikkunaLoppu - ateriaKesto; m++) { if (mahtuuko(m)) { ateriaAlku = m; break; } }
+  }
+  let ateriaSijoitus = null;
+  if (ateriaAlku >= 0) {
+    for (let m = ateriaAlku; m < ateriaAlku + ateriaKesto; m++) varattu[m] = true;
+    ateriaSijoitus = { alku: ateriaAlku, loppu: ateriaAlku + ateriaKesto };
+  }
+
+  // Kuinka monta ehdokasta kannattaa pyytää moottorilta — vapaiden
+  // minuuttien karkea arvio jaettuna kevyellä keskimääräisellä lohkolla,
+  // ei tarkka (todellinen sijoittelu alla joka tapauksessa jättää pois
+  // sen minkä lohkot eivät oikeasti mahdu).
+  let vapaaMin = 0;
+  for (let m = ikkunaAlku; m < ikkunaLoppu; m++) { if (!varattu[m]) vapaaMin++; }
+  const pyydettavaMaara = Math.min(10, Math.max(1, Math.ceil(vapaaMin / 15)));
+  const ehdokkaat = await laskeOpintoPaivanAskeleet(pyydettavaMaara, null, null, null, huominenIso);
+
+  const opiskelupatkat = [];
+  ehdokkaat.forEach(function(e) {
+    const kohde = e.item;
+    const vaihe = kohdeVaihe(kohde);
+    const kesto = haeOpintoKestoMinuutteina(vaihe);
+    let loytyi = -1;
+    for (let m = ikkunaAlku; m <= ikkunaLoppu - kesto; m++) {
+      let vapaa = true;
+      for (let k = m; k < m + kesto; k++) { if (varattu[k]) { vapaa = false; break; } }
+      if (vapaa) { loytyi = m; break; }
+    }
+    if (loytyi < 0) return;
+    for (let k = loytyi; k < loytyi + kesto; k++) varattu[k] = true;
+    const kurssi = e.tyyppi === 'aihe' ? (kohde.opinto_kurssit ? kohde.opinto_kurssit.name : '') : (kohde.lahde || '');
+    opiskelupatkat.push({ tyyppi: 'opiskelu-esikatselu', nimi: kohde.name, kurssi: kurssi, vaihe: vaihe, alku: loytyi, loppu: loytyi + kesto });
+  });
+
+  let rivit = kiinteatMenot.map(function(m) { return { tyyppi: 'live', alku: m.alku, loppu: m.loppu, title: m.title }; });
+  if (ateriaSijoitus) rivit.push({ tyyppi: 'lounas', alku: ateriaSijoitus.alku, loppu: ateriaSijoitus.loppu });
+  rivit = rivit.concat(opiskelupatkat);
+  rivit.sort(function(a, b) { return a.alku - b.alku; });
+
+  kehys.innerHTML = '';
+  if (rivit.length === 0) { kehys.style.display = 'none'; return; }
+  kehys.style.display = 'block';
+
+  const otsikko = document.createElement('div');
+  otsikko.className = 'osio-nimi nyt-huomenna-otsikko';
+  otsikko.textContent = '🔮 Huomenna (esikatselu — voi vielä muuttua)';
+  kehys.appendChild(otsikko);
+
+  rivit.forEach(function(rivi) {
+    const el = document.createElement('div');
+    if (rivi.tyyppi === 'lounas') {
+      el.className = 'nyt-loki-rivi matala huomenna';
+      el.innerHTML = '<div class="nyt-loki-aika">' + kelloMinuuteista(rivi.alku) + '</div><div class="nyt-loki-teksti">Lounas</div>';
+    } else if (rivi.tyyppi === 'live') {
+      el.className = 'nyt-loki-rivi live huomenna';
+      el.innerHTML = '<div class="nyt-loki-aika">' + kelloMinuuteista(rivi.alku) + '</div><div class="nyt-loki-teksti"><b>' + rivi.title + '</b></div>';
+    } else {
+      el.className = 'nyt-loki-rivi matala huomenna';
+      el.innerHTML =
+        '<div class="nyt-loki-aika">' + kelloMinuuteista(rivi.alku) + '</div>' +
+        '<div class="nyt-loki-teksti"><b>' + rivi.nimi + '</b>' +
+        '<span class="pieni">' + rivi.kurssi + (rivi.kurssi ? ' · ' : '') + OPINTO_VAIHE_NIMET[rivi.vaihe] + '</span></div>';
+    }
+    kehys.appendChild(el);
+  });
 }
 
 function piirraNytKortti(rivi) {
