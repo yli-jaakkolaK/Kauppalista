@@ -4262,6 +4262,10 @@ sw.js v162 → v163.
 
 sw.js v163 → v164.
 
+**Neljäs jälkikorjaus samana päivänä: pieni tauko paluumatkan jälkeen.** Katri hyväksyi tämän päivän todellisen muodon ("same studytime until 10 and when i come home small break and then 14.15-15.30 studying") ja vahvisti ettei enempää mahdu ("its not possible to cram more unless studying in bus or in the evening" — molemmat tietoisesti rakentamatta jätettyjä laajennuksia, ei pyyntö juuri nyt). Lisätty: jokaisen VARMISTETUN (ei "tarkentuu lähempänä" -arvion) paluumatkan jälkeen varataan pieni tauko (`paluutauko_min`-asetus, oletus 15min) ennen kuin opiskelupätkiä sijoitetaan — ei ryntäistä opiskeluun heti ovesta astuttua. Näkyy lokissa omana "☕ Pieni tauko" -rivinään.
+
+sw.js v164 → v165.
+
 ---
 
 ## Nykytila (päivitetty 2026-08-18, COPILOT.md-sääntö 4 — huom: aiempi "Nykytila ja seuraavat askeleet" -osio jäi tästä tiedostosta ylemmäs pitkän istunnon aikana kertyneiden uusien osioiden taakse, ei enää tiedoston lopussa; siirto omaksi erikseen tehtäväksi työksi, ei nyt)

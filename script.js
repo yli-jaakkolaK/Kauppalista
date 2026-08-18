@@ -3597,6 +3597,20 @@ async function piirraNytLoki(askeleet) {
   );
   siirtymaLuettelot.forEach(function(lista) { lista.forEach(function(r) { siirtymat.push(r); }); });
 
+  // Pieni tauko kotiin paluun jälkeen (2026-08-18, Katrin pyyntö: "when i
+  // come home small break and then studying" — ei ryntäistä opiskeluun heti
+  // ovesta astuttua). Koskee vain VARMISTETTUJA paluumatkoja (ei
+  // "tarkentuu lähempänä" -arvioita, joilla ei ole todellista loppuaikaa).
+  const paluuTauko = haeAsetusNumero('paluutauko_min', 15);
+  const taukoRivit = [];
+  siirtymat.forEach(function(s) {
+    if (s.tyyppi !== 'siirtyma' || s.suunta !== 'paluu') return;
+    const a = s.loppu, b = Math.min(1439, s.loppu + paluuTauko);
+    for (let m = a; m < b; m++) varattu[m] = true;
+    taukoRivit.push({ tyyppi: 'tauko-paluu', alku: a, loppu: b });
+  });
+  taukoRivit.forEach(function(r) { siirtymat.push(r); });
+
   // Ateria — suojattu, EI jätetä pois (§4.5): kokeile oletusaikaa, muuten
   // ensimmäinen vapaa rako opiskeluikkunan sisällä.
   const ateriaKesto = haeAsetusNumero('aterian_kesto_min', 30);
@@ -3662,6 +3676,9 @@ function piirraNytLokiRivi(rivi) {
   if (rivi.tyyppi === 'lounas') {
     el.className = 'nyt-loki-rivi matala';
     el.innerHTML = '<div class="nyt-loki-aika">' + kelloMinuuteista(rivi.alku) + '</div><div class="nyt-loki-teksti">Lounas</div>';
+  } else if (rivi.tyyppi === 'tauko-paluu') {
+    el.className = 'nyt-loki-rivi matala';
+    el.innerHTML = '<div class="nyt-loki-aika">' + kelloMinuuteista(rivi.alku) + '</div><div class="nyt-loki-teksti">☕ Pieni tauko</div>';
   } else if (rivi.tyyppi === 'live') {
     // Kiinteä meno — oma selkeä live-merkki, EI himmennetty (§4.1: "ei saa
     // näyttää samalta kuin siirrettävä opiskelupätkä eikä himmentyä").
