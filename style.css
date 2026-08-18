@@ -1533,6 +1533,27 @@ h1 {
   white-space: nowrap;
 }
 
+/* Tehtävänäkymän PACER-ohjelista jäi pois yllä olevan poissulkulistan
+   ulkopuolelle (2026-08-18, Katrin löydös: "there is nice explanation as
+   what to do but there is no way to read it until end because of
+   capping") — täsmälleen sama yksirivinen ellipsis-ansa kuin muillakin
+   .list li -rakenteilla ennen niiden omaa korjausta, vain ei koskaan
+   huomattu koska ohjetekstejä ei testattu pitkinä. Ohjeteksti PITÄÄ näkyä
+   kokonaan, sama periaate kuin Varastolla — id-skoopattu, ei tarvitse
+   koskea script.js:n puolelle uutta luokkaa. */
+#opinto-tehtava-ohje-lista li {
+  align-items: flex-start;
+  padding: 8px 0;
+}
+#opinto-tehtava-ohje-lista li span {
+  flex: 1;
+  min-width: 0;
+  white-space: normal;
+  overflow: visible;
+  text-overflow: clip;
+  word-break: break-word;
+}
+
 .list li.varasto-rivi {
   align-items: flex-start;
   min-height: 44px;
