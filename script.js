@@ -2579,7 +2579,7 @@ function paivitaTehtavatMaaraajatNakyvyys() {
 // historiaa, ei nollaa väliä — VAIN sr_next_review lyhenee tarvittaessa). ===
 async function lataaReittiKertausjono() {
   const listEl = document.getElementById('reitti-kertausjono-lista');
-  const tyhjaEl = document.getElementById('reitti-kertausjono-tyhja');
+  const osioEl = document.getElementById('reitti-kertausjono-osio');
   if (!listEl) return;
 
   const { data: aiheet, error } = await db.from('opinto_aiheet')
@@ -2590,7 +2590,9 @@ async function lataaReittiKertausjono() {
 
   listEl.innerHTML = '';
   const rivit = aiheet || [];
-  tyhjaEl.style.display = rivit.length === 0 ? 'block' : 'none';
+  // Koko osio pois näkyvistä kun tyhjä, ei "ei kertausjonossa olevia
+  // solmuja" -tekstiä (Katrin yleissääntö 2026-08-18).
+  osioEl.style.display = rivit.length === 0 ? 'none' : 'block';
 
   rivit.forEach(function(aihe) {
     const li = document.createElement('li');

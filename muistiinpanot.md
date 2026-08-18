@@ -4266,6 +4266,12 @@ sw.js v163 → v164.
 
 sw.js v164 → v165.
 
+**Yleissääntö: tyhjä osio piiloon, ei "ei X:ää" -tekstiä.** Katri: "make general rule that if you are about to show me something along these lines 'ei kertausjonossa olevia solmuja' don't show that section at all, simplicity is high in value." Sama periaate joka on jo aiemmin tässä istunnossa sovellettu Tehtävät+Määräajat-korttiin — nyt yleissääntönä koko sovellukselle. Ensimmäinen konkreettinen korjaus (hänen oma esimerkkinsä): Reitin Kertausjono-osio (`#reitti-kertausjono-osio` kääri otsikon+listan+jakoviivan, koko paketti piiloon kun tyhjä `lataaReittiKertausjono()`:ssa) — poistettu vanha `#reitti-kertausjono-tyhja`-tekstielementti kokonaan.
+
+**Ei vielä auditoitu:** koodikannassa on ~15+ muuta `.section-empty`-elementtiä joilla on oikea "ei..."-teksti sidottuna listan tyhjyyteen (kurssit, sillat/taitosolmut, henkselit, lapset, materiaali-jasennys, silta-ehdotus, opinto-materiaali, teema). Osa `.section-empty`-elementeistä EI ole listan tyhjyystiloja lainkaan, vaan pysyviä ohjetekstejä jotka näytetään aina tarkoituksella ("Anna arjen yrittää ensin...", "Kellonajat jolloin lapsi on poissa...") — näitä ei pidä piilottaa. Täysi läpikäynti jätetty omaksi, myöhemmäksi työksi.
+
+sw.js v165 → v166.
+
 ---
 
 ## Nykytila (päivitetty 2026-08-18, COPILOT.md-sääntö 4 — huom: aiempi "Nykytila ja seuraavat askeleet" -osio jäi tästä tiedostosta ylemmäs pitkän istunnon aikana kertyneiden uusien osioiden taakse, ei enää tiedoston lopussa; siirto omaksi erikseen tehtäväksi työksi, ei nyt)
