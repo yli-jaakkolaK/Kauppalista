@@ -218,7 +218,6 @@
     <hr class="divider">
 
     <ul class="list" id="teema-list"></ul>
-    <p class="section-empty" id="teema-tyhja" style="display:none">Ei vielä muruja tässä teemassa. Siirrä Laiturista ⋯-valikon kautta.</p>
   </div>
 
   <!-- Vahdittu lepo (2026-07-21, ks. KONSEPTIKIRJA.md 4.10b / muistiinpanot.md
@@ -407,7 +406,6 @@
 
       <div class="section-title" id="opinto-kurssi-otsikko">📚 Opinnot</div>
       <ul class="list" id="opinto-kurssi-lista"></ul>
-      <p class="section-empty" id="opinto-tyhja" style="display:none">Ei vielä kursseja. Lisää ensimmäinen alta.</p>
 
       <div class="add-item" id="opinto-kurssi-lisays">
         <span class="prefix">›</span>
@@ -446,7 +444,6 @@
       <div class="section-title">🌉 Sillat <span class="opinto-kartta-linkki" id="silta-etsi-linkki"><span class="silta-ikoni" id="silta-etsi-ikoni"></span><span id="silta-etsi-teksti">Etsi sillat</span></span></div>
       <p class="section-empty" id="silta-odottaa-ilmoitus" style="display:none"></p>
       <ul class="list" id="taitosolmu-lista"></ul>
-      <p class="section-empty" id="taitosolmu-tyhja" style="display:none">Ei vielä siltoja. Sillat löytyvät automaattisesti "Etsi sillat" -toiminnolla, kun vähintään kaksi aktiivista kurssia on täyttänyt materiaalikenttänsä.</p>
 
       <div class="add-item">
         <span class="prefix">›</span>
@@ -480,8 +477,6 @@
         <div class="section-title">🗂 Loki</div>
         <ul class="list" id="hytti-kortit-list"></ul>
       </div>
-      <p class="section-empty" id="hytti-tyhja" style="display:none">Yksi kortti per kurssi, projekti tai tilaisuus. Kirjoita muistiinpanot riveiksi, merkkaa toimintaa vaativat tehtäviksi — ne kokoontuvat itsestään ylös. Pidä seuraava askel pienenä ja rumana: ei "kirjoita essee" vaan "avaa tiedosto ja kirjoita yksi ruma kappale". Ideat kuuluvat Laituriin — työn alla olevat tänne.</p>
-
       <div class="hytti-tyyppi-valinta">
         <button class="kalenteri-tila-btn hytti-tyyppi-btn active" data-tyyppi="jatkuva">Jatkuva</button>
         <button class="kalenteri-tila-btn hytti-tyyppi-btn" data-tyyppi="paattyva">Päättyvä</button>
@@ -605,7 +600,6 @@
     </div>
     <p class="editori-tiedosto-tila" id="opinto-kurssi-materiaali-tiedosto-tila" style="display:none"></p>
     <ul class="list" id="opinto-materiaali-lista"></ul>
-    <p class="section-empty" id="opinto-materiaali-tyhja" style="display:none">Ei vielä materiaalia. "+ Lisää materiaalia" tuo tiedoston tai tekstin — tästä näet mitkä on jo käsitelty.</p>
     <!-- Kurssitason yhteinen tarkistus (2026-08-17) — käsittelee KAIKKI
          odottavat osat yhtenä kokonaisuutena (Katrin havainto: pitkä
          materiaali liitetään usein monessa osassa, äly ei saa ehdottaa
@@ -639,7 +633,6 @@
     <div class="section-title">🧭 Aiheet</div>
 
     <ul class="list" id="opinto-aihe-lista"></ul>
-    <p class="section-empty" id="opinto-aihe-tyhja" style="display:none">Ei vielä aiheita.</p>
 
     <div class="add-item">
       <span class="prefix">›</span>
@@ -798,7 +791,6 @@
     <div class="dialog-box">
       <p class="dialog-title">Ketkä lapset katettu?</p>
       <ul class="list" id="kattaa-lapset-lista"></ul>
-      <p class="section-empty" id="kattaa-lapset-tyhja" style="display:none">Ei lapsiprofiileja vielä — lisää ne Asetukset → 👶 Lapset.</p>
       <div class="dialog-buttons">
         <button class="dialog-btn dialog-btn-cancel" id="kattaa-lapset-sulje">Sulje</button>
         <button class="dialog-btn" id="kattaa-lapset-tallenna-btn">Tallenna</button>
@@ -896,7 +888,6 @@
 
       <p class="section-title" style="margin-top:12px">Ketkä lapset</p>
       <ul class="list" id="hoito-jasennys-lapset-lista"></ul>
-      <p class="section-empty" id="hoito-jasennys-lapset-tyhja" style="display:none">Ei lapsiprofiileja vielä — lisää ne Asetukset → 👶 Lapset.</p>
 
       <div class="dialog-buttons">
         <button class="dialog-btn dialog-btn-cancel" id="hoito-jasennys-sulje">Peruuta</button>
@@ -922,13 +913,15 @@
         <input type="text" id="materiaali-jasennys-kurssi-input" placeholder="kurssin nimi (uusi tai olemassa oleva)...">
       </div>
 
-      <p class="section-title" style="margin-top:12px">Aiheet</p>
-      <ul class="list" id="materiaali-jasennys-aihe-lista"></ul>
-      <p class="section-empty" id="materiaali-jasennys-aihe-tyhja" style="display:none">Ei tunnistettuja aiheita.</p>
+      <div id="materiaali-jasennys-aihe-osio">
+        <p class="section-title" style="margin-top:12px">Aiheet</p>
+        <ul class="list" id="materiaali-jasennys-aihe-lista"></ul>
+      </div>
 
-      <p class="section-title" style="margin-top:12px">Deadlinet</p>
-      <ul class="list" id="materiaali-jasennys-deadline-lista"></ul>
-      <p class="section-empty" id="materiaali-jasennys-deadline-tyhja" style="display:none">Ei tunnistettuja deadlineja.</p>
+      <div id="materiaali-jasennys-deadline-osio">
+        <p class="section-title" style="margin-top:12px">Deadlinet</p>
+        <ul class="list" id="materiaali-jasennys-deadline-lista"></ul>
+      </div>
 
       <div class="dialog-buttons">
         <button class="dialog-btn dialog-btn-cancel" id="materiaali-jasennys-sulje">Peruuta</button>
@@ -941,7 +934,6 @@
     <div class="dialog-box">
       <p class="dialog-title">Ehdotetut sillat</p>
       <ul class="list" id="silta-ehdotus-lista"></ul>
-      <p class="section-empty" id="silta-ehdotus-tyhja" style="display:none">Ei ehdotuksia tällä kertaa.</p>
       <div class="dialog-buttons">
         <button class="dialog-btn dialog-btn-cancel" id="silta-ehdotus-sulje">Sulje</button>
         <button class="dialog-btn" id="silta-ehdotus-tallenna-btn">Tallenna hyväksytyt</button>
@@ -1005,7 +997,6 @@
          lasketaan. Jaettu perheen data (ei owner_id). -->
     <div class="section-title">👶 Lapset</div>
     <ul class="list" id="lapset-lista"></ul>
-    <p class="section-empty" id="lapset-tyhja" style="display:none">Ei vielä lapsiprofiileja — ristiriitalogiikka toimii ilman niitä samoin kuin ennen (kaikki tunnistamattomat päällekkäisyydet käsitellään "huomio"-tasolla).</p>
     <div class="add-item">
       <span class="prefix">›</span>
       <input type="text" id="lapsi-uusi-input" placeholder="lapsen nimi...">
@@ -1022,7 +1013,6 @@
          (ks. omaHenkilo script.js:ssä). -->
     <div class="section-title">🎗️ Henkselit</div>
     <ul class="list" id="henkselit-lista"></ul>
-    <p class="section-empty" id="henkselit-tyhja" style="display:none">Ei aktiivisia tai tulevia henkseleitä.</p>
     <div class="settings-row">
       <span>Päivä</span>
       <input type="date" id="henkselit-pvm-input">
@@ -1189,10 +1179,11 @@
          välitön kun kohde asetetaan (ks. script.js asetaLaiturinKoti), ei
          jää mitään konfiguroitavaa. -->
 
-    <div class="section-title">✨ Mitä äly on tehnyt</div>
-    <p class="section-empty" id="aly-log-tyhja" style="display:none">Ei vielä mitään.</p>
-    <button class="laituri-arkisto-toggle" id="aly-log-toggle" style="display:none">Näytä loki (0)</button>
-    <div class="aly-log-list" id="aly-log-list" style="display:none"></div>
+    <div id="aly-log-osio" style="display:none">
+      <div class="section-title">✨ Mitä äly on tehnyt</div>
+      <button class="laituri-arkisto-toggle" id="aly-log-toggle" style="display:none">Näytä loki (0)</button>
+      <div class="aly-log-list" id="aly-log-list" style="display:none"></div>
+    </div>
   </div>
 
   <!-- Ristiriitapaketti v2 (2026-08-06) — yhden lapsen profiili + viikkopohja

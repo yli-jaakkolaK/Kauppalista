@@ -929,7 +929,6 @@ async function lataaTeemaSisalto() {
 
   const listEl = document.getElementById('teema-list');
   listEl.innerHTML = '';
-  document.getElementById('teema-tyhja').style.display = murut.length === 0 ? 'block' : 'none';
 
   murut.forEach(function(muru) {
     const li = document.createElement('li');
@@ -1193,7 +1192,6 @@ async function lataaOpintoKurssit() {
   const kurssit = data || [];
   const listEl = document.getElementById('opinto-kurssi-lista');
   listEl.innerHTML = '';
-  document.getElementById('opinto-tyhja').style.display = kurssit.length === 0 ? 'block' : 'none';
 
   for (const kurssi of kurssit) {
     const { data: aiheet, error: aiheError } = await db.from('opinto_aiheet').select('pero_vaihe, kertausjonossa').eq('kurssi_id', kurssi.id);
@@ -1450,7 +1448,6 @@ async function lataaOpintoKurssiMateriaalit() {
   const rivit = data || [];
   const listEl = document.getElementById('opinto-materiaali-lista');
   listEl.innerHTML = '';
-  document.getElementById('opinto-materiaali-tyhja').style.display = rivit.length === 0 ? 'block' : 'none';
   document.getElementById('opinto-kurssi-silta-linkki').style.display = rivit.length === 0 ? 'none' : 'block';
 
   let tiedostoKartta = {};
@@ -1507,7 +1504,6 @@ async function lataaOpintoAiheet() {
   const aiheet = data || [];
   const listEl = document.getElementById('opinto-aihe-lista');
   listEl.innerHTML = '';
-  document.getElementById('opinto-aihe-tyhja').style.display = aiheet.length === 0 ? 'block' : 'none';
 
   aiheet.forEach(function(aihe) {
     const li = document.createElement('li');
@@ -4097,7 +4093,6 @@ async function lataaTaitosolmut() {
   const solmut = data || [];
   const listEl = document.getElementById('taitosolmu-lista');
   listEl.innerHTML = '';
-  document.getElementById('taitosolmu-tyhja').style.display = solmut.length === 0 ? 'block' : 'none';
 
   solmut.forEach(function(solmu) {
     const li = document.createElement('li');
@@ -4321,6 +4316,14 @@ async function etsiSiltoja() {
   }
   piilotaSiltaOdotusIlmoitus();
   odottavatSiltaRivitIdt = [];
+  // Ei avata tyhjää dialogia (2026-08-18, Katrin yleissääntö: "if there is
+  // nothing to show, don't show it at all") — sama suora toast-malli kuin
+  // kurssikohtaisella haulla jo on (ks. yllä "Ei löytynyt siltoja tälle
+  // kurssille tällä kertaa.").
+  if (tulos.kelvolliset.length === 0) {
+    naytaIlmoitus('Ei löytynyt siltoja tällä kertaa.');
+    return;
+  }
   naytaSiltaEhdotukset(tulos.kelvolliset, tulos.aiheKartta, tulos.kurssiKartta);
 }
 
@@ -4394,7 +4397,6 @@ function naytaSiltaEhdotukset(ehdotukset, aiheKartta, kurssiKartta) {
   const overlay = document.getElementById('silta-ehdotus-overlay');
   const lista = document.getElementById('silta-ehdotus-lista');
   lista.innerHTML = '';
-  document.getElementById('silta-ehdotus-tyhja').style.display = ehdotukset.length === 0 ? 'block' : 'none';
 
   ehdotukset.forEach(function(ehdotus) {
     const li = document.createElement('li');
@@ -5461,7 +5463,6 @@ async function lataaLapset() {
   const lapset = data || [];
   const listEl = document.getElementById('lapset-lista');
   listEl.innerHTML = '';
-  document.getElementById('lapset-tyhja').style.display = lapset.length === 0 ? 'block' : 'none';
   lapset.forEach(function(lapsi) {
     const li = document.createElement('li');
     li.addEventListener('click', function() { avaaLapsi(lapsi); });
@@ -5734,7 +5735,6 @@ document.getElementById('lapsi-poikkeus-lisaa-btn').addEventListener('click', as
 function avaaKattaaLapsetValikko(rivi) {
   const lista = document.getElementById('kattaa-lapset-lista');
   lista.innerHTML = '';
-  document.getElementById('kattaa-lapset-tyhja').style.display = cachedLapset.length === 0 ? 'block' : 'none';
   const katetut = new Set(rivi.kattaa_lapset || []);
 
   cachedLapset.forEach(function(lapsi) {
@@ -6054,7 +6054,6 @@ async function lataaHenkselit() {
   const rivit = data || [];
   const listEl = document.getElementById('henkselit-lista');
   listEl.innerHTML = '';
-  document.getElementById('henkselit-tyhja').style.display = rivit.length === 0 ? 'block' : 'none';
   rivit.forEach(function(rivi) {
     const li = document.createElement('li');
     li.addEventListener('click', function() { avaaHenkselitMuokkaus(rivi); });
@@ -7727,17 +7726,14 @@ async function lataaLoki() {
   cachedHyttiKortit = kortit || [];
 
   const kortitOsio = document.getElementById('hytti-kortit-osio');
-  const tyhja = document.getElementById('hytti-tyhja');
 
   if (cachedHyttiKortit.length === 0) {
     kortitOsio.style.display = 'none';
-    tyhja.style.display = 'block';
     paivitaHyttiArkistoLinkki();
     return;
   }
 
   kortitOsio.style.display = 'block';
-  tyhja.style.display = 'none';
 
   const kortitListEl = document.getElementById('hytti-kortit-list');
   kortitListEl.innerHTML = '';
@@ -9788,7 +9784,7 @@ async function loadAiLog() {
   }
 
   const listEl = document.getElementById('aly-log-list');
-  const emptyEl = document.getElementById('aly-log-tyhja');
+  const osioEl = document.getElementById('aly-log-osio');
   const toggleEl = document.getElementById('aly-log-toggle');
   // Kollapsoitu osio (2026-08-11, Katrin pyyntö) — sama "otsikko + laske
   // auki -nappi" -kuvio kuin Laiturin arkistossa (ks. paivitaLaituriArkisto),
@@ -9797,12 +9793,12 @@ async function loadAiLog() {
   listEl.innerHTML = '';
 
   if (!data || data.length === 0) {
-    emptyEl.style.display = 'block';
-    toggleEl.style.display = 'none';
-    listEl.style.display = 'none';
+    // Koko osio pois näkyvistä kun tyhjä, ei "ei vielä mitään" -tekstiä
+    // (Katrin yleissääntö 2026-08-18).
+    osioEl.style.display = 'none';
     return;
   }
-  emptyEl.style.display = 'none';
+  osioEl.style.display = 'block';
   toggleEl.style.display = 'block';
   toggleEl.textContent = 'Näytä loki (' + data.length + ')';
   listEl.style.display = oliAuki ? 'block' : 'none';
@@ -11280,7 +11276,6 @@ function avaaHoitoJasennysDialogi(rivi, jasennetty) {
 
   const lista = document.getElementById('hoito-jasennys-lapset-lista');
   lista.innerHTML = '';
-  document.getElementById('hoito-jasennys-lapset-tyhja').style.display = cachedLapset.length === 0 ? 'block' : 'none';
   const tunnistetutNimet = new Set((jasennetty.children || []).map(function(n) { return String(n).toLowerCase(); }));
   cachedLapset.forEach(function(lapsi) {
     const li = document.createElement('li');
@@ -11600,7 +11595,7 @@ function avaaMateriaaliJasennysDialogi(rivit, jasennetty) {
   const aiheLista = document.getElementById('materiaali-jasennys-aihe-lista');
   aiheLista.innerHTML = '';
   const aiheet = Array.isArray(jasennetty.aiheet) ? jasennetty.aiheet : [];
-  document.getElementById('materiaali-jasennys-aihe-tyhja').style.display = aiheet.length === 0 ? 'block' : 'none';
+  document.getElementById('materiaali-jasennys-aihe-osio').style.display = aiheet.length === 0 ? 'none' : 'block';
   aiheet.forEach(function(aihe) {
     const li = document.createElement('li');
     const checkbox = document.createElement('input');
@@ -11631,7 +11626,7 @@ function avaaMateriaaliJasennysDialogi(rivit, jasennetty) {
   const deadlineLista = document.getElementById('materiaali-jasennys-deadline-lista');
   deadlineLista.innerHTML = '';
   const deadlinet = Array.isArray(jasennetty.deadlinet) ? jasennetty.deadlinet : [];
-  document.getElementById('materiaali-jasennys-deadline-tyhja').style.display = deadlinet.length === 0 ? 'block' : 'none';
+  document.getElementById('materiaali-jasennys-deadline-osio').style.display = deadlinet.length === 0 ? 'none' : 'block';
   deadlinet.forEach(function(dl) {
     const li = document.createElement('li');
     const checkbox = document.createElement('input');

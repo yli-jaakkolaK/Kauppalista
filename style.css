@@ -4002,6 +4002,28 @@ h1 {
 .ruori .segmentti.ankkurit .anchor-btn-labeled svg { width: 15px; height: 15px; }
 .ruori .segmentti.ankkurit .anchor-btn-labeled span { font-size: 12px; font-weight: 700; color: var(--muste); white-space: nowrap; }
 
+/* Ankkuririvin oma painettava-pinta (2026-08-18, Katrin palaute: "ruori
+   anchors don't have painettavan muotokieli in them, rounding is off").
+   Rivi oli yhä vanhaa litteää list-riviä (pelkkä alaviiva) vaikka muu Ruori
+   on jo merikartta-lasipintaa — sama pysyvä koholla-varjo + pyöristys kuin
+   esim. .hytti-valilehti-btn:llä, sinapinkeltaisella (--sinappi) lämpimällä
+   lasilla erottumassa muista, neutraaleista pinnoista. */
+.ruori .segmentti.ankkurit .list li.ankkuri-rivi {
+  border-bottom: none;
+  border-radius: var(--r-kosketettava);
+  background: linear-gradient(165deg, rgba(194, 154, 46, .20), rgba(194, 154, 46, .07));
+  border: 1px solid rgba(194, 154, 46, .38);
+  box-shadow: 0 2px 6px rgba(34, 31, 26, .10), inset 0 1px 0 rgba(255, 255, 255, .5);
+  padding: 8px 10px;
+  margin-bottom: 8px;
+  transition: transform var(--keski) var(--kelluu), box-shadow var(--keski) var(--kelluu);
+}
+.ruori .segmentti.ankkurit .list li.ankkuri-rivi:last-child { margin-bottom: 0; }
+.ruori .segmentti.ankkurit .list li.ankkuri-rivi:active {
+  transform: translateY(1px) scale(.99);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .5);
+}
+
 /* --- Hytti --- */
 .ruori .hytti-luento { display: flex; align-items: center; gap: 6px; margin-bottom: 6px; }
 .ruori .hytti-luento .piste { background: var(--loki-vaara); }

@@ -4272,6 +4272,18 @@ sw.js v164 → v165.
 
 sw.js v165 → v166.
 
+**Yleissäännön täysi läpikäynti + Ruorin ankkuririveille painettava muotokieli (2026-08-18).** Katri vahvisti säännön ehdottomaksi ("I want it done") ja lisäsi toisen, erillisen korjauksen: "ruori anchors don't have painettavan muotokieli in them, rounding is off and i think we should put sinapinkeltainen backround with same pressable effect."
+
+**Ruori-ankkurit:** `.ruori .segmentti.ankkurit .list li.ankkuri-rivi` oli yhä vanhaa litteää list-riviä (pelkkä alaviiva, ei taustaa/pyöristystä) vaikka muu Ruori on jo merikartta-lasipintaa. Lisätty sama pysyvä koholla-varjo + `--r-kosketettava`-pyöristys kuin esim. `.hytti-valilehti-btn`:llä, sinapinkeltaisella (`--sinappi`-pohjainen lämmin lasi) taustalla erottumassa muista pinnoista, plus `:active`-painalluspalaute.
+
+**Tyhjät osiot, täysi läpikäynti (13 kohtaa):** kaikki löydetyt `.section-empty`-elementit joiden teksti oli sidottu listan tyhjyyteen (ei pysyviä ohjetekstejä, ei tila-/lataus-indikaattoreita — nämä jätetty koskematta). Kaksi hoitotapaa riippuen kontekstista:
+- **Listalla oma lisäys-kontrolli vieressä** (kurssit, sillat/taitosolmut, teema, opinto-aiheet, opinto-materiaali, lapset, henkselit, Loki-kortit) — "ei vielä X:ää" -teksti poistettu KOKONAAN, otsikko+lisäyskontrolli jäävät (ne itsessään jo kertovat mitä tehdä, teksti oli redundantti).
+- **Puhdas laskettu/tekoälyn tuottama lista, ei omaa lisäystä** (Kertausjono, äly-loki "Mitä äly on tehnyt", materiaali-jäsennyksen Aiheet/Deadlinet-alaosiot) — koko osio (otsikko+lista+tarv. jakoviiva) piiloon omassa kääre-`<div>`:ssään, sama malli kuin aiemmin tehty Kertausjonolle.
+- **Sillat-ehdotusdialogi ei enää avaudu tyhjänä ollenkaan** — löytyi jo olemassa oleva malli koodikannasta (kurssikohtainen haku käytti jo toastia "Ei löytynyt siltoja tälle kurssille tällä kertaa." sen sijaan että avaisi tyhjän dialogin) — yleinen "Etsi sillat" -haku ei käyttänyt samaa suojausta, lisätty sama toast-malli, poistettu tarpeeton `#silta-ehdotus-tyhja`.
+- **Kahden lapsiprofiili-uupumisdialogin** ("Ketkä lapset katettu?", hoitomerkinnän jäsennys) redirect-teksti ("lisää ne Asetukset → 👶 Lapset") poistettu myös, tietoinen valinta — säännön sanamuoto oli ehdoton eikä tehnyt poikkeusta ohjaavalle tekstille.
+
+sw.js v166 → v167.
+
 ---
 
 ## Nykytila (päivitetty 2026-08-18, COPILOT.md-sääntö 4 — huom: aiempi "Nykytila ja seuraavat askeleet" -osio jäi tästä tiedostosta ylemmäs pitkän istunnon aikana kertyneiden uusien osioiden taakse, ei enää tiedoston lopussa; siirto omaksi erikseen tehtäväksi työksi, ei nyt)
