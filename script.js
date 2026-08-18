@@ -5040,6 +5040,12 @@ const FOLI_TUNNETUT_MATKAT = [
     kohdePysakit: ['499', '130', '134', '162', '1685'], // Kupittaan jäähalli / Uudenmaantulli
     kestoMin: 45,
     hosumisPuskuriMin: 10,
+    // Katrin täsmennys 18.8.: kalenterin alkuaika (12:00) EI ole todellinen
+    // tarve olla paikalla — koululounas ennen tapaamista ("lunch at school")
+    // ei ole omana kalenterimerkintänään, samaan tapaan kuin päiväkotivienti
+    // ei näy kalenterissa. "I need to be at school at 11" — todellinen
+    // saapumistarve on 60min ENNEN kalenterin alkuaikaa.
+    saavuEnnenTapahtumaaMin: 60,
   },
 ];
 
@@ -5056,7 +5062,8 @@ function etsiTunnettuFoliMatka(tapahtuma) {
 // listassa (kaukaisempi lähtö tarkentuu lähempänä).
 async function haeFoliLahtoEnnenTapahtumaa(tapahtumaAlkuMs, matka) {
   const lahdot = await haeFoliLahdot(matka.kotiPysakki);
-  const viimeinenSallittu = tapahtumaAlkuMs - (matka.kestoMin + matka.hosumisPuskuriMin) * 60000;
+  const tarveOllaPaikallaMs = tapahtumaAlkuMs - (matka.saavuEnnenTapahtumaaMin || 0) * 60000;
+  const viimeinenSallittu = tarveOllaPaikallaMs - (matka.kestoMin + matka.hosumisPuskuriMin) * 60000;
   let paras = null;
   lahdot.forEach(function(l) {
     const lahtoMs = l.expecteddeparturetime * 1000;
@@ -5107,7 +5114,7 @@ async function haeFoliSiirtymatTapahtumalle(tapahtuma, paivanIso, varattu) {
     for (let m = a; m < b; m++) varattu[m] = true;
     rivit.push({ tyyppi: 'siirtyma', alku: a, loppu: b, linja: meno.linja, kohde: meno.kohde, suunta: 'meno' });
   } else {
-    const arvioAlku = aikaMinuutteina(tapahtuma.event_time.slice(0, 5)) - matka.kestoMin - matka.hosumisPuskuriMin;
+    const arvioAlku = aikaMinuutteina(tapahtuma.event_time.slice(0, 5)) - (matka.saavuEnnenTapahtumaaMin || 0) - matka.kestoMin - matka.hosumisPuskuriMin;
     rivit.push({ tyyppi: 'siirtyma-tuntematon', alku: arvioAlku, loppu: arvioAlku, suunta: 'meno' });
   }
   if (paluu) {

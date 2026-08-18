@@ -4250,6 +4250,10 @@ sw.js v159 → v160.
 
 sw.js v160 → v161.
 
+**Jälkikorjaus samana päivänä:** Katri laski itse käsin ja huomasi virheen: "if i leave 11.05 i'll be at school 11.45 and meeting starts at 12.. as you stated lunch 11 so i need to be at school at 11.." — kalenterin alkuaika (12:00) EI ole todellinen paikallaolotarve, koska ennen tapaamista on koululounas jolla ei ole omaa kalenterimerkintäänsä (sama ilmiö kuin päiväkotivienti aiemmin: todellinen menoaika on aiempi kuin mitä kalenteri kertoo). Lisätty matkakonfiguraatioon `saavuEnnenTapahtumaaMin: 60` — todellinen saapumistarve lasketaan nyt tapahtuman alkuajasta miinus tämä, ja bussihaku käyttää SITÄ, ei kalenterin raakaa alkuaikaa. Muuttaa laskettua viimeistä lähtöaikaa 11:05 → 10:05, ja lyhentää aamun vapaata opiskeluikkunaa merkittävästi (09:15–10:05, ei 09:15–11:05).
+
+sw.js v161 → v162.
+
 ---
 
 ## Nykytila (päivitetty 2026-08-18, COPILOT.md-sääntö 4 — huom: aiempi "Nykytila ja seuraavat askeleet" -osio jäi tästä tiedostosta ylemmäs pitkän istunnon aikana kertyneiden uusien osioiden taakse, ei enää tiedoston lopussa; siirto omaksi erikseen tehtäväksi työksi, ei nyt)
