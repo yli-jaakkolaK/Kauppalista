@@ -335,14 +335,6 @@
     <div id="opinto-tanaan-osio" style="display:none">
       <p class="nyt-deadline" id="nyt-deadline-rivi" style="display:none"></p>
       <div class="nyt-loki" id="nyt-loki"></div>
-      <div class="osio">
-        <div class="osio-nimi">Boost</div>
-        <div class="nyt-boost" id="nyt-boost"></div>
-        <!-- §4.8: "··" avaa rullavalitsimen (10-120min) — natiivi <select>,
-             sama muotokieli kuin Toistuvan muistutuksen rulla-kentät. -->
-        <select id="nyt-boost-rulla" class="settings-numero-input" style="display:none;margin-top:8px"></select>
-        <p class="selite" id="nyt-boost-tulos" style="display:none"></p>
-      </div>
     </div>
 
     <div id="hytti-tanaan-osio" style="display:none">
@@ -357,6 +349,23 @@
          huomiselle EIKÄ mitään tallenneta (esikatselu, ei sitova suunnitelma
          — huomisen todellinen tila riippuu siitä mitä tänään ehditään). -->
     <div id="nyt-huomenna" style="display:none"></div>
+
+    <!-- Boost siirretty sivun alimmaiseksi (2026-08-18, Katrin pyyntö
+         elävän testauksen jälkeen: "you may relocate boost at the bottom
+         of the page") — oli aiemmin nyt-lokin alla SAMASSA #opinto-tanaan-
+         osiossa, mikä työnsi huomisen esikatselun (Katrin mielestä
+         tärkeämpi "jo tehty suunnitelma") Boostin ALLE kun tämän päivän
+         loki oli tyhjä. Näkyvyys hallitaan yhä samalla ehdolla kuin ennen
+         (piirraOpintoTanaanOsio: onko tälle päivälle ylipäätään askeleita)
+         — vain sijainti DOMissa muuttui, ei logiikka. -->
+    <div id="nyt-boost-osio" class="osio" style="display:none">
+      <div class="osio-nimi">Boost</div>
+      <div class="nyt-boost" id="nyt-boost"></div>
+      <!-- §4.8: "··" avaa rullavalitsimen (10-120min) — natiivi <select>,
+           sama muotokieli kuin Toistuvan muistutuksen rulla-kentät. -->
+      <select id="nyt-boost-rulla" class="settings-numero-input" style="display:none;margin-top:8px"></select>
+      <p class="selite" id="nyt-boost-tulos" style="display:none"></p>
+    </div>
 
     </div> <!-- /hytti-tabi-nyt -->
 

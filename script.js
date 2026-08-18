@@ -3628,12 +3628,19 @@ function kelloMinuuteista(min) {
 
 async function piirraOpintoTanaanOsio(kaikkiAskeleet) {
   const osio = document.getElementById('opinto-tanaan-osio');
+  // Boost asuu nyt omassa, sivun alimmaisessa säiliössään (2026-08-18, ks.
+  // index.html:n kommentti) — näkyvyys silti SAMA ehto kuin lokilla, koska
+  // Boost lukee samaa päivän askel-poolia eikä sillä ole mitään ehdotettavaa
+  // jos ehtoa ei täyty.
+  const boostOsio = document.getElementById('nyt-boost-osio');
   const askeleet = suodataNakyvatAskeleet(kaikkiAskeleet || []);
   if (!askeleet || askeleet.length === 0) {
     osio.style.display = 'none';
+    boostOsio.style.display = 'none';
     return;
   }
   osio.style.display = 'block';
+  boostOsio.style.display = 'block';
   await paivitaAsetukset();
   await piirraNytDeadlineRivi();
   await piirraNytLoki(askeleet);
