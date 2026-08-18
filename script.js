@@ -107,6 +107,20 @@ function vaihdaHyttiValilehti(id) {
   document.getElementById('hytti-tabi-kartta').style.display = id === 'kartta' ? 'block' : 'none';
   // Tehtävät/Sillat/Huoli siirtyivät Nyt-välilehdeltä Reittiin (2026-08-17).
   // Kortit siirtyi omaksi Loki-välilehdekseen (2026-08-18, §6b).
+  //
+  // Jokainen välilehti lataa NYT vain omansa (2026-08-18 korjaus, Katrin
+  // raportoimat tuplat Nyt-sivulla) — lataaHyttiPaanakyma() (Reitin oma
+  // lataaja) kutsui aiemmin myös lataaHyttiTanaanKaista():a JA
+  // lataaOpintoPaivanAskeleet():ta, jotka MOLEMMAT renderöivät Nyt-tabin
+  // omia elementtejä (#hytti-tanaan-osio, #nyt-loki) — se oli AINOA reitti
+  // jolla Nyt sai sisältönsä avaaOsio({route:'hytti'}):n oletuspolulla,
+  // koska tämä funktio ei aiemmin tehnyt mitään 'nyt':lle. Jos käyttäjä ehti
+  // vaihtaa Reitti-tabille ennen tämän ensimmäisen kutsun valmistumista,
+  // kaksi päällekkäistä kutsua saattoi renderöidä Nyt-tabin sisällön
+  // kahdesti peräkkäin ilman että kumpikaan tyhjensi toisen jälkeä oikeassa
+  // järjestyksessä — klassinen "kaksi rinnakkaista tyhjennä+täytä-kutsua"
+  // -kilpa-ajo (Katrin raportoimat tuplat Nyt-sivulla).
+  if (id === 'nyt') { paivitaHyttiTyoVapaaLabel(); lataaHyttiTanaanKaista(); lataaOpintoPaivanAskeleet(); }
   if (id === 'reitti') lataaHyttiPaanakyma();
   if (id === 'loki') lataaLoki();
   if (id === 'kartta') lataaOpintoKartta();
@@ -1675,14 +1689,25 @@ async function avaaOpintoTehtava(aihe, paivanAskel) {
   }
 }
 
-async function suljeOpintoTehtava() {
+// Pysäyttää ajanoton ja tyhjentää tehtävänäkymän tilan — yhteinen molemmille
+// poistumisreiteille (takaisin-nuoli JA "Kurssin materiaalit →") jottei
+// kumpikaan unohda lopettaa kesken olevaa sessiota (2026-08-18, eriytetty
+// suljeOpintoTehtava():n sisältä kun "Kurssin materiaalit →" -linkin bugi
+// korjattiin — ks. alla).
+async function lopetaOpintoTehtavaSessioJaTyhjenna() {
   if (opintoTehtavaSessioId) {
     const { error } = await db.from('opinto_sessiot').update({ loppui_at: new Date().toISOString() }).eq('id', opintoTehtavaSessioId);
     if (error) console.error('Tehtävänäkymän ajanoton lopetus epäonnistui:', error);
     opintoTehtavaSessioId = null;
     opintoTehtavaAlkoiAt = null;
   }
+  const kurssiId = currentOpintoAihe ? currentOpintoAihe.kurssi_id : null;
   currentOpintoAihe = null;
+  return kurssiId;
+}
+
+async function suljeOpintoTehtava() {
+  await lopetaOpintoTehtavaSessioJaTyhjenna();
   const avattuNytLokista = !!currentOpintoTehtavaPaivanAskel;
   currentOpintoTehtavaPaivanAskel = null;
   if (avattuNytLokista) {
@@ -1714,19 +1739,37 @@ function opintoNykyinenKierros(aihe) {
   return Math.min((aihe.retrieval_kierrokset || 0) + 1, 3);
 }
 
+// Yleinen varaohje (2026-08-18, korjaa saman päivän regression) — PACER-
+// tyypin pakkovalinta poistettiin riviltä aiemmin tänään (Katrin palaute:
+// tuntui liian raskaalta), mutta tämä funktio olettI VIELÄ ettei ohjetta
+// voida näyttää ollenkaan jos pacer_paatyyppi on tyhjä ("Aseta ensin
+// PACER-tyyppi kurssin aihelistalta" — nappia jota ei enää ole). Suurin
+// osa OLEMASSA OLEVISTA aiheista jäi tyhjäksi kun poisto tehtiin, joten
+// tämä käytännössä hiljensi ohjeen useimmilta vanhoilta aiheilta.
+// Yleinen, tyyppiriippumaton OPINTO_VAIHE_OHJE toimii nyt VARMANA
+// varaohjeena aina kun tyyppikohtaista ohjematriisia ei löydy — ei
+// koskaan enää täysin tyhjää.
 async function paivitaOpintoTehtavaOhje() {
   const aihe = currentOpintoAihe;
+  const listEl = document.getElementById('opinto-tehtava-ohje-lista');
+  const tyhjaEl = document.getElementById('opinto-tehtava-ohje-tyhja');
+
+  const naytaYleisohje = function() {
+    listEl.innerHTML = '';
+    tyhjaEl.textContent = OPINTO_VAIHE_OHJE[aihe.pero_vaihe] || '';
+    tyhjaEl.style.display = 'block';
+  };
+
+  if (aihe.pero_vaihe !== 'priming' && aihe.pero_vaihe !== 'reference' && !aihe.pacer_paatyyppi) {
+    naytaYleisohje();
+    return;
+  }
+
   let kysely = db.from('ohjematriisi').select().eq('pero_vaihe', aihe.pero_vaihe).order('sort_order');
   if (aihe.pero_vaihe === 'priming' || aihe.pero_vaihe === 'reference') {
     kysely = kysely.is('pacer_tyyppi', null);
-  } else if (aihe.pacer_paatyyppi) {
-    kysely = kysely.eq('pacer_tyyppi', aihe.pacer_paatyyppi);
   } else {
-    // Tyyppi asettamatta eikä vaihe ole tyyppiriippumaton — ei voida
-    // näyttää ohjetta, ks. #opinto-tehtava-ohje-tyhja.
-    document.getElementById('opinto-tehtava-ohje-lista').innerHTML = '';
-    document.getElementById('opinto-tehtava-ohje-tyhja').style.display = 'block';
-    return;
+    kysely = kysely.eq('pacer_tyyppi', aihe.pacer_paatyyppi);
   }
   if (aihe.pero_vaihe === 'retrieval') {
     kysely = kysely.eq('kierros_numero', opintoNykyinenKierros(aihe));
@@ -1734,12 +1777,16 @@ async function paivitaOpintoTehtavaOhje() {
   const { data, error } = await kysely;
   if (error) {
     console.error('Ohjematriisin haku epäonnistui:', error);
+    naytaYleisohje();
     return;
   }
   const rivit = data || [];
-  const listEl = document.getElementById('opinto-tehtava-ohje-lista');
+  if (rivit.length === 0) {
+    naytaYleisohje();
+    return;
+  }
   listEl.innerHTML = '';
-  document.getElementById('opinto-tehtava-ohje-tyhja').style.display = rivit.length === 0 ? 'block' : 'none';
+  tyhjaEl.style.display = 'none';
   rivit.forEach(function(rivi) {
     const li = document.createElement('li');
     const check = document.createElement('input');
@@ -1930,8 +1977,52 @@ function paivitaOpintoTehtavaMuutVaiheet() {
     const teksti = document.createElement('span');
     teksti.textContent = (i < nykyinenIdx ? '✓ ' : v === currentOpintoAihe.pero_vaihe ? '▶ ' : '· ') + OPINTO_VAIHE_NIMET[v];
     li.appendChild(teksti);
+    // Paluu aiempaan vaiheeseen (2026-08-18, Katrin palaute: "mitä jos
+    // vahingossa painaa opiskelluksi? klikkaamalla edellistä vaihetta...
+    // vois päästä aiempaan vaiheeseen") — vain MENNEET vaiheet napautettavia,
+    // ei tulevat (ei voi hypätä eteenpäin ohittamalla vaiheita täältä).
+    if (i < nykyinenIdx) {
+      li.classList.add('napautettava');
+      li.addEventListener('click', function() { palaaOpintoVaiheeseen(v); });
+    }
     listEl.appendChild(li);
   });
+}
+
+// Palaa aiempaan PERO-vaiheeseen (2026-08-18) — korjaa vahingossa liian
+// pitkälle edenneen aiheen ilman että historiaa tuhotaan tarpeettomasti:
+// nollaa VAIN 'reference'-siirtymän liput (reference_tehty/kertausjonossa,
+// asetettu etenetaOpintoKohde():ssa juuri reference-vaiheeseen tultaessa)
+// jos palataan sitä edeltävään vaiheeseen. retrieval_kierrokset/sr_*-kentät
+// jätetään koskematta — ne kuvaavat toteutunutta kertaushistoriaa, joka on
+// yhä totta vaikka vaihe palautetaan, ei jotain jota "vahinko" mitätöisi.
+async function palaaOpintoVaiheeseen(vaihe) {
+  const aihe = currentOpintoAihe;
+  if (!aihe) return;
+  const vahvistus = await naytaVahvistus(
+    'Palataanko vaiheeseen ' + OPINTO_VAIHE_NIMET[vaihe] + '?',
+    'Jos aihe eteni tähän vahingossa, tämä palauttaa sen takaisin.',
+    'Palaa'
+  );
+  if (!vahvistus) return;
+
+  const paivitys = { pero_vaihe: vaihe };
+  const referenceIdx = PERO_VAIHE_JARJESTYS.indexOf('reference');
+  if (PERO_VAIHE_JARJESTYS.indexOf(vaihe) < referenceIdx) {
+    paivitys.reference_tehty = false;
+    paivitys.kertausjonossa = false;
+  }
+
+  const { error } = await db.from('opinto_aiheet').update(paivitys).eq('id', aihe.id);
+  if (ilmoitaKirjoitusvirheesta(error, 'Vaiheeseen palaaminen')) return;
+  Object.assign(aihe, paivitys);
+  naytaIlmoitus('Palautettu vaiheeseen: ' + OPINTO_VAIHE_NIMET[vaihe]);
+
+  paivitaOpintoTehtavaOtsikko();
+  await paivitaOpintoTehtavaOhje();
+  paivitaOpintoTehtavaPriming();
+  paivitaOpintoTehtavaKierros();
+  paivitaOpintoTehtavaMuutVaiheet();
 }
 
 function paivitaOpintoTehtavaMateriaali() {
@@ -1944,8 +2035,20 @@ function paivitaOpintoTehtavaMateriaali() {
   }
 }
 
+// "Kurssin materiaalit →" (2026-08-18 bugikorjaus, Katrin havainto: "ku
+// painaa tosta mistä pitäis päästä kurssimateriaaliin ni ei vie mihinkään
+// paitsi hytin etusivulle") — kutsui aiemmin VAIN suljeOpintoTehtava():aa,
+// joka sulkee näkymän mihin tahansa kontekstista riippuvaan paikkaan (usein
+// Nyt-tabille, ei koskaan kurssin materiaalisivulle) — linkin lupaus ja
+// toteutus eivät vastanneet toisiaan. Nyt hakee aiheen oman kurssin ja avaa
+// SEN sivun (jossa materiaalilista todella on).
 document.getElementById('opinto-tehtava-kurssi-materiaali-linkki').addEventListener('click', async function() {
-  await suljeOpintoTehtava();
+  const kurssiId = await lopetaOpintoTehtavaSessioJaTyhjenna();
+  currentOpintoTehtavaPaivanAskel = null;
+  if (!kurssiId) { showHyttiView('reitti'); return; }
+  const { data: kurssi, error } = await db.from('opinto_kurssit').select().eq('id', kurssiId).single();
+  if (error || !kurssi) { console.error('Kurssin haku epäonnistui materiaalilinkiltä:', error); showHyttiView('reitti'); return; }
+  await avaaOpintoKurssi(kurssi);
 });
 
 // "✓ Merkitse tehdyksi" — käyttäytyy vaiheen mukaan (sung-metodi.md §7):
@@ -3245,9 +3348,32 @@ function naytaOpintoOhje(vaihe, kohde) {
 // korvaa saman tarpeen paremmalla muotokielellä. Itse hakufunktio säilyy —
 // Boost (suoritaNytBoost) käyttää sitä edelleen samalla moottorilla
 // (TASO 1 + deadline + kuorma). EI tallennu opinto_paivan_askeleet-tauluun.
+//
+// Kolmiportainen varmuusketju (2026-08-18, Katrin kaksi palautetta samasta
+// napista): (1) "boosti 30/60 sanoo vaan et tee sitä mikä näkyy nyt
+// sivulla" — vanha versio ei koskaan poissulkenut jo tänään tarjottuja
+// askeleita, joten pisteytys palautti lähes aina saman kuin Nyt-kortilla jo
+// oli. (2) "en halua että boosti sanoo ei oo mitään mitä 15min voi tehdä,
+// voin sen ajan doomscrollata" — tarkka ikkunarajoitus saattoi jättää
+// KAIKEN pois jos päivän ainoat ripeät aiheet sattuivat olemaan pidempiä.
+// Ratkaisu: yritä ensin jotain UUTTA joka mahtuu tarkasti, sitten jotain
+// UUTTA vaikka ei täysin mahtuisi (parempi aloittaa kesken jäävä kuin ei
+// mitään), vasta viimeisenä hyväksy toisto jo näkyvästä — ei koskaan tyhjää
+// jos ylipäätään mitään ripeää on tarjolla.
 async function etsiIkkunaanSopivaAskel(ikkunaMin) {
-  const tulokset = await laskeOpintoPaivanAskeleet(1, null, null, ikkunaMin);
-  return tulokset.length > 0 ? tulokset[0] : null;
+  const { data: nykyiset } = await db.from('opinto_paivan_askeleet')
+    .select('aihe_id, taitosolmu_id').eq('owner_id', currentUserId).eq('pvm', opintoTanaanPvm()).eq('tila', 'tarjolla');
+  const poissuljetutAiheIdt = new Set((nykyiset || []).filter(function(r) { return r.aihe_id; }).map(function(r) { return r.aihe_id; }));
+  const poissuljetutSolmuIdt = new Set((nykyiset || []).filter(function(r) { return r.taitosolmu_id; }).map(function(r) { return r.taitosolmu_id; }));
+
+  const tarkka = await laskeOpintoPaivanAskeleet(1, poissuljetutAiheIdt, poissuljetutSolmuIdt, ikkunaMin);
+  if (tarkka.length > 0) return tarkka[0];
+
+  const loysa = await laskeOpintoPaivanAskeleet(1, poissuljetutAiheIdt, poissuljetutSolmuIdt, null);
+  if (loysa.length > 0) return loysa[0];
+
+  const mikaTahansa = await laskeOpintoPaivanAskeleet(1, null, null, ikkunaMin);
+  return mikaTahansa.length > 0 ? mikaTahansa[0] : null;
 }
 
 // === SESSION-LOKI (2026-08-05, ks. sql/099, muistiinpanot.md "Session-
@@ -3401,12 +3527,19 @@ async function piirraNytLoki(askeleet) {
     for (let m = a; m < b; m++) varattu[m] = true;
   });
 
+  // Siirtymäpuskuri (2026-08-18, Katrin pyyntö: "voisko ne siirtymäbufferit
+  // aktivoida kans tohon" — asetus oli jo olemassa Ristiriitamerkille mutta
+  // ei koskenut päivän opiskelusijoittelua). Puskuri varaa ajan kiinteän
+  // menon MOLEMMIN PUOLIN opiskelupätkien sijoittelua varten — näytettävä
+  // palkki (kiinteatMenot, alla) käyttää silti TODELLISTA aikaa, ei
+  // puskuroitua, ettei kalenterissa näytetä väärää kellonaikaa.
+  const siirtymaPuskuri = haeAsetusNumero('siirtymapuskuri_min', 30);
   const kiinteatMenot = [];
   (tapahtumat || []).forEach(function(t) {
     if (!t.event_time) return; // koko päivän kestävä — ei sijoiteta aikajanalle
     const a = aikaMinuutteina(t.event_time.slice(0, 5));
     const b = Math.min(1439, t.event_end_time ? aikaMinuutteina(t.event_end_time.slice(0, 5)) : a + 60);
-    for (let m = a; m < b; m++) varattu[m] = true;
+    for (let m = Math.max(0, a - siirtymaPuskuri); m < Math.min(1440, b + siirtymaPuskuri); m++) varattu[m] = true;
     kiinteatMenot.push({ alku: a, loppu: b, title: t.title });
   });
 
@@ -4197,7 +4330,10 @@ async function avaaTaitosolmu(solmu) {
 
 document.getElementById('taitosolmu-back-btn').addEventListener('click', function() {
   currentTaitosolmu = null;
-  showHyttiView();
+  // Sillat asuu Reitti-tabilla (2026-08-17 siirto) — paluu 'nyt':iin oli
+  // vanha oletus jäänyt siirrosta jäljelle, korjattu 2026-08-18 samassa
+  // erässä kuin muu tabikohtainen latausbugi (context-aware return).
+  showHyttiView('reitti');
   lataaTaitosolmut();
 });
 
@@ -4208,7 +4344,10 @@ document.getElementById('taitosolmu-poista-btn').addEventListener('click', async
   const { error } = await db.from('taitosolmut').delete().eq('id', currentTaitosolmu.id);
   if (ilmoitaKirjoitusvirheesta(error, 'Taitosolmun poisto')) return;
   currentTaitosolmu = null;
-  showHyttiView();
+  // Sillat asuu Reitti-tabilla (2026-08-17 siirto) — paluu 'nyt':iin oli
+  // vanha oletus jäänyt siirrosta jäljelle, korjattu 2026-08-18 samassa
+  // erässä kuin muu tabikohtainen latausbugi (context-aware return).
+  showHyttiView('reitti');
   lataaTaitosolmut();
 });
 
@@ -7217,8 +7356,6 @@ function piirraHyttiKorttiRivi(kortti) {
 // funktioon jotta Reitti ei enää riipu siitä onko kortteja ollenkaan.
 async function lataaHyttiPaanakyma() {
   if (raahattavaRivi) return;
-  paivitaHyttiTyoVapaaLabel();
-  lataaHyttiTanaanKaista();
   lataaReittiViikko();
   lataaReittiDeadlinet();
   lataaReittiKertausjono();
@@ -7227,7 +7364,6 @@ async function lataaHyttiPaanakyma() {
   suoritaHoitotasoDiagnoosiJosAika().then(lataaHoitotasoEhdotukset);
   paivitaSiltaOdotusIlmoitus();
   naytaOdottavatSiltaEhdotukset();
-  lataaOpintoPaivanAskeleet();
   document.getElementById('huoli-pvm-input').value = opintoTanaanPvm();
 
   // hytti_kortit!inner pakottaa inner joinin, jolloin status-suodatus rajaa
@@ -9138,8 +9274,10 @@ function avaaOsio(osio) {
     lataaHyttiOpiskeluaika();
     lataaHyttiSuljetutIkkunat();
   } else if (osio.route === 'hytti') {
+    // showHyttiView() -> vaihdaHyttiValilehti('nyt') lataa nyt itse oman
+    // sisältönsä (2026-08-18 korjaus) — ei enää tarvitse kutsua Reitin
+    // lataajaa erikseen tässä, ks. vaihdaHyttiValilehti:n oma kommentti.
     showHyttiView();
-    lataaHyttiPaanakyma();
   } else {
     alert(osio.name + ' tulossa pian.');
   }

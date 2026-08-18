@@ -2968,6 +2968,17 @@ h1 {
   color: var(--messinki);
   font-weight: 600;
 }
+/* Aiempaan vaiheeseen palaaminen (2026-08-18) — vain menneet (✓) vaiheet
+   napautettavia, tunnistettava kosketettavaksi ilman erillistä nappia. */
+.opinto-tehtava-muu-vaihe.napautettava {
+  cursor: pointer;
+  text-decoration: underline;
+  text-decoration-color: var(--hius-vahva, var(--border));
+  text-underline-offset: 3px;
+}
+.opinto-tehtava-muu-vaihe.napautettava:active {
+  opacity: .6;
+}
 .list-header-oikea .settings-btn.active {
   color: var(--messinki);
 }
