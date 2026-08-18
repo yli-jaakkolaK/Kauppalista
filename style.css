@@ -3064,17 +3064,33 @@ h1 {
   margin-top: 6px;
 }
 
-/* Kurssikortti Reitti-välilehdellä (2026-08-11, CODE_vaihe1b.md §4) —
-   ainoa osa jonka muotokieli uusitaan tässä erässä, TARKOITUKSELLA
-   rajattu vain tähän luokkaan (loput Hytistä pysyy nykyisessä
-   tumma/vaalea-teemassa, sama "yksi näkymä kerrallaan" -periaate kuin
-   Ruorin/Laiturin migraatiolla). Luettavan pinnan muotokieli:
-   --r-luettava, paperinsävyinen tausta, hiusviiva. */
+/* Kurssikortti Reitti-välilehdellä, PÄIVITETTY luettavasta painettavaan
+   muotokieleen (2026-08-18, Katrin pyyntö: "courses under it should use
+   painettava muotokieli and some sort of beautiful satama design" —
+   2026-08-11-versio ("ainoa osa jonka muotokieli uusitaan tässä erässä")
+   käytti vain luettavan pinnan --r-luettava-tyyliä, ei koskaan päivitetty
+   samaan lämpimään lasiin kuin Nyt-välilehden Boost-napit/nav-napit
+   saivat 18.8. — kortti ON kosketettava (koko kortti avaa kurssin), ei
+   pelkkä luettava sisältö. Poisto-"×" siirretty pois rivin sisäisestä
+   flex-virtauksesta (jossa se hyppi paikasta toiseen nimen pituuden
+   mukaan, Katrin havainto "deleting x are around the place") omaksi
+   kiinteäksi neliöksi kortin oikeaan yläkulmaan. */
 .opinto-kurssi-kortti {
-  display: block; list-style: none; cursor: pointer;
-  background: var(--paperi); border: 1px solid var(--hius); border-radius: var(--r-luettava);
-  padding: 12px 14px; margin-bottom: 10px;
+  display: block; list-style: none; cursor: pointer; position: relative;
+  background: linear-gradient(165deg, rgba(255, 252, 244, .6), rgba(234, 230, 220, .25));
+  border: 1px solid var(--hius-vahva);
+  border-radius: var(--r-kosketettava);
+  backdrop-filter: blur(7px); -webkit-backdrop-filter: blur(7px);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .6), 0 2px 6px rgba(34, 31, 26, .08);
+  padding: 14px 44px 14px 16px;
+  margin-bottom: 10px;
+  transition: transform var(--keski) var(--kelluu), box-shadow var(--keski) var(--kelluu);
 }
+.opinto-kurssi-kortti:hover, .opinto-kurssi-kortti:focus-visible {
+  transform: translateY(-2px);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .7), 0 6px 14px rgba(34, 31, 26, .12);
+}
+.opinto-kurssi-kortti:active { transform: translateY(0) scale(.99); }
 .opinto-kurssi-kortti-ylarivi { display: flex; align-items: center; gap: 8px; }
 .opinto-kurssi-kortti-nimi { font-family: var(--fontti-loki); font-size: 15px; color: var(--muste); flex: 1; min-width: 0; }
 /* PERO-vaihe messingillä versaalina — informatiivinen, ei kosketettava. */
@@ -3082,12 +3098,22 @@ h1 {
   font-family: var(--fontti-loki); font-size: 10.5px; font-weight: 700; letter-spacing: .16em;
   text-transform: uppercase; color: var(--messinki); flex: none; white-space: nowrap;
 }
-.opinto-kurssi-kortti-ylarivi .delete-btn { flex: none; min-height: 0; min-width: 0; padding: 0 0 0 8px; font-size: 20px; }
+/* Kiinteä paikka, ei enää osa ylarivin flex-virtausta. */
+.opinto-kurssi-kortti-ylarivi .delete-btn {
+  position: absolute; top: 10px; right: 10px;
+  flex: none; width: 26px; height: 26px; min-height: 0; min-width: 0;
+  display: flex; align-items: center; justify-content: center;
+  padding: 0; font-size: 16px; line-height: 1;
+  border-radius: 6px;
+  background: rgba(184, 67, 58, .10);
+  border: 1px solid rgba(184, 67, 58, .3);
+  color: var(--loki-vaara);
+}
 /* Jäljellä-palkki: EI prosentteja/pistemääriä osaamiselle, kertoo vain
    paljonko on jäljellä (ei-hallussa-osuus) — neutraali muste, ei Kartan
    värikoodattu 3-palkki, koska tämä ei ole osaamismittari. */
 .opinto-kurssi-kortti-palkki-kehys {
-  height: 4px; margin-top: 10px; border-radius: 2px; overflow: hidden; background: var(--hius);
+  height: 4px; margin-top: 10px; border-radius: 2px; overflow: hidden; background: rgba(156, 122, 67, .18);
 }
 .opinto-kurssi-kortti-palkki { height: 100%; background: var(--vaimea); }
 
@@ -3763,7 +3789,7 @@ h1 {
    optisesti samalle riville kellon yläkaaren kanssa. Alapalkki vei 22px:n
    pohjatäytteen tarpeen pois (§5.3) — pienennetty ettei jää tyhjää tilaa
    otsakkeen ja Sään väliin. */
-.ruori .otsake { display: flex; justify-content: space-between; align-items: flex-start; padding: 6px 2px 2px; }
+.ruori .otsake { display: flex; justify-content: space-between; align-items: flex-start; padding: 6px 2px 0; }
 .ruori .otsake-vas { flex: 1; min-width: 0; }
 .ruori .otsake-ylarivi { display: flex; align-items: center; gap: 12px; }
 /* SATAMA sinapilla (2026-08-11, Katrin pyyntö) — sama --sinappi joka on
@@ -3812,13 +3838,18 @@ h1 {
    (§0/§3): SVG:llä ei width/height-attribuuttia, vain viewBox + CSS
    width:100%;height:auto — kehys oli olemassa vain koska ympyrä oli
    pienempi kuin sille varattu tila, joten kehys poistuu kokonaan.
-   150px -> 128px (2026-08-18, Katrin toistuva palaute "remove empty space
-   above temperature & weather symbols") — .otsake on flex-rivi jossa kello
-   on pisin lapsi, joten koko rivin (ja siten Sään alkamiskohdan) korkeus
-   seuraa AINA kelloa, ei lyhyttä SATAMA-tunnusta, riippumatta otsakkeen
-   omasta padding-arvosta. Ainoa oikea tapa kaventaa tunnuksen alle jäävää
-   tyhjää tilaa on pienentää itse kelloa. */
-.ruori .kello-kehys { flex: none; width: 128px; height: 128px; }
+   150px -> 128px -> 104px (2026-08-18, Katrin TOISTUVA palaute, kolmas
+   kierros "remove extra space between clock and weather symbols") —
+   .otsake on flex-rivi jossa kello on pisin lapsi, joten koko rivin (ja
+   siten Sään alkamiskohdan) korkeus seuraa AINA kelloa, ei lyhyttä
+   SATAMA-tunnusta, riippumatta otsakkeen omasta padding-arvosta. Ainoa
+   oikea tapa kaventaa tunnuksen alle jäävää tyhjää tilaa on pienentää itse
+   kelloa — harkittu myös position:absolute (irrottaisi kellon kokonaan
+   rivin korkeuslaskennasta), mutta hylätty tässä kierroksessa: kello
+   kelluisi silloin Sään sisällön PÄÄLLE ilman elävää testausta siitä
+   miten sään tagit/tuntirivi asettuvat kapealla (400px) näytöllä — liian
+   iso riski ilman visuaalista tarkistusta. */
+.ruori .kello-kehys { flex: none; width: 104px; height: 104px; }
 .ruori .kello-kehys svg { width: 100%; height: auto; display: block; cursor: default; }
 
 .ruori .segmentti {
