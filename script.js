@@ -3230,6 +3230,46 @@ async function laskeOpintoPaivanAskeleet(maxAskeliaYlikirjoitus, poissuljetutAih
     return taitosolmuOnValmis(s, tarvitseeKaaret, vaiheKartta) && opintoOnkoRipe(s, tanaan);
   });
 
+  // --- Kurssin sisäinen esitietojärjestys (sort_order), 2026-08-18, Katrin
+  // pyyntö: Math Roadmap -kurssille tuotiin 22 uutta opinto_aiheet-riviä
+  // sort_order-kentällä loogiseen esitietojärjestykseen (esim. "Right
+  // triangle trigonometry" ennen "Unit circle & radians"), mutta mikään ei
+  // aiemmin estänyt moottoria ehdottamasta myöhempää aihetta ennen
+  // aiempaa. Taitosolmut/taito_kaaret ovat LUKITULLA päätöksellä varattu
+  // usean SAMANAIKAISEN kurssin yhteisille silta-käsitteille (ei tämän
+  // saman-kurssin-sisäisen järjestyksen mallintamiseen) — siksi kevyt oma
+  // sort_order-esto tässä, ei uusi taito_kaaret-käyttötapa.
+  //
+  // "Estävä" aihe = sama kurssi, PIENEMPI sort_order, !reference_tehty
+  // (= sama "PACER-kierros kesken" -lippu jota "Laske tavoitetahti"
+  // -ominaisuus jo käyttää "jäljellä olevat aiheet" -suodattimena yllä,
+  // ei uutta rinnakkaista valmius-käsitettä). Jousto: jos estävä aihe on
+  // PAHASTI myöhässä (oma tavoiteikkuna yli SORT_ORDER_JOUSTO_PAIVIA
+  // päivää sitten) EIKÄ sillä ole minkäänlaista edistystä (yhä priming-
+  // vaiheessa, ei siis edes aloitettu) se lakkaa estämästä — muuten yksi
+  // jumiutunut aihe tukkisi koko kurssin loputtomiin. Sama kynnys ei koske
+  // encoding/retrieval-vaiheessa jo olevaa aihetta: sillä ON edistystä,
+  // joten se saa jatkaa estämistä vaikka olisi myöhässä — vain "ei
+  // mitään edistystä" -tapaus vapautetaan.
+  const SORT_ORDER_JOUSTO_PAIVIA = haeAsetusNumero('sort_order_jousto_paivia', 14);
+  const pienimmatEstavatSortOrderit = new Map();
+  kaikkiAiheet.forEach(function(a) {
+    if (a.sort_order == null || a.kurssi_id == null) return;
+    if (a.reference_tehty) return;
+    const paivaaMyohassa = a.tavoiteikkuna
+      ? Math.round((new Date(tanaan + 'T00:00:00') - new Date(a.tavoiteikkuna + 'T00:00:00')) / 86400000)
+      : -1;
+    const pahastiMyohassaEikaEdistysta = a.pero_vaihe === 'priming' && paivaaMyohassa > SORT_ORDER_JOUSTO_PAIVIA;
+    if (pahastiMyohassaEikaEdistysta) return;
+    const nykyinenRaja = pienimmatEstavatSortOrderit.get(a.kurssi_id);
+    if (nykyinenRaja === undefined || a.sort_order < nykyinenRaja) pienimmatEstavatSortOrderit.set(a.kurssi_id, a.sort_order);
+  });
+  function aiheenSortOrderEstaa(a) {
+    if (a.sort_order == null || a.kurssi_id == null) return false;
+    const estavaRaja = pienimmatEstavatSortOrderit.get(a.kurssi_id);
+    return estavaRaja !== undefined && estavaRaja < a.sort_order;
+  }
+
   // --- Pisteytys: aiheen paino = suurempi kovasta opinto_deadlinet-listasta
   // TAI omasta pehmeästä tavoiteikkunasta (opintoDeadlinePaino-kaava toimii
   // sellaisenaan tavoiteikkunalle koska se on samanmuotoinen yhden-kentän
@@ -3238,6 +3278,7 @@ async function laskeOpintoPaivanAskeleet(maxAskeliaYlikirjoitus, poissuljetutAih
     .filter(function(a) {
       if (poissuljetutAiheIdt && poissuljetutAiheIdt.has(a.id)) return false;
       if (ikkunaMin && haeOpintoKestoMinuutteina(a.pero_vaihe) > ikkunaMin) return false;
+      if (aiheenSortOrderEstaa(a)) return false;
       return opintoOnkoRipe(a, tanaan);
     })
     .map(function(a) {
