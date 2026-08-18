@@ -2118,13 +2118,18 @@ h1 {
   border-radius: var(--r-kosketettava);
   background: linear-gradient(165deg, rgba(255, 252, 244, .5), rgba(234, 230, 220, .18));
   border: 1px solid var(--hius-vahva);
+  /* Pysyvä koholla-varjo (2026-08-18, Katrin palaute: "puuttuu toiminto
+     että näkee että tästä voi oikeasti painaa") — pelkkä :hover-kohotus ei
+     näy kosketusnäytöllä lainkaan ennen kuin jo painaa, joten "painettava"
+     -vihje pitää olla näkyvissä LEPOTILASSA, ei vasta hoverissa. */
+  box-shadow: 0 2px 6px rgba(34, 31, 26, .10), inset 0 1px 0 rgba(255, 255, 255, .5);
   font-family: var(--fontti-loki);
   font-size: 12.5px;
   letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--vaimea);
   cursor: pointer;
-  transition: transform var(--keski) var(--kelluu), border-color var(--keski) var(--kelluu), color var(--keski) var(--kelluu), background var(--keski) var(--kelluu);
+  transition: transform var(--keski) var(--kelluu), border-color var(--keski) var(--kelluu), color var(--keski) var(--kelluu), background var(--keski) var(--kelluu), box-shadow var(--keski) var(--kelluu);
 }
 .hytti-valilehti-btn.active {
   border-color: var(--messinki);
@@ -2133,7 +2138,7 @@ h1 {
   background: linear-gradient(165deg, rgba(255, 252, 244, .78), rgba(234, 230, 220, .32));
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, .6);
 }
-.hytti-valilehti-btn:active { transform: translateY(0) scale(.96); }
+.hytti-valilehti-btn:active { transform: translateY(1px) scale(.96); box-shadow: inset 0 1px 0 rgba(255, 255, 255, .5); }
 
 /* Valmistautumisvaihe (2026-07-18, ks. muistiinpanot.md) — kevyt rivi
    päämuistutuksen välilehtien alla, koskee kumpaakin (Pika/Kellonaika).
@@ -3505,6 +3510,29 @@ h1 {
 }
 #hytti-tabi-loki .add-item button:active { transform: translateY(0) scale(.95); }
 #hytti-tabi-loki .add-item input { font-family: var(--fontti-loki); }
+
+/* Reitin "📚 Opinnot" -osio merikartta-muotokielelle (2026-08-18, Katrin
+   pyyntö: "kurssit myös sataman muotokielellä") — kurssikortit
+   (.opinto-kurssi-kortti) olivat jo, ympäröivä otsikko/lisäysrivi eivät. */
+#opinto-kurssi-otsikko { font-family: var(--fontti-loki); }
+#opinto-kurssi-lisays { border-bottom: none; }
+#opinto-kurssi-lisays input { font-family: var(--fontti-loki); color: var(--muste); }
+#opinto-kurssi-lisays input::placeholder { color: var(--vaimea); }
+#opinto-kurssi-lisays button {
+  border-radius: var(--r-kosketettava);
+  background: linear-gradient(165deg, rgba(255, 252, 244, .7), rgba(234, 230, 220, .25));
+  border: 1px solid var(--hius-vahva);
+  backdrop-filter: blur(7px); -webkit-backdrop-filter: blur(7px);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .6);
+  color: var(--muste); font-size: 24px;
+  transition: transform var(--keski) var(--kelluu), box-shadow var(--keski) var(--kelluu);
+}
+#opinto-kurssi-lisays button:hover,
+#opinto-kurssi-lisays button:focus-visible {
+  transform: translateY(-2px);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .7), 0 4px 12px rgba(34, 31, 26, .12);
+}
+#opinto-kurssi-lisays button:active { transform: translateY(0) scale(.95); }
 
 #hytti-tabi-loki .hytti-tyyppi-btn {
   border-radius: var(--r-kosketettava);

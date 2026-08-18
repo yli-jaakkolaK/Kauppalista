@@ -2371,7 +2371,6 @@ async function lataaReittiViikko() {
 // TULEVAT deadlinet, lähin ensin, enintään 3 (spekin oma raja).
 async function lataaReittiDeadlinet() {
   const listEl = document.getElementById('reitti-deadline-lista');
-  const tyhjaEl = document.getElementById('reitti-deadline-tyhja');
   if (!listEl) return;
   const tanaan = opintoTanaanPvm();
 
@@ -2383,7 +2382,7 @@ async function lataaReittiDeadlinet() {
 
   listEl.innerHTML = '';
   if (kurssiIdt.length === 0) {
-    tyhjaEl.style.display = 'block';
+    paivitaTehtavatMaaraajatNakyvyys();
     return;
   }
 
@@ -2398,7 +2397,6 @@ async function lataaReittiDeadlinet() {
     .sort(function(a, b) { return a.pvm < b.pvm ? -1 : 1; })
     .slice(0, 3);
 
-  tyhjaEl.style.display = kaikki.length === 0 ? 'block' : 'none';
   kaikki.forEach(function(d) {
     const li = document.createElement('li');
     const teksti = document.createElement('span');
@@ -2426,6 +2424,23 @@ async function lataaReittiDeadlinet() {
 
     listEl.appendChild(li);
   });
+  paivitaTehtavatMaaraajatNakyvyys();
+}
+
+// Tehtävät+määräajat-kortin näkyvyys (2026-08-18, ks. index.html:n oma
+// kommentti) — kaksi eri lataajaa (lataaHyttiPaanakyma tehtäville,
+// lataaReittiDeadlinet määräajoille) päivittävät saman kortin näkyvyyden
+// itsenäisesti, kumpi tahansa valmistuu ensin — funktio tarkistaa AINA
+// molempien listojen SEN HETKISEN DOM-tilan, ei jää kiinni suoritusjärjestykseen.
+function paivitaTehtavatMaaraajatNakyvyys() {
+  const osio = document.getElementById('hytti-tehtavat-osio');
+  const divider = document.getElementById('hytti-tehtavat-divider');
+  if (!osio) return;
+  const tehtavia = document.getElementById('hytti-tehtavat-list').children.length;
+  const maaraaikoja = document.getElementById('reitti-deadline-lista').children.length;
+  const nayta = (tehtavia + maaraaikoja) > 0;
+  osio.style.display = nayta ? 'block' : 'none';
+  if (divider) divider.style.display = nayta ? 'block' : 'none';
 }
 
 // === KERTAUSJONO (§5.3) — RAKENNETTU. Kurssien alla näkyvät solmut jotka
@@ -7232,7 +7247,7 @@ async function lataaHyttiPaanakyma() {
   const tehtavatListEl = document.getElementById('hytti-tehtavat-list');
   tehtavatListEl.innerHTML = '';
   (tehtavat || []).forEach(function(rivi) { tehtavatListEl.appendChild(piirraHyttiTehtavaRivi(rivi)); });
-  document.getElementById('hytti-tehtavat-tyhja').style.display = (tehtavat || []).length === 0 ? 'block' : 'none';
+  paivitaTehtavatMaaraajatNakyvyys();
 
   await paivitaAnkkuroidutAvaimet();
   await paivitaMuistutuksetKartta();

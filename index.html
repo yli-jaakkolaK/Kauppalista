@@ -376,28 +376,20 @@
 
       <hr class="divider">
 
-      <!-- Tehtävät (2026-08-17, siirretty Nyt-välilehdeltä) — "heti kalenterin
-           alapuolelle": itslearning-integraatio ei ole rakennettu — ainoa
-           sisääntulo tällä hetkellä on käsin lisätty kortin rivi joka on
-           merkitty tehtäväksi (hytti_rivit.is_task). Hälytysnappi
-           (luoMuistutusNappi) on jo rivillä, ei uusi. -->
-      <div id="hytti-tehtavat-osio">
-        <div class="section-title">✅ Tehtävät</div>
+      <!-- Tehtävät + Lähestyvät määräajat YHDISTETTY (2026-08-18, Katrin
+           pyyntö: "ei tarvii näyttää osiota ollenkaan jos siinä lukee ei
+           avoimia tehtäviä... eikö noi osiot vois yhdistää?"). Kaksi eri
+           datalähdettä (hytti_rivit.is_task vs opinto_deadlinet) samassa
+           kortissa peräkkäin, EI enää tyhjätilatekstiä — koko osio piiloon
+           jos molemmat listat ovat tyhjät (paivitaTehtavatMaaraajatNakyvyys,
+           kutsutaan molempien erillisten latausten jälkeen). -->
+      <div id="hytti-tehtavat-osio" style="display:none">
+        <div class="section-title">✅ Tehtävät ja määräajat</div>
         <ul class="list" id="hytti-tehtavat-list"></ul>
-        <p class="section-empty" id="hytti-tehtavat-tyhja" style="display:none">Ei avoimia tehtäviä.</p>
+        <ul class="list" id="reitti-deadline-lista"></ul>
       </div>
 
-      <hr class="divider">
-
-      <!-- Lähestyvät määräajat (§5.1 kohta 2, 2026-08-17) — enintään 3
-           lähintä tulevaa opinto_deadlinet-riviä aktiivisilta kursseilta,
-           📎-nappi liittää tiedoston juuri siihen määräaikaan
-           (materiaaliKohdeDeadline, sql/133). -->
-      <div class="section-title">⏳ Lähestyvät määräajat</div>
-      <ul class="list" id="reitti-deadline-lista"></ul>
-      <p class="section-empty" id="reitti-deadline-tyhja" style="display:none">Ei tulevia määräaikoja.</p>
-
-      <hr class="divider">
+      <hr class="divider" id="hytti-tehtavat-divider" style="display:none">
 
       <!-- Kolmiportainen kadenssi, Taso 2 (VAIHE2_JA_LISAYKSET_CODELLE.md,
            18.8.2026) — "ainoa taso joka yhä kysyy". Dismissible-kortit,
@@ -405,11 +397,11 @@
            (opinto_hoitotaso_ehdotukset, kasitelty=false). -->
       <div id="opinto-hoitotaso-ehdotukset"></div>
 
-      <div class="section-title">📚 Opinnot</div>
+      <div class="section-title" id="opinto-kurssi-otsikko">📚 Opinnot</div>
       <ul class="list" id="opinto-kurssi-lista"></ul>
       <p class="section-empty" id="opinto-tyhja" style="display:none">Ei vielä kursseja. Lisää ensimmäinen alta.</p>
 
-      <div class="add-item">
+      <div class="add-item" id="opinto-kurssi-lisays">
         <span class="prefix">›</span>
         <input type="text" id="opinto-uusi-kurssi-input" placeholder="uuden kurssin nimi...">
         <button id="opinto-uusi-kurssi-btn">+</button>
