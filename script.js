@@ -572,12 +572,29 @@ async function paivitaAnkkuroidutAvaimet() {
 // voi koskaan poistaa toisen käyttäjän ankkuria.
 async function vaihdaAnkkurointiYleinen(source, id, content, jalkeenPaivitys) {
   const idStr = String(id);
-  if (ankkuroidutAvaimet.has(source + ':' + idStr)) {
+  const oliAnkkuroitu = ankkuroidutAvaimet.has(source + ':' + idStr);
+  if (oliAnkkuroitu) {
     const { error } = await db.from('ankkurit').delete().eq('source', source).eq('source_ref', idStr).eq('user_id', currentUserId);
     if (ilmoitaKirjoitusvirheesta(error, 'Ankkuroinnin poisto')) return;
   } else {
     const { error } = await db.from('ankkurit').insert({ content: content, source: source, source_ref: idStr, user_id: currentUserId });
     if (ilmoitaKirjoitusvirheesta(error, 'Ankkurointi')) return;
+  }
+  // Laiturin murut EIVÄT ole pysyvä lista kuten Muistilaput/Kalenteri —
+  // Laituri on sisääntulo/triage-pino, ja nostaminen ankkuriksi ON
+  // nimenomaan pinosta poistamista (2026-08-19, Katrin pyyntö: "jos nostaa
+  // jotain laiturista ankkuriksi sen pitäisi kadota laiturista"). Käyttää
+  // samaa piilota_laiturista-lippua kuin muutkin Laiturista-piilotusreitit
+  // (koti-valuminen, materiaalin sijoitus, ks. lataaLaituri:n
+  // eq('piilota_laiturista', false)) — ei uutta rinnakkaista mekanismia.
+  // Käytännössä tämä on aina nosto (true): laskun (release) reitti on eri,
+  // ks. Ruorin Ankkurit-listan irrotaNappi-käsittelijä, joka palauttaa
+  // liputuksen — Laiturista noussut rivi katoaa Laiturista NÄHTÄVISTÄ heti
+  // noustessa, joten sen omaa ⚓-nappia ei enää pääse painamaan uudelleen
+  // laskeakseen sitä TÄÄLTÄ käsin.
+  if (source === 'laituri') {
+    const { error: piilotaError } = await db.from('laituri').update({ piilota_laiturista: !oliAnkkuroitu }).eq('id', id);
+    if (piilotaError) console.error('Laiturin piilotuksen päivitys ankkuroinnissa epäonnistui:', piilotaError);
   }
   await paivitaAnkkuroidutAvaimet();
   jalkeenPaivitys();
@@ -12451,6 +12468,18 @@ function openRowMenu(li, items) {
 
   li.appendChild(menu);
   openRowMenuEl = menu;
+  // Valikko avautuu oletuksena RIVIN ALLE (.row-menu, top:100%) — lähellä
+  // näytön alareunaa (2026-08-19, Katrin löydös: Laiturin alimpien murujen
+  // kohdevalikko ei mahtunut auki, osa kohdista jäi ruudun/kiinteän
+  // alapalkin alle eikä niitä pystynyt painamaan) tämä työntää valikon
+  // osittain näkymättömiin. Käännetään RIVIN YLÄPUOLELLE jos alapuolella ei
+  // ole tilaa — yksi korjaus kaikille openRowMenu()-kutsupaikoille kerralla.
+  const kaytettavissaAlhaalla = window.innerHeight - (document.body.classList.contains('has-alapalkki') ? 84 : 0);
+  const menuKorkeus = menu.getBoundingClientRect().height;
+  const liAla = li.getBoundingClientRect().bottom;
+  if (liAla + menuKorkeus > kaytettavissaAlhaalla) {
+    menu.classList.add('row-menu-ylos');
+  }
   setTimeout(function() { document.addEventListener('click', handleRowMenuOutsideClick, true); }, 0);
 }
 

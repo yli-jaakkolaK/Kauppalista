@@ -1904,6 +1904,13 @@ h1 {
   box-shadow: 0 4px 14px rgba(0, 0, 0, 0.2);
   overflow: hidden;
 }
+/* Käännetty rivin YLÄPUOLELLE (2026-08-19, ks. openRowMenu():n
+   reunantunnistus script.js:ssä) kun rivi on niin lähellä näytön alareunaa
+   ettei valikko mahtuisi kokonaan näkyviin alaspäin avautuneena. */
+.row-menu.row-menu-ylos {
+  top: auto;
+  bottom: 100%;
+}
 
 .row-menu-item {
   background: none;
@@ -3849,17 +3856,20 @@ h1 {
   color: var(--loki-vaara); border: 1.8px solid var(--loki-vaara); border-radius: 2px;
   padding: 3px 7px; filter: url(#leimasin);
 }
-.ruori .saa-tunnit { display: flex; gap: 10px; margin-top: 14px; padding-top: 12px; border-top: 1px dotted var(--hius-vahva); overflow-x: auto; scroll-padding: 6px; }
+/* Katkoviiva + sen yläpuolinen tila poistettu (2026-08-19, Katrin pyyntö
+   "remove straight line above weather symbols and move everything up") —
+   tuntirivi kelluu nyt suoraan tagien alla ilman erotinta. */
+.ruori .saa-tunnit { display: flex; gap: 10px; margin-top: 6px; overflow-x: auto; scroll-padding: 6px; }
 .ruori .saa-tunti { display: flex; flex-direction: column; align-items: center; gap: 3px; flex: none; min-width: 36px; padding: 4px 3px; border-radius: var(--r-kosketettava); }
-/* Nykyinen tunti: liquid glass -korostus (2026-08-11, Katrin lupa käyttää
-   sitä laajemmin missä järkevää) — sama lämmin lasi -resepti kuin
-   kuormakytkimessä/ankkuri-napeissa, ei koristeena vaan koska tämä on
-   juuri se "mistä ollaan nyt" -kohta joka ansaitsee korostuksen. */
+/* Nykyinen tunti: TASAINEN korostus, EI lämmin lasi (2026-08-19 korjattu,
+   Katrin havainto: "sääikonien kohdalla mun tekee mieli painaa siitä mis
+   ollaan nyt ku käyttää painettavan muotokieltä" — lasi-resepti (backdrop-
+   filter + sisävalo) on sovelluksessa muualla AINA "tämä on nappi" -vihje,
+   ja tuntisolu ei ole kosketettava. Alkuperäinen 2026-08-11-versio lainasi
+   lasi-reseptiä vahingossa väärään, ei-interaktiiviseen kohteeseen —
+   korvattu tasaisella sinappi-sävyllä ilman kiiltoa/reunusta/syvyyttä. */
 .ruori .saa-tunti-nyt {
-  background: linear-gradient(165deg, rgba(255, 252, 244, .72), rgba(234, 230, 220, .28));
-  border: 1px solid rgba(156, 122, 67, .5);
-  backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .65);
+  background: rgba(194, 154, 46, .16);
 }
 .ruori .saa-tunti-aika { font-size: 10.5px; color: var(--vaimea); }
 .ruori .saa-tunti-nyt .saa-tunti-aika { color: var(--muste); font-weight: 700; }
@@ -3916,18 +3926,24 @@ h1 {
 .ruori .segmentti.ankkurit .ankkuri-toiminnot { display: flex; flex-direction: column; gap: 16px; flex: none; margin-top: 1px; }
 /* Kolmas kierros (2026-08-19, Katri täsmensi taas): edellinen versio (täysi
    ympyrä + sinappi MOLEMMILLE napeille) meni liian pitkälle kahdella
-   tavalla. (1) Muoto: hän halusi vain saman painettavan neliömäisen
-   muotokielen kuin muualla (var(--r-kosketettava)), EI ympyrää — "square
-   with painettava muotokieli, not round". (2) Väri: sinappi kuuluu VAIN
-   ⚓-napille — "it is visual cue that somethin is risen as an anchor",
-   koska tässä listassa ⚓-nappi on AINA "irrota"-tilassa (ankkurit-list
-   näyttää jo-ankkuroituja rivejä, ks. script.js:n irrotaNappi). ⋯-valikko
-   on eri toiminto (siirrä/muistuta/ehdota), ei "risen as an anchor"
-   -tilaa, joten se pysyy neutraalina lasina — sama muoto, eri väri. */
+   tavalla. (1) Muoto: hän halusi saman painettavan muotokielen kuin
+   muualla, EI ympyrää — "square with painettava muotokieli, not round".
+   (2) Väri: sinappi kuuluu VAIN ⚓-napille — "it is visual cue that
+   somethin is risen as an anchor", koska tässä listassa ⚓-nappi on AINA
+   "irrota"-tilassa (ankkurit-list näyttää jo-ankkuroituja rivejä, ks.
+   script.js:n irrotaNappi). ⋯-valikko on eri toiminto (siirrä/muistuta/
+   ehdota), ei "risen as an anchor" -tilaa, joten se pysyy neutraalina
+   lasina — sama muoto, eri väri.
+   Neljäs täsmennys: "shape of pressable anchor should be same shape as tab
+   icons are using as backround" — var(--r-kosketettava) (13px) on SAMA
+   arvo jota alapalkin ~64-78px-tabit käyttävät, mutta 13px 30px-napissa on
+   suhteellisesti PALJON pyöreämpi kuin 13px 64px-tabissa (13/30 ≈ 43% vs.
+   13/64 ≈ 20%). Skaalattu suhteessa alapalkin tabiin (6px ≈ 20% 30px:stä)
+   sen sijaan että käytettäisiin samaa kiinteää pikseliarvoa. */
 .ruori .segmentti.ankkurit .anchor-btn,
 .ruori .segmentti.ankkurit .overflow-btn {
   position: relative; min-width: 0; min-height: 0; width: 30px; height: 30px; flex: none;
-  border-radius: var(--r-kosketettava); opacity: 1;
+  border-radius: 6px; opacity: 1;
   backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
   transition: background var(--keski) var(--kelluu), box-shadow var(--keski) var(--kelluu), transform var(--keski) var(--kelluu);
 }
@@ -3998,6 +4014,19 @@ h1 {
 .ruori .segmentti.ankkurit .list li.ankkuri-rivi:active {
   transform: translateY(1px) scale(.99);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, .5);
+}
+
+/* Äly-ehdotukset (anchor-candidates-list) samaan kauniiseen laatikkoon
+   (2026-08-19, Katrin pyyntö: "add every suggestion from äly into that
+   beautiful box") — .anchor-candidate-row on jaettu luokka (myös Laiturin
+   ehdotuskorteissa muualla), joten skoopattu tänne Ankkurit-segmenttiin
+   ettei Laiturin oma kulta-katkoviiva-tyyli muutu vahingossa. */
+.ruori .segmentti.ankkurit .list li.anchor-candidate-row {
+  border: 1px solid rgba(194, 154, 46, .38);
+  border-radius: var(--r-kosketettava);
+  background: linear-gradient(165deg, rgba(194, 154, 46, .20), rgba(194, 154, 46, .07));
+  box-shadow: 0 2px 6px rgba(34, 31, 26, .10), inset 0 1px 0 rgba(255, 255, 255, .5);
+  padding: 8px 10px;
 }
 
 /* Kalenteri- ja Hytti-segmentit samalle sinapinlämpöiselle pinnalle kuin
