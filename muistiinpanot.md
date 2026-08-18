@@ -4344,6 +4344,12 @@ sw.js v172 → v173.
 
 sw.js v173 → v174.
 
+**Nyt-lokin "vain 9.15 näkyi tänään" -tutkinta + lounaan sijoittelubugi korjattu (2026-08-18, sama istunto jatkuu).** Katri: "today i din't see any other study session but 9.15 one". Tutkittu Supabasesta suoraan (MCP-työkalulla): tälle päivälle (ti 2026-08-18) oli laskettu 6 valmista opinto_paivan_askeleet-riviä ('tarjolla'), kalenterissa yksi omista tapahtumista ("Sari Turku amk + Sari" 12:00-13:00, Joukahaisenkatu — tunnettu Föli-matka, todellinen saapumistarve 60min ennen). **TÄRKEÄ RAJOITUS: Nyt-loki lasketaan AINA selaimessa tuoreena eikä sen sijoittelua tallenneta minnekään** — en siis voi jälkikäteen todistetusti toistaa mitä hän NÄKI aiemmin tänään, vain päätellä koodista mikä on mahdollista/todennäköistä. Löysin ja korjasin yhden todellisen, riippumattoman bugin `piirraNytLoki()`:ssä (JA sen kopiossa "huomisen esikatselu" -funktiossa — kaksi kertaa samat rivit, molemmat korjattu): kun lounaan oletusaika (klo 11) oli varattu, vanha koodi haki ENSIMMÄISEN vapaan minuutin koko opiskeluikkunan ALUSTA — jos aamu oli lyhyt (esim. matkan takia vain ~50 min ennen lähtöä), 30 min lounas saattoi syödä käytännössä koko lyhyen aamu-ikkunan turhaan, vaikka iltapäivällä olisi ollut reilusti tilaa. Korjattu hakemaan LÄHIN vapaa rako toivotusta ajasta (skannaa ulospäin molempiin suuntiin), ei enää aina päivän alusta.
+**Samalla löytyi bonus: huomiselle (ke 2026-08-19) on kalenterissa AITO PÄÄLLEKKÄISYYS** — "Aamos kylässä" 15:00-18:15 ja "Suunnistus Pääskyvuori" 16:00-19:00 menevät päällekkäin 16:00-18:15 (2h 15min). Kerroin tästä Katrille erikseen, ei liity Nyt-lokiin.
+**Sivuhuomio kirjattu, ei korjattu:** "ruori, muokkaa aikaa is still in old style" — ks. edellinen osio yllä, jäljitetty parisuhdeaika-kortin "✎ Muokkaa aikaa" -nappiin, odottaa omaa työtä.
+
+sw.js v174 → v175.
+
 ---
 
 ## Nykytila (päivitetty 2026-08-18, COPILOT.md-sääntö 4 — huom: aiempi "Nykytila ja seuraavat askeleet" -osio jäi tästä tiedostosta ylemmäs pitkän istunnon aikana kertyneiden uusien osioiden taakse, ei enää tiedoston lopussa; siirto omaksi erikseen tehtäväksi työksi, ei nyt)

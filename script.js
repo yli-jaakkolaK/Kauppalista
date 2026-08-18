@@ -3712,8 +3712,21 @@ async function piirraNytLoki(askeleet) {
   };
   let ateriaAlku = aikaMinuutteina(haeAsetusTeksti('ateria_alku', '11:00'));
   if (!mahtuuko(ateriaAlku)) {
-    ateriaAlku = -1;
-    for (let m = ikkunaAlku; m <= ikkunaLoppu - ateriaKesto; m++) { if (mahtuuko(m)) { ateriaAlku = m; break; } }
+    // Etsi LÄHIN vapaa rako toivotusta ajasta, ei ensimmäistä ikkunan alusta
+    // (2026-08-18, Katrin havainto: päivä jossa aamu oli lyhyt matkan/
+    // tapaamisen takia näytti vain yhden opiskelupätkän). Vanha koodi haki
+    // ensimmäisen vapaan minuutin ikkunan ALUSTA jos oletusaika (klo 11) oli
+    // varattu — jos aamu oli lyhyt (esim. 50 min ennen matkaa), 30 min lounas
+    // sijoittui sinne ja söi käytännössä koko lyhyen aamu-ikkunan, vaikka
+    // iltapäivällä olisi ollut reilusti tilaa. Skannaa nyt ULOSPÄIN
+    // toivotusta ajasta (lähempi voittaa) sen sijaan että aina lähdettäisiin
+    // päivän alusta.
+    let paras = -1;
+    for (let etaisyys = 1; etaisyys <= (ikkunaLoppu - ikkunaAlku) && paras < 0; etaisyys++) {
+      if (mahtuuko(ateriaAlku - etaisyys)) paras = ateriaAlku - etaisyys;
+      else if (mahtuuko(ateriaAlku + etaisyys)) paras = ateriaAlku + etaisyys;
+    }
+    ateriaAlku = paras;
   }
   let ateriaSijoitus = null;
   if (ateriaAlku >= 0) {
@@ -3868,8 +3881,21 @@ async function naytaHuomisenEsikatselu() {
   };
   let ateriaAlku = aikaMinuutteina(haeAsetusTeksti('ateria_alku', '11:00'));
   if (!mahtuuko(ateriaAlku)) {
-    ateriaAlku = -1;
-    for (let m = ikkunaAlku; m <= ikkunaLoppu - ateriaKesto; m++) { if (mahtuuko(m)) { ateriaAlku = m; break; } }
+    // Etsi LÄHIN vapaa rako toivotusta ajasta, ei ensimmäistä ikkunan alusta
+    // (2026-08-18, Katrin havainto: päivä jossa aamu oli lyhyt matkan/
+    // tapaamisen takia näytti vain yhden opiskelupätkän). Vanha koodi haki
+    // ensimmäisen vapaan minuutin ikkunan ALUSTA jos oletusaika (klo 11) oli
+    // varattu — jos aamu oli lyhyt (esim. 50 min ennen matkaa), 30 min lounas
+    // sijoittui sinne ja söi käytännössä koko lyhyen aamu-ikkunan, vaikka
+    // iltapäivällä olisi ollut reilusti tilaa. Skannaa nyt ULOSPÄIN
+    // toivotusta ajasta (lähempi voittaa) sen sijaan että aina lähdettäisiin
+    // päivän alusta.
+    let paras = -1;
+    for (let etaisyys = 1; etaisyys <= (ikkunaLoppu - ikkunaAlku) && paras < 0; etaisyys++) {
+      if (mahtuuko(ateriaAlku - etaisyys)) paras = ateriaAlku - etaisyys;
+      else if (mahtuuko(ateriaAlku + etaisyys)) paras = ateriaAlku + etaisyys;
+    }
+    ateriaAlku = paras;
   }
   let ateriaSijoitus = null;
   if (ateriaAlku >= 0) {
