@@ -8362,16 +8362,27 @@ document.querySelectorAll('.silta-ikoni').forEach(function(el) { el.innerHTML = 
 // 24x24-viewBoxissa (aurinko pilven takaa kurkistaen, pilvi+viiva-sade,
 // pilvi+hiutale, pilvi+salama) — sama rakenne kuin tunnetuilla sääpalveluilla
 // (yr.no, Apple Sää, Ilmatieteenlaitos), ei enää oma sommittelu.
+// Värit "virallisten" säämerkkien tapaan (2026-08-19, Katrin palaute:
+// aiempi versio oli tasan yksivärinen currentColor-ääriviiva joka ei
+// näyttänyt oikealta säämerkiltä — oikeat sääpalvelut käyttävät aina väriä,
+// aurinko keltainen/kultainen, pilvi harmaa, sade/lumi sininen, salama
+// meripihka). CSS-muuttujina (ei kiinteitä hex-arvoja) jotta tumma teema
+// mukautuu automaattisesti kuten muukin sovellus — ei uusia värejä, samat
+// jaetut tokenit kuin muualla.
+const SAA_VARI_AURINKO = 'var(--sinappi)';
+const SAA_VARI_PILVI = 'var(--vaimea)';
+const SAA_VARI_SADE = 'var(--syvanne)';
+const SAA_VARI_SALAMA = 'var(--huomio)';
 const SAA_IKONIT = {
-  sun: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="4.6"/><path d="M12 1.5v2.4M12 20.1v2.4M4.5 4.5l1.7 1.7M17.8 17.8l1.7 1.7M1.5 12h2.4M20.1 12h2.4M4.5 19.5l1.7-1.7M17.8 6.2l1.7-1.7"/></svg>',
-  cloud: '<svg viewBox="0 0 24 24"><path fill="currentColor" d="M6.5 19a4.5 4.5 0 0 1-.4-8.98A5.5 5.5 0 0 1 16.8 9.1 4 4 0 0 1 16.5 19h-10z"/></svg>',
-  partlycloudy: '<svg viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="16.2" cy="7.3" r="3"/><path d="M16.2 1.8v1.6M21.4 4.1l-1.2 1.2M23 7.3h-1.6M19.4 11l-1.3-1.3"/></g><path fill="currentColor" d="M6.5 19a4.3 4.3 0 0 1-.4-8.58A5.3 5.3 0 0 1 15.9 9.4 3.8 3.8 0 0 1 15.6 19H6.5z"/></svg>',
-  fog: '<svg viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" stroke-linecap="round" fill="none"><path d="M3 7.5h18M3 12h18M3 16.5h13"/></svg>',
-  drizzle: '<svg viewBox="0 0 24 24"><path fill="currentColor" d="M6.5 16a4.3 4.3 0 0 1-.4-8.58A5.3 5.3 0 0 1 15.9 6.4 3.8 3.8 0 0 1 15.6 16H6.5z"/><g stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M8.5 19.5v1.7M13.5 19.5v1.7"/></g></svg>',
-  rain: '<svg viewBox="0 0 24 24"><path fill="currentColor" d="M6.5 15a4.3 4.3 0 0 1-.4-8.58A5.3 5.3 0 0 1 15.9 5.4 3.8 3.8 0 0 1 15.6 15H6.5z"/><g stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M7.5 18l-1.2 3.2M12 18l-1.2 3.2M16.5 18l-1.2 3.2"/></g></svg>',
-  rainshower: '<svg viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="16.2" cy="6.8" r="2.6"/><path d="M16.2 1.9v1.4M20.7 3.9l-1.1 1.1M22.1 6.8h-1.4M18.9 10.1l-1.2-1.2"/></g><path fill="currentColor" d="M6 16a4.1 4.1 0 0 1-.4-8.18A5.1 5.1 0 0 1 15.1 6.3 3.6 3.6 0 0 1 14.8 16H6z"/><g stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M8 19l-1 2.7M14 19l-1 2.7"/></g></svg>',
-  snow: '<svg viewBox="0 0 24 24"><path fill="currentColor" d="M6.5 15a4.3 4.3 0 0 1-.4-8.58A5.3 5.3 0 0 1 15.9 5.4 3.8 3.8 0 0 1 15.6 15H6.5z"/><g stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M8 18.2v3.4M6.5 20l3-1.8M6.5 18.2l3 1.8M15 18.2v3.4M13.5 20l3-1.8M13.5 18.2l3 1.8"/></g></svg>',
-  thunder: '<svg viewBox="0 0 24 24"><path fill="currentColor" d="M6.5 14a4.3 4.3 0 0 1-.4-8.58A5.3 5.3 0 0 1 15.9 4.4 3.8 3.8 0 0 1 15.6 14H6.5z"/><path fill="currentColor" d="M13.5 12.5l-5 6.5h3.3l-.6 4.3 5-6.8h-3.3l.6-4z"/></svg>',
+  sun: '<svg viewBox="0 0 24 24" fill="none" stroke="' + SAA_VARI_AURINKO + '" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="4.6" fill="' + SAA_VARI_AURINKO + '" fill-opacity=".18"/><path d="M12 1.5v2.4M12 20.1v2.4M4.5 4.5l1.7 1.7M17.8 17.8l1.7 1.7M1.5 12h2.4M20.1 12h2.4M4.5 19.5l1.7-1.7M17.8 6.2l1.7-1.7"/></svg>',
+  cloud: '<svg viewBox="0 0 24 24"><path fill="' + SAA_VARI_PILVI + '" d="M6.5 19a4.5 4.5 0 0 1-.4-8.98A5.5 5.5 0 0 1 16.8 9.1 4 4 0 0 1 16.5 19h-10z"/></svg>',
+  partlycloudy: '<svg viewBox="0 0 24 24"><g fill="' + SAA_VARI_AURINKO + '" fill-opacity=".18" stroke="' + SAA_VARI_AURINKO + '" stroke-width="1.8" stroke-linecap="round"><circle cx="16.2" cy="7.3" r="3"/><path d="M16.2 1.8v1.6M21.4 4.1l-1.2 1.2M23 7.3h-1.6M19.4 11l-1.3-1.3" fill="none"/></g><path fill="' + SAA_VARI_PILVI + '" d="M6.5 19a4.3 4.3 0 0 1-.4-8.58A5.3 5.3 0 0 1 15.9 9.4 3.8 3.8 0 0 1 15.6 19H6.5z"/></svg>',
+  fog: '<svg viewBox="0 0 24 24" stroke="' + SAA_VARI_PILVI + '" stroke-width="2" stroke-linecap="round" fill="none"><path d="M3 7.5h18M3 12h18M3 16.5h13"/></svg>',
+  drizzle: '<svg viewBox="0 0 24 24"><path fill="' + SAA_VARI_PILVI + '" d="M6.5 16a4.3 4.3 0 0 1-.4-8.58A5.3 5.3 0 0 1 15.9 6.4 3.8 3.8 0 0 1 15.6 16H6.5z"/><g stroke="' + SAA_VARI_SADE + '" stroke-width="1.8" stroke-linecap="round"><path d="M8.5 19.5v1.7M13.5 19.5v1.7"/></g></svg>',
+  rain: '<svg viewBox="0 0 24 24"><path fill="' + SAA_VARI_PILVI + '" d="M6.5 15a4.3 4.3 0 0 1-.4-8.58A5.3 5.3 0 0 1 15.9 5.4 3.8 3.8 0 0 1 15.6 15H6.5z"/><g stroke="' + SAA_VARI_SADE + '" stroke-width="1.8" stroke-linecap="round"><path d="M7.5 18l-1.2 3.2M12 18l-1.2 3.2M16.5 18l-1.2 3.2"/></g></svg>',
+  rainshower: '<svg viewBox="0 0 24 24"><g fill="' + SAA_VARI_AURINKO + '" fill-opacity=".18" stroke="' + SAA_VARI_AURINKO + '" stroke-width="1.8" stroke-linecap="round"><circle cx="16.2" cy="6.8" r="2.6"/><path d="M16.2 1.9v1.4M20.7 3.9l-1.1 1.1M22.1 6.8h-1.4M18.9 10.1l-1.2-1.2" fill="none"/></g><path fill="' + SAA_VARI_PILVI + '" d="M6 16a4.1 4.1 0 0 1-.4-8.18A5.1 5.1 0 0 1 15.1 6.3 3.6 3.6 0 0 1 14.8 16H6z"/><g stroke="' + SAA_VARI_SADE + '" stroke-width="1.8" stroke-linecap="round"><path d="M8 19l-1 2.7M14 19l-1 2.7"/></g></svg>',
+  snow: '<svg viewBox="0 0 24 24"><path fill="' + SAA_VARI_PILVI + '" d="M6.5 15a4.3 4.3 0 0 1-.4-8.58A5.3 5.3 0 0 1 15.9 5.4 3.8 3.8 0 0 1 15.6 15H6.5z"/><g stroke="' + SAA_VARI_SADE + '" stroke-width="1.6" stroke-linecap="round"><path d="M8 18.2v3.4M6.5 20l3-1.8M6.5 18.2l3 1.8M15 18.2v3.4M13.5 20l3-1.8M13.5 18.2l3 1.8"/></g></svg>',
+  thunder: '<svg viewBox="0 0 24 24"><path fill="' + SAA_VARI_PILVI + '" d="M6.5 14a4.3 4.3 0 0 1-.4-8.58A5.3 5.3 0 0 1 15.9 4.4 3.8 3.8 0 0 1 15.6 14H6.5z"/><path fill="' + SAA_VARI_SALAMA + '" d="M13.5 12.5l-5 6.5h3.3l-.6 4.3 5-6.8h-3.3l.6-4z"/></svg>',
   // Tuuli (2026-08-11, Katrin pyyntö) — ei omaa leimasinta eikä numeroa,
   // vain kuvake sääkuvakkeen vierellä sinä tuntina kun tuulee. "tuuli" on
   // ohut kaksirivinen versio, "tuuliKova" paksumpi + väritetty --vaara:lla
@@ -8408,16 +8419,21 @@ function saaIkoniAvainKoodille(koodi) {
   if (koodi >= 95 && koodi <= 99) return 'thunder';
   return 'cloud';
 }
-// Sadetodennäköisyys < 19% -> pudotetaan sadekuvakkeesta pilviseen
-// vastineeseen (2026-08-11, elävä testaus: koodi voi teknisesti tarkoittaa
-// "tihkua" mutta jos todennäköisyys on silti pieni tälle nimenomaiselle
-// tunnille, sadekuvake harhaanjohtaa). Aurinkoiset sadekuvakkeet (rainshower)
-// tippuvat kirkkaan-pilvisen (partlycloudy) puolelle, lumi/ukkonen tavalliseen
-// pilveen — ei koskaan jää sadetta kuvaavaksi ilman riittävää todennäköisyyttä.
+// Sadetodennäköisyyden kynnys — 19 -> 20 (2026-08-19, Katrin pyyntö: "if
+// there is 20% or more propability of rain mark it") — sama kynnys sekä
+// sadeprosentin näyttämiselle tuntiriveillä ETTÄ ikonin pudotukselle
+// sadekuvakkeesta pilviseen vastineeseen alla (2026-08-11, elävä testaus:
+// koodi voi teknisesti tarkoittaa "tihkua" mutta jos todennäköisyys on
+// silti pieni tälle nimenomaiselle tunnille, sadekuvake harhaanjohtaa) —
+// YKSI kynnys, ei kaksi hieman eri arvoa. Aurinkoiset sadekuvakkeet
+// (rainshower) tippuvat kirkkaan-pilvisen (partlycloudy) puolelle,
+// lumi/ukkonen tavalliseen pilveen — ei koskaan jää sadetta kuvaavaksi
+// ilman riittävää todennäköisyyttä.
+const SAA_SADE_KYNNYS = 20;
 const SAA_SADEIKONI_LASKEUTUU = { drizzle: 'cloud', rain: 'cloud', snow: 'cloud', thunder: 'cloud', rainshower: 'partlycloudy' };
 function saaIkoniHtml(koodi, sade) {
   let avain = saaIkoniAvainKoodille(koodi);
-  if (typeof sade === 'number' && sade < 19 && SAA_SADEIKONI_LASKEUTUU[avain]) {
+  if (typeof sade === 'number' && sade < SAA_SADE_KYNNYS && SAA_SADEIKONI_LASKEUTUU[avain]) {
     avain = SAA_SADEIKONI_LASKEUTUU[avain];
   }
   return SAA_IKONIT[avain];
@@ -8505,7 +8521,7 @@ async function lataaRuoriSaa() {
         + '<span class="saa-tunti-aika">' + tunnit[i].slice(11, 13) + '</span>'
         + '<span class="saa-tunti-ikoni">' + saaIkoniHtml(saa.hourly.weather_code[i], sade) + saaTuuliIkoni(tuuli) + '</span>'
         + '<span class="saa-tunti-lampo">' + (typeof tuntuu === 'number' ? Math.round(tuntuu) + '°' : '') + '</span>'
-        + '<span class="saa-tunti-sade">' + (sade >= 10 ? pyoristaKymmeneen(sade) + '%' : '') + '</span>'
+        + '<span class="saa-tunti-sade">' + (sade >= SAA_SADE_KYNNYS ? pyoristaKymmeneen(sade) + '%' : '') + '</span>'
         + '</div>';
     }).join('');
     if (nykyIdx >= 0) {
