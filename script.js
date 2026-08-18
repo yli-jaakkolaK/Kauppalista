@@ -3525,12 +3525,24 @@ async function piirraNytLoki(askeleet) {
   const nytMin = nyt.getHours() * 60 + nyt.getMinutes();
 
   const [{ data: tapahtumat }, { data: suljetut }, { data: opiskeluajat }] = await Promise.all([
-    // Vain Katrin omat merkinnät (Katrin pyyntö 17.8.2026: "ei Juhan
-    // kalenterimerkintöjä") — ei koko perheen jaettu kalenterinäkymä.
-    db.from('kalenteri_tapahtumat').select('title, event_time, event_end_time').eq('event_date', tanaan).eq('user_id', currentUserId).order('event_time'),
+    // Katrin omat + jaettu perhekalenteri, EI Juhan oma (Katrin pyyntö
+    // 17.8.2026: "ei Juhan kalenterimerkintöjä"). KORJATTU 2026-08-18:
+    // suodatti aiemmin kalenteri_tapahtumat.user_id:llä — tarkistettu
+    // suoraan kannasta että tämä sarake on käytännössä AINA tyhjä (sama
+    // "organizer on tyhjä" -ilmiö joka on jo dokumentoitu Kalenterisyötteet-
+    // osiossa), joten suodatus ei koskaan täsmännyt mihinkään — Katrin OMAT
+    // kiinteät menot (esim. huomisen "Aamos kylässä"/"Suunnistus") eivät
+    // koskaan näkyneet Nyt-lokin sijoittelussa, jolloin opiskelupätkä olisi
+    // voitu sijoittaa suoraan niiden päälle. Oikea suodatin on liitetyn
+    // syötteen henkilo (null = jaettu perhekalenteri, kuuluu myös Katrille).
+    db.from('kalenteri_tapahtumat').select('title, event_time, event_end_time, kalenteri_syotteet!inner(henkilo)').eq('event_date', tanaan).order('event_time'),
     db.from('hytti_suljetut_ikkunat').select('alkaa, paattyy').eq('owner_id', currentUserId).eq('viikonpaiva', viikonpaiva),
     db.from('hytti_opiskeluaika').select('alkaa, paattyy').eq('owner_id', currentUserId).eq('viikonpaiva', viikonpaiva),
   ]);
+  const omatTapahtumat = (tapahtumat || []).filter(function(t) {
+    const h = t.kalenteri_syotteet ? t.kalenteri_syotteet.henkilo : null;
+    return h === omaHenkilo || h === null;
+  });
   const opiskeluIkkuna = (opiskeluajat && opiskeluajat[0]) || { alkaa: '09:00', paattyy: '15:30' };
   const ikkunaAlku = aikaMinuutteina(opiskeluIkkuna.alkaa.slice(0, 5));
   const ikkunaLoppu = aikaMinuutteina(opiskeluIkkuna.paattyy.slice(0, 5));
@@ -3550,7 +3562,7 @@ async function piirraNytLoki(askeleet) {
   // puskuroitua, ettei kalenterissa näytetä väärää kellonaikaa.
   const siirtymaPuskuri = haeAsetusNumero('siirtymapuskuri_min', 30);
   const kiinteatMenot = [];
-  (tapahtumat || []).forEach(function(t) {
+  omatTapahtumat.forEach(function(t) {
     if (!t.event_time) return; // koko päivän kestävä — ei sijoiteta aikajanalle
     const a = aikaMinuutteina(t.event_time.slice(0, 5));
     const b = Math.min(1439, t.event_end_time ? aikaMinuutteina(t.event_end_time.slice(0, 5)) : a + 60);
@@ -3668,10 +3680,17 @@ async function naytaHuomisenEsikatselu() {
   const viikonpaiva = huominenD.getDay();
 
   const [{ data: tapahtumat }, { data: suljetut }, { data: opiskeluajat }] = await Promise.all([
-    db.from('kalenteri_tapahtumat').select('title, event_time, event_end_time').eq('event_date', huominenIso).eq('user_id', currentUserId).order('event_time'),
+    // Sama korjaus kuin piirraNytLoki:ssa (2026-08-18) — kalenteri_tapahtumat.
+    // user_id on käytännössä aina tyhjä, suodatus liitetyn syötteen
+    // henkilo-kentän mukaan (null = jaettu perhekalenteri, kuuluu Katrille).
+    db.from('kalenteri_tapahtumat').select('title, event_time, event_end_time, kalenteri_syotteet!inner(henkilo)').eq('event_date', huominenIso).order('event_time'),
     db.from('hytti_suljetut_ikkunat').select('alkaa, paattyy').eq('owner_id', currentUserId).eq('viikonpaiva', viikonpaiva),
     db.from('hytti_opiskeluaika').select('alkaa, paattyy').eq('owner_id', currentUserId).eq('viikonpaiva', viikonpaiva),
   ]);
+  const omatTapahtumat = (tapahtumat || []).filter(function(t) {
+    const h = t.kalenteri_syotteet ? t.kalenteri_syotteet.henkilo : null;
+    return h === omaHenkilo || h === null;
+  });
   const opiskeluIkkuna = (opiskeluajat && opiskeluajat[0]) || { alkaa: '09:00', paattyy: '15:30' };
   const ikkunaAlku = aikaMinuutteina(opiskeluIkkuna.alkaa.slice(0, 5));
   const ikkunaLoppu = aikaMinuutteina(opiskeluIkkuna.paattyy.slice(0, 5));
@@ -3685,7 +3704,7 @@ async function naytaHuomisenEsikatselu() {
 
   const siirtymaPuskuri = haeAsetusNumero('siirtymapuskuri_min', 30);
   const kiinteatMenot = [];
-  (tapahtumat || []).forEach(function(t) {
+  omatTapahtumat.forEach(function(t) {
     if (!t.event_time) return;
     const a = aikaMinuutteina(t.event_time.slice(0, 5));
     const b = Math.min(1439, t.event_end_time ? aikaMinuutteina(t.event_end_time.slice(0, 5)) : a + 60);
