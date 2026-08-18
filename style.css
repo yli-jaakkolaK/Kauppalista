@@ -3729,12 +3729,24 @@ h1 {
    kuormitustila on nyt pelkkä kytkin (ei tekstiä/laatikkoa), SATAMA sen
    oikealla puolella samalla rivillä, päivämäärä siirtyi alapalkin
    kalenterikuvakkeeseen (§5.3). */
-.ruori .otsake { display: flex; justify-content: space-between; align-items: center; padding: 2px 2px 22px; }
+/* Tunnus tasattu kellon yläreunan kanssa (2026-08-18, Katrin pyyntö) —
+   oli align-items:center, jolloin SATAMA lojui kellon 150px-korkeuden
+   keskellä turhan ilmavasti. flex-start + kevyt padding-top hakee tunnuksen
+   optisesti samalle riville kellon yläkaaren kanssa. Alapalkki vei 22px:n
+   pohjatäytteen tarpeen pois (§5.3) — pienennetty ettei jää tyhjää tilaa
+   otsakkeen ja Sään väliin. */
+.ruori .otsake { display: flex; justify-content: space-between; align-items: flex-start; padding: 6px 2px 8px; }
 .ruori .otsake-vas { flex: 1; min-width: 0; }
 .ruori .otsake-ylarivi { display: flex; align-items: center; gap: 12px; }
 /* SATAMA sinapilla (2026-08-11, Katrin pyyntö) — sama --sinappi joka on
-   muutenkin käytössä sovelluksessa, ei uusi väri. */
-.ruori .tunnus { font-size: 22px; letter-spacing: .34em; color: var(--sinappi); font-weight: 700; margin: 0; }
+   muutenkin käytössä sovelluksessa, ei uusi väri. Kirjainväli tiivistetty
+   .34em -> .14em (2026-08-18, Katrin palaute: teksti näytti siltä että
+   joka kirjaimen välissä olisi lyöntiväli) — HTML:ssä oli SAMAAN AIKAAN
+   myös kirjainten välissä oikeat välilyönnit ("S A T A M A"), jotka
+   TUPLASIVAT ison letter-spacingin kanssa syntyvän raon. Poistettu
+   välilyönnit (index.html: "SATAMA") ja kevennetty letter-spacing samalla
+   — pelkkä jommankumman korjaus ei olisi riittänyt. */
+.ruori .tunnus { font-size: 22px; letter-spacing: .14em; color: var(--sinappi); font-weight: 700; margin: 0; }
 
 /* Kuormitustila-kytkin — itse painettava pinta (--r-kosketettava), ei
    erillistä laatikkoa/tekstiä. Pois päältä: lämmin lasi + messinkikehys.
@@ -3813,6 +3825,10 @@ h1 {
    otsake, samalla tavalla kuin --paperi-tausta jo muutenkin näkyy. */
 .ruori .segmentti.saa {
   padding: 0 2px 18px; background: none; border: none; box-shadow: none; margin-bottom: 4px;
+  /* Segmentti on <a>-elementti (linkki open-meteo.com:iin) — ilman tätä
+     selaimen oletustyyli alleviivasi kaiken sisällön, myös ison lämpötila-
+     lukeman (2026-08-18, Katrin havainto). */
+  text-decoration: none;
 }
 .ruori .segmentti.saa:hover, .ruori .segmentti.saa:focus-visible {
   transform: none; background: none; box-shadow: none;
@@ -3828,7 +3844,7 @@ h1 {
   padding: 3px 7px; filter: url(#leimasin);
 }
 .ruori .saa-tunnit { display: flex; gap: 10px; margin-top: 14px; padding-top: 12px; border-top: 1px dotted var(--hius-vahva); overflow-x: auto; scroll-padding: 6px; }
-.ruori .saa-tunti { display: flex; flex-direction: column; align-items: center; gap: 4px; flex: none; min-width: 30px; padding: 4px 3px; border-radius: var(--r-kosketettava); }
+.ruori .saa-tunti { display: flex; flex-direction: column; align-items: center; gap: 3px; flex: none; min-width: 36px; padding: 4px 3px; border-radius: var(--r-kosketettava); }
 /* Nykyinen tunti: liquid glass -korostus (2026-08-11, Katrin lupa käyttää
    sitä laajemmin missä järkevää) — sama lämmin lasi -resepti kuin
    kuormakytkimessä/ankkuri-napeissa, ei koristeena vaan koska tämä on
@@ -3841,8 +3857,14 @@ h1 {
 }
 .ruori .saa-tunti-aika { font-size: 10.5px; color: var(--vaimea); }
 .ruori .saa-tunti-nyt .saa-tunti-aika { color: var(--muste); font-weight: 700; }
+/* Ikoni suurennettu 15px -> 20px (2026-08-18) — yksi koostettu virallisen
+   näköinen säämerkki (ks. SAA_IKONIT script.js:ssä) ansaitsee enemmän
+   tilaa kuin aiempi 2-3 pientä rinnakkaista merkkiä. */
 .ruori .saa-tunti-ikoni { display: flex; align-items: center; gap: 1px; }
-.ruori .saa-tunti-ikoni svg { width: 15px; height: 15px; display: block; }
+.ruori .saa-tunti-ikoni svg { width: 20px; height: 20px; display: block; }
+/* Tuntukohtainen lämpötila (2026-08-18, Katrin pyyntö — "tuntuu kuin"
+   jokaiselle tunnille, ei vain yläosan nyt-lukemalle). */
+.ruori .saa-tunti-lampo { font-size: 12px; font-weight: 700; color: var(--muste); }
 .ruori .saa-tunti-sade { font-size: 10px; color: var(--syvanne); }
 .ruori .saa-tunti-sade:empty::before { content: '\00b7'; color: var(--hius-vahva); }
 
@@ -3886,16 +3908,31 @@ h1 {
    44px keskipisteiden väliin ettei "painamisalue voi olla isompi, mutta
    ei päällekkäin" -vaatimus riko itseään. */
 .ruori .segmentti.ankkurit .ankkuri-toiminnot { display: flex; flex-direction: column; gap: 16px; flex: none; margin-top: 1px; }
+/* Toinen kierros (2026-08-18, Katri täsmensi aiempaa palautetta): edellinen
+   korjaus laittoi sinapin RIVIN taustaan (ks. li.ankkuri-rivi alla), mutta
+   Katri tarkoitti alunperin näitä kahta NAPPIA — "just edges doesn't
+   register in my brain i need to actually do something". Napit olivat yhä
+   neutraalia lasia (rgba 255,252,244 = ei sinappia lainkaan), pelkkä ohut
+   messinkireunus syttyi vain .active-tilassa. Nyt tausta on OIKEASTI
+   sinappia lepotilassakin, ja pyöristys täysi ympyrä (13px neliskanttisessa
+   30px-napissa näytti "väärältä" — sama arvo joka toimii isommalla
+   laatalla ei skaalaudu pieneen nappiin). Merkin väri vaihdettu vaimeasta
+   (harmaa) musteeksi (tumma) kontrastin vuoksi vahvempaa sinappitaustaa
+   vasten. */
 .ruori .segmentti.ankkurit .anchor-btn,
 .ruori .segmentti.ankkurit .overflow-btn {
   position: relative; min-width: 0; min-height: 0; width: 30px; height: 30px; flex: none;
-  border-radius: var(--r-kosketettava); opacity: 1;
-  border: 1px solid rgba(156, 122, 67, .5);
-  background: linear-gradient(165deg, rgba(255, 252, 244, .72), rgba(234, 230, 220, .28));
+  border-radius: 50%; opacity: 1;
+  border: 1px solid rgba(156, 122, 67, .55);
+  background: linear-gradient(165deg, rgba(194, 154, 46, .85), rgba(163, 128, 32, .68));
   backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .65);
-  color: var(--vaimea);
-  transition: background var(--keski) var(--kelluu), box-shadow var(--keski) var(--kelluu);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .4), 0 2px 5px rgba(34, 31, 26, .16);
+  color: var(--muste);
+  transition: background var(--keski) var(--kelluu), box-shadow var(--keski) var(--kelluu), transform var(--keski) var(--kelluu);
+}
+.ruori .segmentti.ankkurit .anchor-btn:active,
+.ruori .segmentti.ankkurit .overflow-btn:active {
+  transform: scale(.92);
 }
 /* Näkyvä pinta pieni (~3-4px marginaali merkin ympärillä), kosketusalue
    silti 44px läpinäkyvällä ::after-kerroksella (§4.2). */
@@ -3909,10 +3946,11 @@ h1 {
    TÄYSI messinki-täyttö joka hukkasi lasi-pinnan kokonaan (litteä pronssi,
    ei enää painettavan näköinen) — messinki nyt VARJOSTUKSENA (sisä-
    hehku + reuna), lasi-tausta säilyy näkyvissä. Merkki itse (currentColor)
-   pysyy aina samana harmaana, ei vaihdu .active-tilassa (§4.3). */
+   pysyy aina samana musteen värisenä, ei vaihdu .active-tilassa (§4.3) —
+   pelkkä ympäristö (reuna+hehku) kertoo tilan. */
 .ruori .segmentti.ankkurit .anchor-btn.active {
   border-color: var(--messinki);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .65), inset 0 0 0 1px rgba(156, 122, 67, .35), 0 0 6px rgba(156, 122, 67, .3);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .4), inset 0 0 0 1px rgba(156, 122, 67, .4), 0 0 6px rgba(156, 122, 67, .35);
 }
 .ruori .segmentti.ankkurit .anchor-btn:disabled { opacity: .4; cursor: default; }
 .ruori .segmentti.ankkurit .anchor-btn:disabled::after { display: none; }
@@ -3946,6 +3984,31 @@ h1 {
 .ruori .segmentti.ankkurit .list li.ankkuri-rivi:last-child { margin-bottom: 0; }
 .ruori .segmentti.ankkurit .list li.ankkuri-rivi:active {
   transform: translateY(1px) scale(.99);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .5);
+}
+
+/* Kalenteri- ja Hytti-segmentit samalle sinapinlämpöiselle pinnalle kuin
+   .ankkuri-rivi yllä (2026-08-18, Katrin palaute: "that box where anchors
+   are written, that is beautiful, can you use it instead of ankkurit in
+   calendar view... and in hytti today") — korvaa perus-.segmentin
+   neutraalin paperikortin (rgba 255,253,248) samalla sinappi-lasi-
+   reseptillä. Hover/active-tilat toistettu erikseen koska perus-.segmentti
+   määrittää ne neutraalilla taustalla, joka muuten voittaisi levon jälkeen
+   (sama luokkamäärä, myöhempi sääntö tässä tiedostossa voittaa). */
+.ruori .segmentti.kalenteri,
+.ruori .segmentti.hytti {
+  background: linear-gradient(165deg, rgba(194, 154, 46, .20), rgba(194, 154, 46, .07));
+  border: 1px solid rgba(194, 154, 46, .38);
+  border-radius: var(--r-kosketettava);
+  box-shadow: 0 2px 6px rgba(34, 31, 26, .10), inset 0 1px 0 rgba(255, 255, 255, .5);
+}
+.ruori .segmentti.kalenteri:hover, .ruori .segmentti.kalenteri:focus-visible,
+.ruori .segmentti.hytti:hover, .ruori .segmentti.hytti:focus-visible {
+  background: linear-gradient(165deg, rgba(194, 154, 46, .28), rgba(194, 154, 46, .11));
+  box-shadow: 0 6px 16px rgba(34, 31, 26, .14), inset 0 1px 0 rgba(255, 255, 255, .5);
+}
+.ruori .segmentti.kalenteri:active,
+.ruori .segmentti.hytti:active {
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, .5);
 }
 

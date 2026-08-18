@@ -8313,13 +8313,24 @@ document.querySelectorAll('.silta-ikoni').forEach(function(el) { el.innerHTML = 
 // "vanhan datan näyttäminen tuoreena on pahempi virhe kuin sään puuttuminen"
 // (§2.2) — paketin mahdollista vanha_data-varakenttää ei koskaan renderöidä
 // täältä tuoreena datana.
+// Yhdistetyt "virallisen näköiset" säämerkit (2026-08-18, Katrin palaute:
+// aiempi versio piirsi 2-3 ERILLISTÄ pientä kuvaketta rinnakkain samaan
+// soluun — esim. aurinko+pilvi+pisara omina 15px-merkkeinään — mikä ei
+// näyttänyt keneltäkään tunnetulta säämerkiltä, vain sekavalta pikselikasalta.
+// Jokainen WMO-koodiryhmä saa nyt YHDEN koostetun kuvakkeen samassa
+// 24x24-viewBoxissa (aurinko pilven takaa kurkistaen, pilvi+viiva-sade,
+// pilvi+hiutale, pilvi+salama) — sama rakenne kuin tunnetuilla sääpalveluilla
+// (yr.no, Apple Sää, Ilmatieteenlaitos), ei enää oma sommittelu.
 const SAA_IKONIT = {
-  sun: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.2 4.2l1.4 1.4M18.4 18.4l1.4 1.4M2 12h2M20 12h2M4.2 19.8l1.4-1.4M18.4 5.6l1.4-1.4"/></svg>',
-  cloud: '<svg viewBox="0 0 24 24"><path fill="currentColor" d="M7 18a4.5 4.5 0 0 1-.4-8.98A5.5 5.5 0 0 1 17.3 8.1 4 4 0 0 1 17 18H7z"/></svg>',
-  drop: '<svg viewBox="0 0 24 24"><path fill="currentColor" d="M12 2s6 7.2 6 11.5A6 6 0 0 1 6 13.5C6 9.2 12 2 12 2z"/></svg>',
-  snow: '<svg viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" stroke-linecap="round" fill="none"><path d="M12 2v20M4 7l16 10M20 7L4 17"/></svg>',
-  lightning: '<svg viewBox="0 0 24 24"><path fill="currentColor" d="M13 2 4 14h6l-1 8 9-12h-6l1-8z"/></svg>',
-  fog: '<svg viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" stroke-linecap="round" fill="none"><path d="M3 8h18M3 12h18M3 16h12"/></svg>',
+  sun: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="4.6"/><path d="M12 1.5v2.4M12 20.1v2.4M4.5 4.5l1.7 1.7M17.8 17.8l1.7 1.7M1.5 12h2.4M20.1 12h2.4M4.5 19.5l1.7-1.7M17.8 6.2l1.7-1.7"/></svg>',
+  cloud: '<svg viewBox="0 0 24 24"><path fill="currentColor" d="M6.5 19a4.5 4.5 0 0 1-.4-8.98A5.5 5.5 0 0 1 16.8 9.1 4 4 0 0 1 16.5 19h-10z"/></svg>',
+  partlycloudy: '<svg viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="16.2" cy="7.3" r="3"/><path d="M16.2 1.8v1.6M21.4 4.1l-1.2 1.2M23 7.3h-1.6M19.4 11l-1.3-1.3"/></g><path fill="currentColor" d="M6.5 19a4.3 4.3 0 0 1-.4-8.58A5.3 5.3 0 0 1 15.9 9.4 3.8 3.8 0 0 1 15.6 19H6.5z"/></svg>',
+  fog: '<svg viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" stroke-linecap="round" fill="none"><path d="M3 7.5h18M3 12h18M3 16.5h13"/></svg>',
+  drizzle: '<svg viewBox="0 0 24 24"><path fill="currentColor" d="M6.5 16a4.3 4.3 0 0 1-.4-8.58A5.3 5.3 0 0 1 15.9 6.4 3.8 3.8 0 0 1 15.6 16H6.5z"/><g stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M8.5 19.5v1.7M13.5 19.5v1.7"/></g></svg>',
+  rain: '<svg viewBox="0 0 24 24"><path fill="currentColor" d="M6.5 15a4.3 4.3 0 0 1-.4-8.58A5.3 5.3 0 0 1 15.9 5.4 3.8 3.8 0 0 1 15.6 15H6.5z"/><g stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M7.5 18l-1.2 3.2M12 18l-1.2 3.2M16.5 18l-1.2 3.2"/></g></svg>',
+  rainshower: '<svg viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="16.2" cy="6.8" r="2.6"/><path d="M16.2 1.9v1.4M20.7 3.9l-1.1 1.1M22.1 6.8h-1.4M18.9 10.1l-1.2-1.2"/></g><path fill="currentColor" d="M6 16a4.1 4.1 0 0 1-.4-8.18A5.1 5.1 0 0 1 15.1 6.3 3.6 3.6 0 0 1 14.8 16H6z"/><g stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M8 19l-1 2.7M14 19l-1 2.7"/></g></svg>',
+  snow: '<svg viewBox="0 0 24 24"><path fill="currentColor" d="M6.5 15a4.3 4.3 0 0 1-.4-8.58A5.3 5.3 0 0 1 15.9 5.4 3.8 3.8 0 0 1 15.6 15H6.5z"/><g stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M8 18.2v3.4M6.5 20l3-1.8M6.5 18.2l3 1.8M15 18.2v3.4M13.5 20l3-1.8M13.5 18.2l3 1.8"/></g></svg>',
+  thunder: '<svg viewBox="0 0 24 24"><path fill="currentColor" d="M6.5 14a4.3 4.3 0 0 1-.4-8.58A5.3 5.3 0 0 1 15.9 4.4 3.8 3.8 0 0 1 15.6 14H6.5z"/><path fill="currentColor" d="M13.5 12.5l-5 6.5h3.3l-.6 4.3 5-6.8h-3.3l.6-4z"/></svg>',
   // Tuuli (2026-08-11, Katrin pyyntö) — ei omaa leimasinta eikä numeroa,
   // vain kuvake sääkuvakkeen vierellä sinä tuntina kun tuulee. "tuuli" on
   // ohut kaksirivinen versio, "tuuliKova" paksumpi + väritetty --vaara:lla
@@ -8340,34 +8351,35 @@ function saaTuuliIkoni(nopeus) {
   return '';
 }
 
-// WMO-säätunnus -> kuvakeyhdistelmä (Ruori-speksi §2.3). Sääntö: jos kuvassa
-// on aurinko, pilvi JA pisara, kaikki kolme näytetään erikseen — sävytys ei
-// saa syödä silmäiltävyyttä (koskee erityisesti 80-82).
-function saaIkonitKoodille(koodi) {
-  if (koodi === 0) return ['sun'];
-  if (koodi === 1 || koodi === 2) return ['sun', 'cloud'];
-  if (koodi === 3) return ['cloud'];
-  if (koodi === 45 || koodi === 48) return ['cloud', 'fog'];
-  if (koodi >= 51 && koodi <= 57) return ['cloud', 'drop'];
-  if (koodi >= 61 && koodi <= 67) return ['cloud', 'drop', 'drop'];
-  if ((koodi >= 71 && koodi <= 77) || (koodi >= 85 && koodi <= 86)) return ['cloud', 'snow'];
-  if (koodi >= 80 && koodi <= 82) return ['sun', 'cloud', 'drop'];
-  if (koodi >= 95 && koodi <= 99) return ['cloud', 'lightning'];
-  return ['cloud'];
+// WMO-säätunnus -> YKSI koostettu kuvake (Ruori-speksi §2.3, uudistettu
+// 2026-08-18). Aiemmin tämä palautti 1-3 erillistä kuvakeavainta jotka
+// aseteltiin rinnakkain — nyt jokainen WMO-ryhmä vastaa suoraan yhtä
+// SAA_IKONIT-avainta, koska yhdistelmä on jo piirretty kuvakkeen sisään.
+function saaIkoniAvainKoodille(koodi) {
+  if (koodi === 0) return 'sun';
+  if (koodi === 1 || koodi === 2) return 'partlycloudy';
+  if (koodi === 3) return 'cloud';
+  if (koodi === 45 || koodi === 48) return 'fog';
+  if (koodi >= 51 && koodi <= 57) return 'drizzle';
+  if (koodi >= 61 && koodi <= 67) return 'rain';
+  if ((koodi >= 71 && koodi <= 77) || (koodi >= 85 && koodi <= 86)) return 'snow';
+  if (koodi >= 80 && koodi <= 82) return 'rainshower';
+  if (koodi >= 95 && koodi <= 99) return 'thunder';
+  return 'cloud';
 }
-// Sadetodennäköisyys < 19% -> ei näytetä pisara-/lumi-/salamakuvaketta
-// vaikka WMO-koodi periaatteessa sitä vaatisi (2026-08-11, elävä testaus:
-// koodi voi teknisesti tarkoittaa "tihkua" mutta jos todennäköisyys on
-// silti pieni tälle nimenomaiselle tunnille, pisara harhaanjohtaa).
-// Ei koskaan jätä ikonia tyhjäksi — putoaa 'cloud':iin jos kaikki
-// sadeosat suodattuvat pois.
+// Sadetodennäköisyys < 19% -> pudotetaan sadekuvakkeesta pilviseen
+// vastineeseen (2026-08-11, elävä testaus: koodi voi teknisesti tarkoittaa
+// "tihkua" mutta jos todennäköisyys on silti pieni tälle nimenomaiselle
+// tunnille, sadekuvake harhaanjohtaa). Aurinkoiset sadekuvakkeet (rainshower)
+// tippuvat kirkkaan-pilvisen (partlycloudy) puolelle, lumi/ukkonen tavalliseen
+// pilveen — ei koskaan jää sadetta kuvaavaksi ilman riittävää todennäköisyyttä.
+const SAA_SADEIKONI_LASKEUTUU = { drizzle: 'cloud', rain: 'cloud', snow: 'cloud', thunder: 'cloud', rainshower: 'partlycloudy' };
 function saaIkoniHtml(koodi, sade) {
-  let avaimet = saaIkonitKoodille(koodi);
-  if (typeof sade === 'number' && sade < 19) {
-    avaimet = avaimet.filter(function(k) { return k !== 'drop' && k !== 'snow' && k !== 'lightning'; });
-    if (avaimet.length === 0) avaimet = ['cloud'];
+  let avain = saaIkoniAvainKoodille(koodi);
+  if (typeof sade === 'number' && sade < 19 && SAA_SADEIKONI_LASKEUTUU[avain]) {
+    avain = SAA_SADEIKONI_LASKEUTUU[avain];
   }
-  return avaimet.map(function(k) { return SAA_IKONIT[k]; }).join('');
+  return SAA_IKONIT[avain];
 }
 function pyoristaKymmeneen(n) { return Math.round(n / 10) * 10; }
 
@@ -8444,9 +8456,14 @@ async function lataaRuoriSaa() {
     tunnitEl.innerHTML = nakyvat.map(function(i, idx) {
       const sade = saa.hourly.precipitation_probability[i];
       const tuuli = saa.hourly.wind_speed_10m ? saa.hourly.wind_speed_10m[i] : undefined;
+      // Tuntukohtainen "tuntuu kuin" -lukema (2026-08-18, Katrin pyyntö) —
+      // sama apparent_temperature-sarja jota jo käytetään yläosan isolle
+      // lukemalle, nyt myös jokaisella tunnilla erikseen, ei vain nyt-hetkellä.
+      const tuntuu = saa.hourly.apparent_temperature ? saa.hourly.apparent_temperature[i] : undefined;
       return '<div class="saa-tunti' + (idx === nykyIdx ? ' saa-tunti-nyt' : '') + '">'
         + '<span class="saa-tunti-aika">' + tunnit[i].slice(11, 13) + '</span>'
         + '<span class="saa-tunti-ikoni">' + saaIkoniHtml(saa.hourly.weather_code[i], sade) + saaTuuliIkoni(tuuli) + '</span>'
+        + '<span class="saa-tunti-lampo">' + (typeof tuntuu === 'number' ? Math.round(tuntuu) + '°' : '') + '</span>'
         + '<span class="saa-tunti-sade">' + (sade >= 10 ? pyoristaKymmeneen(sade) + '%' : '') + '</span>'
         + '</div>';
     }).join('');
@@ -8511,15 +8528,36 @@ async function lataaRuoriKalenteri() {
     tyhja.style.display = 'block';
     return;
   }
+  const jarjestetyt = jarjestaAjanMukaan(rivit.slice());
+  // "Mitä seuraavaksi", ei "päivän ensimmäinen koko päivän" (2026-08-18,
+  // Katrin palaute) — aiemmin tämä näytti aina jarjestetyt[0]:n, eli päivän
+  // ENSIMMÄISEN tapahtuman kellonajasta riippumatta, koko loppupäivän
+  // vaikka se olisi jo ohi. Pudotetaan pois tapahtumat joiden päättymisaika
+  // (event_end_time, tai oletus event_time+60min jos ei tiedossa — sama
+  // käytäntö kuin muualla kalenterikoodissa, ks. esim. kalenteri-kuukausi-
+  // palkkien layout) on jo mennyt. Koko päivän tapahtuma (ei event_time)
+  // pysyy aina relevanttina — jarjestaAjanMukaan lajittelee ne viimeisiksi,
+  // joten ne nousevat "seuraavaksi" vain kun mikään ajallinen ei enää ole
+  // kesken, mikä on oikea käytös.
+  const nytMin = new Date().getHours() * 60 + new Date().getMinutes();
+  const seuraavat = jarjestetyt.filter(function(t) {
+    if (!t.event_time) return true;
+    const loppuMin = t.event_end_time ? aikaMinuutteina(t.event_end_time) : aikaMinuutteina(t.event_time) + 60;
+    return loppuMin >= nytMin;
+  });
+  if (seuraavat.length === 0) {
+    segmentti.style.display = 'none';
+    tyhja.style.display = 'none';
+    return;
+  }
   tyhja.style.display = 'none';
   segmentti.style.display = 'block';
   segmentti.onclick = function() { avaaOsio({ route: 'kalenteri' }); };
 
-  const jarjestetyt = jarjestaAjanMukaan(rivit.slice());
-  const eka = jarjestetyt[0];
+  const eka = seuraavat[0];
   document.getElementById('ruori-kal-aika').textContent = eka.event_time ? eka.event_time.slice(0, 5) : 'Koko päivä';
-  document.getElementById('ruori-kal-lisaa').textContent = jarjestetyt.length > 1
-    ? (eka.title + ' + ' + (jarjestetyt.length - 1) + ' muuta')
+  document.getElementById('ruori-kal-lisaa').textContent = seuraavat.length > 1
+    ? (eka.title + ' + ' + (seuraavat.length - 1) + ' muuta')
     : eka.title;
 
   const henkselit = await fetchVisibleHenkselit(tanaanIso, tanaanIso);
