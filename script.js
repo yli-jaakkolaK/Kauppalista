@@ -2427,10 +2427,12 @@ async function opintoPaivanKuorma(kohdePvm) {
   // muuten kuormataso (ja siten PACER-vaihesuositus/tavoiteaskelmäärä)
   // vääristyi menoista jotka eivät oikeasti koske Katria.
   const { data: tapahtumat } = await db.from('kalenteri_tapahtumat')
-    .select('event_time, location, kalenteri_syotteet!inner(henkilo)')
+    .select('event_time, location, vastuu_henkilo, kalenteri_syotteet!inner(henkilo)')
     .eq('event_date', tanaan).not('event_time', 'is', null);
+  // vastuu_henkilo (sql/135) ohittaa syötteen oman henkilön kun asetettu —
+  // ks. paallekkaisyysVakavuus()-kommentti samasta ominaisuudesta.
   const omat = (tapahtumat || []).filter(function(t) {
-    const h = t.kalenteri_syotteet ? t.kalenteri_syotteet.henkilo : null;
+    const h = t.vastuu_henkilo || (t.kalenteri_syotteet ? t.kalenteri_syotteet.henkilo : null);
     return h === omaHenkilo || h === null;
   });
   // Bussilla kulkeminen on omaa kuormaansa kalenterimenon lisäksi (Katrin
@@ -3643,12 +3645,13 @@ async function piirraNytLoki(askeleet) {
     // EI koske Katria vaikka olisikin perhetapahtuma — ratkaiseva on kumman
     // kalenterissa se on, ei tapahtuman scope. Vain jaettu perhekalenteri
     // (henkilo=null) tai Katrin oma (henkilo=katri) laskee hänen esteekseen.
-    db.from('kalenteri_tapahtumat').select('title, event_time, event_end_time, kalenteri_syotteet!inner(henkilo)').eq('event_date', tanaan).order('event_time'),
+    db.from('kalenteri_tapahtumat').select('title, event_time, event_end_time, vastuu_henkilo, kalenteri_syotteet!inner(henkilo)').eq('event_date', tanaan).order('event_time'),
     db.from('hytti_suljetut_ikkunat').select('alkaa, paattyy').eq('owner_id', currentUserId).eq('viikonpaiva', viikonpaiva),
     db.from('hytti_opiskeluaika').select('alkaa, paattyy').eq('owner_id', currentUserId).eq('viikonpaiva', viikonpaiva),
   ]);
+  // vastuu_henkilo (sql/135) ohittaa syötteen oman henkilön kun asetettu.
   const omatTapahtumat = (tapahtumat || []).filter(function(t) {
-    const h = t.kalenteri_syotteet ? t.kalenteri_syotteet.henkilo : null;
+    const h = t.vastuu_henkilo || (t.kalenteri_syotteet ? t.kalenteri_syotteet.henkilo : null);
     return h === omaHenkilo || h === null;
   });
   const opiskeluIkkuna = (opiskeluajat && opiskeluajat[0]) || { alkaa: '09:00', paattyy: '15:30' };
@@ -3844,12 +3847,13 @@ async function naytaHuomisenEsikatselu() {
     // Sama korjaus kuin piirraNytLoki:ssa (2026-08-18) — kalenteri_tapahtumat.
     // user_id on käytännössä aina tyhjä, suodatus liitetyn syötteen
     // henkilo-kentän mukaan (null = jaettu perhekalenteri, kuuluu Katrille).
-    db.from('kalenteri_tapahtumat').select('title, event_time, event_end_time, kalenteri_syotteet!inner(henkilo)').eq('event_date', huominenIso).order('event_time'),
+    db.from('kalenteri_tapahtumat').select('title, event_time, event_end_time, vastuu_henkilo, kalenteri_syotteet!inner(henkilo)').eq('event_date', huominenIso).order('event_time'),
     db.from('hytti_suljetut_ikkunat').select('alkaa, paattyy').eq('owner_id', currentUserId).eq('viikonpaiva', viikonpaiva),
     db.from('hytti_opiskeluaika').select('alkaa, paattyy').eq('owner_id', currentUserId).eq('viikonpaiva', viikonpaiva),
   ]);
+  // vastuu_henkilo (sql/135) ohittaa syötteen oman henkilön kun asetettu.
   const omatTapahtumat = (tapahtumat || []).filter(function(t) {
-    const h = t.kalenteri_syotteet ? t.kalenteri_syotteet.henkilo : null;
+    const h = t.vastuu_henkilo || (t.kalenteri_syotteet ? t.kalenteri_syotteet.henkilo : null);
     return h === omaHenkilo || h === null;
   });
   const opiskeluIkkuna = (opiskeluajat && opiskeluajat[0]) || { alkaa: '09:00', paattyy: '15:30' };
@@ -5443,10 +5447,22 @@ function tarvitseeLapsiValvontaa(lapsi, isoPvm, paallekkaisAlku, paallekkaisLopp
 function paallekkaisyysVakavuus(a, b, isoPvm) {
   if (a.syote_id && b.syote_id && a.syote_id === b.syote_id) return 'full';
 
+  // Eri vastuuhenkilö hoitaa (sql/135, Katrin pyyntö 2026-08-18: "is there a
+  // way to mark in satama who is going where") — jos MOLEMMILLA puolilla on
+  // tunnistettu, ERI vastuuhenkilö (per-tapahtuma vastuu_henkilo-yliajo, tai
+  // sen puuttuessa syötteen oma henkilo), kyseessä ei ole todellinen
+  // ristiriita vaikka ajat menisivät päällekkäin — kaksi eri ihmistä hoitaa
+  // kaksi eri asiaa samaan aikaan. Tarkistetaan ENNEN muita sääntöjä, myös
+  // ennen hytti-rauhoitusikkunaa: jos vastuu on selvästi jaettu, mikään muu
+  // ei tee siitä silti ristiriitaa.
+  const aVastuu = a.vastuu_henkilo || a._henkilo;
+  const bVastuu = b.vastuu_henkilo || b._henkilo;
+  if (aVastuu && bVastuu && aVastuu !== bVastuu) return 'none';
+
   const hyttiaMukana = a._scope === 'hytti' || b._scope === 'hytti';
   if (hyttiaMukana && onkoRauhoitusIkkunassa(isoPvm)) return 'attention';
 
-  if (a._henkilo || b._henkilo || a.syote_id || b.syote_id) return 'full';
+  if (aVastuu || bVastuu || a.syote_id || b.syote_id) return 'full';
 
   const aLoppu = a.event_end_time || a.event_time;
   const bLoppu = b.event_end_time || b.event_time;
@@ -5890,6 +5906,35 @@ function avaaKattaaLapsetValikko(rivi) {
 document.getElementById('kattaa-lapset-sulje').addEventListener('click', function() {
   document.getElementById('kattaa-lapset-overlay').style.display = 'none';
 });
+
+// "Kuka hoitaa" -yliajo (sql/135, Katrin pyyntö 2026-08-18: "is there a way
+// to mark in satama who is going where") — kevyt openRowMenu-alivalikko
+// samaan tapaan kuin Laiturin avaaKohdeValikko/avaaKohdeAlivalikko, ei oma
+// dialogi-overlay koska kolme nappia (Minä / puoliso / tyhjennä) riittää.
+// Kirjoittaa suoraan kalenteri_tapahtumat.vastuu_henkilo-sarakkeeseen —
+// ks. paallekkaisyysVakavuus() joka lukee tätä ristiriitalaskennassa, ja
+// opintoPaivanKuorma()/piirraNytLoki()/naytaHuomisenEsikatselu() jotka
+// lukevat sitä "onko tämä minun kuormaani" -suodattimessa.
+function avaaVastuuHenkiloValikko(rivi, li) {
+  const items = [];
+  if (omaHenkilo && rivi.vastuu_henkilo !== omaHenkilo) {
+    items.push({ label: 'Minä hoidan', onClick: function() { asetaVastuuHenkilo(rivi, omaHenkilo); } });
+  }
+  if (toinenKayttaja && rivi.vastuu_henkilo !== toinenKayttaja.henkilo) {
+    items.push({ label: henkiloNimi(toinenKayttaja.henkilo) + ' hoitaa', onClick: function() { asetaVastuuHenkilo(rivi, toinenKayttaja.henkilo); } });
+  }
+  if (rivi.vastuu_henkilo) {
+    items.push({ label: '× Poista merkintä', danger: true, onClick: function() { asetaVastuuHenkilo(rivi, null); } });
+  }
+  openRowMenu(li, items);
+}
+async function asetaVastuuHenkilo(rivi, henkilo) {
+  const { error } = await db.from('kalenteri_tapahtumat').update({ vastuu_henkilo: henkilo }).eq('id', rivi.id);
+  if (ilmoitaKirjoitusvirheesta(error, 'Vastuuhenkilön tallennus')) return;
+  rivi.vastuu_henkilo = henkilo;
+  naytaIlmoitus(henkilo ? henkiloNimi(henkilo) + ' hoitaa tämän' : 'Merkintä poistettu');
+  lataaKalenteri();
+}
 
 // Huolilippu tapahtuma-ankkuroituna (Ristiriitapaketti v2, sql/107) —
 // valinnainen LISÄYS päivämäärä-ankkuroituun huoleen (ei sijasta, Katrin
@@ -6582,10 +6627,16 @@ function piirraKalenteriRivi(rivi) {
   // käyttäjä ei voinut ennustaa ristiriitalogiikkaa ilman tätä. Kirjain EI
   // luota pelkkään väriin ("muoto kertoo tilan, ei väri yksin") — P=perhe
   // (ei henkilo-tietoa, jaettu/käsin lisätty), muuten henkilön alkukirjain.
+  // vastuu_henkilo (sql/135) ohittaa tämän kirjaimen/vihjeen kun asetettu —
+  // ks. avaaVastuuHenkiloValikko(). Sama kirjain-periaate ("muoto kertoo
+  // tilan, ei väri yksin") pätee edelleen, vain lähde vaihtuu.
   const omistaja = document.createElement('span');
   omistaja.className = 'kalenteri-omistaja';
-  omistaja.textContent = rivi._henkilo ? rivi._henkilo.charAt(0).toUpperCase() : 'P';
-  omistaja.title = rivi._henkilo ? henkiloNimi(rivi._henkilo) : 'Perhe (kaikille yhteinen)';
+  const nayttoHenkilo = rivi.vastuu_henkilo || rivi._henkilo;
+  omistaja.textContent = nayttoHenkilo ? nayttoHenkilo.charAt(0).toUpperCase() : 'P';
+  omistaja.title = nayttoHenkilo
+    ? henkiloNimi(nayttoHenkilo) + (rivi.vastuu_henkilo ? ' hoitaa (merkitty)' : '')
+    : 'Perhe (kaikille yhteinen)';
   li.appendChild(omistaja);
 
   li.dataset.tuoteId = rivi.id;
@@ -6636,6 +6687,10 @@ function piirraKalenteriRivi(rivi) {
     { label: '⏰ Muistutus', onClick: function() { avaaMuistutusPaneeli('kalenteri', rivi.id, rivi.title, rivi.event_date, rivi.event_time, lataaKalenteri); } },
     { label: '👶 Ketkä lapset katettu', onClick: function() { avaaKattaaLapsetValikko(rivi); } },
     { label: '🚩 Merkitse huoli tähän', onClick: function() { avaaHuoliTapahtumaValikko(rivi); } },
+    {
+      label: rivi.vastuu_henkilo ? '👤 Kuka hoitaa (' + henkiloNimi(rivi.vastuu_henkilo) + ')' : '👤 Kuka hoitaa',
+      onClick: function() { avaaVastuuHenkiloValikko(rivi, li); },
+    },
   ];
   if (!rivi.ical_uid) {
     menuItems.push({
@@ -6780,6 +6835,7 @@ async function lataaKalenteri() {
         _tyyppi: 'tapahtuma', id: t.id, title: t.title, event_date: t.event_date, event_time: t.event_time,
         event_end_time: t.event_end_time, syote_id: t.syote_id, _henkilo: t._henkilo,
         _vari: t._vari, _scope: t._scope, ical_uid: t.ical_uid, user_id: t.user_id,
+        vastuu_henkilo: t.vastuu_henkilo,
       };
     });
 
@@ -7517,7 +7573,7 @@ async function paivitaRistiriitaPallura() {
   const loppu = new Date();
   loppu.setDate(loppu.getDate() + RISTIRIITA_PALLURA_PAIVIA_ETEENPAIN);
   const { data, error } = await db.from('kalenteri_tapahtumat')
-    .select('id, event_date, event_time, event_end_time, syote_id, kalenteri_syotteet(henkilo, scope)')
+    .select('id, event_date, event_time, event_end_time, syote_id, vastuu_henkilo, kalenteri_syotteet(henkilo, scope)')
     .gte('event_date', tanaan)
     .lte('event_date', paivamaaraISO(loppu))
     .not('event_time', 'is', null);

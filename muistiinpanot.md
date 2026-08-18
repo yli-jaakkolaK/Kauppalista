@@ -4350,11 +4350,23 @@ sw.js v173 → v174.
 
 sw.js v174 → v175.
 
+**Uusi ominaisuus: "Kuka hoitaa" -yliajo kalenteritapahtumille (2026-08-18, sama istunto jatkuu).** Katri, kun kerroin huomisen "Aamos kylässä"/"Suunnistus Pääskyvuori" -päällekkäisyydestä: "is there a way to mark in satama who is going where? i am with other child home with aamos and husband goes suunnistus with other child" — ei siis todellinen ristiriita, kaksi eri ihmistä hoitaa kaksi eri asiaa.
+- **Migraatio ajettu suoraan MCP:llä** (`sql/135_kalenteri_vastuu_henkilo.sql`): `kalenteri_tapahtumat.vastuu_henkilo` (nullable text). Oma sarake suoraan päätauluun EI erillinen sivutaulu — turvallista koska CalDAV-synkka (`api/_lib/caldav-sync.js`, `on_conflict=ical_uid` + `merge-duplicates`) päivittää vain payloadissa mukana olevat sarakkeet, tämä ei ole siinä, säilyy siis synkkauksen yli (sama päättely kuin `kalenteri_kuittaukset`-taulun taustalla, mutta tässä ei tarvittu erillistä taulua koska yliajo on 1:1 tapahtuman kanssa eikä per-käyttäjä).
+- **UI:** Kalenteri-sivun rivin ⋯-valikkoon uusi "👤 Kuka hoitaa" -kohta (avaaVastuuHenkiloValikko/asetaVastuuHenkilo, script.js) — kevyt openRowMenu-alivalikko (Minä hoidan / [puolison nimi] hoitaa / × Poista merkintä), sama kevyt kaava kuin Laiturin kohdevalikko. Olemassa oleva rivin "omistaja"-kirjainmerkki (P=perhe, muuten henkilön alkukirjain) näyttää nyt yliajon kun asetettu, tooltip kertoo "(merkitty)".
+- **Ristiriitalogiikka korjattu:** `paallekkaisyysVakavuus()` — jos MOLEMMILLA päällekkäisillä tapahtumilla on tunnistettu, ERI vastuuhenkilö (yliajo tai sen puuttuessa syötteen oma henkilo), palauttaa `'none'` ennen muita sääntöjä. Aiemmin `a._henkilo || b._henkilo || a.syote_id || b.syote_id` teki KAIKISTA synkatuista päällekkäisyyksistä `'full'`-ristiriidan riippumatta siitä olivatko ne oikeasti saman ihmisen päällekkäisiä menoja.
+- **"Oma kuorma" -suodattimet päivitetty** (`opintoPaivanKuorma`, `piirraNytLoki`, `naytaHuomisenEsikatselu`) käyttämään `vastuu_henkilo`:a jos asetettu syötteen oman henkilon sijaan/lisäksi — sama muutos kolmeen paikkaan, kaikki select-kyselyt päivitetty hakemaan uusi sarake mukaan.
+- **`paivitaRistiriitaPallura()`** (etusivun kalenteribadge-laskuri) päivitetty samalla — sen oma kysely oli kapea eikä hakenut `vastuu_henkilo`:a, olisi jäänyt näyttämään vanhaa ristiriitalukua vaikka itse Ruori-segmentti olisi jo korjaantunut.
+- **Ei vielä testattu livenä** — tarkista että ⋯-valikon uusi kohta löytyy ja toimii, ja että huomisen kaksi tapahtumaa lakkaavat näyttämästä ristiriitana kun merkitset ne.
+
+sw.js v175 → v176.
+
 ---
 
 ## Nykytila (päivitetty 2026-08-18, COPILOT.md-sääntö 4 — huom: aiempi "Nykytila ja seuraavat askeleet" -osio jäi tästä tiedostosta ylemmäs pitkän istunnon aikana kertyneiden uusien osioiden taakse, ei enää tiedoston lopussa; siirto omaksi erikseen tehtäväksi työksi, ei nyt)
 
-**Viimeisin tässä istunnossa, `sw.js` nyt v171 (uusi istunto 2026-08-18):** Neljä täsmennystä edellisen istunnon Ruori-korjauksiin elävän testin jälkeen — ⚓/⋯-napit takaisin neliöiksi (vain ⚓ sinappi, ⋯ neutraali), otsakkeen kello pienennetty (150px→128px) koska SE, ei padding, aiheutti tyhjän tilan Sään yläpuolella, säämerkit värillisiksi jaettuja CSS-tokeneita käyttäen, sadeprosentin kynnys 10%→20%. Ks. oma osio yllä. **Ei vielä testattu livenä.**
+**Viimeisin tässä istunnossa, `sw.js` nyt v176:** Uusi "Kuka hoitaa" -yliajo-ominaisuus kalenteritapahtumille (sql/135, ⋯-valikon uusi kohta) — ratkaisee tilanteen jossa kaksi eri ihmistä hoitaa kaksi eri, ajallisesti päällekkäistä perhetapahtumaa: ei enää virheellistä ristiriitamerkkiä, oma kuorma/Nyt-loki -laskenta kunnioittaa sitä. Ks. oma osio yllä. **Ei vielä testattu livenä.**
+
+Sitä ennen, `sw.js` v171: Neljä täsmennystä edellisen istunnon Ruori-korjauksiin elävän testin jälkeen — ⚓/⋯-napit takaisin neliöiksi (vain ⚓ sinappi, ⋯ neutraali), otsakkeen kello pienennetty (150px→128px) koska SE, ei padding, aiheutti tyhjän tilan Sään yläpuolella, säämerkit värillisiksi jaettuja CSS-tokeneita käyttäen, sadeprosentin kynnys 10%→20%. Ks. oma osio yllä. **Ei vielä testattu livenä.**
 
 Sitä ennen, `sw.js` v170: Opiskelumoottori (`laskeOpintoPaivanAskeleet()`) kunnioittaa nyt kurssin sisäistä sort_order-esitietojärjestystä — Math Roadmapin 22 uutta aihetta eivät enää voi tulla ehdotetuiksi väärässä järjestyksessä, jousto pahasti myöhässä olevalle aloittamattomalle aiheelle ettei yksi jumi tukkisi koko kurssia. **Ei vielä testattu livenä.**
 

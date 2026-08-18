@@ -3970,10 +3970,15 @@ h1 {
    ehdokaskortin hyväksyntänapille (candidate-listan acceptButton käyttää
    samaa .anchor-btn-luokkaa muttei .active:ia, koska mitään ei ole vielä
    nostettu) — base-tila (yllä) on siis neutraali lasi kuten ⋯-valikkokin,
-   sinappi tulee VASTA tässä. */
+   sinappi tulee VASTA tässä.
+   Kuudes täsmennys (2026-08-18): "shapes are correct in set anchors but
+   backround shoud be same shade as counting circle above" — Katri vertasi
+   sinappia "Ehdotukset"-otsikon viereiseen laskurimerkkiin (`.inline-badge`,
+   `anchor-candidates-badge`), joka on TASAINEN `var(--accent)`, ei liuku.
+   Vaihdettu liuku samaksi tasaiseksi väriksi täsmälleen samalla tokenilla. */
 .ruori .segmentti.ankkurit .anchor-btn.active {
   border: 1px solid rgba(156, 122, 67, .55);
-  background: linear-gradient(165deg, rgba(194, 154, 46, .85), rgba(163, 128, 32, .68));
+  background: var(--accent);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, .4), 0 2px 5px rgba(34, 31, 26, .16);
   color: var(--muste);
 }
