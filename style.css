@@ -139,10 +139,12 @@ body.has-alapalkki { padding-bottom: 84px; }
    saa oikeasti tilaa, TIETOISESTI maltillisesti (700px, ei rajaton) koska
    muuta sisältöä (listat, painikkeet) ei ole vielä elävästi testattu
    leveämpänä. Jos jokin näyttää rikkinäiseltä leveänä, kerro niin
-   kavennetaan takaisin tai skaalataan kohde kerrallaan. */
+   kavennetaan takaisin tai skaalataan kohde kerrallaan.
+   700px -> 960px (2026-08-18, Katrin jatkopyyntö "vieläkin isompi Miro-
+   kanvaasi") — sama varovaisuusperiaate on yhä voimassa, ei rajaton. */
 @media (min-width: 900px) {
   .container {
-    max-width: 700px;
+    max-width: 960px;
   }
 }
 
@@ -1045,90 +1047,13 @@ h1 {
   margin: 10px 0 2px;
 }
 
-.sections-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  margin-top: 24px;
-}
-
-.section-tile {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  min-height: 96px;
-  border: 1px dashed var(--border-dash);
-  margin: 0 0 -1px -1px;
-  cursor: pointer;
-  position: relative;
-  -webkit-tap-highlight-color: transparent;
-}
-
-.section-tile .tile-icon {
-  font-size: 34px;
-  line-height: 1;
-}
-
-.section-tile .tile-icon.tile-icon-kalenteri {
-  display: flex;
-  flex-direction: column;
-  width: 34px;
-  border: 1px solid var(--accent);
-  border-radius: 3px;
-  overflow: hidden;
-}
-
-.tile-icon-kalenteri .kal-kk {
-  display: block;
-  background: var(--accent);
-  color: var(--ground);
-  font-size: 8px;
-  letter-spacing: 0.05em;
-  text-align: center;
-  line-height: 1.6;
-}
-
-.tile-icon-kalenteri .kal-pv {
-  display: block;
-  font-size: 17px;
-  font-weight: bold;
-  line-height: 1.25;
-  text-align: center;
-  color: var(--text);
-}
-
-.section-tile .tile-label {
-  font-size: 13px;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  color: var(--text);
-  text-align: center;
-}
-
-.tile-badge {
-  display: none;
-  position: absolute;
-  top: 6px;
-  right: 6px;
-  align-items: center;
-  justify-content: center;
-  min-width: 20px;
-  height: 20px;
-  padding: 0 5px;
-  border-radius: 10px;
-  background: var(--accent);
-  color: var(--ground);
-  font-size: 11px;
-  font-weight: bold;
-}
-
-/* E3-keskiporras (2026-07-16): sama huomiopallura-kieli kuin .tile-badge,
-   mutta INLINE (ei laattaa/absoluuttista sijoitusta) — ankkuriehdokkaat
-   eivät elä omalla navigointilaatallaan, vaan suoraan Etusivun "⚓
-   Ankkurit" -otsikon vieressä missä ne itsekin näkyvät. Reagointipohjainen
-   nollaus (kuten Kalenteri-laatalla) — laskuri on suoraan reagoimattomien
-   ehdokkaiden määrä, ei tarvitse erillistä "nähty"-aikaleimaa. */
+/* E3-keskiporras (2026-07-16): sama huomiopallura-kieli kuin muut pallurat
+   (nyk. .alapalkki-tabi-badge, ks. paivitaKalenteriBadge()), mutta INLINE
+   (ei laattaa/absoluuttista sijoitusta) — ankkuriehdokkaat eivät elä omalla
+   navigointilaatallaan, vaan suoraan Etusivun "⚓ Ankkurit" -otsikon
+   vieressä missä ne itsekin näkyvät. Reagointipohjainen nollaus (kuten
+   Kalenterin palluralla) — laskuri on suoraan reagoimattomien ehdokkaiden
+   määrä, ei tarvitse erillistä "nähty"-aikaleimaa. */
 .inline-badge {
   display: none;
   align-items: center;
@@ -4042,12 +3967,6 @@ h1 {
 .ruori .rauha b { display: block; font-size: 11px; letter-spacing: .2em; text-transform: uppercase; color: var(--loki-vaara); margin-bottom: 8px; }
 .ruori .rauha p { margin: 0; font-size: 14.5px; line-height: 1.6; color: var(--vaimea); max-width: 30ch; margin-inline: auto; }
 
-/* Vanha navigointiruudukko (Laituri/Muistilaput/Varasto/Asetukset ym.) —
-   EI vielä osa v7-Ruori-speksiä, säilyy väliaikaisesti ennallaan (oma,
-   koskematon tyylinsä muualla tässä tiedostossa) kunnes oikea alapalkki
-   rakennetaan; tässä vain hieman ilmaa yläpuolelle uuden Hytti-segmentin jälkeen. */
-.ruori .sections-grid { margin-top: 4px; }
-
 @media (prefers-reduced-motion: reduce) {
   .ruori *, .ruori *::before { animation: none !important; transition-duration: .01ms !important; }
 }
@@ -4133,6 +4052,7 @@ h1 {
   align-items: center; gap: 3px; cursor: pointer; font-family: inherit; flex: 1; max-width: 68px;
 }
 .alapalkki-tabi-pinta {
+  position: relative;
   width: 100%; aspect-ratio: 1; display: flex; align-items: center; justify-content: center;
   border-radius: var(--r-kosketettava);
   background: linear-gradient(165deg, rgba(255, 252, 244, .55), rgba(234, 230, 220, .22));
@@ -4142,6 +4062,24 @@ h1 {
   transition: background var(--keski) var(--kelluu);
 }
 .alapalkki-tabi:active .alapalkki-tabi-pinta { background: linear-gradient(165deg, rgba(255, 252, 244, .8), rgba(234, 230, 220, .4)); }
+/* Kalenterin uusien tapahtumien pallura (2026-08-18) — sama huomiopallura-
+   kieli kuin poistetun 2x3-ruudukon .tile-badge käytti (ks.
+   paivitaKalenteriBadge()), vain pienempänä ja kiinni kuvakkeen kulmassa,
+   koska alapalkin ~64px kehys on ahtaampi kuin ruudukon 96px laatta oli. */
+.alapalkki-tabi-badge {
+  display: none;
+  position: absolute;
+  top: -3px; right: -3px;
+  align-items: center; justify-content: center;
+  min-width: 18px; height: 18px;
+  padding: 0 4px;
+  border-radius: 9px;
+  background: var(--accent);
+  color: var(--ground);
+  font-size: 10.5px;
+  font-weight: bold;
+  border: 1.5px solid var(--ground, #FBF9F3);
+}
 .alapalkki-tabi svg { width: 84%; height: 84%; display: block; margin: 0 auto; }
 .alapalkki-tabi.alapalkki-lisaa svg { width: 60%; height: 60%; }
 /* Ruori hieman vasemmalle omassa kehyksessään (elävä testaus). */
@@ -4342,6 +4280,8 @@ h1 {
 }
 @media (min-width: 900px) {
   .opinto-miro-iframe {
-    height: min(75vh, 900px);
+    /* 900px -> 1200px (2026-08-18, samalla pyynnöllä kuin .container-leveys
+       yllä) — vh-katto nostettu mukana ettei kapeampi ikkuna jää jälkeen. */
+    height: min(85vh, 1200px);
   }
 }

@@ -157,11 +157,15 @@ const ALAPALKKI_IKONIT = {
   laituri: '<span class="alapalkki-emoji">🛟</span>',
   // Korvattu (2026-08-12, Katrin pyyntö: "täsmälleen sama kalenterikuvake
   // kuin ruudukossa") käsinpiirretyllä SVG-versiolla kokeillun sijaan —
-  // sama markup/luokat kuin navigointiruudukon .tile-icon-kalenteri:ssä
-  // (ks. lataaOsiot()): messinki/sinappi-reunus, KUUKAUDEN lyhenne
-  // täyttötaustaisessa yläraidassa (EI viikonpäivä — se oli väärä lukema
-  // tähän kuvakkeeseen alunperin), iso päivänumero alla. Arvot täytetään
-  // paivitaAlapalkkiKalenteriPaiva():ssa data-role-attribuuttien kautta.
+  // sama muotokieli kuin ruudukon (nyk. poistettu, ks. §2x3-ruudukon poisto
+  // alla) .tile-icon-kalenteri käytti: messinki/sinappi-reunus, KUUKAUDEN
+  // lyhenne täyttötaustaisessa yläraidassa (EI viikonpäivä — se oli väärä
+  // lukema tähän kuvakkeeseen alunperin), iso päivänumero alla. Arvot
+  // täytetään paivitaAlapalkkiKalenteriPaiva():ssa data-role-attribuuttien
+  // kautta. Pallura (2026-08-18, ruudukon poiston yhteydessä siirretty tänne
+  // ks. paivitaKalenteriBadge()) elää samassa .alapalkki-tabi-pinta-
+  // kehyksessä, ei omana elementtinään ALAPALKKI_IKONIT-merkkijonon
+  // ulkopuolella — siksi se lisätään erikseen luoAlapalkkiNappi():ssa.
   kalenteri: '<span class="alapalkki-kal-ikoni"><span class="alapalkki-kal-kk" data-role="alapalkki-kal-kk"></span><span class="alapalkki-kal-pv" data-role="alapalkki-kal-pv"></span></span>',
   hytti: '<span class="alapalkki-emoji">🚪</span>',
   muistilaput: '<span class="alapalkki-emoji">🗒️</span>',
@@ -214,15 +218,20 @@ function luoAlapalkkiNappi(id) {
   nappi.setAttribute('aria-label', ALAPALKKI_NIMET[id]);
   // Painettavan pinnan säilö (2026-08-11, elävä testaus) — kuvake ISTUU
   // lämpimällä lasilla, se ei ole vain palkin tausta koko rivin verran.
-  nappi.innerHTML = '<span class="alapalkki-tabi-pinta">' + (ALAPALKKI_IKONIT[id] || '') + '</span><span class="alapalkki-alleviiva"></span>';
+  // Kalenterin pallura (2026-08-18) elää tämän pinnan KULMASSA, samalla
+  // tavalla kuin poistetun 2x3-ruudukon .tile-badge teki laatan kulmassa —
+  // vain kalenterilla toistaiseksi (Katrin päätös: Laituri/Asetukset-
+  // pallurat EIVÄT siirry tänne nyt, ks. paivitaKalenteriBadge()).
+  const pallura = id === 'kalenteri' ? '<span class="alapalkki-tabi-badge" data-role="alapalkki-badge-kalenteri" style="display:none"></span>' : '';
+  nappi.innerHTML = '<span class="alapalkki-tabi-pinta">' + (ALAPALKKI_IKONIT[id] || '') + pallura + '</span><span class="alapalkki-alleviiva"></span>';
   nappi.addEventListener('click', function() { alapalkkiSiirry(id); });
   return nappi;
 }
 
 // Täyttää sekä alapalkin että järjestysarkin kalenterikuvakkeet (kaikki
 // data-role-osumat dokumentissa, ei vain kiinnitetyt) — sama kuukauden
-// lyhenne + päivänumero kuin navigointiruudukon .tile-icon-kalenteri
-// käyttää (lataaOsiot()), KALENTERI_KUUKAUDET on sama jaettu vakio.
+// lyhenne + päivänumero kuin poistetun 2x3-navigointiruudukon
+// .tile-icon-kalenteri käytti, KALENTERI_KUUKAUDET on sama jaettu vakio.
 function paivitaAlapalkkiKalenteriPaiva() {
   const nyt = new Date();
   const kk = KALENTERI_KUUKAUDET[nyt.getMonth()].slice(0, 3).toUpperCase();
@@ -250,6 +259,7 @@ function piirraAlapalkki() {
   lisaaNappi.addEventListener('click', avaaAlapalkkiArkki);
   kontti.appendChild(lisaaNappi);
   paivitaAlapalkkiKalenteriPaiva();
+  paivitaKalenteriBadge();
 }
 
 function naytaAlapalkki(aktiivinenId) {
@@ -640,17 +650,20 @@ function paivitaNakyvyysIkoni() {
   document.getElementById('settings-btn').textContent = currentList.visibility === 'shared' ? '👥' : '🔒';
 }
 
-// Lataa etusivun: navigointiruudukko, Ankkurit ja päivämäärä.
+// Lataa etusivun: Ankkurit ja päivämäärä. Navigointi hoituu alapalkista
+// (2026-08-18, ks. piirraAlapalkki) — vanha 2x3-navigointiruudukko poistettu,
+// sen ainoa vielä tarvittu osa (Kalenterin uusien tapahtumien pallura)
+// siirrettiin alapalkin kalenterikuvakkeeseen, ks. paivitaKalenteriBadge().
 // Listat (nyk. "Muistilaput") EIVÄT enää ole suoraan etusivulla, ks. lataaMuistilaput()
 async function lataaKotinakyma() {
   // Tuore asetuskartta ennen ankkurien piirtoa (ks. ankkurit_nayta_maara,
   // lataaAnkkurit alla) — muuten oletusarvo (3) näkyisi kunnes käyttäjä
   // ehtii käydä Kalenterissa/Asetuksissa samassa istunnossa.
   paivitaAsetukset();
-  lataaOsiot();
   lataaAnkkurit();
   loadAnchorCandidates();
   paivitaRistiriitaPallura();
+  paivitaKuittausTila();
   lataaRuoriKalenteri();
   lataaRuoriHytti();
   lataaRuoriSaa();
@@ -7366,13 +7379,16 @@ async function paivitaKuittausTila() {
   paivitaKalenteriBadge();
 }
 
-// Kalenteri-laatan pallura = kuittausjono + ristiriitapaketin kuittaamattomat
+// Kalenterin pallura = kuittausjono + ristiriitapaketin kuittaamattomat
 // 'full'-ristiriidat yhteenlaskettuna (Ristiriitapaketti kohta 4, 2026-07-17,
 // ks. muistiinpanot.md) — molemmat ovat "kalenteri kaipaa reaktiota" -signaaleja,
-// jaettu yhteen palluraan ettei etusivulle tule kahta erillistä kalenterimerkkiä.
+// jaettu yhteen palluraan ettei sovelluksessa näy kahta erillistä
+// kalenterimerkkiä. Asui aiemmin 2x3-navigointiruudukon Kalenteri-laatassa,
+// siirretty (2026-08-18, ruudukon poiston yhteydessä) alapalkin
+// kalenterikuvakkeeseen — sama pallura, uusi paikka, ei uutta logiikkaa.
 function paivitaKalenteriBadge() {
   huomioPallurat.kalenteri = kuittausjonoUudet.length + ristiriitaPalluraMaara;
-  const badge = document.querySelector('.tile-badge[data-osio-key="kalenteri"]');
+  const badge = document.querySelector('[data-role="alapalkki-badge-kalenteri"]');
   if (badge) {
     if (huomioPallurat.kalenteri) {
       badge.textContent = huomioPallurat.kalenteri;
@@ -8459,7 +8475,7 @@ async function lataaRuoriSaa() {
 // TÄSMÄLLEEN samoja ristiriita-/huolilaskentafunktioita kuin oikea
 // Kalenteri-näkymä (paivanRistiriitaTila, computeVisibleDaySignals) — ei
 // omaa, eriytyvää päättelyä samasta asiasta. Napautus vie oikeaan
-// päivänäkymään, sama reitti kuin sections-list-ruudukon Kalenteri-ruudulla.
+// päivänäkymään, sama reitti kuin alapalkin Kalenteri-kuvakkeella.
 async function lataaRuoriKalenteri() {
   const tanaanIso = paivamaaraISO(new Date());
   const puskuriAlku = new Date();
@@ -9482,56 +9498,6 @@ function showCoupleTimeCalendarCard(calendar) {
   list.insertBefore(card, list.firstChild);
   const title = document.getElementById('anchor-candidates-title');
   if (title) title.style.display = 'block';
-}
-
-// Hakee etusivun osiot (Laituri, Ankkurit, ym.) ja piirtää ne geneerisesti —
-// osiot tulevat tietokannasta (nimi, ikoni, reitti, järjestys), ei kovakoodattuina
-async function lataaOsiot() {
-  if (raahattavaRivi) return;
-  const { data, error } = await db.from('home_sections').select().eq('enabled', true).order('sort_order');
-  if (error) {
-    console.error('Osioiden haku epäonnistui:', error);
-    return;
-  }
-
-  const sectionsGrid = document.getElementById('sections-list');
-  sectionsGrid.innerHTML = '';
-
-  (data || []).forEach(function(osio) {
-    const tile = document.createElement('div');
-    tile.className = 'section-tile';
-    tile.dataset.tuoteId = osio.id;
-    alustaRaahaus(tile, osio, { container: sectionsGrid, cache: data, taulu: 'home_sections', jalkeenPaivitys: lataaOsiot });
-    tile.addEventListener('click', function() { avaaOsio(osio); });
-
-    const ikoni = document.createElement('span');
-    ikoni.className = 'tile-icon';
-    if (osio.key === 'kalenteri') {
-      ikoni.classList.add('tile-icon-kalenteri');
-      const tanaan = new Date();
-      const kk = KALENTERI_KUUKAUDET[tanaan.getMonth()].slice(0, 3).toUpperCase();
-      ikoni.innerHTML = '<span class="kal-kk">' + kk + '</span><span class="kal-pv">' + tanaan.getDate() + '</span>';
-    } else {
-      ikoni.textContent = osio.icon;
-    }
-    tile.appendChild(ikoni);
-
-    const nimi = document.createElement('span');
-    nimi.className = 'tile-label';
-    nimi.textContent = osio.name;
-    tile.appendChild(nimi);
-
-    const badge = document.createElement('span');
-    badge.className = 'tile-badge';
-    badge.dataset.osioKey = osio.key;
-    tile.appendChild(badge);
-
-    sectionsGrid.appendChild(tile);
-  });
-
-  paivitaLaituriBadge();
-  paivitaKuittausTila();
-  updateSettingsBadge();
 }
 
 // Avaa osion sen route-kentän mukaan. Vain 'laituri' on toistaiseksi toiminnallinen.
@@ -12940,13 +12906,13 @@ document.getElementById('ankkurit-laajenna').addEventListener('click', function(
   lataaAnkkurit();
 });
 
-// Muistilaput (linkki renderöidään dynaamisesti lataaOsiot():ssa)
+// Muistilaput (linkki alapalkissa, ks. piirraAlapalkki())
 document.getElementById('muistilaput-back-btn').addEventListener('click', function() {
   showHomeView();
   lataaKotinakyma();
 });
 
-// Laituri (linkki renderöidään dynaamisesti lataaOsiot():ssa)
+// Laituri (linkki alapalkissa, ks. piirraAlapalkki())
 document.getElementById('laituri-back-btn').addEventListener('click', function() {
   peruLaiturinMateriaaliKonteksti();
   showHomeView();
