@@ -4,28 +4,30 @@
   padding: 0;
 }
 
-/* Värit: --muted, --accent-text ja --huomio on tarkistettu WCAG AA
-   -kontrastisuhdetta (>=4.5:1) vasten --ground-taustaa käyttävälle
-   leipätekstille — aiempi --muted (#B0AA9E vaaleassa) jäi vain n. 2,1:1:een,
-   ei riittänyt ulkona auringossa luettavaksi (Katrin havainto 2026-07-10
-   testissä). Vaaleassa teemassa tummennettu VIELÄ KERRAN 2026-07-13 (Katrin
-   uusi testipalaute: bare-minimum 4,5:1 ei riitä oikeassa auringossa
-   käsivarren mitalta, tarvitaan selvä marginaali) — kaikki kolme laskettu
-   nyt noin 6-6,5:1:een asti, ei enää vain juuri rajalla. Tumma teema oli jo
-   valmiiksi tässä haarukassa (5-8:1), ei koskettu. --accent itse pysyy
-   ennallaan (käytössä isoissa/lihavoiduissa otsikoissa ja ikoneina, joilla
-   lievemmät kontrastivaatimukset) — --accent-text on oma, tummempi versio
-   nimenomaan leipätekstikäyttöön (esim. kalenterin kellonaika-teksti).
-   --huomio ja --vaara ovat kolmiportaisen merkkikielen kaksi muuta sävyä,
-   ks. "Kalenterin merkkikieli" muistiinpanot.md:ssä: kulta/--accent =
-   neutraali tieto, meripihka/--huomio = huomaa tämä (ei koskaan
-   syyllistävä), punainen/--vaara = mahdotonta, vaatii reaktion — VARATTU
-   YKSINOMAAN päällekkäisyysmerkille. */
+/* Värit: --muted ja --huomio on tarkistettu WCAG AA -kontrastisuhdetta
+   (>=4.5:1) vasten --ground-taustaa käyttävälle leipätekstille — aiempi
+   --muted (#B0AA9E vaaleassa) jäi vain n. 2,1:1:een, ei riittänyt ulkona
+   auringossa luettavaksi (Katrin havainto 2026-07-10 testissä). Vaaleassa
+   teemassa tummennettu VIELÄ KERRAN 2026-07-13 (Katrin uusi testipalaute:
+   bare-minimum 4,5:1 ei riitä oikeassa auringossa käsivarren mitalta,
+   tarvitaan selvä marginaali) — molemmat laskettu nyt noin 6-6,5:1:een
+   asti, ei enää vain juuri rajalla. Tumma teema oli jo valmiiksi tässä
+   haarukassa (5-8:1), ei koskettu.
+   --huomio ja --vaara ovat kolmiportaisen merkkikielen kaksi sävyä, ks.
+   "Kalenterin merkkikieli" muistiinpanot.md:ssä: meripihka/--huomio =
+   huomaa tämä (ei koskaan syyllistävä), punainen/--vaara = mahdotonta,
+   vaatii reaktion — VARATTU YKSINOMAAN päällekkäisyysmerkille. Kolmas,
+   neutraali "kulta"-taso käytti aiemmin tätä samaa teemaa seuraavaa
+   --accent/--accent-text-paria (POISTETTU kokonaan 2026-08-25, Katrin
+   täyskattava sinappi-siivous: "yellow accent colour... is this problem
+   anywhere else? would be nice to fix it at once" — kaikki 37 käyttöpaikkaa
+   koko tiedostossa, mukaan lukien perus-h1/.back-btn joka näkyi JOKAISELLA
+   ruudulla, vaihdettu kiinteään var(--sinappi)/var(--sinappi-text):iin,
+   ks. tokenit alempana MERIKARTTA-lohkossa). Ei enää yhtään kuluttajaa
+   koko tiedostossa, poistettu tarpeettomana. */
 :root {
   --ground: #F8F5EF;
   --text: #1A1A1A;
-  --accent: #C8941A;
-  --accent-text: #73530F;
   --muted: #5F5A4F;
   --border: #E0DDD6;
   --border-dash: #C8C3B8;
@@ -38,8 +40,6 @@
   :root {
     --ground: #1A2928;
     --text: #F0EDE8;
-    --accent: #E8B84B;
-    --accent-text: #E8B84B;
     --muted: #7FA19E;
     --border: #2D4140;
     --border-dash: #3A5250;
@@ -89,6 +89,14 @@
      eivät seuraisi mukana huomaamatta). rgba(var(--sinappi-rgb), X) sitoo
      ne yhteen ilman color-mix()-syntaksia. */
   --sinappi-rgb: 194, 154, 46;
+  /* Tummennettu, WCAG AA -turvallinen leipätekstiversio sinapista
+     (2026-08-25, Katrin täyskattava sinappi-siivous: "yellow accent colour
+     in laituri instead of sinappi, is this problem anywhere else?").
+     Arvo periytyy suoraan vanhasta --accent-text:stä (#73530F, jo aiemmin
+     mitattu >=4,5:1-kontrastiksi --paperia/--ground-taustaa vasten, ks.
+     tiedoston alkupään värikommentti) — sama hue-perhe kuin --sinappi,
+     vain tummempi silmissä luettavaa tekstiä varten. */
+  --sinappi-text: #73530F;
   --loki-vaara: #B8433A;
   --hius: rgba(34, 31, 26, .16);
   --hius-vahva: rgba(34, 31, 26, .34);
@@ -165,7 +173,7 @@ h1 {
   letter-spacing: 0.24em;
   text-indent: 0.24em;
   text-transform: uppercase;
-  color: var(--accent);
+  color: var(--sinappi);
   text-align: center;
   margin-bottom: 4px;
 }
@@ -210,7 +218,7 @@ h1 {
   -webkit-appearance: none;
   font-size: 30px;
   font-family: var(--fontti-loki);
-  color: var(--accent);
+  color: var(--sinappi);
   cursor: pointer;
   display: flex;
   align-items: center;
@@ -304,7 +312,7 @@ h1 {
 
 .valinta-napit .dialog-btn:disabled:hover {
   background: none;
-  color: var(--accent);
+  color: var(--sinappi);
 }
 
 .valinta-checkbox {
@@ -312,7 +320,7 @@ h1 {
   height: 20px;
   margin-right: 6px;
   flex-shrink: 0;
-  accent-color: var(--accent);
+  accent-color: var(--sinappi);
 }
 
 .list li.valinta-valittu {
@@ -1130,8 +1138,8 @@ h1 {
 }
 
 .aly-log-tila-aktiivinen {
-  color: var(--accent-text);
-  border-color: var(--accent);
+  color: var(--sinappi-text);
+  border-color: var(--sinappi);
 }
 
 .aly-log-tila-rauennut {
@@ -1154,7 +1162,7 @@ h1 {
 
 .aly-log-linkki:hover,
 .aly-log-linkki:active {
-  color: var(--accent-text);
+  color: var(--sinappi-text);
 }
 
 .aly-log-kumoa-btn {
@@ -1186,13 +1194,13 @@ h1 {
   flex-shrink: 0;
   background: none;
   border: none;
-  /* var(--accent) -> var(--sinappi) 2026-08-25 (Katrin löydös: "wrong
-     yellow colour instead of sinappi") — --accent on teemaa seuraava
-     token, tumma-tilassa selvästi kirkkaamman keltainen (#E8B84B) kuin
-     kiinteä --sinappi (#C29A2E), sama korjausperiaate kuin muualla tässä
-     erässä (.inline-badge, kalenterikuvake). Koskee jokaista numero-/
-     aika-/päivämäärä-/select-kenttää Asetuksissa JA Lapsi-näkymässä
-     (jaettu luokka). */
+  /* Oli var(--accent), vaihdettu var(--sinappi):iin 2026-08-25 (Katrin
+     löydös: "wrong yellow colour instead of sinappi") — --accent oli
+     teemaa seuraava token, tumma-tilassa selvästi kirkkaamman keltainen
+     (#E8B84B) kuin kiinteä --sinappi (#C29A2E), sama korjausperiaate kuin
+     muualla tässä erässä (.inline-badge, kalenterikuvake). Koskee jokaista
+     numero-/aika-/päivämäärä-/select-kenttää Asetuksissa JA Lapsi-
+     näkymässä (jaettu luokka). */
   border-bottom: 1px solid var(--sinappi);
   outline: none;
   font-family: var(--fontti-loki);
@@ -1296,7 +1304,7 @@ h1 {
 .section-link {
   font-size: 12px;
   letter-spacing: 0.04em;
-  color: var(--accent);
+  color: var(--sinappi);
   text-align: center;
   padding: 8px 0;
   cursor: pointer;
@@ -1326,10 +1334,10 @@ h1 {
   height: 18px;
   padding: 0 5px;
   border-radius: 9px;
-  /* var(--accent) -> var(--sinappi) 2026-08-25 (Katrin ohje: sama sävy
-     kuin nostettu ankkuri / SATAMA-otsikko) — --accent seuraisi laitteen
-     tumma/vaalea-tilaa, --sinappi on kiinteä, sama periaate kuin
-     .anchor-btn.active:lla. */
+  /* Oli var(--accent), vaihdettu var(--sinappi):iin 2026-08-25 (Katrin
+     ohje: sama sävy kuin nostettu ankkuri / SATAMA-otsikko) — --accent
+     seurasi laitteen tumma/vaalea-tilaa, --sinappi on kiinteä, sama
+     periaate kuin .anchor-btn.active:lla. */
   background: var(--sinappi);
   color: var(--paperi);
   font-size: 10px;
@@ -1478,7 +1486,7 @@ h1 {
   appearance: none;
   -webkit-appearance: none;
   font-size: 22px;
-  color: var(--accent);
+  color: var(--sinappi);
   cursor: pointer;
   display: flex;
   align-items: center;
@@ -1508,7 +1516,7 @@ h1 {
 
 .restore-btn:hover,
 .restore-btn:active {
-  color: var(--accent-text);
+  color: var(--sinappi-text);
 }
 
 /* UI-BUGI-korjaus (2026-07-20, ks. muistiinpanot.md): .aly-ehdotus-btn ja
@@ -1644,7 +1652,7 @@ h1 {
   appearance: none;
   -webkit-appearance: none;
   font-size: 28px;
-  color: var(--accent);
+  color: var(--sinappi);
   cursor: pointer;
   display: flex;
   align-items: center;
@@ -1699,7 +1707,7 @@ h1 {
   font-weight: bold;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: var(--accent);
+  color: var(--sinappi);
   cursor: pointer;
 }
 
@@ -2120,7 +2128,7 @@ h1 {
   flex: 1;
   background: none;
   border: none;
-  border-bottom: 1px solid var(--accent);
+  border-bottom: 1px solid var(--sinappi);
   outline: none;
   font-family: var(--fontti-loki);
   font-size: 18px;
@@ -2455,6 +2463,14 @@ h1 {
 .row-menu-item:hover,
 .row-menu-item:active {
   background: rgba(156, 122, 67, .12);
+}
+
+/* Väliaikainen "Ladataan…"-tila (2026-08-25, ks. openRowMenu()-kommentti
+   script.js:ssä) — luetaan silmällä normaalina rivinä muuten, mutta ei saa
+   näyttää napautettavalta jotta ei houkuttele turhaa tappia kesken haun. */
+.row-menu-item:disabled {
+  color: var(--vaimea);
+  cursor: default;
 }
 
 .row-menu-item-danger {
@@ -3369,8 +3385,8 @@ h1 {
 }
 
 .paiva-merkki--keskustellaan {
-  color: var(--accent);
-  border: 1px dashed var(--accent);
+  color: var(--sinappi);
+  border: 1px dashed var(--sinappi);
 }
 
 /* Ristiriitamerkki v2 (2026-08-05): ⚠️-symboli, EI pilleri — ei taustaa/
@@ -3428,7 +3444,7 @@ h1 {
 }
 
 .kalenteri-kortti-kuorma {
-  color: var(--accent);
+  color: var(--sinappi);
   font-size: 11px;
 }
 
@@ -3570,7 +3586,7 @@ h1 {
 /* Opintopolku VAIHE 1 (2026-07-21, ks. muistiinpanot.md "Opintopolku") */
 .opinto-kartta-linkki {
   float: right;
-  color: var(--accent);
+  color: var(--sinappi);
   text-transform: none;
   letter-spacing: normal;
   cursor: pointer;
@@ -3640,8 +3656,8 @@ h1 {
    meripihka/punainen) sävyjä sekaannuksen välttämiseksi (ks. "Kalenterin
    merkkikieli" muistiinpanot.md:ssä — ne on VARATTU päällekkäisyysmerkille). */
 .opinto-vaihe-priming { color: var(--muted); }
-.opinto-vaihe-encoding { color: var(--accent-text); }
-.opinto-vaihe-retrieval { color: var(--accent-text); }
+.opinto-vaihe-encoding { color: var(--sinappi-text); }
+.opinto-vaihe-retrieval { color: var(--sinappi-text); }
 .opinto-vaihe-reference { color: var(--muted); }
 .opinto-vaihe-yllapito { color: var(--muted); }
 .opinto-vaihe-overlearning { color: var(--muted); }
@@ -3677,7 +3693,7 @@ h1 {
   background: var(--border);
 }
 
-.opinto-kartta-lohko--hallussa { background: var(--accent); }
+.opinto-kartta-lohko--hallussa { background: var(--sinappi); }
 .opinto-kartta-lohko--tyon-alla { background: var(--huomio); }
 .opinto-kartta-lohko--edessa { background: var(--border-dash); }
 
@@ -3781,7 +3797,7 @@ h1 {
   white-space: nowrap;
 }
 .opinto-materiaali-tila.kasitelty {
-  color: var(--accent);
+  color: var(--sinappi);
 }
 
 /* Reitti-välilehden viikkonavigaatio + uudet listat (deadlinet, kertausjono,
@@ -3844,7 +3860,7 @@ h1 {
   width: 18px;
   height: 18px;
   flex-shrink: 0;
-  accent-color: var(--accent);
+  accent-color: var(--sinappi);
 }
 .silta-ehdotus-nimi-input {
   flex: 1;
@@ -3900,7 +3916,7 @@ h1 {
 .huoli-vakavuus-btn:active,
 .huoli-vakavuus-btn.tallennettu {
   opacity: 1;
-  border-color: var(--accent);
+  border-color: var(--sinappi);
 }
 
 /* Taitosolmun käsitekartta-editori (2026-08-04, ks. muistiinpanot.md
@@ -3928,7 +3944,7 @@ h1 {
   cursor: pointer;
 }
 .kasitekartta-vari-btn.active {
-  border-color: var(--accent);
+  border-color: var(--sinappi);
 }
 .kasitekartta-tyokalu-btn {
   font-size: 12px;
@@ -3940,8 +3956,8 @@ h1 {
   cursor: pointer;
 }
 .kasitekartta-tyokalu-btn.active {
-  border-color: var(--accent);
-  color: var(--accent-text);
+  border-color: var(--sinappi);
+  color: var(--sinappi-text);
 }
 .kasitekartta-wrap {
   position: relative;
@@ -3971,7 +3987,7 @@ h1 {
   white-space: pre-wrap;
 }
 .kasitekartta-teksti-laatikko:focus {
-  outline: 2px solid var(--accent);
+  outline: 2px solid var(--sinappi);
   background: #fff;
 }
 
@@ -3988,7 +4004,7 @@ h1 {
 
 .opinto-tanaan-vaihe {
   font-size: 12px;
-  color: var(--accent-text);
+  color: var(--sinappi-text);
   text-transform: uppercase;
   letter-spacing: 0.05em;
 }
@@ -4007,7 +4023,7 @@ h1 {
 .hytti-seuraava-askel-laatikko {
   font-size: 14px;
   color: var(--text);
-  border: 1px solid var(--accent);
+  border: 1px solid var(--sinappi);
   border-radius: 6px;
   padding: 10px 12px;
   margin: 12px 0 16px;
@@ -4345,7 +4361,7 @@ h1 {
   content: '•';
   position: absolute;
   left: 0;
-  color: var(--accent);
+  color: var(--sinappi);
 }
 
 .vinkki-alaotsikko {
@@ -4687,8 +4703,8 @@ h1 {
 .laituri-materiaali-banneri {
   display: flex; align-items: center; justify-content: space-between; gap: 10px;
   padding: 9px 12px; margin-bottom: 10px;
-  background: var(--ground); border: 1px solid var(--accent); border-radius: 8px;
-  font-size: 13px; color: var(--accent-text);
+  background: var(--ground); border: 1px solid var(--sinappi); border-radius: 8px;
+  font-size: 13px; color: var(--sinappi-text);
 }
 
 /* Jaettu editori (2026-08-11, CODE_vaihe1b.md §2) — "iOS-muistiinpanojen
@@ -4784,7 +4800,7 @@ h1 {
   min-width: 18px; height: 18px;
   padding: 0 4px;
   border-radius: 9px;
-  background: var(--accent);
+  background: var(--sinappi);
   color: var(--ground);
   font-size: 10.5px;
   font-weight: bold;
@@ -4816,10 +4832,11 @@ h1 {
    (ruudukon versio on kiinteä 34px). */
 .alapalkki-kal-ikoni {
   width: 74%; display: flex; flex-direction: column;
-  /* var(--accent) -> var(--sinappi) 2026-08-25 (Katrin ohje: sama sävy
-     kuin nostettu ankkuri / SATAMA-otsikko / ehdotusten laskuripallura) —
-     kommentti tässä on aina sanonut "sinapinkeltainen raita", mutta
-     toteutus käytti teemaa seuraavaa --accent-tokenia; nyt kiinteä. */
+  /* Oli var(--accent), vaihdettu var(--sinappi):iin 2026-08-25 (Katrin
+     ohje: sama sävy kuin nostettu ankkuri / SATAMA-otsikko / ehdotusten
+     laskuripallura) — kommentti tässä on aina sanonut "sinapinkeltainen
+     raita", mutta toteutus käytti teemaa seuraavaa --accent-tokenia; nyt
+     kiinteä. */
   border: 1px solid var(--sinappi); border-radius: 4px; overflow: hidden;
   background: #FDFBF6;
 }
@@ -4843,7 +4860,7 @@ h1 {
   -webkit-touch-callout: none;
 }
 .alapalkki-arkki-lista li:last-child { border-bottom: 0; }
-.alapalkki-arkki-lista li.alapalkki-raja-jalkeen { border-bottom: 2px dashed var(--accent); }
+.alapalkki-arkki-lista li.alapalkki-raja-jalkeen { border-bottom: 2px dashed var(--sinappi); }
 .alapalkki-arkki-lista li svg { width: 24px; height: 24px; flex: none; }
 .alapalkki-arkki-lista li .alapalkki-arkki-nimi { flex: 1; font-size: 15px; }
 .alapalkki-arkki-lista li .alapalkki-arkki-kahva { color: var(--muted); font-size: 18px; cursor: grab; padding: 4px 6px; }

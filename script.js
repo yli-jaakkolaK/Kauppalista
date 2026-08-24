@@ -10986,7 +10986,7 @@ async function avaaKohdeAlivalikko(rivi, li, kategoria) {
   // ja avasi SEN tekstinmuokkauksen — täsmälleen kuvattu oire. Näytetään nyt
   // heti väliaikainen "Ladataan…"-valikko joka pitää kosketuspinnan
   // varattuna koko haun ajan, korvataan oikealla listalla kun data saapuu.
-  openRowMenu(li, [{ label: 'Ladataan…', onClick: function() {} }]);
+  openRowMenu(li, [{ label: 'Ladataan…', disabled: true }]);
   const kaikki = await haeKotiKohteet();
   // Jos Katri ehti napauttaa valikon kiinni (tai jonkin toisen rivin auki)
   // haun ollessa kesken, ei tuputeta vanhaa listaa takaisin näkyviin —
@@ -12829,11 +12829,24 @@ function openRowMenu(li, items, korvaaSamaRivi) {
     } else {
       nappi.textContent = kohta.label;
     }
-    nappi.addEventListener('click', function(e) {
-      e.stopPropagation();
-      closeRowMenu();
-      kohta.onClick();
-    });
+    // kohta.disabled (2026-08-25, Katrin löydös: "second pop up i still
+    // press through") — väliaikainen "Ladataan…"-kohta (ks.
+    // avaaKohdeAlivalikko) NÄYTTI napautettavalta napilta, ja koska sen
+    // oma onClick oli tyhjä funktio, napautus silti ehti closeRowMenu():n
+    // ANSIOSTA sulkea koko valikon ennen kuin haku ehti valmistua —
+    // seuraava, oikean sisällön avaava openRowMenu()-kutsu näki tämän
+    // sulkemisen "Katri perui itse" -tilanteena eikä avannut mitään, joka
+    // näytti täsmälleen napautuksen "menevän läpi" tyhjyyteen. Disabled-
+    // kohta ei enää reagoi napautukseen ollenkaan, valikko pysyy auki.
+    if (kohta.disabled) {
+      nappi.disabled = true;
+    } else {
+      nappi.addEventListener('click', function(e) {
+        e.stopPropagation();
+        closeRowMenu();
+        kohta.onClick();
+      });
+    }
     menu.appendChild(nappi);
   });
 
