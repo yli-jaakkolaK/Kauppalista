@@ -627,6 +627,21 @@ h1 {
   margin-top: 2px;
 }
 
+/* "▫N"-niputus (2026-08-24) — pieni luettava merkintä, EI nappi
+   (--r-kosketettava ei sovi tähän, koko solu on jo napautettava). Vasen
+   alakulma ettei törmää päivänumeroon (vasen ylä) eikä ⚠️/🟠-merkkeihin
+   (oikea ylä). */
+.kalenteri-kuukausi-piilossa {
+  position: absolute;
+  left: 3px;
+  bottom: 1px;
+  z-index: 1;
+  font-size: 9px;
+  font-weight: 700;
+  color: var(--vaimea);
+  line-height: 1;
+}
+
 /* Ohennettu 5px -> 3px kun linjoja nostettiin kolmesta neljään (2026-08-05,
    "we are 4") — mahtuu samaan tilaan tiiviimmällä pitchillä (7px, ks.
    KUUKAUSI_LINJA_TOP_PX script.js:ssä). */

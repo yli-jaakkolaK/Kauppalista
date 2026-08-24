@@ -7074,15 +7074,25 @@ function laskeViikonLinjat(viikonTapahtumat) {
 const KUUKAUSI_MAX_LINJOJA = 4;
 const KUUKAUSI_LINJA_TOP_PX = [12, 19, 26, 33];
 
+// Palauttaa { tulos, piilossa } — piilossa on montako tätä päivää koskevaa
+// tapahtumaa EI mahtunut näkyviin linjoille (2026-08-24, Katrin raportoima
+// hiljainen datahävikki, ks. muistiinpanot.md "▫N-niputus"). Aiemmin nämä
+// jätettiin äänettömästi piirtämättä ilman mitään jälkeä — raskas päivä
+// saattoi näyttää kevyeltä vilkaisulla, suoraan vilkaisuarvo-periaatteen
+// (KONSEPTIKIRJA.md periaate 1) vastaisesti. Kutsuja (piirraKuukausiPaiva)
+// näyttää piilossa-määrän pienenä "+N"-merkintänä solun kulmassa.
 function assignMonthDayLanes(paivanMonipaivaisetKattavat, paivanYksipaivaiset, viikonLinjat) {
   const linjaVapaaAlkaen = new Array(KUUKAUSI_MAX_LINJOJA).fill(-Infinity);
   const tulos = [];
+  let piilossa = 0;
 
   paivanMonipaivaisetKattavat.forEach(function(t) {
     const linja = viikonLinjat.get(t.id);
     if (linja !== undefined && linja < KUUKAUSI_MAX_LINJOJA) {
       linjaVapaaAlkaen[linja] = Infinity;
       tulos.push({ tapahtuma: t, linja: linja });
+    } else {
+      piilossa++;
     }
   });
 
@@ -7093,12 +7103,12 @@ function assignMonthDayLanes(paivanMonipaivaisetKattavat, paivanYksipaivaiset, v
       const alku = t.event_time ? aikaMinuutteina(t.event_time) : -Infinity;
       const loppu = t.event_time ? aikaMinuutteina(t.event_end_time || t.event_time) : Infinity;
       const linja = linjaVapaaAlkaen.findIndex(function(vapaaAlkaen) { return vapaaAlkaen <= alku; });
-      if (linja === -1) return;
+      if (linja === -1) { piilossa++; return; }
       linjaVapaaAlkaen[linja] = loppu;
       tulos.push({ tapahtuma: t, linja: linja });
     });
 
-  return tulos;
+  return { tulos: tulos, piilossa: piilossa };
 }
 
 // Piirtää yhden päiväruudun sisällön: päivänumero (vasen yläkulma), enintään
@@ -7208,11 +7218,11 @@ function piirraKuukausiPaiva(pvm, paivittainYksipaivaiset, monipaivaiset, viikon
     solu.appendChild(merkit);
   }
 
-  const linjoitetut = assignMonthDayLanes(paivanMonipaivaisetKattavat, paivanYksipaivaiset, viikonLinjat);
-  if (linjoitetut.length > 0) {
+  const linjat = assignMonthDayLanes(paivanMonipaivaisetKattavat, paivanYksipaivaiset, viikonLinjat);
+  if (linjat.tulos.length > 0) {
     const palkitEl = document.createElement('div');
     palkitEl.className = 'kalenteri-kuukausi-palkit';
-    linjoitetut.forEach(function(kohde) {
+    linjat.tulos.forEach(function(kohde) {
       const asettelu = computeEventBarLayout(kohde.tapahtuma, iso);
       const palkki = document.createElement('div');
       palkki.className = 'kalenteri-kuukausi-palkki' + (asettelu.reunaLuokka ? ' ' + asettelu.reunaLuokka : '');
@@ -7224,6 +7234,22 @@ function piirraKuukausiPaiva(pvm, paivittainYksipaivaiset, monipaivaiset, viikon
       palkitEl.appendChild(palkki);
     });
     solu.appendChild(palkitEl);
+  }
+
+  // "▫N"-niputus (2026-08-24, Katrin raportoima hiljainen datahävikki) — ei
+  // oma nappi/kosketuskohde (Katri: "ei erillistä nappulaa vaan päivästä
+  // painamalla pääsee päivänäkymään") — koko solu on jo napautettava (ks.
+  // solu.addEventListener alla), tämä on VAIN luettava merkintä siitä että
+  // jotain jäi linjojen ulkopuolelle. Pelkkä numero + "+", ei erillistä
+  // ▫-symbolia — sopii samaan pieneen, hillittyyn tyyliin kuin viikonpäivien
+  // lyhenteet/päivänumero, ei kosketettava-kokoinen (--r-kosketettava ei
+  // sovi, tämä ei ole nappi).
+  if (linjat.piilossa > 0) {
+    const piilossaEl = document.createElement('span');
+    piilossaEl.className = 'kalenteri-kuukausi-piilossa';
+    piilossaEl.textContent = '+' + linjat.piilossa;
+    piilossaEl.title = linjat.piilossa + ' tapahtumaa lisää tänä päivänä — napauta päivää nähdäksesi kaikki';
+    solu.appendChild(piilossaEl);
   }
 
   solu.addEventListener('click', function() {

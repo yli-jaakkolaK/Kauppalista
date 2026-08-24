@@ -4526,3 +4526,20 @@ Uusin tässä istunnossa: omistaja-kirjainmerkin poisto päivänäkymästä (ks.
 Seuraava luonnollinen askel: avata Kalenteri-välilehti kaikissa kolmessa näkymässä sovelluksen TÄYDEN sulkemisen/uudelleenavauksen jälkeen ja tarkistaa kaikki kertaalleen: merikartta-pinta, "tänään"-ympyrä, viikkopalkkien saumaton yhdistyminen monipäiväisillä tapahtumilla, päivänäkymän rivien puhtaus (ei ⋯/⚓/kirjainmerkkiä, pelkkä reunaväri kertoo kenen meno), koko rivin napautus avaa toimintovalikon, ⓘ-nappi paljastaa osoitteen.
 
 Auki: `.pv-kuorma`-tyylinen kuormakortti + `.kal-lippu-rivi`-ristiriitarivin mockup-visuaali päivänäkymän otsikkoon (tietoisesti rajattu pois kaikilla kierroksilla, ei ole vielä olemassa). Miro-kanvaasin tyhjä-tila-bugi 15min-Boostilla (vanha, ei vieläkään lisätietoa).
+
+---
+
+## Selittämätön häiriösarja + kuukausinäkymän ▫N-niputus (2026-08-24, sama päivä jatkuu)
+
+**"Before you continue" — häiriöraportti tutkittu ennen rakentamista.** Katri: viiden viimeisimmän avauksen aikana kalenteri näytti "100 uutta tapahtumaa" (Kuittaa kaikki epäonnistui, joutui hyväksymään yksitellen), Laituri näytti hetken tyhjältä, sovellus pyysi Google-kirjautumista joka avauksella, ja Hytin Boost puuttui — kaikki paitsi kirjautumispyyntö korjautuivat sovelluksen toistuvalla sulkemisella/avaamisella.
+
+**Todennäköisin yhteinen syy: viisi peräkkäistä `sw.js`-versiopäivitystä samana päivänä** (v181→v185). Service workerin `fetch`-käsittelijä käyttää globaalia `caches.match()`-hakua joka ei takaa että kaikki tiedostot tulevat SAMASTA cache-sukupolvesta uuden version asennuksen ja vanhan siivouksen välisenä lyhyenä ikkunana — selittäisi juuri tällaisen sekalaisen häiriöjoukon jonka pelkkä uudelleenavaus (versio ehtii vakiintua) korjaa. "Kuittaa kaikki epäonnistui" -oire täsmää tarkemminkin: `kalenteri-kuittaa-kaikki`-nappi tekee YHDEN bulk-upsertin (`onConflict:'ical_uid,user_id'`) — jos joukossa oli hetkellisesti sama ical_uid kahdesti (esim. saman siirtymän aikana luettu epäjohdonmukainen data), Postgres hylkää KOKO erän ("ON CONFLICT DO UPDATE command cannot affect row a second time") vaikka yksittäiset kuittaukset onnistuvat, koska niissä ei ole tätä törmäystä. Tarkistettu suoraan DB:stä: ei duplikaatti-ical_uid:eja juuri nyt, tapahtuma-/kuittausmäärät näyttävät normaaleilta — data on siis kunnossa nyt, ongelma oli hetkellinen.
+
+**Kirjautumispyyntö EI selittynyt cache-teorialla** (auth elää `localStorage`:ssa, jota SW:n `caches.delete()` ei koskaan koske, enkä koskenut mihinkään auth-koodiin tänään). Katri testasi: Chrome (sekä työpöytä että mobiili) toimii normaalisti, VAIN Safari pyytää kirjautumista joka avauksella. Tämä on Safarin oma tallennuskäytäntö (ITP/PWA-tallennustilan aggressiivisempi tyhjennys) — EI Sataman koodivika, ei korjattavissa sovelluspuolelta.
+
+**Kuukausinäkymän ▫N-niputus rakennettu** (Katrin tarkennus: "ei erillistä nappulaa vaan päivästä painamalla pääsee päivänäkymään... kuukausinäkymässäkin sit siinä päivässä joku satamaan sopiva merkki että tässä päivässä on esim +3 menoa näkyvien lisäksi"):
+- `assignMonthDayLanes()` palauttaa nyt `{ tulos, piilossa }` — `piilossa` laskee montako tätä päivää koskevaa tapahtumaa EI mahtunut 4 linjan kattoon (aiemmin pudotettiin täysin äänettömästi, KONSEPTIKIRJA §1:n vilkaisuarvo-periaatteen vastaisesti — raskas päivä saattoi näyttää kevyeltä).
+- Uusi `.kalenteri-kuukausi-piilossa`-merkintä ("+N") solun vasemmassa alakulmassa kun `piilossa > 0` — EI oma nappi/kosketuskohde, koko solu on jo napautettava (menee päivänäkymään, olemassa oleva toiminto koskematta).
+- Hytti-tapahtumien erillinen kevyempi ilme (konseptin toinen osa) jätettiin tietoisesti tälle kierrokselle ulkopuolelle Katrin omasta rajauksesta.
+
+**Ei vielä testattu livenä.** `node -c script.js` ja style.css-aaltosulkutasapaino puhtaat.
