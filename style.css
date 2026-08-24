@@ -1275,6 +1275,7 @@ h1 {
    automaattisesti oikean, teemasta riippumattoman värin ilman että yhtään
    yksittäistä sääntöä pitää koskea erikseen. */
 #laituri-view {
+  font-family: var(--fontti-loki);
   background: var(--paperi);
   color: var(--muste);
   --ground: var(--paperi);
@@ -1290,17 +1291,35 @@ h1 {
   margin: 0 0 4px;
 }
 
+/* Laiturin muru-rivi merikartta-luettava-pinnalle (2026-08-24, "Laituri
+   loppuun") — sama .arkki-resepti kuin ehdotuskorteilla (ks. .list
+   li.laituri-ehdotus-rivi), jokainen muru oma kevyt lasilaatikkonsa
+   erillisten hiusviivalla-erotettujen rivien sijaan. Kevyt kosketuspalaute
+   (translateY-nosto) vaikka koko rivillä ei ole omaa napautustoimintoa —
+   Katrin ohje: rivien pitää tuntua kosketettavilta muun Sataman tapaan. */
 .laituri-row {
   position: relative; /* ankkuroi "Sijoita…"-valikon (.row-menu) juuri rivin alle */
   display: flex;
   align-items: center;
   min-height: 52px;
-  border-bottom: 1px solid var(--border);
+  padding: 0 10px;
+  margin-bottom: 4px;
+  background: rgba(255, 253, 248, .5);
+  border: 1px solid var(--hius);
+  border-radius: var(--r-luettava);
   gap: 4px;
+  transition: transform var(--keski) var(--kelluu), background var(--keski) var(--kelluu);
 }
 
 .laituri-row:last-child {
-  border-bottom: none;
+  margin-bottom: 0;
+}
+
+.laituri-row:hover {
+  transform: translateY(-2px);
+}
+.laituri-row:active {
+  transform: translateY(0) scale(.996);
 }
 
 .laituri-row.sijoitettu {
@@ -1441,6 +1460,11 @@ h1 {
    kehys tunnistaa sen MUODOSTA erilliseksi kuin varsinaiset Laituri-rivit
    (ks. "Kalenterin merkkikieli"/"väri koristaa, musta kertoo" -periaate —
    itse ehdotusteksti on informaatiota, täysi --text). */
+/* Laiturin ehdotuskortti (kauppa/hetki-silta/hoitojäsennys/materiaali-
+   jäsennys, kaikki jakavat tämän luokan) merikartta-luettava-pinnalle
+   (2026-08-24, Katrin pyyntö "Laituri loppuun") — sama .arkki-tyyppinen
+   resepti kuin kalenterin .pv-kuorma jo käyttää: kevyt paperinsävyinen
+   lasi, kiinteä (ei katkoviiva) --hius-reunaviiva, --r-luettava. */
 .list li.laituri-ehdotus-rivi {
   display: flex;
   flex-direction: column;
@@ -1448,10 +1472,11 @@ h1 {
   gap: 8px;
   padding: 8px 10px;
   margin: -1px 0 4px;
-  border: 1px dashed var(--border-dash);
-  border-radius: 4px;
+  background: rgba(255, 253, 248, .5);
+  border: 1px solid var(--hius);
+  border-radius: var(--r-luettava);
   font-size: 13px;
-  color: var(--text);
+  color: var(--muste);
 }
 
 .laituri-ehdotus-virhe {

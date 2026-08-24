@@ -4622,3 +4622,16 @@ Katri vastasi molempiin v190:n kysymyksiin ja lisäsi kolmannen huomion:
 3. **Sinappi-siivous:** `.ankkuri-rivi`/`.ruori .segmentti.kalenteri`/`.segmentti.hytti`/`.ankkuri-rivi:active` (yht. 8 kohtaa) käyttivät kovakoodattua `rgba(194,154,46,X)`:ää `--sinapin` (`#C29A2E`) sijaan — sama arvo, ei sidottu muuttujaan. Lisätty `--sinappi-rgb: 194, 154, 46;` `:root`-tokeneihin, kaikki 8 kohtaa käyttävät nyt `rgba(var(--sinappi-rgb), X)`:ää — ei color-mix()-syntaksia (ei käytetä muualla tiedostossa), pelkkä var()-korvaus rgba():n sisällä, laajasti tuettu.
 
 **Ei vielä testattu livenä.** `node -c script.js` ja style.css-aaltosulkutasapaino puhtaat.
+
+---
+
+## Laituri loppuun merikartta-pintaan (2026-08-24, sama päivä jatkuu)
+
+Yhtenäistämisprojektin viimeinen erä: `#laituri-view` sai fontin (`var(--fontti-loki)`, oli aiemmin vain väri/tausta-token-remap, ei fonttia). Kaksi ei-jaettua Laituri-omaa elementtiä siirretty `.arkki`-tyyppiselle luettava-pinnalle (paperinsävyinen lasi, kiinteä `--hius`-reunaviiva, `--r-luettava`):
+
+- **`.laituri-row`** (jokainen muru) — oli pelkkä hiusviivalla erotettu list-rivi, on nyt oma kevyt lasilaatikko per muru, `--keski`/`--kelluu`-kosketuspalaute lisätty vaikka rivillä ei ole omaa napautustoimintoa (Katrin ohje: rivien pitää tuntua kosketettavilta).
+- **`.list li.laituri-ehdotus-rivi`** (kaikki ehdotuskortit: kauppa, hetki-silta, hoitojäsennys `piirraHoitoJasennysKortti`, materiaalijäsennys — kaikki jakavat tämän yhden luokan) — katkoviivakehys (`dashed var(--border-dash)`, 4px pyöristys) korvattu kiinteällä `--hius`-reunalla + `--r-luettava`illa + paperinsävyisellä lasitaustalla.
+
+**Tietoisesti koskematta jätetty:** `.laituri-jatkorivi-rivi` (säikeen jatko-osa, tarkoituksella sisennetty VASEN reunaviiva -tyyliin kiinni vanhemmastaan, ei oma kortti — muuttaminen boksiksi olisi rikkonut sen visuaalisen "kuuluu edelliseen" -suhteen) ja `.laituri-arkisto-rivi` (tarkoituksella himmennetty/toissijainen sekundäärinäkymä, ei nimetty pyynnössä). Napit sisällä (`.dialog-btn` ym.) eivät tarvinneet erillistä korjausta — perivät jo jaetun v187-191-nappityylin.
+
+**Ei vielä testattu livenä.** `node -c script.js` ja style.css-aaltosulkutasapaino puhtaat.
