@@ -209,7 +209,7 @@ h1 {
   appearance: none;
   -webkit-appearance: none;
   font-size: 30px;
-  font-family: 'Courier New', Courier, monospace;
+  font-family: var(--fontti-loki);
   color: var(--accent);
   cursor: pointer;
   display: flex;
@@ -218,22 +218,38 @@ h1 {
   -webkit-tap-highlight-color: transparent;
 }
 
+/* Toinen jaettu kirjastolöydös samassa haussa (2026-08-24, "8 näkymän
+   viimeinen erä") — .list-headerin oikean laidan ikoninappi, käytössä
+   käytännössä jokaisen näkymän otsikkorivillä (App-view 🔒/☑, Teema
+   👥/🗑, Vahdittu 👥, Taitosolmu 🗑 ym.), jäi pois v187:n napkierroksesta
+   koska ei ollut samassa `.check-btn`/`.anchor-btn`-ryhmässä. Sama
+   .saadin-lasiresepti. */
 .settings-btn {
   grid-column: 3;
   min-width: 44px;
   min-height: 44px;
-  background: none;
-  border: none;
+  border-radius: var(--r-kosketettava);
+  border: 1px solid rgba(156, 122, 67, .45);
+  background: linear-gradient(165deg, rgba(255, 252, 244, .72), rgba(234, 230, 220, .32));
+  backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
   outline: none;
   appearance: none;
   -webkit-appearance: none;
   font-size: 22px;
-  color: var(--accent);
+  color: var(--muste);
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
   -webkit-tap-highlight-color: transparent;
+  transition: transform var(--keski) var(--kelluu), border-color var(--keski) var(--kelluu);
+}
+.settings-btn:hover,
+.settings-btn:focus-visible {
+  transform: translateY(-2px);
+}
+.settings-btn:active {
+  transform: translateY(0) scale(.95);
 }
 
 /* app-view tarvitsee KAKSI otsikkorivin oikean puolen nappia (valinta +
@@ -265,7 +281,7 @@ h1 {
   justify-content: space-between;
   gap: 10px;
   padding: 10px 0;
-  border-top: 1px dashed var(--border-dash);
+  border-top: 1px solid var(--hius);
   font-size: 13px;
   color: var(--muted);
 }
@@ -343,6 +359,29 @@ h1 {
   margin: -24px -12px;
   padding: 20px 12px 32px;
   border-radius: 8px;
+  --ground: var(--paperi);
+  --text: var(--muste);
+  --muted: var(--vaimea);
+  --border: var(--hius);
+  --border-dash: var(--hius-vahva);
+}
+
+/* === VIIMEISET 7 NÄKYMÄÄ (2026-08-24, "viimeinen erä") === Sama tekniikka
+   kuin Laiturilla: fontti + kiinteät token-remapit, MUTTA EI edellä olevaa
+   negatiivista margin/padding/border-radius-reunanrikkoa — Laituri ei
+   sitäkään saanut (ei pyydetty), ja `--ground`/`--paperi` ovat riittävän
+   lähellä toisiaan valoisassa tilassa (#F8F5EF vs #EAE6DC) ettei "paperi-
+   saareke" erotu häiritsevästi ilman reunanrikkoa. */
+#muistilaput-view,
+#varasto-view,
+#teema-view,
+#vahdittu-view,
+#app-view,
+#asetukset-view,
+#lapsi-view {
+  font-family: var(--fontti-loki);
+  background: var(--paperi);
+  color: var(--muste);
   --ground: var(--paperi);
   --text: var(--muste);
   --muted: var(--vaimea);
@@ -1045,12 +1084,15 @@ h1 {
   align-items: center;
   flex-wrap: wrap;
   gap: 8px;
-  padding: 10px 0;
-  border-bottom: 1px dashed var(--border-dash);
+  padding: 8px 10px;
+  margin-bottom: 4px;
+  background: rgba(255, 253, 248, .5);
+  border: 1px solid var(--hius);
+  border-radius: var(--r-luettava);
 }
 
 .aly-log-rivi:last-child {
-  border-bottom: none;
+  margin-bottom: 0;
 }
 
 .aly-log-teksti {
@@ -1120,19 +1162,23 @@ h1 {
   font-size: 11px;
   letter-spacing: 0.04em;
   text-transform: uppercase;
-  background: none;
-  border: 1px dashed var(--accent);
-  color: var(--accent);
-  border-radius: 4px;
+  border-radius: var(--r-kosketettava);
+  border: 1px solid rgba(156, 122, 67, .5);
+  background: linear-gradient(165deg, rgba(255, 252, 244, .72), rgba(234, 230, 220, .28));
+  backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
+  color: var(--muste);
   padding: 5px 9px;
   cursor: pointer;
   -webkit-tap-highlight-color: transparent;
+  transition: transform var(--keski) var(--kelluu), border-color var(--keski) var(--kelluu);
 }
 
-.aly-log-kumoa-btn:hover,
+.aly-log-kumoa-btn:hover {
+  transform: translateY(-1px);
+}
 .aly-log-kumoa-btn:active {
-  background: var(--accent);
-  color: var(--ground);
+  transform: translateY(0) scale(.96);
+  border-color: var(--messinki);
 }
 
 .settings-numero-input {
@@ -1142,7 +1188,7 @@ h1 {
   border: none;
   border-bottom: 1px solid var(--accent);
   outline: none;
-  font-family: 'Courier New', Courier, monospace;
+  font-family: var(--fontti-loki);
   font-size: 16px;
   color: var(--accent);
   text-align: center;
@@ -1547,7 +1593,7 @@ h1 {
   background: none;
   border: none;
   outline: none;
-  font-family: 'Courier New', Courier, monospace;
+  font-family: var(--fontti-loki);
   font-size: 18px;
   color: var(--text);
 }
@@ -1813,10 +1859,30 @@ h1 {
   word-break: break-word;
 }
 
+/* Jaettu kirjastolöydös (2026-08-24, "8 näkymän viimeinen erä"): tämä
+   luokka on JO jaettu kolmen näkymän kesken (Muistilaput/Varaston oma
+   listavalitsin, App-viewin sisältörivit Varasto-kategorian listalla) —
+   korjattu KERRAN tässä sen sijaan että tehtäisiin sama työ erikseen
+   jokaisen näkymän kohdalla myöhemmin. .arkki-luettava-pinta hiusviiva-
+   erottimien sijaan (rivit saavat nyt oman kevyen lasilaatikkonsa). */
 .list li.varasto-rivi {
   align-items: flex-start;
   min-height: 44px;
-  padding: 6px 0;
+  padding: 8px 10px;
+  margin-bottom: 4px;
+  background: rgba(255, 253, 248, .5);
+  border: 1px solid var(--hius);
+  border-radius: var(--r-luettava);
+  transition: transform var(--keski) var(--kelluu), background var(--keski) var(--kelluu);
+}
+.list li.varasto-rivi:last-child {
+  margin-bottom: 0;
+}
+.list li.varasto-rivi:hover {
+  transform: translateY(-2px);
+}
+.list li.varasto-rivi:active {
+  transform: translateY(0) scale(.996);
 }
 
 .list li.varasto-rivi span:not(.history-time) {
@@ -1899,9 +1965,26 @@ h1 {
    yksirivisenä ellipsis-katkaisuna. 4 riviä riittää yhtä hyvin kuin
    Ankkureille (lyhyempi ikonikaista tässä: check+⚓+⋯, ei erillistä
    muistutus-nappia — ⏰ on jo ⋯-valikon takana, ks. Rivien UI-remontti). */
+/* Toinen jaettu kirjastolöydös samassa haussa kuin .varasto-rivi yllä:
+   käytössä App-viewin (Kauppalista) ja Muistilappujen sisältörivillä.
+   Sama .arkki-luettava-pinta. */
 .list li.elava-rivi {
   align-items: flex-start;
-  padding: 6px 0;
+  padding: 8px 10px;
+  margin-bottom: 4px;
+  background: rgba(255, 253, 248, .5);
+  border: 1px solid var(--hius);
+  border-radius: var(--r-luettava);
+  transition: transform var(--keski) var(--kelluu), background var(--keski) var(--kelluu);
+}
+.list li.elava-rivi:last-child {
+  margin-bottom: 0;
+}
+.list li.elava-rivi:hover {
+  transform: translateY(-2px);
+}
+.list li.elava-rivi:active {
+  transform: translateY(0) scale(.996);
 }
 
 .list li.elava-rivi span:not(.muistutus-aika):not(.history-time) {
@@ -2006,7 +2089,7 @@ h1 {
   border: none;
   border-bottom: 1px solid var(--accent);
   outline: none;
-  font-family: 'Courier New', Courier, monospace;
+  font-family: var(--fontti-loki);
   font-size: 18px;
   color: var(--text);
   padding: 4px 0;
@@ -2613,7 +2696,7 @@ h1 {
 
 .muistutus-toistuva-aika-rivi select,
 .muistutus-toistuva-aika-rivi input[type="time"] {
-  font-family: 'Courier New', Courier, monospace;
+  font-family: var(--fontti-loki);
   font-size: 15px;
   color: var(--text);
   background: var(--ground);
@@ -2641,7 +2724,7 @@ h1 {
 }
 
 .muistutus-toistuva-loppu-rivi input[type="date"] {
-  font-family: 'Courier New', Courier, monospace;
+  font-family: var(--fontti-loki);
   font-size: 13px;
   color: var(--text);
   background: var(--ground);
@@ -2661,28 +2744,43 @@ h1 {
   margin-top: 4px;
 }
 
+/* Jaettu nappikirjasto -korjaus (2026-08-24, "8 näkymän viimeinen erä" —
+   löytyi Muistilaput/Varaston listarivien ✎/⇄-napeista, jäi vahingossa
+   pois v187:n check/anchor/overflow/reminder/delete/link-btn-erästä vaikka
+   on sama perhe: sama bare-icon-nappi-rakenne). Sama .saadin-lasiresepti
+   kuin muillakin, kiinteä `--muste`-ikoniväri ei `--muted` samasta
+   dark-tilassa-katoaa-syystä. */
 .edit-btn {
   min-width: 52px;
   min-height: 52px;
-  background: none;
-  border: none;
+  border-radius: var(--r-kosketettava);
+  border: 1px solid rgba(156, 122, 67, .45);
+  background: linear-gradient(165deg, rgba(255, 252, 244, .72), rgba(234, 230, 220, .32));
+  backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
   outline: none;
   appearance: none;
   -webkit-appearance: none;
   font-size: 24px;
-  color: var(--muted);
+  color: var(--muste);
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
   -webkit-tap-highlight-color: transparent;
   opacity: 0.7;
+  transition: transform var(--keski) var(--kelluu), opacity var(--keski) var(--kelluu), border-color var(--keski) var(--kelluu);
 }
 
 .edit-btn:hover,
-.edit-btn:active {
-  color: var(--accent);
+.edit-btn:focus-visible {
+  color: var(--messinki);
   opacity: 1;
+  transform: translateY(-1px);
+}
+.edit-btn:active {
+  color: var(--messinki);
+  opacity: 1;
+  transform: translateY(0) scale(.94);
 }
 
 .list-footer {
@@ -2703,30 +2801,38 @@ h1 {
   flex: 1;
   font-size: 14px;
   letter-spacing: 0.16em;
-  color: var(--accent);
+  color: var(--sinappi);
   padding-left: 24px;
 }
 
 .eye-btn {
   min-width: 52px;
   min-height: 52px;
-  background: none;
-  border: none;
+  border-radius: var(--r-kosketettava);
+  border: 1px solid rgba(156, 122, 67, .45);
+  background: linear-gradient(165deg, rgba(255, 252, 244, .72), rgba(234, 230, 220, .32));
+  backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
   outline: none;
   appearance: none;
   -webkit-appearance: none;
-  color: var(--accent);
+  color: var(--muste);
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
   -webkit-tap-highlight-color: transparent;
-  opacity: 0.6;
+  opacity: 0.7;
+  transition: transform var(--keski) var(--kelluu), opacity var(--keski) var(--kelluu);
 }
 
 .eye-btn:hover,
+.eye-btn:focus-visible {
+  opacity: 1;
+  transform: translateY(-1px);
+}
 .eye-btn:active {
   opacity: 1;
+  transform: translateY(0) scale(.94);
 }
 
 .history-item {
@@ -2887,7 +2993,7 @@ h1 {
    sama syöttökenttien värimaailma kuin muualla (esim. #muistutus-hetki-input). */
 .jatkorivi-teksti {
   width: 100%;
-  font-family: 'Courier New', Courier, monospace;
+  font-family: var(--fontti-loki);
   font-size: 14px;
   color: var(--text);
   background: var(--ground);
@@ -2908,7 +3014,7 @@ h1 {
 }
 
 .jatkorivi-heratys-rivi input[type="date"] {
-  font-family: 'Courier New', Courier, monospace;
+  font-family: var(--fontti-loki);
   font-size: 13px;
   color: var(--text);
   background: var(--ground);
@@ -3268,8 +3374,9 @@ h1 {
    erillään historiasta (2b), samantyylinen huomiolaatikko kuin Hytin
    "seuraava askel" (.hytti-seuraava-askel-laatikko), oma kultainen reunus. */
 .teema-sovittu-linja-laatikko {
-  border: 1px solid var(--accent);
-  border-radius: 6px;
+  background: rgba(255, 253, 248, .5);
+  border: 1px solid var(--hius);
+  border-radius: var(--r-luettava);
   padding: 10px 12px;
   margin: 12px 0 16px;
 }
@@ -3296,7 +3403,7 @@ h1 {
 
 #teema-sovittu-linja-input {
   width: 100%;
-  font-family: 'Courier New', Courier, monospace;
+  font-family: var(--fontti-loki);
   font-size: 14px;
   color: var(--text);
   background: var(--ground);
@@ -3411,7 +3518,7 @@ h1 {
   display: flex;
   align-items: center;
   min-width: 26px;
-  font-family: 'Courier New', Courier, monospace;
+  font-family: var(--fontti-loki);
   font-size: 13px;
   font-weight: bold;
   color: var(--muted);
@@ -3419,7 +3526,7 @@ h1 {
 
 .opinto-deadline-lisays input[type="date"],
 .opinto-deadline-lisays select {
-  font-family: 'Courier New', Courier, monospace;
+  font-family: var(--fontti-loki);
   font-size: 13px;
   color: var(--text);
   background: var(--ground);
@@ -3431,7 +3538,7 @@ h1 {
 }
 
 .opinto-vaihe-select {
-  font-family: 'Courier New', Courier, monospace;
+  font-family: var(--fontti-loki);
   font-size: 12px;
   color: var(--text);
   background: var(--ground);
@@ -3652,7 +3759,7 @@ h1 {
 }
 .silta-ehdotus-nimi-input {
   flex: 1;
-  font-family: 'Courier New', Courier, monospace;
+  font-family: var(--fontti-loki);
   font-size: 14px;
   color: var(--text);
   background: var(--ground);
@@ -3678,7 +3785,7 @@ h1 {
   margin: 10px 0;
 }
 .huoli-pikalisays input[type="date"] {
-  font-family: 'Courier New', Courier, monospace;
+  font-family: var(--fontti-loki);
   font-size: 13px;
   color: var(--text);
   background: var(--ground);
@@ -3765,7 +3872,7 @@ h1 {
 .kasitekartta-teksti-laatikko {
   position: absolute;
   min-width: 40px;
-  font-family: 'Courier New', Courier, monospace;
+  font-family: var(--fontti-loki);
   font-size: 13px;
   color: #111;
   background: rgba(255, 255, 255, 0.85);
@@ -4161,7 +4268,7 @@ h1 {
 }
 
 #signout-link {
-  font-family: 'Courier New', Courier, monospace;
+  font-family: var(--fontti-loki);
   font-size: 11px;
   letter-spacing: 0.1em;
   color: var(--muted);
@@ -4386,7 +4493,7 @@ h1 {
 .ruori .segmentti.ankkurit .add-item { align-items: flex-end; }
 .ruori .segmentti.ankkurit .add-item textarea {
   flex: 1; background: none; border: none; outline: none; resize: none; overflow: hidden;
-  font-family: 'Courier New', Courier, monospace; font-size: 18px; line-height: 1.35;
+  font-family: var(--fontti-loki); font-size: 18px; line-height: 1.35;
   padding: 10px 0; max-height: 220px; color: var(--muste);
 }
 .ruori .segmentti.ankkurit .add-item textarea::placeholder { color: var(--vaimea); }

@@ -1063,6 +1063,11 @@ async function lataaVahdittuSisalto() {
   listEl.innerHTML = '';
   (data || []).forEach(function(tuote) {
     const li = document.createElement('li');
+    // Sama .elava-rivi-luokka kuin Kauppalistan/Muistilappujen sisältörivit
+    // (2026-08-24, "8 näkymän viimeinen erä") — merikartta-luettava-pinta,
+    // ei omaa erillistä luokkaa/sääntöä koska rakenne (check+teksti+×) on
+    // identtinen niiden kanssa.
+    li.className = 'elava-rivi';
 
     const check = document.createElement('button');
     check.className = 'check-btn';
@@ -5661,6 +5666,7 @@ async function lataaLapset() {
   listEl.innerHTML = '';
   lapset.forEach(function(lapsi) {
     const li = document.createElement('li');
+    li.className = 'elava-rivi'; // 2026-08-24, "8 näkymän viimeinen erä" — sama luettava-pinta kuin muualla
     li.addEventListener('click', function() { avaaLapsi(lapsi); });
     const teksti = document.createElement('span');
     teksti.textContent = lapsi.nimi;
@@ -5831,6 +5837,7 @@ async function lataaLapsiLukuvuosijaksot() {
   listEl.innerHTML = '';
   (data || []).forEach(function(jakso) {
     const li = document.createElement('li');
+    li.className = 'elava-rivi';
     const teksti = document.createElement('span');
     teksti.textContent = jakso.alkaa + ' – ' + jakso.paattyy + ' · ' + (LUKUVUOSI_TYYPPI_NIMET[jakso.tyyppi] || jakso.tyyppi);
     li.appendChild(teksti);
@@ -5881,6 +5888,7 @@ async function lataaLapsiPaivapoikkeukset() {
   listEl.innerHTML = '';
   (data || []).forEach(function(poikkeus) {
     const li = document.createElement('li');
+    li.className = 'elava-rivi';
     const teksti = document.createElement('span');
     let kuvaus = poikkeus.paiva + ' · ' + (PAIVAPOIKKEUS_TYYPPI_NIMET[poikkeus.tyyppi] || poikkeus.tyyppi);
     if (poikkeus.tyyppi === 'mukautettu' && poikkeus.alkaa && poikkeus.paattyy) {
@@ -6290,6 +6298,7 @@ async function lataaHenkselit() {
   listEl.innerHTML = '';
   rivit.forEach(function(rivi) {
     const li = document.createElement('li');
+    li.className = 'elava-rivi'; // 2026-08-24, "8 näkymän viimeinen erä" — sama luettava-pinta kuin muualla
     li.addEventListener('click', function() { avaaHenkselitMuokkaus(rivi); });
 
     const teksti = document.createElement('span');
@@ -13952,6 +13961,7 @@ async function lataaHyttiSuljetutIkkunat() {
   listEl.innerHTML = '';
   (data || []).forEach(function(ikkuna) {
     const li = document.createElement('li');
+    li.className = 'elava-rivi';
     const teksti = document.createElement('span');
     teksti.textContent = VIIKONPAIVA_NIMET_HYTTI[ikkuna.viikonpaiva] + ' ' + ikkuna.alkaa.slice(0, 5) + '–' + ikkuna.paattyy.slice(0, 5) + (ikkuna.syy ? ' — ' + ikkuna.syy : '');
     li.appendChild(teksti);

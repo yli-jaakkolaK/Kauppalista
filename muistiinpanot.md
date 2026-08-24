@@ -4647,3 +4647,32 @@ Yhtenäistämisprojektin viimeinen erä: `#laituri-view` sai fontin (`var(--font
 **3. `.divider` — AUDITOITU, EI poistettu mistään, vain tyyli päivitetty.** Katri pyysi poistamaan `.divider`-käytön kohdista joissa se erottaa kahta JO omalla pinnallaan (`.arkki`-korotus) olevaa elementtiä, koska pinnan oma reuna riittäisi. Kävin läpi kaikki 37 käyttökohtaa (`grep 'class="divider"' index.html`) ja tarkistin jokaisen ympäristön: JOKAINEN nykyinen `.divider` erottaa kahta ERI SISÄLTÖRYHMÄÄ (esim. otsikko/lista, lista/syöterivi, osio A/osio B) — ei yhtään kohtaa jossa MOLEMMAT puolet olisivat jo yksittäin korotettuja pintoja. Esimerkkejä tarkistetuista: Laiturin oma divider (rivi ~1361, ennen `#laituri-list`:iä — VAIN toinen puoli, lista, on nyt korotettu, syöterivit yläpuolella eivät ole), Reitin useat osioerottimet Kurssit/Kertausjono/Sillat/Huoli-osioiden välissä (mikään puoli ei ole yksittäin korotettu, `.opinto-kurssi-kortti` on kyllä korotettu MUTTA divider ei ole sen VIERESSÄ vaan koko Kurssit-OSION jälkeen), Asetusten osioerottimet (Tili/Ilmoitukset/Vinkit/Sovellus/Lapset — ei yhtään korotettua elementtiä kummallakaan puolella). Johtopäätös: kaikki nykyiset dividerit ovat aidosti tarpeellisia sisältöryhmäerottimia, ei visuaalista kohinaa poistettavaksi — poistaminen tapahtunee LUONNOLLISESTI seuraavassa 8-näkymän erässä SITÄ MUKAA kun kunkin näkymän omat listat/kortit saavat oman `.arkki`-pintansa (silloin osa näistä samoista dividereistä voi muuttua aidosti redundanteiksi). `.divider` päivitetty katkoviivasta hiusviivaksi (`border-top: 1px solid var(--hius)`) kaikkialla, HTML koskematta.
 
 **Ei vielä testattu livenä.** `node -c script.js` ja style.css-aaltosulkutasapaino puhtaat.
+
+---
+
+## Viimeinen erä: 8 näkymän merikartta-pinta (2026-08-24, sama päivä jatkuu)
+
+Yhtenäistämisprojektin viimeinen erä. Katrin pyytämä järjestys ("kirjastotarkistus alussa") toimi hyvin — Muistilapun kohdalla löytyi heti kolme jaettua elementtiä joita ei vielä ollut migroitu, korjattiin kerran ja sovellettiin loppuihin sitä mukaa kun ne osuivat kohdalle.
+
+**Uudet jaetut kirjastolöydöt (korjattu kerran, ei per näkymä):**
+- **`.edit-btn`** (Muistilaput/Varaston listavalitsimen ✎/⇄) ja **`.settings-btn`** (KÄYTÄNNÖSSÄ JOKAISEN näkymän `.list-header`-oikean-laidan ikoni: App-view 🔒/☑, Teema 👥/🗑, Vahdittu 👥, Taitosolmu 🗑 ym.) jäivät molemmat pois v187:n nappierästä — nyt `.saadin`-lasireseptillä kuten muutkin.
+- **`.eye-btn`** (App-view), **`.aly-log-kumoa-btn`** (Asetusten äly-loki) — sama resepti.
+- **`.varasto-rivi`/`.elava-rivi`** (`.list li`-rivin sisältörivit — jaettu Muistilappujen/Varaston listavalitsimen JA App-viewin sisältörivien kesken) siirretty `.arkki`-luettava-pintaan (oli hiusviivalla erotettu litteä lista). Sama korjaus kattoi automaattisesti Muistilaput+Varasto+App-view kerralla.
+- **`Courier New` → `var(--fontti-loki)`, 17 kohtaa koko tiedostosta** — isoin yksittäinen löydös. Nämä olivat lomakekenttien (input/select/textarea) omia font-family-ylikirjoituksia jotka EIVÄT perineet sivun fonttia vaikka niiden näkymä oli jo migroitu — mukaan lukien YKSI kohta jo "valmiiksi" merkityn Ruorin sisällä (`.ruori .segmentti.ankkurit .add-item textarea`), todiste siitä että "valmis"-näkymissäkin voi piillä jaettu-komponentti-aukkoja. `body`:n oma perus-Courier New jätetty koskematta (se on tarkoituksellinen fallback vielä-migroimattomille näkymille).
+- **`.valinta-palkki`** (App-view) dashed→hiusviiva.
+
+**Näkymä kerrallaan (fontti + `--ground`/`--text`/`--muted`/`--border`-remap kaikille):**
+- **Taitosolmu** — jo VALMIS aiemmasta Hytti-korjauksesta (kuuluu Hytti/Reitti-kokonaisuuteen, sai remapin silloin). Ei omaa listaa/kortteja, pelkkä lomake+piirtoalue — ei tarvinnut lisätyötä.
+- **Muistilaput** — rivit (`.varasto-rivi`, jaettu korjaus yllä), 2 dividerä poistettu (molemmat suoraan listaa reunustavia).
+- **Varasto** — sama rivikorjaus jaettuna, 2 dividerä poistettu.
+- **Teema** — rivit tulivat ILMAISEKSI (`#teema-list` käyttää `.laituri-row`-luokkaa, jo korjattu edellisessä erässä!). `.teema-sovittu-linja-laatikko` (oma kortti) siirretty `--accent`-kehyksestä `--hius`+`.arkki`-taustaan. 1 divider poistettu.
+- **Vahdittu** — `#vahdittu-list`:n rivit eivät saaneet mitään omaa luokkaa aiemmin (paljas `<li>`) — lisätty `elava-rivi` script.js:ään (yksi rivi, ei toiminnallista muutosta). Yksi divider jäi (erottaa asetukset syöterivistä, ei listaa reunustava).
+- **App-view (Kauppalista)** — rivit jaetun `.elava-rivi`/`.varasto-rivi`-korjauksen kautta. `.list-footer .count`:n `var(--accent)` → `var(--sinappi)`. Molemmat dividerit jätetty (kumpikaan ei reunusta listaa suoraan — toinen erottaa otsikon syöterivistä, toinen sisällön yhteenvetopalkista).
+- **Asetukset** — SUURIN näkymä, monta osiota. `#hytti-suljetut-ikkunat-lista` ja `.aly-log-rivi` saivat `elava-rivi`/oman `.arkki`-korjauksensa. Kaikki 7 divideriä jäivät (jokainen erottaa kaksi eri asetusosiota — Tili/Ilmoitukset/Vinkit/Sovellus/Hytin ikkunat/Äly-loki — ei yksikään reunusta pelkkää listaa suoraan).
+- **Lapsi** — `#lapset-lista`, `#henkselit-lista`, `#lapsi-lukuvuosi-lista`, `#lapsi-poikkeus-lista` saivat kaikki `elava-rivi`-luokan. Kaikki 3 dividerä jäivät (jokaisen välissä on lomake/lisäysrivi, ei suora listareunus).
+
+**Divider-uudelleenarviointi: 5 poistettu (Muistilaput ×2, Varasto ×2, Teema ×1), loput ~32 jäivät.** Kriteeri jota sovelsin (tarkennus v193:n "molemmat puolet jo korotettuja" -kriteeriin): divider poistuu kun se on VÄLITTÖMÄSTI ennen/jälkeen nyt-korotetun listan ilman mitään muuta sisältöä välissä — pelkän listan oma reunus riittää silloin, vaikka toinen puoli (otsikko) ei itse ole korotettu. Jos jotain muuta (syöterivi, lomake, osio-otsikko) on välissä, divider jäi, koska se erottaa aidosti kaksi sisältöryhmää eikä ole enää suoraan listan reunalla.
+
+**Ei tähän erään koskettu, tarkistettu ja jätetty tietoisesti:** `.paiva-merkki--keskustellaan`/`.kalenteri-kortti` (dashed var(--accent)/var(--border-dash) — molemmat aiemmin ERIKSEEN rajattu Kalenteri-retheme-erässä, eivät osa 8 näkymän scopea). `.hytti-kortti-suodatin` (pieni alleviivaus-tyylinen filtterilabeli, jo oikeassa väriarvossa remapin kautta, ei kortti/rivi). `.alapalkki-arkki-lista li.alapalkki-raja-jalkeen` (tarkoituksellinen raja-merkki alapalkin järjestelynäkymässä, ei yleinen korttireuna).
+
+**Ei vielä testattu livenä** — tämä on suurin yksittäinen erä koko yhtenäistämisprojektissa, koskee 8 näkymää + useita jaettuja komponentteja kerralla. `node -c script.js` ja style.css-aaltosulkutasapaino puhtaat.
