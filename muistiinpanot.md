@@ -4506,3 +4506,23 @@ Katri: "my husband's weekend trip in the beginning of september shows as 3 separ
 **Katrin toinen löydös samassa viestissä: "weird ellipses are still in day view".** Tarkistin koodin uudelleen rivi riviltä — edellisen erän ⋯/⚓-nappien poisto ON koodissa (ei jäänyt kesken, `createOverflowButton`-kutsu ja `ankkurointiNappi`-luonti eivät enää ole `piirraKalenteriRivi`:ssä), eikä mitään muuta "…"/"⋯"-sisältöä löytynyt päivänäkymän koodista. Todennäköisin selitys: PWA:n `sw.js`-cache ei ollut vielä päivittynyt Katrin laitteella edellisen deployn jälkeen (tämä sovellus on toistuvasti kärsinyt tästä samasta viiveestä — service worker ottaa uuden version käyttöön vasta seuraavalla avauskerralla, ei aina heti). **Ei korjattu koodissa koska mitään korjattavaa ei löytynyt** — pyydetty Katria sulkemaan sovellus kokonaan ja avaamaan uudelleen (ei vain selaimen päivitys) ennen seuraavaa tarkistusta.
 
 **Ei vielä testattu livenä.** `node -c script.js` ja style.css-aaltosulkutasapaino puhtaat.
+
+---
+
+## "Ellipse" tarkoittikin muotoa, ei pisteitä (2026-08-24, sama päivä jatkuu)
+
+Katri palasi sulkemisen/uudelleenavauksen jälkeen: "second I did that but still there is letter inside (my even K ect) ellipse in front of headline." Väärinkäsitys selvisi — "ellipse" ei tarkoittanutkaan "⋯"-pistemerkkiä (se oli jo poistettu ja pysyi poissa) vaan KIRJAIMELLISESTI ellipsi-/ympyrä-MUOTOA: pyöreä omistaja-kirjainmerkki (`.kalenteri-omistaja`, "K"/"J"/"P" ympyrässä otsikon edessä), jonka tietoisesti PÄÄTIN säilyttää edellisessä erässä a11y-perusteella ("muoto kertoo tilan, ei väri yksin") — Katri ei halunnut sitä.
+
+**Poistettu kokonaan** `piirraKalenteriRivi`:stä — rivin oma reunaväri (edellisessä erässä lisätty, `resolveEventOwnerColor`) kertoo nyt KENEN meno on YKSIN, täsmälleen kuten viikkonäkymän palkilla, jolla ei myöskään ole kirjainmerkkiä. "Kuka hoitaa" pysyy tarkistettavissa koko rivin napautuksesta avautuvasta valikosta. Orvoksi jäänyt `.kalenteri-omistaja`-CSS poistettu kokonaan.
+
+**Ei vielä testattu livenä.** `node -c script.js` ja style.css-aaltosulkutasapaino puhtaat.
+
+---
+
+## Nykytila (päivitetty 2026-08-24, myöhäisin)
+
+Uusin tässä istunnossa: omistaja-kirjainmerkin poisto päivänäkymästä (ks. yllä juuri ylle), `sw.js` v185. Sitä ennen samana päivänä, järjestyksessä: monipäiväisen tapahtuman rako-korjaus (v184) → päivänäkymän ⋯/⚓-nappien poisto + rivin oma väri (v183) → kalenterin merikartta-pinta + osoitteen näkyvyyskorjaus (v182) → kalenterin UI-uudistus + Lukkarikoneen osoite datatasolla (v181, `sql/138`). **Ei vielä testattu livenä yhtäkään näistä viidestä erästä lopullisessa muodossaan** — Katri on testannut MATKALLA (kaksi bugia löytyi ja korjattu: monipäiväisen tapahtuman rako, omistajamerkin väärinymmärretty muoto) mutta ei vielä koko lopputulosta yhtenä kokonaisuutena.
+
+Seuraava luonnollinen askel: avata Kalenteri-välilehti kaikissa kolmessa näkymässä sovelluksen TÄYDEN sulkemisen/uudelleenavauksen jälkeen ja tarkistaa kaikki kertaalleen: merikartta-pinta, "tänään"-ympyrä, viikkopalkkien saumaton yhdistyminen monipäiväisillä tapahtumilla, päivänäkymän rivien puhtaus (ei ⋯/⚓/kirjainmerkkiä, pelkkä reunaväri kertoo kenen meno), koko rivin napautus avaa toimintovalikon, ⓘ-nappi paljastaa osoitteen.
+
+Auki: `.pv-kuorma`-tyylinen kuormakortti + `.kal-lippu-rivi`-ristiriitarivin mockup-visuaali päivänäkymän otsikkoon (tietoisesti rajattu pois kaikilla kierroksilla, ei ole vielä olemassa). Miro-kanvaasin tyhjä-tila-bugi 15min-Boostilla (vanha, ei vieläkään lisätietoa).

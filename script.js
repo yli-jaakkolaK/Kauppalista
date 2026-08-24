@@ -6701,23 +6701,13 @@ function piirraKalenteriRivi(rivi) {
     li.appendChild(glyyfi);
   }
 
-  // Omistajamerkki (2026-07-17, ks. muistiinpanot.md "Ristiriitapaketti" —
-  // Katrin OSA X -löydös): rivin reunaväri (yllä) kertoo FEEDIN, ei KENEN
-  // meno on — käyttäjä ei voinut ennustaa ristiriitalogiikkaa ilman tätä.
-  // Kirjain EI luota pelkkään väriin ("muoto kertoo tilan, ei väri yksin") — P=perhe
-  // (ei henkilo-tietoa, jaettu/käsin lisätty), muuten henkilön alkukirjain.
-  // vastuu_henkilo (sql/135) ohittaa tämän kirjaimen/vihjeen kun asetettu —
-  // ks. avaaVastuuHenkiloValikko(). Sama kirjain-periaate ("muoto kertoo
-  // tilan, ei väri yksin") pätee edelleen, vain lähde vaihtuu.
-  const omistaja = document.createElement('span');
-  omistaja.className = 'kalenteri-omistaja';
-  const nayttoHenkilo = rivi.vastuu_henkilo || rivi._henkilo;
-  omistaja.textContent = nayttoHenkilo ? nayttoHenkilo.charAt(0).toUpperCase() : 'P';
-  omistaja.title = nayttoHenkilo
-    ? henkiloNimi(nayttoHenkilo) + (rivi.vastuu_henkilo ? ' hoitaa (merkitty)' : '')
-    : 'Perhe (kaikille yhteinen)';
-  li.appendChild(omistaja);
-
+  // Omistaja-kirjainmerkki (pyöreä "K"/"J"/"P"-badge) POISTETTU 2026-08-24
+  // (Katrin täsmennys: "ellipse in front of headline" — pyöreä muoto, ei
+  // pisteet). Rivin oma reunaväri (ks. yllä, resolveEventOwnerColor) kertoo
+  // nyt KENEN meno on YKSIN, samaan tapaan kuin viikkonäkymän palkilla, jolla
+  // ei myöskään ole erillistä kirjainmerkkiä. Kuka-tieto on silti aina
+  // tarkistettavissa koko rivin napautuksesta avautuvasta "👤 Kuka hoitaa"
+  // -valikkokohdasta.
   li.dataset.tuoteId = rivi.id;
 
   // Nimi AINA näkyvissä kokonaan (2026-08-18, Katrin ohje: "teksti ei saa

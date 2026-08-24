@@ -2744,30 +2744,6 @@ h1 {
    2026-08-24 rivin omalla reunaväri+taustasävyllä, ks. .kalenteri-rivi-
    varillinen alempana — sama periaate kuin viikkonäkymän palkilla. */
 
-/* Omistajamerkki (2026-07-17, ks. muistiinpanot.md "Ristiriitapaketti"):
-   kertoo KENEN meno rivi on (K/J/P) — ei luota pelkkään väriin
-   väripisteeseen, koska väri kertoo FEEDIN eikä käyttäjä voinut aiemmin
-   päätellä siitä henkilöä. Neutraali reunuskirjain, ei täytetty väri —
-   erottuu MUODOLLA/tekstillä, ei väririippuvainen. */
-.kalenteri-omistaja {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 16px;
-  height: 16px;
-  min-width: 16px;
-  padding: 0;
-  line-height: 1;
-  border-radius: 50%;
-  border: 1px solid var(--hius-vahva);
-  color: var(--vaimea);
-  font-size: 9px;
-  font-weight: bold;
-  margin-right: 6px;
-  flex-shrink: 0;
-  flex-grow: 0;
-}
-
 /* Nimi + sijainti -pari päivänäkymän rivillä (2026-08-18, kalenterin
    UI-uudistus, Katrin ohje: "teksti ei saa koskaan katketa piiloon" — pätee
    myös Lukkarikoneen luentojen osoitteeseen). Poissuljettu yllä olevasta
@@ -2775,8 +2751,7 @@ h1 {
    korkeutta pitkälle nimelle/osoitteelle sen sijaan että sisältö katoaisi.
    `.list li` sai `align-items:flex-start` skoopattuna tämän ryhmän sisällä,
    jotta kaksiriviset tekstit eivät roiku pystykeskitettynä rivin muihin,
-   yksiriviisiin kiinteän-levyisiin merkkeihin (kellonaika, väripiste,
-   omistajakirjain) nähden. */
+   yksiriviisiin kiinteän-levyisiin merkkeihin (kellonaika) nähden. */
 .kalenteri-paiva-ryhma .list li {
   align-items: flex-start;
   padding: 6px 0;
@@ -2787,8 +2762,7 @@ h1 {
 .kalenteri-paiva-ryhma .list li:active {
   background: rgba(156, 122, 67, .08);
 }
-.kalenteri-paiva-ryhma .list li .kalenteri-aika,
-.kalenteri-paiva-ryhma .list li .kalenteri-omistaja {
+.kalenteri-paiva-ryhma .list li .kalenteri-aika {
   margin-top: 3px;
 }
 
