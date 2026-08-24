@@ -1528,23 +1528,52 @@ h1 {
    VAAKASUUNNASSA `-3px`:iin (pystysuunta pysyy `-6px`:ssä, koska siinä ei
    ole vierekkäistä nappia riskinä) — 3px+3px=6px täsmää tasan gapin kanssa,
    joten hit-slopit koskettavat mutta eivät koskaan mene päällekkäin. */
+/* Jaettujen rivinappien (check/anchor/overflow/reminder/delete/link-btn)
+   merikartta-pinta (2026-08-24, Katrin pyyntö "jaetut komponentit ensin,
+   koko sovellusta koskeva pass") — sama .saadin-tyyppinen lasiresepti kuin
+   Ruorin/Kalenterin napeilla, mutta OMA, hieman VAHVEMPI opasiteetti
+   (.72/.32 tavallisen .5/.18:n sijaan) koska nämä napit ovat jaettuja
+   komponentteja jotka näkyvät MYÖS niiden 8 näkymän päällä joita ei ole
+   vielä siirretty merikartta-taustalle (Asetukset/Lapsi/Muistilaput/
+   Varasto/Teema/Vahdittu/App-view/Taitosolmu/Hytti-kortti) — tumma teema
+   näissä näkymissä tarkoittaa tumman `--ground`-taustan takana olevaa
+   nappia, joten lasin pitää olla riittävän peittävä että kiinteä `--muste`-
+   ikoniväri pysyy luettavana riippumatta siitä minkä värinen tausta napin
+   TAKANA sattuu olemaan — ei enää teemaa seuraavaa `--muted`-väriä, koska
+   se olisi voinut kadota vaaleaan lasiin tumma-teemallisen laitteen
+   valossa. `color:var(--muste)` on nyt KIINTEÄ (ei seuraa laitteen tumma/
+   vaalea-tilaa) täsmälleen samasta syystä kuin Laituri/Kalenteri-migraatiot
+   aiemmin. */
 .check-btn {
   position: relative;
   min-width: 36px;
   min-height: 52px;
-  background: none;
-  border: none;
+  border-radius: var(--r-kosketettava);
+  border: 1px solid rgba(156, 122, 67, .45);
+  background: linear-gradient(165deg, rgba(255, 252, 244, .72), rgba(234, 230, 220, .32));
+  backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
   outline: none;
   appearance: none;
   -webkit-appearance: none;
   font-size: 18px;
-  color: var(--muted);
+  color: var(--muste);
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
   -webkit-tap-highlight-color: transparent;
-  font-family: 'Courier New', Courier, monospace;
+  font-family: var(--fontti-loki);
+  opacity: .6;
+  transition: transform var(--keski) var(--kelluu), opacity var(--keski) var(--kelluu), border-color var(--keski) var(--kelluu);
+}
+.check-btn:hover,
+.check-btn:focus-visible {
+  opacity: 1;
+  transform: translateY(-1px);
+}
+.check-btn:active {
+  opacity: 1;
+  transform: translateY(0) scale(.94);
 }
 
 .check-btn::before,
@@ -1559,7 +1588,9 @@ h1 {
 }
 
 .list li.done .check-btn {
-  color: var(--accent);
+  color: var(--syvanne);
+  border-color: var(--syvanne);
+  opacity: 1;
 }
 
 /* RIVIEN UI-REMONTTI (2026-07-16): `flex:1` EI ollut aiemmin rajattu vain
@@ -1846,44 +1877,56 @@ h1 {
   position: relative;
   min-width: 36px;
   min-height: 52px;
-  background: none;
-  border: none;
+  border-radius: var(--r-kosketettava);
+  border: 1px solid rgba(156, 122, 67, .45);
+  background: linear-gradient(165deg, rgba(255, 252, 244, .72), rgba(234, 230, 220, .32));
+  backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
   outline: none;
   appearance: none;
   -webkit-appearance: none;
   font-size: 24px;
-  color: var(--muted);
+  color: var(--muste);
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
   -webkit-tap-highlight-color: transparent;
-  opacity: 0.5;
+  opacity: 0.6;
+  transition: transform var(--keski) var(--kelluu), opacity var(--keski) var(--kelluu), border-color var(--keski) var(--kelluu);
 }
 
 .delete-btn:hover,
-.delete-btn:active {
+.delete-btn:focus-visible {
   color: #e24b4a;
+  border-color: #e24b4a;
   opacity: 1;
+  transform: translateY(-1px);
+}
+.delete-btn:active {
+  opacity: 1;
+  transform: translateY(0) scale(.94);
 }
 
 .anchor-btn {
   position: relative;
   min-width: 32px;
   min-height: 44px;
-  background: none;
-  border: none;
+  border-radius: var(--r-kosketettava);
+  border: 1px solid rgba(156, 122, 67, .45);
+  background: linear-gradient(165deg, rgba(255, 252, 244, .72), rgba(234, 230, 220, .32));
+  backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
   outline: none;
   appearance: none;
   -webkit-appearance: none;
   font-size: 20px;
-  color: var(--muted);
+  color: var(--muste);
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
   -webkit-tap-highlight-color: transparent;
-  opacity: 0.4;
+  opacity: 0.55;
+  transition: transform var(--keski) var(--kelluu), opacity var(--keski) var(--kelluu), border-color var(--keski) var(--kelluu), background var(--keski) var(--kelluu);
 }
 
 /* Materiaalilinkki per opiskelusolmu (2026-08-05, ks. HYTTI_SPEKSI §5) —
@@ -1893,23 +1936,34 @@ h1 {
   position: relative;
   min-width: 32px;
   min-height: 44px;
-  background: none;
-  border: none;
+  border-radius: var(--r-kosketettava);
+  border: 1px solid rgba(156, 122, 67, .45);
+  background: linear-gradient(165deg, rgba(255, 252, 244, .72), rgba(234, 230, 220, .32));
+  backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
   outline: none;
   appearance: none;
   -webkit-appearance: none;
   font-size: 14px;
-  color: var(--muted);
+  color: var(--muste);
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
   -webkit-tap-highlight-color: transparent;
+  opacity: .7;
+  transition: transform var(--keski) var(--kelluu), opacity var(--keski) var(--kelluu);
 }
+.link-btn:hover, .link-btn:focus-visible { opacity: 1; transform: translateY(-1px); }
+.link-btn:active { opacity: 1; transform: translateY(0) scale(.94); }
 
 .anchor-btn:hover,
+.anchor-btn:focus-visible {
+  opacity: 1;
+  transform: translateY(-1px);
+}
 .anchor-btn:active {
   opacity: 1;
+  transform: translateY(0) scale(.94);
 }
 
 /* Ankkuri-SVG (2026-08-11, Ruori-speksi §4.1) korvasi kaikkialla sovelluksessa
@@ -1926,10 +1980,11 @@ h1 {
    väri yksin" -periaate. Koskee kaikkia ⚓-nappeja koko sovelluksessa
    (sama luokka), ei vain Laituria. */
 .anchor-btn.active {
-  color: var(--ground);
+  color: var(--paperi);
   opacity: 1;
-  background: var(--accent);
-  border-radius: 8px;
+  background: var(--messinki);
+  border-color: var(--messinki);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .3);
 }
 
 .anchor-btn.leaving {
@@ -1949,28 +2004,37 @@ h1 {
   position: relative;
   min-width: 32px;
   min-height: 44px;
-  background: none;
-  border: none;
+  border-radius: var(--r-kosketettava);
+  border: 1px solid rgba(156, 122, 67, .45);
+  background: linear-gradient(165deg, rgba(255, 252, 244, .72), rgba(234, 230, 220, .32));
+  backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
   outline: none;
   appearance: none;
   -webkit-appearance: none;
   font-size: 18px;
-  color: var(--muted);
+  color: var(--muste);
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
   -webkit-tap-highlight-color: transparent;
-  opacity: 0.4;
+  opacity: 0.55;
+  transition: transform var(--keski) var(--kelluu), opacity var(--keski) var(--kelluu), border-color var(--keski) var(--kelluu);
 }
 
 .reminder-btn:hover,
+.reminder-btn:focus-visible {
+  opacity: 1;
+  transform: translateY(-1px);
+}
 .reminder-btn:active {
   opacity: 1;
+  transform: translateY(0) scale(.94);
 }
 
 .reminder-btn.active {
-  color: var(--accent);
+  color: var(--messinki);
+  border-color: var(--messinki);
   opacity: 1;
 }
 
@@ -1981,25 +2045,33 @@ h1 {
   position: relative;
   min-width: 32px;
   min-height: 44px;
-  background: none;
-  border: none;
+  border-radius: var(--r-kosketettava);
+  border: 1px solid rgba(156, 122, 67, .45);
+  background: linear-gradient(165deg, rgba(255, 252, 244, .72), rgba(234, 230, 220, .32));
+  backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
   outline: none;
   appearance: none;
   -webkit-appearance: none;
   font-size: 20px;
-  color: var(--muted);
+  color: var(--muste);
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
   -webkit-tap-highlight-color: transparent;
-  opacity: 0.5;
+  opacity: 0.6;
   flex-shrink: 0;
+  transition: transform var(--keski) var(--kelluu), opacity var(--keski) var(--kelluu), border-color var(--keski) var(--kelluu);
 }
 
 .overflow-btn:hover,
+.overflow-btn:focus-visible {
+  opacity: 1;
+  transform: translateY(-1px);
+}
 .overflow-btn:active {
   opacity: 1;
+  transform: translateY(0) scale(.94);
 }
 
 /* BUGIKORJAUS (2026-08-03, Katrin huomio Laiturista/Ankkureista): korkeintaan
@@ -2015,6 +2087,13 @@ h1 {
   flex-shrink: 0;
 }
 
+/* Kiinteä paperi (ei --ground) — sama syy kuin jaettujen nappien lasilla
+   yllä: valikko avautuu MYÖS niiden näkymien päällä joita ei ole vielä
+   siirretty merikartta-taustalle, joten sen oma pinta ei saa riippua
+   laitteen tumma/vaalea-tilasta ollakseen aina luettava riippumatta mikä
+   on sen TAKANA. Melkein täysin peittävä (.97) koska tämä on ponnahdus-
+   valikko, ei inline-sisältöä — .arkki-luokan .5-läpinäkyvyys ei riittäisi
+   erottumaan taustasta selvästi. */
 .row-menu {
   position: absolute;
   top: 100%;
@@ -2023,10 +2102,10 @@ h1 {
   display: flex;
   flex-direction: column;
   min-width: 150px;
-  background: var(--ground);
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.2);
+  background: rgba(255, 253, 248, .97);
+  border: 1px solid var(--hius-vahva);
+  border-radius: var(--r-luettava);
+  box-shadow: 0 6px 18px rgba(34, 31, 26, .18);
   overflow: hidden;
 }
 /* Käännetty rivin YLÄPUOLELLE (2026-08-18, ks. openRowMenu():n
@@ -2042,23 +2121,24 @@ h1 {
   border: none;
   outline: none;
   text-align: left;
-  font-family: 'Courier New', Courier, monospace;
+  font-family: var(--fontti-loki);
   font-size: 15px;
   font-weight: 500;
-  color: var(--text);
+  color: var(--muste);
   padding: 12px 16px;
   min-height: 44px;
   cursor: pointer;
   -webkit-tap-highlight-color: transparent;
+  transition: background var(--keski) var(--kelluu);
 }
 
 .row-menu-item:not(:last-child) {
-  border-bottom: 1px solid var(--border);
+  border-bottom: 1px solid var(--hius);
 }
 
 .row-menu-item:hover,
 .row-menu-item:active {
-  background: var(--border);
+  background: rgba(156, 122, 67, .12);
 }
 
 .row-menu-item-danger {

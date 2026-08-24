@@ -4543,3 +4543,17 @@ Auki: `.pv-kuorma`-tyylinen kuormakortti + `.kal-lippu-rivi`-ristiriitarivin moc
 - Hytti-tapahtumien erillinen kevyempi ilme (konseptin toinen osa) jätettiin tietoisesti tälle kierrokselle ulkopuolelle Katrin omasta rajauksesta.
 
 **Ei vielä testattu livenä.** `node -c script.js` ja style.css-aaltosulkutasapaino puhtaat.
+
+---
+
+## Jaetut rivinapit merikartta-pinnalle (2026-08-24, sama päivä jatkuu)
+
+Katri palasi tutkimusraportin pohjalta priorisoidulla jatkopyynnöllä: siirrä jaetut, moneen näkymään yhteiset komponentit (`.check-btn`/`.anchor-btn`/`.overflow-btn`/`.row-menu`) merikartta-pintaan ENNEN yksittäisten näkymien (Laituri, Hytti, koskemattomat 8) korjaamista, koska tämä hyödyttää kaikkia kerralla. Kaksi asiaa selvisi samalla hänen puoleltaan: kalenterin pinta OLI jo deployattu (hän oli lukenut vanhaa paikallista kopiota, ei tuoretta tiedostoa), ja K/J/P-kirjainten poisto ei ollut vahinko vaan hänen oma pyyntönsä.
+
+**Laajennettu pyydettyä neljää kohdennetusti kuuteen** — `.reminder-btn`/`.delete-btn`/`.link-btn` jakavat SAMAN `::before`-hit-slop-säännön `.check-btn`/`.anchor-btn`/`.overflow-btn`:n kanssa jo valmiiksi CSS:ssä (yksi selkeästi yhtenäinen napkieli, ei erillinen), joten näiden jättäminen vanhaan tyyliin olisi luonut UUDEN sisäisen ristiriidan samalla rivillä (esim. uusi lasimainen ⚓ vieressä vanha katkoviivaton × ilman mitään pintaa) — täsmälleen se "näkymä hajoaa visuaalisesti" -riski jota Katri pyysi tarkistamaan.
+
+**Kriittinen tarkistus tehty ennen rakentamista — tumma teema jaetun komponentin taustana:** nämä napit näkyvät MYÖS niiden 8 näkymän päällä joita ei ole vielä siirretty merikartta-taustalle — niissä sivun tausta seuraa yhä laitteen tumma/vaalea-tilaa (`--ground`). Jos olisin vain vaihtanut ikonivärin `--muted`:sta johonkin kiinteään sävyyn taustaa koskematta, tumman teeman laitteella nappi olisi voinut kadota näkymättömiin (sama bugiluokka joka on korjattu useasti tässä projektissa aiemmin). Ratkaisu: napit saavat OMAN kiinteän lasitaustan (ei vain väriä) — `.saadin`-resepti mutta hieman peittävämpänä (.72/.32 tavallisen .5/.18:n sijaan) juuri tätä käyttötapausta varten, jolloin kiinteä tumma `--muste`-ikoniväri pysyy luettavana riippumatta siitä mikä väri on TAKANA. `.row-menu` sai vastaavasti lähes täysin peittävän `--paperi`-pohjaisen taustan (.97) tavallisen `.arkki`-luokan .5-läpinäkyvyyden sijaan, samasta syystä.
+
+**Koskemattomana jätetty tietoisesti:** Ruorin oma `.ruori .segmentti.ankkurit .anchor-btn/.overflow-btn`-skoopattu ylikirjoitus (jo oma, hienovaraisempi lasireseptinsä, täysin itsenäinen — perusluokan muutokset eivät vuoda läpi koska skoopattu sääntö asettaa kaikki tarvittavat ominaisuudet uudelleen). `.anchor-btn.leaving`-poistumisanimaatio koskematta (oma yksinkertainen transition, ei osa tätä pyyntöä). `.row-menu-item-danger`:n kiinteä `#e24b4a`-punainen koskematta (jo teemariippumaton, ei tarvinnut korjausta).
+
+**Ei vielä testattu livenä** — erityisesti tumma-teema-tapaus (jaettu nappi vanhan, tumma-teemaa seuraavan näkymän päällä) on uutta, ei aiemmin testattua aluetta, koska aiemmat migraatiot (Ruori/Kalenteri) ovat aina saaneet KOKO sivun oman kiinteän merikartta-taustan samalla kertaa eivätkä ole koskaan tarvinneet toimia mielivaltaisen (mahdollisesti tumman) taustan päällä. `node -c script.js` (ei JS-muutoksia tässä erässä) ja style.css-aaltosulkutasapaino puhtaat.
