@@ -5984,6 +5984,15 @@ function avaaVastuuHenkiloValikko(rivi, li) {
   if (toinenKayttaja && rivi.vastuu_henkilo !== toinenKayttaja.henkilo) {
     items.push({ label: henkiloNimi(toinenKayttaja.henkilo) + ' hoitaa', onClick: function() { asetaVastuuHenkilo(rivi, toinenKayttaja.henkilo); } });
   }
+  // Lapset kohteena (2026-08-18, kalenterin UI-uudistus) — "kuka hoitaa"
+  // tarkoittaa tässä "kenen menosta on kyse" (esim. "Rebekka: neuvola"),
+  // ei kirjaimellisesti kuljettajaa. Avain = nimi pienellä, sama kuin
+  // EVENT_OWNER_COLORS/-KIRJAIMET käyttävät värin/kirjaimen hakuun.
+  cachedLapset.forEach(function(lapsi) {
+    const avain = lapsi.nimi.toLowerCase();
+    if (rivi.vastuu_henkilo === avain) return;
+    items.push({ label: lapsi.nimi + ': tämä meno', onClick: function() { asetaVastuuHenkilo(rivi, avain); } });
+  });
   if (rivi.vastuu_henkilo) {
     items.push({ label: '× Poista merkintä', danger: true, onClick: function() { asetaVastuuHenkilo(rivi, null); } });
   }
@@ -6408,31 +6417,30 @@ document.getElementById('pacer-kehote-toggle').addEventListener('change', async 
   await paivitaAsetukset();
 });
 
-// === KALENTERIN OMISTAJAVÄRIT (2026-08-05, Kalenteri UI -uudistus) ===
-// Kiinteä 4-värinen paletti henkilön mukaan, käytössä kuukausi- ja
-// viikkonäkymän palkeissa. EI koske päivänäkymää (piirraKalenteriRivi),
-// joka näyttää edelleen syötteen omaa _vari-kenttää koskemattomana — tämä
-// on tietoinen rajaus, ei unohdus (ks. Kalenteri UI -speksi "Ei muuteta").
-// 'lapset' ei ole tällä hetkellä saavutettavissa mistään oikeasta syötteestä
-// (henkilo-sarakkeen check-constraint sallii vain katri/juha/null) — varattu
-// tulevaa lapsikohtaista kalenterisyötettä varten.
-// Päivitetty 2026-08-17 (Katrin kalenterivärit-päätös, ks. style.css
-// --kal-katri/--kal-juha/--kal-yhteinen) — samat arvot molemmissa
-// paikoissa (ei luettu CSS-muuttujasta koska EVENT_OWNER_COLORS oli jo
-// suora hex-objekti tätä ennenkin, ei muutettu rakennetta).
-const EVENT_OWNER_COLORS = { katri: '#D32F2F', juha: '#1976D2', molemmat: '#8E44AD', lapset: '#6b6660' };
-function resolveEventOwnerColor(tapahtuma) {
-  if (tapahtuma._henkilo === 'katri') return EVENT_OWNER_COLORS.katri;
-  if (tapahtuma._henkilo === 'juha') return EVENT_OWNER_COLORS.juha;
-  if (tapahtuma._henkilo === 'lapset') return EVENT_OWNER_COLORS.lapset;
-  return EVENT_OWNER_COLORS.molemmat;
+// === KALENTERIN OMISTAJAVÄRIT (2026-08-05, Kalenteri UI -uudistus;
+// laajennettu 2026-08-18 lapsille + vastuu_henkilo-yliajolle) ===
+// Käytössä kuukausi- ja viikkonäkymän palkeissa SEKÄ (24.8.2026 mockup,
+// ks. muistiinpanot.md) uudistetussa päivänäkymässä.
+// Taulukkopohjainen haku if/else-ketjun sijaan (2026-08-18) — helppo
+// laajentaa, ei enää N if-haaraa per uusi henkilö. Katsoo ENSIN
+// vastuu_henkilo-yliajon (sql/135, "kuka hoitaa" -valikko) ja vasta sen
+// puuttuessa syötteen oman _henkilo:n — sama etusijajärjestys kuin
+// paallekkaisyysVakavuus():ssa ja "oma kuorma" -suodattimissa, jotta
+// väri/kirjain vastaavat sitä mitä muu logiikka jo päätteli vastuusta.
+// 'lapset'-yleiskatto poistettu (oli aina saavuttamaton, ks. vanha
+// kommentti) — korvattu oikeilla rebekka/jamiel-merkinnöillä, jotka OVAT
+// nyt saavutettavissa: vastuu_henkilo on vapaamuotoinen text (sql/135, ei
+// check-constraintia), joten "Kuka hoitaa" -valikko voi kirjoittaa myös
+// lapsen nimen sinne (ks. avaaVastuuHenkiloValikko).
+const EVENT_OWNER_COLORS = {
+  katri: '#D32F2F', juha: '#1976D2', molemmat: '#8E44AD',
+  rebekka: '#E07B2B', jamiel: '#4C8C4A',
+};
+function resolveEventOwnerAvain(tapahtuma) {
+  return tapahtuma.vastuu_henkilo || tapahtuma._henkilo;
 }
-// K/J/Y/L — Y = "Yhteinen" (jaettu/perhe, ei henkilo-tietoa).
-function resolveEventOwnerLetter(tapahtuma) {
-  if (tapahtuma._henkilo === 'katri') return 'K';
-  if (tapahtuma._henkilo === 'juha') return 'J';
-  if (tapahtuma._henkilo === 'lapset') return 'L';
-  return 'Y';
+function resolveEventOwnerColor(tapahtuma) {
+  return EVENT_OWNER_COLORS[resolveEventOwnerAvain(tapahtuma)] || EVENT_OWNER_COLORS.molemmat;
 }
 
 // Muuntaa kellonajan ("HH:MM" tai "HH:MM:SS") prosenttiosuudeksi 07:00–23:00
@@ -6677,9 +6685,14 @@ function piirraKalenteriRivi(rivi) {
     glyyfi.title = (rivi._henkilo ? rivi._henkilo.charAt(0).toUpperCase() + rivi._henkilo.slice(1) + ': ' : '') + 'opiskelu/työ (hytti)';
     li.appendChild(glyyfi);
   } else if (rivi._vari) {
+    // resolveEventOwnerColor (2026-08-18, kalenterin UI-uudistus) eikä
+    // suoraan rivi._vari, jotta piste seuraa vastuu_henkilo-ylikirjoitusta
+    // (sql/135) samalla tavalla kuin viereinen omistaja-kirjain jo tekee —
+    // aiemmin nämä kaksi saattoivat näyttää RISTIRIITAISET tiedot (kirjain
+    // "R" mutta piste silti alkuperäisen syötteen punainen).
     const vari = document.createElement('span');
     vari.className = 'kalenteri-vari';
-    vari.style.backgroundColor = rivi._vari;
+    vari.style.backgroundColor = resolveEventOwnerColor(rivi);
     li.appendChild(vari);
   }
 
@@ -6702,9 +6715,27 @@ function piirraKalenteriRivi(rivi) {
 
   li.dataset.tuoteId = rivi.id;
 
+  // Nimi + sijainti samassa pystyladotussa span-parissa (2026-08-18,
+  // kalenterin UI-uudistus, Katrin ohje: "teksti ei saa koskaan katketa
+  // piiloon" ja lukkarikoneen luennot pitää näyttää osoitteineen). Molemmat
+  // omilla luokillaan (.kalenteri-teksti/.kalenteri-sijainti) ja rajattu
+  // pois .list li:n yleisestä yksirivis-ellipsis-säännöstä (ks. style.css:n
+  // .kalenteri-paiva-ryhma .list li -oma sääntö) — sama korjaustapa kuin
+  // #opinto-tehtava-ohje-lista sai 18.8.
+  const tekstiwrap = document.createElement('span');
+  tekstiwrap.className = 'kalenteri-teksti-wrap';
   const teksti = document.createElement('span');
+  teksti.className = 'kalenteri-teksti';
   teksti.textContent = rivi.title;
-  li.appendChild(teksti);
+  tekstiwrap.appendChild(teksti);
+  const sijainti = tapahtumanSijaintiteksti(rivi);
+  if (sijainti) {
+    const sijaintiEl = document.createElement('span');
+    sijaintiEl.className = 'kalenteri-sijainti';
+    sijaintiEl.textContent = sijainti;
+    tekstiwrap.appendChild(sijaintiEl);
+  }
+  li.appendChild(tekstiwrap);
 
   // "Yksi totuus, kaksi ikkunaa": tapahtuma näkyy AINA agendassa, mutta jos
   // sen on tuonut toinen käyttäjä (tai tekijää ei tunnistettu) eikä minä ole
@@ -6860,7 +6891,7 @@ async function lataaKalenteri() {
   // onkoUusiMinulle) jättää hytti-scopen edelleen erikseen pois — omaa
   // luentoa ei koskaan "kuitata".
   const { data: haetut, error } = await db.from('kalenteri_tapahtumat')
-    .select('*, kalenteri_syotteet(vari, henkilo, scope)')
+    .select('*, kalenteri_syotteet(vari, henkilo, scope, osoite)')
     .gte('event_date', paivamaaraISO(haunAlku))
     .lte('event_date', paivamaaraISO(haunLoppu))
     .order('event_date')
@@ -6877,6 +6908,11 @@ async function lataaKalenteri() {
         _vari: t.kalenteri_syotteet ? t.kalenteri_syotteet.vari : null,
         _henkilo: t.kalenteri_syotteet ? t.kalenteri_syotteet.henkilo : null,
         _scope: t.kalenteri_syotteet ? t.kalenteri_syotteet.scope : null,
+        // Syötteen oletusosoite (kalenteri_syotteet.osoite, sql/136) —
+        // käytetään kun tapahtumalla itsellään ei ole location-tekstiä,
+        // esim. Lukkarikone-luennot: "Joukahaisenkatu 3-5, Turku" kiinteänä
+        // ilman geokoodausta (Katrin 24.8.2026 ohje).
+        _osoite: t.kalenteri_syotteet ? t.kalenteri_syotteet.osoite : null,
       });
     });
 
@@ -6896,7 +6932,7 @@ async function lataaKalenteri() {
         _tyyppi: 'tapahtuma', id: t.id, title: t.title, event_date: t.event_date, event_time: t.event_time,
         event_end_time: t.event_end_time, syote_id: t.syote_id, _henkilo: t._henkilo,
         _vari: t._vari, _scope: t._scope, ical_uid: t.ical_uid, user_id: t.user_id,
-        vastuu_henkilo: t.vastuu_henkilo,
+        vastuu_henkilo: t.vastuu_henkilo, location: t.location, _osoite: t._osoite,
       };
     });
 
@@ -7251,6 +7287,36 @@ async function piirraKuukausiRuudukko(sisalto, kaikkiTapahtumat, kuluvaKuukausi)
   }
 
   sisalto.appendChild(ruudukko);
+  sisalto.appendChild(piirraKuukausiSelite());
+}
+
+// Väriselite kuukausinäkymän alle (2026-08-18, kalenterin UI-uudistus,
+// mockup https://claude.ai/code/artifact/6868b897) — kuukausi näyttää VAIN
+// värillisiä palkkeja ilman nimiä, joten katsoja tarvitsee jonkin paikan
+// josta tarkistaa mikä väri tarkoittaa ketäkin. Lapset listataan vain jos
+// heillä on jokin väri (aina, koska EVENT_OWNER_COLORS kattaa molemmat
+// kiinteästi) — ei ehdollista näkyvyyttä, sama viisi riviä joka kuukausi.
+function piirraKuukausiSelite() {
+  const selite = document.createElement('div');
+  selite.className = 'kalenteri-kuukausi-selite';
+  [
+    ['katri', 'Katri'], ['juha', 'Juha'], ['molemmat', 'Yhteinen'],
+    ['rebekka', 'Rebekka'], ['jamiel', 'Jamiel'],
+  ].forEach(function(pari) {
+    const rivi = document.createElement('span');
+    rivi.className = 'kalenteri-kuukausi-selite-rivi';
+    const piste = document.createElement('span');
+    piste.className = 'kalenteri-kuukausi-selite-piste';
+    piste.style.background = EVENT_OWNER_COLORS[pari[0]];
+    rivi.appendChild(piste);
+    rivi.appendChild(document.createTextNode(pari[1]));
+    selite.appendChild(rivi);
+  });
+  const merkit = document.createElement('span');
+  merkit.className = 'kalenteri-kuukausi-selite-rivi';
+  merkit.textContent = '⚠️ ristiriita · 🟠 huolilippu';
+  selite.appendChild(merkit);
+  return selite;
 }
 
 // === VIIKKONÄKYMÄN AIKAJANA (2026-08-05, Kalenteri UI -uudistus) ===
@@ -7268,10 +7334,10 @@ async function piirraKuukausiRuudukko(sisalto, kaikkiTapahtumat, kuluvaKuukausi)
 const VIIKKO_KOKOPAIVA_MAX_LINJOJA = 2;
 const VIIKKO_KOKOPAIVA_LINJA_TOP_PX = [0, 8];
 // Pidä samassa kuin style.css:n .kalenteri-viikko-tuntialue { height } —
-// tarvitaan tässä koska palkin korkeus px:nä ratkaisee näytetäänkö nimi
-// (ks. VIIKKO_BADGE_NIMI_RAJA_PX, "≥28px" Kalenteri UI -speksissä).
-const VIIKKO_TUNTIALUE_KORKEUS_PX = 400;
-const VIIKKO_BADGE_NIMI_RAJA_PX = 28;
+// 400 -> 544 (2026-08-18, kalenterin UI-uudistus, mockup) = 34px/tunti
+// (16 tuntia) 25px/tunti sijaan, jotta nimelle+osoitteelle on oikeasti
+// tilaa ilman katkaisua (ks. VIIKKO_BADGE_NIMI_RAJA_PX-poisto alla).
+const VIIKKO_TUNTIALUE_KORKEUS_PX = 544;
 
 function piirraViikkoKokopaivaRivi(paivanKaikki, iso) {
   const rivi = document.createElement('div');
@@ -7374,6 +7440,15 @@ function piirraViikkoOpiskeluMerkit(paivanSessiot) {
   });
 }
 
+// Sijaintiteksti kalenteririvin/-palkin toiselle riville (viikko- JA
+// päivänäkymä): tapahtuman oma location, tai jos sitä ei ole, syötteen
+// oletusosoite (kalenteri_syotteet.osoite, sql/138) — esim. Lukkarikone-
+// luennoille kiinteä "Joukahaisenkatu 3-5, Turku" ilman erillistä
+// geokoodausta (Katrin 24.8.2026 ohje: "no need to fetch it from anywhere").
+function tapahtumanSijaintiteksti(t) {
+  return t.location || t._osoite || null;
+}
+
 function piirraViikkoTuntialue(paivanAjalliset, henkselitLista, iso, paivanSessiot) {
   const alue = document.createElement('div');
   alue.className = 'kalenteri-viikko-tuntialue';
@@ -7389,20 +7464,24 @@ function piirraViikkoTuntialue(paivanAjalliset, henkselitLista, iso, paivanSessi
     palkki.style.borderLeftColor = vari;
     palkki.style.backgroundColor = vari + '26'; // ~15% peittävyys (hex-alpha)
 
-    const merkki = document.createElement('span');
-    merkki.className = 'kalenteri-viikko-merkki';
-    merkki.style.backgroundColor = vari;
-    merkki.textContent = resolveEventOwnerLetter(t);
-    palkki.appendChild(merkki);
-
-    const korkeusPx = kohde.heightPct / 100 * VIIKKO_TUNTIALUE_KORKEUS_PX;
-    if (korkeusPx >= VIIKKO_BADGE_NIMI_RAJA_PX) {
-      const nimi = document.createElement('span');
-      nimi.className = 'kalenteri-viikko-nimi';
-      nimi.textContent = t.title;
-      palkki.appendChild(nimi);
-    } else {
-      palkki.title = (t.event_time ? t.event_time.slice(0, 5) + ' ' : '') + t.title;
+    // Nimi näkyy AINA (2026-08-18, kalenterin UI-uudistus, Katrin ohje:
+    // "teksti ei saa koskaan katketa piiloon" — ei enää title-tooltip-
+    // vaihtoehtoa lyhyille palkeille, ks. poistettu VIIKKO_BADGE_NIMI_RAJA_PX).
+    // Osoite/sijainti näkyy toisena rivinä samalla periaatteella (mockup
+    // näytti sen vain jos korkeutta riitti — tiukennettu tähän AINA, koska
+    // kirjoitettu speksi kielsi "paikkojen" katkaisun nimenomaisesti).
+    // Palkki saa kasvaa visuaalisesti yli varatun ajan (min-height CSS:ssä,
+    // z-index nostaa naapurien päälle) sen sijaan että sisältö katoaisi.
+    const nimi = document.createElement('span');
+    nimi.className = 'kalenteri-viikko-nimi';
+    nimi.textContent = t.title;
+    palkki.appendChild(nimi);
+    const sijainti = tapahtumanSijaintiteksti(t);
+    if (sijainti) {
+      const sijaintiEl = document.createElement('span');
+      sijaintiEl.className = 'kalenteri-viikko-sijainti';
+      sijaintiEl.textContent = sijainti;
+      palkki.appendChild(sijaintiEl);
     }
 
     alue.appendChild(palkki);
