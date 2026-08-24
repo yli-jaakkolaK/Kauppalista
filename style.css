@@ -1185,20 +1185,18 @@ h1 {
 }
 
 .toggle input:checked + .toggle-track {
-  background: #34C759;
+  background: var(--messinki);
 }
 
 .toggle input:checked + .toggle-track::before {
   transform: translateX(20px);
 }
 
-/* Hytin "Opiskelu näkyvissä" -kytkin (2026-08-17, Katrin pyyntö: "väri &
-   muotokieli sataman designiin sopiva") — sama .toggle-pohja, mutta
-   messinki ("kaikki kosketettava") iOS-vihreän sijaan. Skoopattu tähän
-   yhteen kytkimeen, ei muuteta yleistä .toggle-komponenttia. */
-.toggle.toggle-messinki input:checked + .toggle-track {
-  background: var(--messinki);
-}
+/* Hytin "Opiskelu näkyvissä" -kytkin sai messinki-värin 2026-08-17 ensin
+   omana `.toggle-messinki`-skooppinaan. 2026-08-24: messinki nostettu
+   KAIKKIEN kytkinten oletukseksi (ks. perus-.toggle input:checked +
+   .toggle-track yllä) — tämä id-skoopattu kaksoiskappale poistettu,
+   `.toggle-messinki`-luokka jäi HTML:ään harmittomana, ei enää tarvita. */
 
 #home-list li {
   cursor: pointer;
@@ -1515,9 +1513,18 @@ h1 {
   display: none;
 }
 
+/* Hiusviivaksi 2026-08-24 ("jaetut komponentit 3. erä") — kaikki 37
+   käyttökohtaa auditoitu läpi, EI löytynyt yhtään kohtaa joka täyttäisi
+   Katrin poisto-kriteerin (erottaa KAHTA jo omalla pinnallaan olevaa
+   elementtiä) — kaikki nykyiset .divider-kohdat erottavat eri
+   sisältöryhmiä (otsikko/lista/syöterivi, tai osio toisesta osiosta)
+   ilman että KUMPIKAAN puoli on vielä oma korotettu .arkki-pintansa,
+   koska ne asuvat näkymissä joita ei ole vielä siirretty yksittäin
+   korotetuille riveille. Jätetty siis kaikkialle, vain tyyli päivitetty
+   katkoviivasta hiusviivaksi. Ks. muistiinpanot.md tarkempi läpikäynti. */
 .divider {
   border: none;
-  border-top: 1px dashed var(--border-dash);
+  border-top: 1px solid var(--hius);
   margin: 16px 0;
 }
 
@@ -2826,12 +2833,26 @@ h1 {
   z-index: 100;
 }
 
+/* Dialogin runko merikartta-pinnalle (2026-08-24, "jaetut komponentit
+   3. erä") — koskee kaikkia 42+ dialogia kerralla. Vahvempi, lähes
+   peittävä lasi (.96) tavallisen .arkki-luettava-pinnan (.5) sijaan, koska
+   tämä on kelluva, koko ruudun ylle nouseva elementti eikä inline-sisältöä
+   — sama peittävyysperiaate kuin .row-menu:lla. Samalla tekniikalla kuin
+   #laituri-view/#hytti-view: --ground/--text/--muted/--border/--border-dash
+   uudelleenmääritellään TÄMÄN laatikon sisällä kiinteiksi, jotta KAIKKI
+   42+ dialogin sisältö (myös se joka ei vielä käytä merikartta-tokeneita
+   suoraan) saa automaattisesti oikean, tumma-tilasta riippumattoman värin
+   — sama "jäisi muuten näkymättömäksi kiinteän-vaalean laatikon päällä
+   tumma-tilassa" -riski kuin Hytillä/Laiturilla. */
 .dialog-box {
   width: 100%;
   max-width: 320px;
-  background: var(--ground);
-  border-top: 1px dashed var(--border-dash);
-  border-bottom: 1px dashed var(--border-dash);
+  font-family: var(--fontti-loki);
+  border-radius: var(--r-kosketettava);
+  background: rgba(255, 253, 248, .96);
+  border: 1px solid var(--hius-vahva);
+  box-shadow: 0 8px 24px rgba(34, 31, 26, .22), inset 0 1px 0 rgba(255, 255, 255, .6);
+  backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
   padding: 28px 20px;
   /* BUGIKORJAUS (2026-08-16, Katrin löydös): pitkä sisältö (esim. 10
      siltasolmu-ehdotusta) venytti laatikon yli näytön korkeuden ilman että
@@ -2839,12 +2860,17 @@ h1 {
      `.dialog-overlay`:n 24px padding molemmin puolin huomioitu laskussa. */
   max-height: calc(100vh - 48px);
   overflow-y: auto;
+  --ground: var(--paperi);
+  --text: var(--muste);
+  --muted: var(--vaimea);
+  --border: var(--hius);
+  --border-dash: var(--hius-vahva);
 }
 
 .dialog-title {
   font-size: 16px;
   letter-spacing: 0.02em;
-  color: var(--text);
+  color: var(--muste);
   text-align: center;
   margin-bottom: 8px;
 }
@@ -2852,7 +2878,7 @@ h1 {
 .dialog-body {
   font-size: 13px;
   letter-spacing: 0.02em;
-  color: var(--muted);
+  color: var(--vaimea);
   text-align: center;
   margin-bottom: 4px;
 }
