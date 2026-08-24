@@ -641,16 +641,31 @@ h1 {
    välejä päivän vaihtuessa (ks. Kalenteri UI -speksi). Jaettu kuukausi- JA
    viikkonäkymän kokopäivä-rivin kesken (computeEventBarLayout tuottaa
    saman reunaLuokan molemmille). */
+/* BUGIKORJAUS (2026-08-24, Katrin löydös: "husband's weekend trip... shows
+   as 3 separate lines"): reunaton muoto (yllä) EI YKSIN riittänyt saumaton-
+   tunnun aikaansaamiseen — sekä kuukausiruudun oma padding (.kalenteri-
+   kuukausi-paiva, 4px vaakasuunnassa) että viikkonäkymän sarakkeiden
+   flex-väli (.kalenteri-viikko-aikajana, gap:4px) jättivät ~4-8px raon
+   joka päivän vaihtuessa, vaikka palkin reunat olivat jo suoria — YKSI
+   yhtenäinen 4 päivän tapahtuma näytti siis 3-4 ERILLISELTÄ palkilta.
+   Negatiivinen margin sillä puolella josta palkki JATKUU (ei sillä missä
+   se oikeasti alkaa/loppuu) laajentaa palkin ulos oman solunsa/sarakkeensa
+   sisältöalueesta niin että se koskettaa naapurisolun/-sarakkeen palkkia —
+   sama 4px-arvo sattuu toimimaan sekä kuukausi- että viikkonäkymässä. */
 .kalenteri-palkki--lahto {
   border-top-right-radius: 0;
   border-bottom-right-radius: 0;
+  margin-right: -4px;
 }
 .kalenteri-palkki--tulo {
   border-top-left-radius: 0;
   border-bottom-left-radius: 0;
+  margin-left: -4px;
 }
 .kalenteri-palkki--keski {
   border-radius: 0;
+  margin-left: -4px;
+  margin-right: -4px;
 }
 
 /* Kuukausinäkymän väriselite (2026-08-18, kalenterin UI-uudistus, mockup
