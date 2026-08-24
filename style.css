@@ -2134,27 +2134,58 @@ h1 {
   transform: translateY(0) scale(.94);
 }
 
+/* 2026-08-24/25: Ruorin Ankkurit-segmentin oma ⚓-nappirakenne siirretty
+   TÄHÄN jaettuun kirjastoon (Katrin ohje "and that version should be in
+   the library") sen sijaan että se pysyisi vain Ruori-skoopattuna —
+   kaikki muut sovelluksen ⚓-napit (Kalenteri, Laituri, Hytti, Muistilaput)
+   näyttivät "vanhoilta" verrattuna, koska niillä oli eri (vanhempi)
+   resepti. Neliömäinen painettava muotokieli (EI ympyrä), koko/säde
+   suhteutettu alapalkin tabeihin — ks. alkuperäiset 2026-08-18-perustelut
+   jotka olivat ennen tätä siirtoa Ruori-skoopattuna, nyt poistettu
+   duplikaattina (ks. .ruori .segmentti.ankkurit -kommentti alempana).
+   Lepotila EI ole sinappi ("äly suggestion anchor should not be in
+   sinappi backround it is reserved only for items raised to anchor") —
+   neutraali lasi. Sinappi tulee VASTA .active-tilassa (ks. alla). */
 .anchor-btn {
   position: relative;
-  min-width: 32px;
-  min-height: 44px;
-  border-radius: var(--r-kosketettava);
-  border: 1px solid rgba(156, 122, 67, .45);
-  background: linear-gradient(165deg, rgba(255, 252, 244, .72), rgba(234, 230, 220, .32));
-  backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
+  width: 30px;
+  height: 30px;
+  min-width: 0;
+  min-height: 0;
+  flex: none;
+  border-radius: 6px;
+  border: 1px solid rgba(156, 122, 67, .5);
+  background: linear-gradient(165deg, rgba(255, 252, 244, .72), rgba(234, 230, 220, .28));
+  backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .65);
   outline: none;
   appearance: none;
   -webkit-appearance: none;
-  font-size: 20px;
-  color: var(--muste);
+  color: var(--vaimea);
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
   -webkit-tap-highlight-color: transparent;
-  opacity: 0.55;
-  transition: transform var(--keski) var(--kelluu), opacity var(--keski) var(--kelluu), border-color var(--keski) var(--kelluu), background var(--keski) var(--kelluu);
+  transition: background var(--keski) var(--kelluu), box-shadow var(--keski) var(--kelluu), transform var(--keski) var(--kelluu);
 }
+/* Näkyvä pinta pieni (~3-4px marginaali merkin ympärillä), kosketusalue
+   silti 44px läpinäkyvällä ::after-kerroksella. */
+.anchor-btn::after {
+  content: ''; position: absolute; top: 50%; left: 50%; width: 44px; height: 44px;
+  transform: translate(-50%, -50%);
+}
+.anchor-btn:disabled { opacity: .4; cursor: default; }
+.anchor-btn:disabled::after { display: none; }
+/* Ehdokaskortin ⚓-hyväksyntä (Laituri/Ruori) — sama anchor-btn-kieli,
+   mutta ihmislähtöiselle ehdotukselle leventyy tekstilabelin verran
+   (ks. loadAnchorCandidates()-kommentti script.js:ssä). */
+.anchor-btn-labeled {
+  width: auto; height: 30px; padding: 0 10px; flex-direction: row; gap: 6px;
+  display: inline-flex; align-items: center;
+}
+.anchor-btn-labeled svg { width: 15px; height: 15px; }
+.anchor-btn-labeled span { font-size: 12px; font-weight: 700; color: var(--muste); white-space: nowrap; }
 
 /* Materiaalilinkki per opiskelusolmu (2026-08-05, ks. HYTTI_SPEKSI §5) —
    sama kosketuskoko/tyhjennysperiaate kuin .anchor-btn, oma pieni luokka
@@ -2183,22 +2214,28 @@ h1 {
 .link-btn:hover, .link-btn:focus-visible { opacity: 1; transform: translateY(-1px); }
 .link-btn:active { opacity: 1; transform: translateY(0) scale(.94); }
 
-.anchor-btn:hover,
-.anchor-btn:focus-visible {
-  opacity: 1;
-  transform: translateY(-1px);
-}
 .anchor-btn:active {
-  opacity: 1;
-  transform: translateY(0) scale(.94);
+  transform: scale(.92);
 }
 
-/* Ankkuri-SVG (2026-08-11, Ruori-speksi §4.1) korvasi kaikkialla sovelluksessa
-   ⚓-emojin, joka oli alustan omassa emoji-fontissa värihallinnan
-   ulkopuolella (esim. Windowsin Segoe UI Emoji piirtää sen sinertävänä eikä
-   noudata color-ominaisuutta ollenkaan) — SVG:n stroke="currentColor"
-   noudattaa aina .anchor-btn:n color-arvoa (§0: koko ala täytettävä). */
-.anchor-btn svg { width: 20px; height: 20px; display: block; }
+/* Ankkuri-ikoni: alustan oma ⚓-emoji SVG:n sisällä, EI käsinpiirretty
+   vektoripolku (Katrin nimenomainen linjaus — käsinpiirretty muutti
+   muodon, se oli alkuperäinen valitus, ks. ANKKURI_SVG:n kommentti
+   script.js:ssä). Emoji-fontit eivät noudata color/currentColor-
+   ominaisuutta ollenkaan, joten väri pakotetaan filter()-ketjulla
+   `.ankkuri-emoji`-luokan kautta (2026-08-24, korvaa riittämättömän
+   pelkän grayscale(1):n). Katrin täsmennys: väri kuuluu NAPIN TAUSTAAN
+   (ks. .anchor-btn yllä, sinapinlämmin lasi), ei itse ikoniin — ikoni
+   pysyy neutraalina (tumma lepotilassa, vaalea täytetyllä tummalla
+   messinki-taustalla aktiivisena), samalla periaatteella kuin muidenkin
+   jaettujen nappien ikonit (check/delete/overflow ym., kiinteä --muste). */
+.anchor-btn svg { width: 21px; height: 21px; display: block; }
+.ankkuri-emoji {
+  filter: grayscale(1) brightness(.4) contrast(1.2);
+}
+.anchor-btn.active .ankkuri-emoji {
+  filter: grayscale(1) brightness(2.2) contrast(1.1);
+}
 
 /* BUGIKORJAUS ("Laiturin ⚓-tilan näkyvyys", ks. muistiinpanot.md): pelkkä
    väri/opacity-ero (kulta vs. himmeä) ei erottunut vilkaisulla — sama
@@ -2207,11 +2244,10 @@ h1 {
    väri yksin" -periaate. Koskee kaikkia ⚓-nappeja koko sovelluksessa
    (sama luokka), ei vain Laituria. */
 .anchor-btn.active {
-  color: var(--paperi);
-  opacity: 1;
-  background: var(--messinki);
-  border-color: var(--messinki);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .3);
+  border: 1px solid rgba(156, 122, 67, .55);
+  background: var(--sinappi);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .4), 0 2px 5px rgba(34, 31, 26, .16);
+  color: var(--muste);
 }
 
 .anchor-btn.leaving {
@@ -2318,9 +2354,16 @@ h1 {
    yllä: valikko avautuu MYÖS niiden näkymien päällä joita ei ole vielä
    siirretty merikartta-taustalle, joten sen oma pinta ei saa riippua
    laitteen tumma/vaalea-tilasta ollakseen aina luettava riippumatta mikä
-   on sen TAKANA. Melkein täysin peittävä (.97) koska tämä on ponnahdus-
-   valikko, ei inline-sisältöä — .arkki-luokan .5-läpinäkyvyys ei riittäisi
-   erottumaan taustasta selvästi. */
+   on sen TAKANA.
+   BUGIKORJAUS (2026-08-25, Katrin löydös Laiturista, "3 pistettä... lappu
+   tulee näkyviin, mut haaleana"): sen jälkeen kun rivit (.laituri-row ym.)
+   saivat oman lähes-samansävyisen paperi-lasikorttinsa ("Laituri loppuun"
+   -erä), tämä valikko alkoi hukkua niiden sekaan — melkein sama
+   rgba(255,253,248,X) taustasävy sekä valikolla että sen alla olevilla
+   korteilla, ero näkyi enää hiuksenohuena reunaviivana. Täysin PEITTÄVÄ
+   (ei enää .97-läpinäkyvä) + vahvempi messinki-sävyinen reuna/varjo, jotta
+   ponnahdusvalikko erottuu selvästi TAUSTASTAAN eikä vain sulaudu siihen
+   — sama korjaus kuin dialogilaatikolla aiemmin samasta syystä. */
 .row-menu {
   position: absolute;
   top: 100%;
@@ -2329,10 +2372,10 @@ h1 {
   display: flex;
   flex-direction: column;
   min-width: 150px;
-  background: rgba(255, 253, 248, .97);
-  border: 1px solid var(--hius-vahva);
+  background: var(--paperi);
+  border: 1px solid rgba(156, 122, 67, .5);
   border-radius: var(--r-luettava);
-  box-shadow: 0 6px 18px rgba(34, 31, 26, .18);
+  box-shadow: 0 8px 22px rgba(34, 31, 26, .28), 0 1px 0 rgba(255, 255, 255, .6) inset;
   overflow: hidden;
 }
 /* Käännetty rivin YLÄPUOLELLE (2026-08-18, ks. openRowMenu():n
@@ -2344,6 +2387,8 @@ h1 {
 }
 
 .row-menu-item {
+  appearance: none;
+  -webkit-appearance: none;
   background: none;
   border: none;
   outline: none;
@@ -2354,6 +2399,7 @@ h1 {
   color: var(--muste);
   padding: 12px 16px;
   min-height: 44px;
+  width: 100%;
   cursor: pointer;
   -webkit-tap-highlight-color: transparent;
   transition: background var(--keski) var(--kelluu);
@@ -4516,23 +4562,15 @@ h1 {
    44px keskipisteiden väliin ettei "painamisalue voi olla isompi, mutta
    ei päällekkäin" -vaatimus riko itseään. */
 .ruori .segmentti.ankkurit .ankkuri-toiminnot { display: flex; flex-direction: column; gap: 16px; flex: none; margin-top: 1px; }
-/* Kolmas kierros (2026-08-18, Katri täsmensi taas): edellinen versio (täysi
-   ympyrä + sinappi MOLEMMILLE napeille) meni liian pitkälle kahdella
-   tavalla. (1) Muoto: hän halusi saman painettavan muotokielen kuin
-   muualla, EI ympyrää — "square with painettava muotokieli, not round".
-   (2) Väri: sinappi kuuluu VAIN ⚓-napille — "it is visual cue that
-   somethin is risen as an anchor", koska tässä listassa ⚓-nappi on AINA
-   "irrota"-tilassa (ankkurit-list näyttää jo-ankkuroituja rivejä, ks.
-   script.js:n irrotaNappi). ⋯-valikko on eri toiminto (siirrä/muistuta/
-   ehdota), ei "risen as an anchor" -tilaa, joten se pysyy neutraalina
-   lasina — sama muoto, eri väri.
-   Neljäs täsmennys: "shape of pressable anchor should be same shape as tab
-   icons are using as backround" — var(--r-kosketettava) (13px) on SAMA
-   arvo jota alapalkin ~64-78px-tabit käyttävät, mutta 13px 30px-napissa on
-   suhteellisesti PALJON pyöreämpi kuin 13px 64px-tabissa (13/30 ≈ 43% vs.
-   13/64 ≈ 20%). Skaalattu suhteessa alapalkin tabiin (6px ≈ 20% 30px:stä)
-   sen sijaan että käytettäisiin samaa kiinteää pikseliarvoa. */
-.ruori .segmentti.ankkurit .anchor-btn,
+/* Ankkuri-napin (.anchor-btn/.anchor-btn.active/.anchor-btn-labeled) koko
+   resepti nostettu tästä Ruori-skoopatusta säännöstä globaaliksi
+   kirjastoksi 2026-08-24/25 (ks. .anchor-btn-kommentti style.css:n
+   alkupuolella kaikkine 2026-08-18-perusteluineen: neliömäinen muoto,
+   sinappi vain .active, säde suhteutettu alapalkin tabeihin). Jäljellä
+   VAIN ⋯-valikkonapin (.overflow-btn) samankokoinen, mutta erikseen
+   pidettävä versio — se ei siirtynyt globaaliksi koska muualla sovelluksessa
+   ⋯-nappi käyttää suurempaa jaettua kosketuskokoa (--r-kosketettava),
+   eikä sitä ole toistaiseksi pyydetty samaan 30px/6px-kieleen. */
 .ruori .segmentti.ankkurit .overflow-btn {
   position: relative; min-width: 0; min-height: 0; width: 30px; height: 30px; flex: none;
   border-radius: 6px; opacity: 1;
@@ -4543,49 +4581,13 @@ h1 {
   color: var(--vaimea);
   transition: background var(--keski) var(--kelluu), box-shadow var(--keski) var(--kelluu), transform var(--keski) var(--kelluu);
 }
-.ruori .segmentti.ankkurit .anchor-btn:active,
 .ruori .segmentti.ankkurit .overflow-btn:active {
   transform: scale(.92);
 }
-/* Näkyvä pinta pieni (~3-4px marginaali merkin ympärillä), kosketusalue
-   silti 44px läpinäkyvällä ::after-kerroksella (§4.2). */
-.ruori .segmentti.ankkurit .anchor-btn::after,
 .ruori .segmentti.ankkurit .overflow-btn::after {
   content: ''; position: absolute; top: 50%; left: 50%; width: 44px; height: 44px;
   transform: translate(-50%, -50%);
 }
-.ruori .segmentti.ankkurit .anchor-btn svg { width: 21px; height: 21px; display: block; }
-/* Viides täsmennys (2026-08-18): "äly suggestion anchor should not be in
-   sinappi backround it is reserved only for items raised to anchor" —
-   sinappi kuuluu tarkalleen .active-tilaan (rivi ON jo noussut ankkuriksi,
-   ks. Ruorin Ankkurit-listan irrotaNappi joka on AINA "active"), EI
-   ehdokaskortin hyväksyntänapille (candidate-listan acceptButton käyttää
-   samaa .anchor-btn-luokkaa muttei .active:ia, koska mitään ei ole vielä
-   nostettu) — base-tila (yllä) on siis neutraali lasi kuten ⋯-valikkokin,
-   sinappi tulee VASTA tässä.
-   Kuudes täsmennys (2026-08-18): "shapes are correct in set anchors but
-   backround shoud be same shade as counting circle above" — Katri vertasi
-   sinappia "Ehdotukset"-otsikon viereiseen laskurimerkkiin (`.inline-badge`,
-   `anchor-candidates-badge`), joka on TASAINEN `var(--accent)`, ei liuku.
-   Vaihdettu liuku samaksi tasaiseksi väriksi täsmälleen samalla tokenilla. */
-.ruori .segmentti.ankkurit .anchor-btn.active {
-  border: 1px solid rgba(156, 122, 67, .55);
-  background: var(--accent);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .4), 0 2px 5px rgba(34, 31, 26, .16);
-  color: var(--muste);
-}
-.ruori .segmentti.ankkurit .anchor-btn:disabled { opacity: .4; cursor: default; }
-.ruori .segmentti.ankkurit .anchor-btn:disabled::after { display: none; }
-
-/* Ehdokaskortin ⚓-hyväksyntä (§4.6) — sama anchor-btn-kieli, mutta
-   ihmislähtöiselle ehdotukselle leventyy tekstilabelin verran (ks.
-   loadAnchorCandidates()-kommentti script.js:ssä). */
-.ruori .segmentti.ankkurit .anchor-btn-labeled {
-  width: auto; height: 30px; padding: 0 10px; flex-direction: row; gap: 6px;
-  display: inline-flex; align-items: center;
-}
-.ruori .segmentti.ankkurit .anchor-btn-labeled svg { width: 15px; height: 15px; }
-.ruori .segmentti.ankkurit .anchor-btn-labeled span { font-size: 12px; font-weight: 700; color: var(--muste); white-space: nowrap; }
 
 /* .ankkuri-rivi/.anchor-candidate-row saivat tämän lasilaatikon 2026-08-18
    ensin TÄSSÄ Ruori-skoopattuna, ja 2026-08-24 se nostettiin globaaliksi

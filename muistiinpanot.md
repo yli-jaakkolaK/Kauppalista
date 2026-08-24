@@ -4676,3 +4676,25 @@ Yhtenäistämisprojektin viimeinen erä. Katrin pyytämä järjestys ("kirjastot
 **Ei tähän erään koskettu, tarkistettu ja jätetty tietoisesti:** `.paiva-merkki--keskustellaan`/`.kalenteri-kortti` (dashed var(--accent)/var(--border-dash) — molemmat aiemmin ERIKSEEN rajattu Kalenteri-retheme-erässä, eivät osa 8 näkymän scopea). `.hytti-kortti-suodatin` (pieni alleviivaus-tyylinen filtterilabeli, jo oikeassa väriarvossa remapin kautta, ei kortti/rivi). `.alapalkki-arkki-lista li.alapalkki-raja-jalkeen` (tarkoituksellinen raja-merkki alapalkin järjestelynäkymässä, ei yleinen korttireuna).
 
 **Ei vielä testattu livenä** — tämä on suurin yksittäinen erä koko yhtenäistämisprojektissa, koskee 8 näkymää + useita jaettuja komponentteja kerralla. `node -c script.js` ja style.css-aaltosulkutasapaino puhtaat.
+
+---
+
+## Kaksi elävän testin bugia: ⚓-napin ulkoasu + Laiturin ⋯-valikon kontrasti (2026-08-24/25, sama istunto jatkuu)
+
+Ensimmäinen oikea elävä testi koko yhtenäistämisprojektille (edellinen 8 näkymän erä oli vielä testaamaton) — kaksi löydöstä.
+
+**1. ⚓-napit näyttivät "vanhoilta" (Kalenteri, Laituri) — koko `.anchor-btn`-resepti nostettu Ruorin versiosta jaettuun kirjastoon.** Ruorin Ankkurit-segmentti oli AINA saanut oman skoopatun, erikseen hiotun ⚓-nappireseptinsä (neliömäinen muoto, `--r-kosketettava`:n sijaan proportionaalinen 6px-säde, sinappi vain nostetulle ankkurille) — muu sovellus (Kalenteri, Laituri, Hytti, Muistilaput) käytti eri, vanhempaa `.anchor-btn`-perusreseptiä eikä koskaan saanut tätä hiontaa. Katrin täsmennykset elävän testin aikana, järjestyksessä: "ones in ruori are the kind i want except that colour should be same as satama" (tulkitsin ensin väärin ikonin väriksi) → "not anchor sinappi but background" (korjasi: kyse oli TAUSTAVÄRISTÄ, ei ikonista) → "and that version should be in the library" (koko Ruorin resepti globaaliksi oletukseksi, ei vain väri). Lopputulos: `.anchor-btn`/`.anchor-btn.active`/`.anchor-btn-labeled` ovat nyt Ruorin tarkka resepti kirjastossa, Ruori-skoopattu kaksoiskappale poistettu (jäljellä vain `.overflow-btn`:n oma 30px/6px-koko, joka EI ollut osa pyyntöä eikä siirtynyt globaaliksi — se käyttää yhä muun sovelluksen isompaa jaettua kosketuskokoa). `.anchor-btn.active`:n tausta `var(--messinki)` → `var(--sinappi)`, sama kuin Ruorin oma korjaus samassa erässä.
+
+**2. Laiturin ⋯-valikko "haalea, ei voi painaa" — kontrastiregressio, ei toiminnallinen vika.** Juurisyy: kun `.laituri-row` sai oman läpikuultavan paperikorttinsa ("Laituri loppuun" -erässä), valikon (`.row-menu`) OMA lähes samansävyinen `.97`-läpinäkyvä paperitausta alkoi hukkua rivien sekaan — molemmat samaa `rgba(255,253,248,X)`-perhettä, ero näkyi enää hiuksenohuena reunaviivana. JS (`openRowMenu`/`handleRowMenuOutsideClick`/nappien click-käsittelijät) tarkistettu rivi riviltä — ei löytynyt mitään toiminnallista vikaa, kaikki napit ovat oikeita `<button>`-elementtejä joilla on toimivat kuuntelijat. Korjaus: `.row-menu` sai TÄYSIN peittävän (`var(--paperi)`, ei enää läpinäkyvä) taustan + vahvemman messinki-sävyisen reunan/varjon, jotta se erottuu selvästi mistä tahansa taustasta eikä sulaudu siihen — sama korjaus kuin dialogilaatikolla aiemmin samasta syystä. Lisäksi `.row-menu-item` sai puuttuneen `appearance:none`/`width:100%`:n (yhtenäisyys/varmuuden vuoksi, ei vahvistettu syyksi, mutta puuttui muista jaetuista napeista poikkeuksellisesti).
+
+**Ei vielä testattu livenä uudelleen tämän korjauksen jälkeen** — odottaa Katrin vahvistusta molemmista. `node -c script.js` ja style.css-aaltosulkutasapaino puhtaat.
+
+---
+
+## Nykytila (päivitetty 2026-08-25)
+
+Koko merikartta-yhtenäistämisprojekti (v186→v195) on nyt PINNAN osalta valmis kaikissa näkymissä ja jaetuissa komponenteissa — ensimmäinen oikea elävä testikierros löysi kaksi pientä jälkikorjausta (ⓐ ⚓-napin resepti, ⓑ Laiturin ⋯-valikon kontrasti, molemmat korjattu yllä, odottavat vahvistusta). Bugi 3 (Hytin tumma tila, ratkaistu "pysyvästi vaalea" -päätöksellä) ja kaikki muut aiemmat elävän testin löydökset on käsitelty.
+
+**Uusi, ERI TYYPPINEN pyyntö juuri saapunut, ei vielä aloitettu:** Asetukset-näkymän RAKENTEELLINEN uudelleenjärjestely (ei pintaa, joka on jo valmis) — 11 peräkkäistä osiota yhtenä pitkänä listana pitää jakaa kolmeen tasoon: (1) yläosa aina näkyvissä (Tili/Ilmoitukset/Sovellus/Lapset/Henkselit), (2) "💡 Vinkit" -sisältö "?"-ohjenapin taakse `.list-header`:iin, EI enää osa vieritettävää listaa, (3) "⚙️ Lisäasetukset" -collapse oletuksena KIINNI (ei muista istuntojen välillä) kokoamaan loput kertaluontoiset viritysarvot (Ristiriitapaketti, Kuormavahti 15 kenttää, Ankkurit-määrä, Hytin ikkunat, Äly-loki). Ei kosketa kenttien toimintaa/tallennusta/pintaa, vain järjestys/näkyvyys. Katrin oma huomio: ankkureiden määrä ja kuormavahdin päivittäinen-menomäärä-raja pitää olla yläosassa (ei collapsen takana) — tarkista tämä ennen kuin sijoitat ne osiin 1 vai 3.
+
+Seuraava askel: aloittaa Asetukset-rakennemuutos edellä kuvatun mukaisesti.

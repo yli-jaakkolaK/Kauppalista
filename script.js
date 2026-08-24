@@ -9062,7 +9062,21 @@ let ankkuritKaikkiNakyvissa = false;
 // contrast()/brightness() -lisäys tähän samaan filter-arvoon, EI paluu
 // käsinpiirrettyyn SVG-polkuun (se muutti muotoa, mikä oli alkuperäinen
 // valitus).
-const ANKKURI_SVG = '<svg viewBox="0 0 24 24"><text x="12" y="12.5" font-size="19" text-anchor="middle" dominant-baseline="central" style="filter:grayscale(1)">⚓</text></svg>';
+// PÄIVITYS (2026-08-24, Katrin elävä löydös: "vielä vanhannäköiset
+// ankkurit" Kalenterissa/Laiturissa) — pelkkä grayscale(1) ei riittänyt:
+// se poistaa emojin natiivin värin mutta jättää sen SIIHEN harmaasävyyn
+// jonka alustan emoji-fontti sattuu piirtämään, joka ei osu lähelläkään
+// uuden merikartta-paletin --muste/--messinki-sävyjä eikä reagoi
+// .anchor-btn.active:n täytettyyn messinki-taustaan mitenkään — näytti
+// siis edelleen "vieraalta" irralliselta harmaalta uuden lämpimän lasin
+// keskellä. Seuraava askel oli jo etukäteen kirjattu tähän kommenttiin:
+// contrast()/brightness()-lisäys SAMAAN filter-ketjuun, ei paluuta
+// käsinpiirrettyyn SVG-polkuun. class (ei enää inline style) jotta
+// .anchor-btn.active saa OMAN, vaaleamman suotimensa (ks. style.css:n
+// .ankkuri-emoji / .anchor-btn.active .ankkuri-emoji) — lepotilassa
+// tumma (osuu --musteen tummuuteen vaalean lasin päällä), aktiivisena
+// vaalea (luettava tumman messinki-täytön päällä).
+const ANKKURI_SVG = '<svg viewBox="0 0 24 24"><text class="ankkuri-emoji" x="12" y="12.5" font-size="19" text-anchor="middle" dominant-baseline="central">⚓</text></svg>';
 
 // Auto-kasvava korkeus ankkurin textarea-kentille (2026-08-11, elävä
 // testaus §1.4) — nollataan ensin 'auto' jotta scrollHeight mittaa oikean
