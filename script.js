@@ -70,6 +70,11 @@ function showAsetuksetView() {
   piilotaKaikkiNakymat();
   document.getElementById('asetukset-view').style.display = 'block';
   naytaAlapalkki('asetukset');
+  // ⚙️ Lisäasetukset -collapse nollataan joka avauksella (2026-08-25,
+  // rakenneuudistus, Katrin oma vaatimus) — <details>-elementti ei koskaan
+  // poistu DOM:ista (vain #asetukset-view piiloutuu display:nonella), joten
+  // ilman tätä se MUISTAISI edellisen auki-tilan koko istunnon ajan.
+  document.getElementById('asetukset-lisa-details').removeAttribute('open');
 }
 
 // Hytin välilehdet (2026-08-11, CODE_vaihe1b.md §1b) — renderöidään
@@ -13768,6 +13773,20 @@ document.getElementById('kalenteri-back-btn').addEventListener('click', function
 document.getElementById('asetukset-back-btn').addEventListener('click', function() {
   showHomeView();
   lataaKotinakyma();
+});
+// Ohje-paneeli ("💡 Vinkit", 2026-08-25 rakenneuudistus) — sama
+// dialog-overlay-kaava kuin muualla, sulkeutuu Sulje-napista tai taustaa
+// napauttamalla.
+document.getElementById('asetukset-ohje-btn').addEventListener('click', function() {
+  document.getElementById('asetukset-ohje-overlay').style.display = 'flex';
+});
+document.getElementById('asetukset-ohje-sulje-btn').addEventListener('click', function() {
+  document.getElementById('asetukset-ohje-overlay').style.display = 'none';
+});
+document.getElementById('asetukset-ohje-overlay').addEventListener('click', function(e) {
+  if (e.target === document.getElementById('asetukset-ohje-overlay')) {
+    document.getElementById('asetukset-ohje-overlay').style.display = 'none';
+  }
 });
 document.getElementById('push-lupa-btn').addEventListener('click', pyydaIlmoitusLupa);
 document.getElementById('push-testi-btn').addEventListener('click', laheteTestipush);

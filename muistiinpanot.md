@@ -4698,3 +4698,34 @@ Koko merikartta-yhtenäistämisprojekti (v186→v195) on nyt PINNAN osalta valmi
 **Uusi, ERI TYYPPINEN pyyntö juuri saapunut, ei vielä aloitettu:** Asetukset-näkymän RAKENTEELLINEN uudelleenjärjestely (ei pintaa, joka on jo valmis) — 11 peräkkäistä osiota yhtenä pitkänä listana pitää jakaa kolmeen tasoon: (1) yläosa aina näkyvissä (Tili/Ilmoitukset/Sovellus/Lapset/Henkselit), (2) "💡 Vinkit" -sisältö "?"-ohjenapin taakse `.list-header`:iin, EI enää osa vieritettävää listaa, (3) "⚙️ Lisäasetukset" -collapse oletuksena KIINNI (ei muista istuntojen välillä) kokoamaan loput kertaluontoiset viritysarvot (Ristiriitapaketti, Kuormavahti 15 kenttää, Ankkurit-määrä, Hytin ikkunat, Äly-loki). Ei kosketa kenttien toimintaa/tallennusta/pintaa, vain järjestys/näkyvyys. Katrin oma huomio: ankkureiden määrä ja kuormavahdin päivittäinen-menomäärä-raja pitää olla yläosassa (ei collapsen takana) — tarkista tämä ennen kuin sijoitat ne osiin 1 vai 3.
 
 Seuraava askel: aloittaa Asetukset-rakennemuutos edellä kuvatun mukaisesti.
+
+---
+
+## Sinapin sävyn yhtenäistäminen: ehdotuslaskuri + kalenterikuvake (2026-08-25, sama istunto jatkuu)
+
+Katri jatkoi elävän testin havainnoilla ⚓-napin jälkeen: "raised anchor backround should be the shade of satama headline on ruori page and the same shade should be in circle above counting, and calendar icon as well" — kaksi jäljellä ollutta `var(--accent)`-kohtaa jotka Katrin OMIEN aiempien kommenttien mukaan olivat AINA olleet tarkoitettu sinapiksi mutta käyttivät teemaa seuraavaa tokenia:
+
+- **`.inline-badge`** (Ruorin "Ehdotukset"-otsikon laskuripallura, `.anchor-candidates-badge`) — tausta `var(--accent)` → `var(--sinappi)`, teksti `var(--ground)` → `var(--paperi)`.
+- **`.alapalkki-kal-ikoni`/`.alapalkki-kal-kk`** (alapalkin Kalenteri-tabin oma kalenterikuvake) — reunus ja kuukausiraita `var(--accent)` → `var(--sinappi)`, raidan teksti `var(--ground)` → `var(--paperi)`. Näiden oma vanha koodikommentti (2026-08-12) on AINA sanonut "sinapinkeltainen raita" — toteutus vain käytti väärää, teemaa seuraavaa muuttujaa koko ajan.
+
+Ei koskettu `.alapalkki-tabi-badge`:a (eri asia — uusien-tapahtumien ilmoituspallura, ei itse kuvake, ei ollut pyynnön listalla).
+
+**Ei vielä testattu livenä.** style.css-aaltosulkutasapaino puhdas.
+
+---
+
+## Asetukset-näkymän rakenneuudistus (2026-08-25, sama istunto jatkuu)
+
+Katrin erillinen rakennepyyntö (ei pintaa, joka on jo valmis v194:ssä) — sivutuote koko yhtenäistämisprojektista, joka paljasti ettei Asetukset ole koskaan noudattanut "vilkaisuarvo"-periaatetta: 11 osiota yhtenä pitkänä listana, Kuormavahdissa yksin 15 numerokenttää, kaikki samalla painoarvolla riippumatta kosketustiheydestä.
+
+**Kolme tasoa, puhtaasti järjestys/näkyvyys — ei kenttien toimintaa, tallennusta tai pintaa kosketettu, kaikki id:t säilytetty muuttumattomina:**
+
+1. **Yläosa (aina näkyvissä):** 👤 Tili → 🔔 Ilmoitukset → 📱 Sovellus (versio+päivitys yhdistetty samaan osioon synkan/äly-testin kanssa, oli aiemmin kaksi erillistä osiota) → 👶 Lapset → 🎗️ Henkselit → 🚦 Kuormavahti (VAIN "kuormaraja-input", "kuinka monta menoa päivässä laukaisee") → ⚓ Ankkurit (näytä-määrä). Kaksi viimeistä jäivät tarkoituksella yläosaan Katrin oman täsmennyksen mukaan ("ankkureiden määrän säätäminen pitää ainakin olla yläosassa... ja se että kuinka monta menoa päivässä laukaisee kuormavahdin") vaikka olivat alunperin hänen omassa osioluettelossaan Lisäasetusten alla — täsmennys korvasi alkuperäisen luokittelun näiden kahden kentän osalta.
+
+2. **"?" ohjenappi `.list-header`:iin** (korvasi tyhjän `<span>`-paikanpitäjän) — "💡 Vinkit" + "Missä muokataan mitäkin" -sisältö siirretty kokonaan omaksi `#asetukset-ohje-overlay`-dialogikseen, sama `.dialog-overlay`/`.dialog-box` -kaava kuin 42+ muulla dialogilla sovelluksessa. Ei enää osa vieritettävää listaa.
+
+3. **"⚙️ Lisäasetukset" — natiivi `<details>`/`<summary>`, oletuksena AINA kiinni.** Sisältää muuttumattomana: ⚠️ Ristiriitapaketti (3 kenttää), 🚦 Kuormavahti loput 14 kenttää, 🕐 Hytin ikkunat, ✨ Mitä äly on tehnyt. **Kriittinen yksityiskohta:** `<details>` on natiivisti tilallinen elementti joka EI koskaan poistu DOM:ista (vain koko `#asetukset-view` piiloutuu display:nonella navigoinnin yhteydessä) — ilman erillistä nollausta se olisi MUISTANUT edellisen auki-tilan koko istunnon ajan, täsmälleen se "aina auki hivuttaa takaisin" -riski jota Katri nimenomaan halusi välttää. `showAsetuksetView()` kutsuu nyt `removeAttribute('open')`:ia joka kerta kun näkymä avataan.
+
+**Ei käytetty valmista collapse-kirjastokomponenttia** — sovelluksessa oli ennestään yksi samantyyppinen kuvio (`.laituri-arkisto-toggle`, äly-loki), mutta se MUISTAA auki-tilan istunnon ajan (tarkoituksella, eri käyttötapaus) — täsmälleen päinvastainen vaatimus kuin Katri pyysi tälle. Natiivi `<details>` sopi paremmin: nollaus yhdellä `removeAttribute`-kutsulla on yksinkertaisempi kuin oman JS-tilan rakentaminen tyhjästä.
+
+**Ei vielä testattu livenä.** `node -c script.js` ja style.css-aaltosulkutasapaino puhtaat. Kaikkien siirrettyjen kenttien id:t tarkistettu (49 kpl) — jokainen esiintyy tiedostossa täsmälleen kerran, ei duplikaatteja eikä kadonneita.

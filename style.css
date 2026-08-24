@@ -1264,6 +1264,28 @@ h1 {
   padding: 16px 0;
 }
 
+/* Asetusten "⚙️ Lisäasetukset" -collapse (2026-08-25, rakenneuudistus) —
+   natiivi <details>/<summary>, ei omaa JS-tila-toteutusta. Oletuksena
+   AINA kiinni (ks. showAsetuksetView() script.js:ssä, nollaa open-
+   attribuutin joka avauksella). */
+#asetukset-lisa-details {
+  margin-top: 24px;
+}
+.asetukset-lisa-summary {
+  margin-top: 0;
+  cursor: pointer;
+  color: var(--messinki);
+  -webkit-tap-highlight-color: transparent;
+}
+.asetukset-lisa-summary::marker {
+  color: var(--messinki);
+}
+/* Sisällön oma ensimmäinen .section-title ei tarvitse tuplaväliä summaryn
+   jälkeen. */
+#asetukset-lisa-details[open] .asetukset-lisa-summary {
+  margin-bottom: 6px;
+}
+
 .section-link {
   font-size: 12px;
   letter-spacing: 0.04em;
@@ -1297,8 +1319,12 @@ h1 {
   height: 18px;
   padding: 0 5px;
   border-radius: 9px;
-  background: var(--accent);
-  color: var(--ground);
+  /* var(--accent) -> var(--sinappi) 2026-08-25 (Katrin ohje: sama sävy
+     kuin nostettu ankkuri / SATAMA-otsikko) — --accent seuraisi laitteen
+     tumma/vaalea-tilaa, --sinappi on kiinteä, sama periaate kuin
+     .anchor-btn.active:lla. */
+  background: var(--sinappi);
+  color: var(--paperi);
   font-size: 10px;
   font-weight: bold;
   vertical-align: middle;
@@ -4792,11 +4818,15 @@ h1 {
    (ruudukon versio on kiinteä 34px). */
 .alapalkki-kal-ikoni {
   width: 74%; display: flex; flex-direction: column;
-  border: 1px solid var(--accent); border-radius: 4px; overflow: hidden;
+  /* var(--accent) -> var(--sinappi) 2026-08-25 (Katrin ohje: sama sävy
+     kuin nostettu ankkuri / SATAMA-otsikko / ehdotusten laskuripallura) —
+     kommentti tässä on aina sanonut "sinapinkeltainen raita", mutta
+     toteutus käytti teemaa seuraavaa --accent-tokenia; nyt kiinteä. */
+  border: 1px solid var(--sinappi); border-radius: 4px; overflow: hidden;
   background: #FDFBF6;
 }
 .alapalkki-kal-kk {
-  display: block; background: var(--accent); color: var(--ground);
+  display: block; background: var(--sinappi); color: var(--paperi);
   font-size: 10px; letter-spacing: .05em; text-align: center; line-height: 1.6;
 }
 .alapalkki-kal-pv { display: block; font-size: 22px; font-weight: bold; line-height: 1.25; text-align: center; color: var(--muste); }

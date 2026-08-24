@@ -951,16 +951,8 @@
     <div class="list-header">
       <button class="back-btn" id="asetukset-back-btn">‹</button>
       <h1>ASETUKSET</h1>
-      <span></span>
+      <button class="settings-btn" id="asetukset-ohje-btn" title="Ohje">?</button>
     </div>
-    <hr class="divider">
-
-    <!-- Versio+päivitys sivun yläosaan (2026-08-11, Katrin pyyntö) — ensin
-         nähtävä tieto, ei haudattuna "📱 Sovellus"-osion alle keskellä
-         pitkää asetussivua. -->
-    <p class="section-empty" id="sovellus-versio">Tarkistetaan...</p>
-    <button class="login-btn settings-action-btn" id="sovellus-paivita-btn">Päivitä sovellus</button>
-
     <hr class="divider">
 
     <div class="section-title">👤 Tili</div>
@@ -976,21 +968,15 @@
 
     <hr class="divider">
 
-    <div class="section-title">💡 Vinkit</div>
-    <div class="vinkki-lista" id="vinkki-lista-data"></div>
-
-    <div class="vinkki-alaotsikko">Missä muokataan mitäkin</div>
-    <div class="vinkki-lista">
-      <div class="vinkki-rivi">Menot ja tapahtumat: lisää ja muokkaa aina iPhonen Kalenterissa — Satama hakee ne itsestään hetken sisällä</div>
-      <div class="vinkki-rivi">Satama näyttää kaikki tapahtumat, mutta ei muokkaa niitä — jos meno on väärässä kalenterissa, siirrä se iPhonen Kalenterissa, Satama päivittyy perässä</div>
-      <div class="vinkki-rivi">Toisen lisäämät menot odottavat kuittaustasi ("N uutta") — kuittaus tarkoittaa "nähty", tapahtuma näkyy kalenterissa joka tapauksessa</div>
-      <div class="vinkki-rivi">Muistutukset, ankkurit ja Hytin tehtävät ovat Sataman omia — ne luodaan ja muokataan Satamassa</div>
-      <div class="vinkki-rivi">Listat, Laituri ja Varasto elävät aina Satamassa — kauppalistalle voi lisätä myös Sirillä</div>
-    </div>
-
-    <hr class="divider">
-
+    <!-- Versio+päivitys+synkka+äly-testi koottu YHDEKSI 📱 Sovellus
+         -osioksi (2026-08-25, rakenneuudistus) — versiorivi oli aiemmin
+         oma erillinen kappaleensa sivun yläreunassa ilman otsikkoa
+         ("ensin nähtävä tieto"), nyt osa samaa toiminto-osiota jonka
+         kanssa se sisällöllisesti kuuluu yhteen. Yhä sivun yläosassa,
+         ei koskaan Lisäasetusten collapse-taakse. -->
     <div class="section-title">📱 Sovellus</div>
+    <p class="section-empty" id="sovellus-versio">Tarkistetaan...</p>
+    <button class="login-btn settings-action-btn" id="sovellus-paivita-btn">Päivitä sovellus</button>
     <p class="section-empty" id="sovellus-synkka-tila">Tarkistetaan...</p>
     <button class="login-btn settings-action-btn" id="sovellus-synkkaa-btn">Hae kalenteri nyt</button>
     <button class="login-btn settings-action-btn" id="aly-testi-btn">Testaa äly</button>
@@ -1043,89 +1029,17 @@
 
     <hr class="divider">
 
-    <div class="section-title">⚠️ Ristiriitapaketti</div>
-    <div class="settings-row">
-      <span>Siirtymäpuskuri: lisätään tapahtumien molempiin päihin ennen päällekkäisyyslaskentaa (min)</span>
-      <input type="number" class="settings-numero-input" id="siirtymapuskuri-input" min="0" step="1">
-    </div>
-    <div class="settings-row">
-      <span>Alle tämän mittainen päällekkäisyys ei laukaise mitään (min)</span>
-      <input type="number" class="settings-numero-input" id="min-paallekkainen-input" min="0" step="1">
-    </div>
-    <div class="settings-row">
-      <span>Ika_yksin_hetkittain-lapsille sallittu hoivaikkunan pituus ilman ristiriitaa (min)</span>
-      <input type="number" class="settings-numero-input" id="yksin-hetkittain-raja-input" min="0" step="1">
-    </div>
-
-    <hr class="divider">
-
+    <!-- Kuormaraja JA Ankkurit-määrä pidetään tarkoituksella sivun
+         yläosassa (2026-08-25, Katrin oma täsmennys rakenneuudistukseen:
+         "ankkureiden määrän säätäminen pitää ainakin olla yläosassa. ja
+         se että kuinka monta menoa päivässä laukaisee kuormavahdin") —
+         nämä kaksi ovat säädöistä ne joita todella kosketetaan silloin
+         tällöin, toisin kuin loput 14 Kuormavahti-kenttää jotka ovat
+         kertaluontoista viritystä (ks. ⚙️ Lisäasetukset alempana). -->
     <div class="section-title">🚦 Kuormavahti</div>
     <div class="settings-row">
       <span>Varoitusmerkki päivälle jolla vähintään N kellonaikamenoa</span>
       <input type="number" class="settings-numero-input" id="kuormaraja-input" min="1" step="1">
-    </div>
-    <div class="settings-row">
-      <span>PACER-kehote: näytä "✓ Tehty siirtää vaiheeseen X" Tänään-korteilla</span>
-      <label class="toggle">
-        <input type="checkbox" id="pacer-kehote-toggle">
-        <span class="toggle-track"></span>
-      </label>
-    </div>
-    <div class="settings-row">
-      <span>Huolilippu: paino josta päivä nousee vähintään "keski"-kuormaksi</span>
-      <input type="number" class="settings-numero-input" id="huoli-keski-kynnys-input" min="0" step="1">
-    </div>
-    <div class="settings-row">
-      <span>Huolilippu: paino josta päivä pakotetaan "raskaaksi"</span>
-      <input type="number" class="settings-numero-input" id="huoli-raskas-kynnys-input" min="0" step="1">
-    </div>
-    <div class="settings-row">
-      <span>Aloittamaton kurssitehtävä saa kovan etusijan kun deadlineen on enintään N päivää</span>
-      <input type="number" class="settings-numero-input" id="kurssi-kiireellisyys-input" min="0" step="1">
-    </div>
-    <div class="settings-row">
-      <span>Tavoitetahdin laskennassa (Taso 1) käytettävä tuntimäärä per opintopiste — nyrkkisääntö, säädä jos tuntuu väärältä</span>
-      <input type="number" class="settings-numero-input" id="tuntia-per-op-input" min="1" step="1">
-    </div>
-    <div class="settings-row">
-      <span>Hoitotason kevennysehdotus (Taso 2) kun tästä useampi % kurssin aiheista on tavoiteikkunastaan jäljessä</span>
-      <input type="number" class="settings-numero-input" id="hoitotaso-jalkeenjaanti-input" min="1" max="100" step="1">
-    </div>
-    <div class="settings-row">
-      <span>Siltasolmun ikkuna sulkeutuu N päivää ennen aikaisinta viittaavaa deadlinea</span>
-      <input type="number" class="settings-numero-input" id="silta-puskuri-input" min="0" step="1">
-    </div>
-    <div class="settings-row">
-      <span>Automaattinen siltatarkistus (jos ei käsin tehty) N päivän kuluttua kurssin lisäyksestä, kerran per kurssi</span>
-      <input type="number" class="settings-numero-input" id="sillat-auto-paivia-input" min="1" step="1">
-    </div>
-    <div class="settings-row">
-      <span>Kiireellisyyden leviäminen tarvitsee-kaarten yli, enintään N askelta</span>
-      <input type="number" class="settings-numero-input" id="silta-leviamissyvyys-input" min="0" step="1">
-    </div>
-    <div class="settings-row">
-      <span>Opiskeluistunto kysyy vahvistusta jos kesto ylittää N tuntia</span>
-      <input type="number" class="settings-numero-input" id="sessio-jarkevyys-input" min="0" step="1">
-    </div>
-    <div class="settings-row">
-      <span>Tehty/ohitettu kortti pysyy näkyvissä kunnes N uutta askelta on tullut sen jälkeen</span>
-      <input type="number" class="settings-numero-input" id="tehdyn-nakyvyys-input" min="0" step="1">
-    </div>
-    <div class="settings-row">
-      <span>Aikaikkuna: kestoarvio priming-vaiheelle (min)</span>
-      <input type="number" class="settings-numero-input" id="kesto-priming-input" min="1" step="1">
-    </div>
-    <div class="settings-row">
-      <span>Aikaikkuna: kestoarvio encoding-vaiheelle (min)</span>
-      <input type="number" class="settings-numero-input" id="kesto-encoding-input" min="1" step="1">
-    </div>
-    <div class="settings-row">
-      <span>Aikaikkuna: kestoarvio retrieval-vaiheelle (min)</span>
-      <input type="number" class="settings-numero-input" id="kesto-retrieval-input" min="1" step="1">
-    </div>
-    <div class="settings-row">
-      <span>Aikaikkuna: kestoarvio ylläpitovaiheelle (min)</span>
-      <input type="number" class="settings-numero-input" id="kesto-yllapito-input" min="1" step="1">
     </div>
 
     <div class="section-title">⚓ Ankkurit</div>
@@ -1136,59 +1050,180 @@
 
     <hr class="divider">
 
-    <!-- Hytin ikkunat (2026-08-10, ks. HYTTI_SPEKSI.md §4.5/§4.5b, sql/112)
-         — Vaihe 1a: pelkkä tallennus/hallinta, generaattori (Vaihe 3) ei
-         vielä lue näitä mihinkään. -->
-    <div class="section-title">🕐 Hytin ikkunat</div>
-    <div class="settings-row">
-      <span>Aterian alku</span>
-      <input type="time" class="settings-numero-input" id="aterian-alku-input">
-    </div>
-    <div class="settings-row">
-      <span>Aterian kesto (min)</span>
-      <input type="number" class="settings-numero-input" id="aterian-kesto-input" min="1" step="1">
-    </div>
+    <!-- ⚙️ Lisäasetukset (2026-08-25, rakenneuudistus) — kertaluontoiset
+         viritysarvot ja diagnostiikka yhden napautuksen taakse, oletuksena
+         AINA kiinni kun näkymä avataan (ks. showAsetuksetView()
+         script.js:ssä, nollaa open-attribuutin joka avauksella — natiivi
+         <details> muuten MUISTAISI edellisen auki-tilan koko istunnon
+         ajan koska container ei koskaan poistu DOM:ista, vain piiloutuu
+         display:nonella, mikä olisi hivuttanut takaisin samaan "aina
+         auki" -ongelmaan jota koko rakenneuudistus yrittää välttää).
+         Sisältö on muuten TÄYSIN entisellään, vain siirretty tänne. -->
+    <details id="asetukset-lisa-details">
+      <summary class="section-title asetukset-lisa-summary">⚙️ Lisäasetukset</summary>
 
-    <!-- Arkipäivien pikatäyttö (2026-08-18, Katrin palaute: "9.15-15.30 on
-         opiskeluaika... toi taitaa olla asetuksissa säädettävissä mut ei
-         näytä ihan vielä toimivan" — tietokannasta tarkistettu: taulu oli
-         täysin tyhjä, ei yhtään tallennettua riviä. Todennäköinen syy:
-         alla oleva ruudukko ESITÄYTTI 09:00/15:30-oletuksen kenttiin näyttäen
-         siltä että se on jo tallennettu, mutta se on VAIN näytettävä
-         placeholder-arvo — tallennus vaatii jonkin kentän oikean MUUTOKSEN
-         (change-tapahtuma), ei pelkkää olemassaolevan arvon vahvistusta.
-         Tämä pikarivi täyttää ma–pe yhdellä painalluksella eikä vaadi
-         viiden erillisen päivän läpikäyntiä. -->
-    <p class="section-empty">Päivän opiskeluaika (oletus 09:00–15:30, säädettävissä päiväkohtaisesti alla)</p>
-    <div class="hytti-ikkuna-lisays" id="hytti-opiskeluaika-arki-rivi">
-      <input type="time" class="settings-numero-input" id="hytti-opiskeluaika-arki-alku" value="09:15">
-      <span>–</span>
-      <input type="time" class="settings-numero-input" id="hytti-opiskeluaika-arki-loppu" value="15:30">
-      <button class="dialog-btn dialog-btn-cancel" id="hytti-opiskeluaika-arki-btn">Käytä ma–pe</button>
-    </div>
-    <div id="hytti-opiskeluaika-ruudukko"></div>
+      <div class="section-title">⚠️ Ristiriitapaketti</div>
+      <div class="settings-row">
+        <span>Siirtymäpuskuri: lisätään tapahtumien molempiin päihin ennen päällekkäisyyslaskentaa (min)</span>
+        <input type="number" class="settings-numero-input" id="siirtymapuskuri-input" min="0" step="1">
+      </div>
+      <div class="settings-row">
+        <span>Alle tämän mittainen päällekkäisyys ei laukaise mitään (min)</span>
+        <input type="number" class="settings-numero-input" id="min-paallekkainen-input" min="0" step="1">
+      </div>
+      <div class="settings-row">
+        <span>Ika_yksin_hetkittain-lapsille sallittu hoivaikkunan pituus ilman ristiriitaa (min)</span>
+        <input type="number" class="settings-numero-input" id="yksin-hetkittain-raja-input" min="0" step="1">
+      </div>
 
-    <p class="section-empty">Suljetut ikkunat — generaattorin rajoite, ei näy päivänäkymässä</p>
-    <ul class="list" id="hytti-suljetut-ikkunat-lista"></ul>
-    <div class="hytti-ikkuna-lisays">
-      <select id="suljettu-ikkuna-viikonpaiva" class="settings-numero-input"></select>
-      <input type="time" id="suljettu-ikkuna-alku" class="settings-numero-input">
-      <input type="time" id="suljettu-ikkuna-loppu" class="settings-numero-input">
-      <input type="text" id="suljettu-ikkuna-syy" class="settings-numero-input" placeholder="syy (valinnainen)">
-      <button class="dialog-btn dialog-btn-cancel" id="suljettu-ikkuna-lisaa-btn">+ Lisää</button>
-    </div>
+      <hr class="divider">
 
-    <hr class="divider">
+      <div class="section-title">🚦 Kuormavahti (loput)</div>
+      <div class="settings-row">
+        <span>PACER-kehote: näytä "✓ Tehty siirtää vaiheeseen X" Tänään-korteilla</span>
+        <label class="toggle">
+          <input type="checkbox" id="pacer-kehote-toggle">
+          <span class="toggle-track"></span>
+        </label>
+      </div>
+      <div class="settings-row">
+        <span>Huolilippu: paino josta päivä nousee vähintään "keski"-kuormaksi</span>
+        <input type="number" class="settings-numero-input" id="huoli-keski-kynnys-input" min="0" step="1">
+      </div>
+      <div class="settings-row">
+        <span>Huolilippu: paino josta päivä pakotetaan "raskaaksi"</span>
+        <input type="number" class="settings-numero-input" id="huoli-raskas-kynnys-input" min="0" step="1">
+      </div>
+      <div class="settings-row">
+        <span>Aloittamaton kurssitehtävä saa kovan etusijan kun deadlineen on enintään N päivää</span>
+        <input type="number" class="settings-numero-input" id="kurssi-kiireellisyys-input" min="0" step="1">
+      </div>
+      <div class="settings-row">
+        <span>Tavoitetahdin laskennassa (Taso 1) käytettävä tuntimäärä per opintopiste — nyrkkisääntö, säädä jos tuntuu väärältä</span>
+        <input type="number" class="settings-numero-input" id="tuntia-per-op-input" min="1" step="1">
+      </div>
+      <div class="settings-row">
+        <span>Hoitotason kevennysehdotus (Taso 2) kun tästä useampi % kurssin aiheista on tavoiteikkunastaan jäljessä</span>
+        <input type="number" class="settings-numero-input" id="hoitotaso-jalkeenjaanti-input" min="1" max="100" step="1">
+      </div>
+      <div class="settings-row">
+        <span>Siltasolmun ikkuna sulkeutuu N päivää ennen aikaisinta viittaavaa deadlinea</span>
+        <input type="number" class="settings-numero-input" id="silta-puskuri-input" min="0" step="1">
+      </div>
+      <div class="settings-row">
+        <span>Automaattinen siltatarkistus (jos ei käsin tehty) N päivän kuluttua kurssin lisäyksestä, kerran per kurssi</span>
+        <input type="number" class="settings-numero-input" id="sillat-auto-paivia-input" min="1" step="1">
+      </div>
+      <div class="settings-row">
+        <span>Kiireellisyyden leviäminen tarvitsee-kaarten yli, enintään N askelta</span>
+        <input type="number" class="settings-numero-input" id="silta-leviamissyvyys-input" min="0" step="1">
+      </div>
+      <div class="settings-row">
+        <span>Opiskeluistunto kysyy vahvistusta jos kesto ylittää N tuntia</span>
+        <input type="number" class="settings-numero-input" id="sessio-jarkevyys-input" min="0" step="1">
+      </div>
+      <div class="settings-row">
+        <span>Tehty/ohitettu kortti pysyy näkyvissä kunnes N uutta askelta on tullut sen jälkeen</span>
+        <input type="number" class="settings-numero-input" id="tehdyn-nakyvyys-input" min="0" step="1">
+      </div>
+      <div class="settings-row">
+        <span>Aikaikkuna: kestoarvio priming-vaiheelle (min)</span>
+        <input type="number" class="settings-numero-input" id="kesto-priming-input" min="1" step="1">
+      </div>
+      <div class="settings-row">
+        <span>Aikaikkuna: kestoarvio encoding-vaiheelle (min)</span>
+        <input type="number" class="settings-numero-input" id="kesto-encoding-input" min="1" step="1">
+      </div>
+      <div class="settings-row">
+        <span>Aikaikkuna: kestoarvio retrieval-vaiheelle (min)</span>
+        <input type="number" class="settings-numero-input" id="kesto-retrieval-input" min="1" step="1">
+      </div>
+      <div class="settings-row">
+        <span>Aikaikkuna: kestoarvio ylläpitovaiheelle (min)</span>
+        <input type="number" class="settings-numero-input" id="kesto-yllapito-input" min="1" step="1">
+      </div>
 
-    <!-- 🛟 Laituri -asetusosio (kohdekohtainen piilotusoletus) POISTETTU
-         (2026-08-16, SATAMA_SPEKSI.md §16.5c kohta 5) — piilotus on nyt AINA
-         välitön kun kohde asetetaan (ks. script.js asetaLaiturinKoti), ei
-         jää mitään konfiguroitavaa. -->
+      <hr class="divider">
 
-    <div id="aly-log-osio" style="display:none">
-      <div class="section-title">✨ Mitä äly on tehnyt</div>
-      <button class="laituri-arkisto-toggle" id="aly-log-toggle" style="display:none">Näytä loki (0)</button>
-      <div class="aly-log-list" id="aly-log-list" style="display:none"></div>
+      <!-- Hytin ikkunat (2026-08-10, ks. HYTTI_SPEKSI.md §4.5/§4.5b, sql/112)
+           — Vaihe 1a: pelkkä tallennus/hallinta, generaattori (Vaihe 3) ei
+           vielä lue näitä mihinkään. -->
+      <div class="section-title">🕐 Hytin ikkunat</div>
+      <div class="settings-row">
+        <span>Aterian alku</span>
+        <input type="time" class="settings-numero-input" id="aterian-alku-input">
+      </div>
+      <div class="settings-row">
+        <span>Aterian kesto (min)</span>
+        <input type="number" class="settings-numero-input" id="aterian-kesto-input" min="1" step="1">
+      </div>
+
+      <!-- Arkipäivien pikatäyttö (2026-08-18, Katrin palaute: "9.15-15.30 on
+           opiskeluaika... toi taitaa olla asetuksissa säädettävissä mut ei
+           näytä ihan vielä toimivan" — tietokannasta tarkistettu: taulu oli
+           täysin tyhjä, ei yhtään tallennettua riviä. Todennäköinen syy:
+           alla oleva ruudukko ESITÄYTTI 09:00/15:30-oletuksen kenttiin näyttäen
+           siltä että se on jo tallennettu, mutta se on VAIN näytettävä
+           placeholder-arvo — tallennus vaatii jonkin kentän oikean MUUTOKSEN
+           (change-tapahtuma), ei pelkkää olemassaolevan arvon vahvistusta.
+           Tämä pikarivi täyttää ma–pe yhdellä painalluksella eikä vaadi
+           viiden erillisen päivän läpikäyntiä. -->
+      <p class="section-empty">Päivän opiskeluaika (oletus 09:00–15:30, säädettävissä päiväkohtaisesti alla)</p>
+      <div class="hytti-ikkuna-lisays" id="hytti-opiskeluaika-arki-rivi">
+        <input type="time" class="settings-numero-input" id="hytti-opiskeluaika-arki-alku" value="09:15">
+        <span>–</span>
+        <input type="time" class="settings-numero-input" id="hytti-opiskeluaika-arki-loppu" value="15:30">
+        <button class="dialog-btn dialog-btn-cancel" id="hytti-opiskeluaika-arki-btn">Käytä ma–pe</button>
+      </div>
+      <div id="hytti-opiskeluaika-ruudukko"></div>
+
+      <p class="section-empty">Suljetut ikkunat — generaattorin rajoite, ei näy päivänäkymässä</p>
+      <ul class="list" id="hytti-suljetut-ikkunat-lista"></ul>
+      <div class="hytti-ikkuna-lisays">
+        <select id="suljettu-ikkuna-viikonpaiva" class="settings-numero-input"></select>
+        <input type="time" id="suljettu-ikkuna-alku" class="settings-numero-input">
+        <input type="time" id="suljettu-ikkuna-loppu" class="settings-numero-input">
+        <input type="text" id="suljettu-ikkuna-syy" class="settings-numero-input" placeholder="syy (valinnainen)">
+        <button class="dialog-btn dialog-btn-cancel" id="suljettu-ikkuna-lisaa-btn">+ Lisää</button>
+      </div>
+
+      <hr class="divider">
+
+      <!-- 🛟 Laituri -asetusosio (kohdekohtainen piilotusoletus) POISTETTU
+           (2026-08-16, SATAMA_SPEKSI.md §16.5c kohta 5) — piilotus on nyt AINA
+           välitön kun kohde asetetaan (ks. script.js asetaLaiturinKoti), ei
+           jää mitään konfiguroitavaa. -->
+
+      <div id="aly-log-osio" style="display:none">
+        <div class="section-title">✨ Mitä äly on tehnyt</div>
+        <button class="laituri-arkisto-toggle" id="aly-log-toggle" style="display:none">Näytä loki (0)</button>
+        <div class="aly-log-list" id="aly-log-list" style="display:none"></div>
+      </div>
+    </details>
+  </div>
+
+  <!-- Asetusten "💡 Vinkit" -sisältö (2026-08-25, rakenneuudistus) — oli
+       osa vieritettävää Asetukset-listaa, siirretty omaksi ohjepaneelikseen
+       "?"-napin taakse koska se on OHJETTA eikä asetus (ei koskaan tarvitse
+       muokata, vain lukea silloin tällöin). Sama dialog-overlay-kaava kuin
+       muualla sovelluksessa, ei omaa erikoisrakennetta. -->
+  <div class="dialog-overlay" id="asetukset-ohje-overlay" style="display:none">
+    <div class="dialog-box">
+      <p class="dialog-title">💡 Vinkit</p>
+      <div class="vinkki-lista" id="vinkki-lista-data"></div>
+
+      <div class="vinkki-alaotsikko">Missä muokataan mitäkin</div>
+      <div class="vinkki-lista">
+        <div class="vinkki-rivi">Menot ja tapahtumat: lisää ja muokkaa aina iPhonen Kalenterissa — Satama hakee ne itsestään hetken sisällä</div>
+        <div class="vinkki-rivi">Satama näyttää kaikki tapahtumat, mutta ei muokkaa niitä — jos meno on väärässä kalenterissa, siirrä se iPhonen Kalenterissa, Satama päivittyy perässä</div>
+        <div class="vinkki-rivi">Toisen lisäämät menot odottavat kuittaustasi ("N uutta") — kuittaus tarkoittaa "nähty", tapahtuma näkyy kalenterissa joka tapauksessa</div>
+        <div class="vinkki-rivi">Muistutukset, ankkurit ja Hytin tehtävät ovat Sataman omia — ne luodaan ja muokataan Satamassa</div>
+        <div class="vinkki-rivi">Listat, Laituri ja Varasto elävät aina Satamassa — kauppalistalle voi lisätä myös Sirillä</div>
+      </div>
+
+      <div class="dialog-buttons">
+        <button class="dialog-btn dialog-btn-cancel" id="asetukset-ohje-sulje-btn">Sulje</button>
+      </div>
     </div>
   </div>
 
