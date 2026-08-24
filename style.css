@@ -2387,19 +2387,10 @@ h1 {
 }
 
 /* Liquid glass päätoiminnolle (2026-08-11, Katrin lupa: "käytä liquid
-   glassia missä järkevää") — vain nämä kolme "sitovaa" Aseta-nappia,
-   ei koko dialogia täyteen koristelua. Sama lämmin lasi -resepti kuin
-   muualla Ruorissa. */
-#muistutus-lisaa-btn,
-#muistutus-kellonaika-lisaa-btn,
-#muistutus-toistuva-aseta-btn {
-  background: linear-gradient(165deg, rgba(255, 252, 244, .8), rgba(234, 230, 220, .4));
-  border: 1px solid rgba(156, 122, 67, .5);
-  border-radius: var(--r-kosketettava);
-  color: var(--muste);
-  backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .65);
-}
+   glassia missä järkevää") — nämä kolme "sitovat" Aseta-napit saivat tämän
+   ENSIN, id-skoopattuna. 2026-08-24: sama resepti yleistettiin KAIKKIIN
+   päätoimintonappeihin (perus-.dialog-btn, ks. yllempänä) — tämä id-skoopattu
+   kaksoiskappale poistettu, .dialog-btn kattaa nämä kolme jo suoraan. */
 
 /* KELLONAIKA-tila: natiivi datetime-local-input toimii jo itsessään
    "rullana" iOS:ssä (sama yhtenäinen wheel-valitsin kuin natiivissa
@@ -2828,18 +2819,33 @@ h1 {
   margin-top: 20px;
 }
 
+/* Perus-.dialog-btn on sovelluksen ainoa "päätoiminto"-nappi (Tallenna/
+   Merkitse tehdyksi/Aseta/Valmis, ks. index.html) — sama vahvempi,
+   peittävämpi lasiresepti (.8/.4) jonka #muistutus-lisaa-btn ym. kolme
+   nappia saivat jo 2026-08-11 "liquid glass päätoiminnolle" -periaatteella
+   (ks. niiden oma kommentti alempana), nyt yleistettynä KAIKKIIN päätoiminto-
+   nappeihin sen sijaan että ne kolme olisivat ainoat. .dialog-btn-cancel/
+   -danger ylikirjoittavat oman, kevyemmän (.72/.28) lasinsa — päätoiminto
+   pysyy visuaalisesti "vahvimpana" vaihtoehtona rivillä (2026-08-24,
+   Katrin pyyntö "jaetut komponentit" -sarjan täydennys). */
 .dialog-btn {
   flex: 1;
-  font-family: 'Courier New', Courier, monospace;
+  font-family: var(--fontti-loki);
   font-size: 13px;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  background: none;
+  border-radius: var(--r-kosketettava);
+  border: 1px solid rgba(156, 122, 67, .5);
+  background: linear-gradient(165deg, rgba(255, 252, 244, .8), rgba(234, 230, 220, .4));
+  backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .65);
+  color: var(--muste);
   padding: 12px 8px;
   cursor: pointer;
   appearance: none;
   -webkit-appearance: none;
   -webkit-tap-highlight-color: transparent;
+  transition: transform var(--keski) var(--kelluu), border-color var(--keski) var(--kelluu), box-shadow var(--keski) var(--kelluu);
   /* Kalenterisilta-korjaus (2026-07-21, ks. muistiinpanot.md): ➕-nappi on
      nyt aito <a href>-linkki <button>:n sijaan (natiivi navigointi, ei
      JS — ks. kalenterisiltaUrl()) — nämä säännöt pitävät sen näyttämältä
@@ -2851,34 +2857,34 @@ h1 {
   text-align: center;
   text-decoration: none;
 }
-
-.dialog-btn-cancel {
-  border-radius: var(--r-kosketettava);
-  border: 1px solid rgba(156, 122, 67, .5);
-  background: linear-gradient(165deg, rgba(255, 252, 244, .72), rgba(234, 230, 220, .28));
-  backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
-  color: var(--muste);
-  transition: transform var(--keski) var(--kelluu), border-color var(--keski) var(--kelluu), box-shadow var(--keski) var(--kelluu);
-}
-
-.dialog-btn-cancel:hover {
+.dialog-btn:hover {
   transform: translateY(-2px);
 }
-.dialog-btn-cancel:active {
+.dialog-btn:active {
   transform: translateY(0) scale(.996);
   border-color: var(--messinki);
+}
+
+.dialog-btn-cancel {
+  background: linear-gradient(165deg, rgba(255, 252, 244, .72), rgba(234, 230, 220, .28));
+  color: var(--muste);
+}
+
+.dialog-btn-cancel:active {
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, .65), 0 0 0 3px rgba(156, 122, 67, .15);
 }
 
 .dialog-btn-danger {
-  border: 1px solid #E24B4A;
+  background: linear-gradient(165deg, rgba(255, 252, 244, .72), rgba(234, 230, 220, .28));
+  border-color: #E24B4A;
   color: #E24B4A;
 }
 
 .dialog-btn-danger:hover,
 .dialog-btn-danger:active {
   background: #E24B4A;
-  color: var(--ground);
+  color: var(--paperi);
+  border-color: #E24B4A;
 }
 
 /* Kalenterisyötteen väri hyväksyntäkorteissa (.kalenteri-kortti-vari).

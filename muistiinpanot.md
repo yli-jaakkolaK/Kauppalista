@@ -4580,3 +4580,17 @@ Katri jatkoi samalla periaatteella kuin v187:ssä (jaetut ensin) — löysi lopu
 Sama tumma-teema-varovaisuus kuin v187:ssä: kaikki saivat OMAN kiinteän lasitaustan (ei vain väriä), koska nämä ovat jaettuja ja näkyvät myös vielä-vanhojen näkymien päällä. Tarkistettu ettei mikään näistä luokista ollut minkään `@media (prefers-color-scheme: dark)` -erityissäännön kohteena (koko tiedostossa vain 4 tumma-teema-lohkoa, ei yksikään koskenut näitä).
 
 **Ei vielä testattu livenä.** `node -c script.js` (ei JS-muutoksia) ja style.css-aaltosulkutasapaino puhtaat.
+
+---
+
+## `.dialog-btn` (paljas) + `.dialog-btn-danger` täydennys (2026-08-24, sama päivä jatkuu)
+
+Katri: "can you do it now?" — viittasi edellisen viestin lopun huomioon, että paljas `.dialog-btn` (Tallenna/Merkitse tehdyksi/Aseta/Valmis, 15+ käyttökohtaa) ja `.dialog-btn-danger` jäivät jaettujen komponenttien 2. erästä pois.
+
+**`.dialog-btn` sai vahvemman ("liquid glass päätoiminnolle") reseptin** — täsmälleen sen minkä `#muistutus-lisaa-btn`/`#muistutus-kellonaika-lisaa-btn`/`#muistutus-toistuva-aseta-btn` saivat jo 2026-08-11 id-skoopattuna kolmelle napille — nyt YLEISTETTY kaikkiin päätoimintonappeihin, koska ne kaikki jakavat saman `.dialog-btn`-luokan. Vanha id-skoopattu kaksoiskappale poistettu (täysin redundantti, sama resepti nyt perusluokassa). `.dialog-btn-cancel` säilyi visuaalisesti KEVYEMPÄNÄ (oma, hillitympi .72/.28-lasi) — päätoiminto pysyy rivillä selvästi "vahvimpana" vaihtoehtona, tarkoituksellinen hierarkia.
+
+**`.dialog-btn-danger` sai saman muodon (`--r-kosketettava`, peritty pohjasta) mutta säilytti punaisen värinsä** — lepotilassa sama kevyt lasi kuin cancel, hover/active täyttyy kiinteällä punaisella (#E24B4A) täsmälleen kuten ennenkin, vain `color: var(--ground)` → `var(--paperi)` (kiinteä).
+
+Sivuvaikutus (odotettu, ei bugi): Laiturin ehdotuskorttien "Tarkista"/"Ei liity" -napit (`class="dialog-btn dialog-btn-cancel"`) saavat nyt myös uuden lasin, koska käyttävät samoja jaettuja luokkia — ei Laiturin oma erillinen muutos, vain sama jaettu komponentti kaikkialla.
+
+**Ei vielä testattu livenä.** `node -c script.js` (ei JS-muutoksia) ja style.css-aaltosulkutasapaino puhtaat.
