@@ -83,6 +83,12 @@
   --syvanne: #3F5F53;
   --messinki: #9C7A43;
   --sinappi: #C29A2E;
+  /* R,G,B-erillisarvot (2026-08-24, Katrin huomio) — .ankkuri-rivi ym.
+     käyttivät kovakoodattua rgba(194,154,46,X):ää --sinapin sijaan (sama
+     arvo, mutta ei sidottu muuttujaan: jos --sinappi joskus muuttuu, nämä
+     eivät seuraisi mukana huomaamatta). rgba(var(--sinappi-rgb), X) sitoo
+     ne yhteen ilman color-mix()-syntaksia. */
+  --sinappi-rgb: 194, 154, 46;
   --loki-vaara: #B8433A;
   --hius: rgba(34, 31, 26, .16);
   --hius-vahva: rgba(34, 31, 26, .34);
@@ -310,6 +316,38 @@ h1 {
   margin: -24px -12px;
   padding: 20px 12px 32px;
   border-radius: 8px;
+}
+
+/* === HYTTI PYSYVÄSTI VAALEAKSI (2026-08-24) === Bugi 3: Hytin sivutausta
+   oli yhä pelkkä body{background:var(--ground)} (seuraa laitteen tumma/
+   vaalea-tilaa) mutta sen YKSITTÄISET komponentit (välilehdet, kortit,
+   ohjelistat) käyttivät jo kiinteitä merikartta-tokeneita — tumma sivu +
+   kiinteän-vaaleat komponentit = "villejä asioita" tumma-tilassa (Katrin
+   raportti). Katrin päätös: Hytti yhdenmukaistetaan Ruorin/Kalenterin
+   kanssa (molemmat PYSYVÄSTI vaaleita, eivät seuraa tumma-tilaa — tietoinen
+   päätös 2026-08-08, ei muuteta tässä). Ei riitä pelkkä background/color —
+   sama tekniikka kuin #laituri-view:llä (rivi ~1170): OMAT --ground/--text/
+   --muted/--border-token-uudelleenmäärittelyt tämän skoopin sisällä, jotta
+   MYÖS ne Hytin elementit jotka eivät vielä ole yksitellen migroitu
+   merikartta-tokeneihin (yhä `var(--muted)` ym.) saavat automaattisesti
+   kiinteän arvon sen sijaan että jäisivät seuraamaan laitteen tumma-tilaa
+   ja aiheuttaisivat saman "villit asiat" -ristiriidan enää eri kohdassa. */
+#hytti-view,
+#hytti-kortti-view,
+#opinto-kurssi-view,
+#opinto-tehtava-view,
+#taitosolmu-view {
+  font-family: var(--fontti-loki);
+  background: var(--paperi);
+  color: var(--muste);
+  margin: -24px -12px;
+  padding: 20px 12px 32px;
+  border-radius: 8px;
+  --ground: var(--paperi);
+  --text: var(--muste);
+  --muted: var(--vaimea);
+  --border: var(--hius);
+  --border-dash: var(--hius-vahva);
 }
 
 .kalenteri-tilat {
@@ -1782,8 +1820,8 @@ h1 {
   align-items: flex-start;
   min-height: 44px;
   border-radius: var(--r-kosketettava);
-  background: linear-gradient(165deg, rgba(194, 154, 46, .20), rgba(194, 154, 46, .07));
-  border: 1px solid rgba(194, 154, 46, .38);
+  background: linear-gradient(165deg, rgba(var(--sinappi-rgb), .20), rgba(var(--sinappi-rgb), .07));
+  border: 1px solid rgba(var(--sinappi-rgb), .38);
   box-shadow: 0 2px 6px rgba(34, 31, 26, .10), inset 0 1px 0 rgba(255, 255, 255, .5);
   padding: 8px 10px;
   margin-bottom: 8px;
@@ -4265,7 +4303,7 @@ h1 {
    lasi-reseptiä vahingossa väärään, ei-interaktiiviseen kohteeseen —
    korvattu tasaisella sinappi-sävyllä ilman kiiltoa/reunusta/syvyyttä. */
 .ruori .saa-tunti-nyt {
-  background: rgba(194, 154, 46, .16);
+  background: rgba(var(--sinappi-rgb), .16);
 }
 .ruori .saa-tunti-aika { font-size: 10.5px; color: var(--vaimea); }
 .ruori .saa-tunti-nyt .saa-tunti-aika { color: var(--muste); font-weight: 700; }
@@ -4422,14 +4460,14 @@ h1 {
    (sama luokkamäärä, myöhempi sääntö tässä tiedostossa voittaa). */
 .ruori .segmentti.kalenteri,
 .ruori .segmentti.hytti {
-  background: linear-gradient(165deg, rgba(194, 154, 46, .20), rgba(194, 154, 46, .07));
-  border: 1px solid rgba(194, 154, 46, .38);
+  background: linear-gradient(165deg, rgba(var(--sinappi-rgb), .20), rgba(var(--sinappi-rgb), .07));
+  border: 1px solid rgba(var(--sinappi-rgb), .38);
   border-radius: var(--r-kosketettava);
   box-shadow: 0 2px 6px rgba(34, 31, 26, .10), inset 0 1px 0 rgba(255, 255, 255, .5);
 }
 .ruori .segmentti.kalenteri:hover, .ruori .segmentti.kalenteri:focus-visible,
 .ruori .segmentti.hytti:hover, .ruori .segmentti.hytti:focus-visible {
-  background: linear-gradient(165deg, rgba(194, 154, 46, .28), rgba(194, 154, 46, .11));
+  background: linear-gradient(165deg, rgba(var(--sinappi-rgb), .28), rgba(var(--sinappi-rgb), .11));
   box-shadow: 0 6px 16px rgba(34, 31, 26, .14), inset 0 1px 0 rgba(255, 255, 255, .5);
 }
 .ruori .segmentti.kalenteri:active,
