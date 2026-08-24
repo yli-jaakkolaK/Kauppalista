@@ -4444,8 +4444,34 @@ Katri lähetti täyden `copilot_viesti_kalenteri.md`-rakennusviestin (kirjoitett
 
 ---
 
+## Kalenterin merikartta-pinta (2026-08-24, sama päivä jatkuu)
+
+Katri lähetti kaksi lisäviestiä samana päivänä, molemmat alunperin osoitettu "Codelle" (toinen tekoälytyökalu) mutta pyysi minua rakentamaan ne — sama kuvio kuin päivän ensimmäisessä erässä.
+
+**Viesti 2 — kuittiteemasta merikartta-designiin:** edellinen erä (v181) korjasi datan/sisällön mutta jätti `#kalenteri-view`:n pinnan vanhaan asuun (`--ground`/`--text`/`--accent`/`--border`, Courier New) vaikka Ruori-etusivu on jo kokonaan merikartta/loki-kielellä (`--paperi`/`--muste`/`--messinki`/`--hius`, Courier Prime). Korjattu:
+- `#kalenteri-view` sai `.ruori`:n täsmälleen saman reseptin (negatiivinen margin+padding+border-radius rikkoo `.container`in reunuksen, fontti+tausta+teksti merikartta-tokeneilla).
+- Tilanvaihdin (`.kalenteri-tila-btn`) sai `.saadin`-reseptin (messinkikehys, lämmin lasitausta, `backdrop-filter`, `aria-pressed`-tyylinen korostus `.active`-luokalla — sovellus käyttää `.active`-luokkaa, ei `aria-pressed`-attribuuttia, joten resepti sovellettiin sen mukaan).
+- Nav-nuolet messinki-väriin, otsikko merkintä-tyyliin (12.5px, letter-spacing .16em, uppercase, vaimea).
+- Kuukausiruudukko: reunaviivat `--hius`, "tänään"-solu ei enää tasaväri vaan pelkkä päivänumero ympyröitynä musteella (kuormaväri jäi koskematta, se on jo oikein erillinen tasaväritys).
+- Viikkonäkymän aikajanan reunat/tuntiviivat `--hius`/`--hius-vahva`.
+- Päivänäkymän rivit (`.kalenteri-paiva-ryhma .list li`) `--hius`-reunaviiva + kevyt kosketuspalaute.
+- Kaikkialle liike-resepti (`--keski`/`--kelluu`, `translateY(-2px)` hover, `scale(.996)` active) samaan tapaan kuin `.ruori .segmentti`.
+- **Tarkistettu, EI muutettu:** monipäiväisten tapahtumien reunalogiikka (`computeEventBarLayout` + `.kalenteri-palkki--lahto/--tulo/--keski`) oli jo oikein sekä kuukausi- että viikkonäkymässä — lähtöpäivä suora oikealta, keskipäivä suora molemmilta, saapumispäivä suora vasemmalta, ei rakoa päivän vaihtuessa. Ei koodimuutosta, vain varmistus lukemalla.
+- Värit (Katri/Juha/Yhteinen/Rebekka/Jamiel), kuorman tasaväritys, ristiriita-/huolilippumerkit (⚠️/🟠) ja niiden kuittauslogiikka jätetty koskematta Katrin nimenomaisen rajauksen mukaisesti.
+- **Ei rakennettu tälläkään kierroksella:** mockupin `.pv-kuorma`-kuormakortti — se ei ollut olemassa (Katrin viesti oletti sen jo rakennetuksi edellisessä erässä, mikä ei pitänyt paikkaansa, ks. edellisen erän oma "tietoisesti EI rakennettu" -kohta).
+
+**Viesti 3 — korjaus "teksti ei saa katketa" -ohjeeseen, tuli KESKEN viestin 2 rakentamisen:** Katri huomasi että alkuperäinen "osoite näkyy aina" -ohje oli väärä lähtökohdiltaan. Uusi, oikea periaate: **kaksi eri tason tietoa, ei sama rivi.** Vain tapahtuman NIMI on relevanttia kaikille (esim. Juha ei tarvitse Katrin luokkatietoja) — se näkyy aina kokonaan, ennallaan. Osoite/luokka on toissijaista tietoa, piilossa oletuksena:
+- **Päivänäkymä:** uusi ⓘ-nappi (messinki, `.kalenteri-sijainti-nappi`) nimen vieressä, näkyy vain jos tapahtumalla on sijaintitieto — napautus paljastaa osoitteen laajentamalla sen paikalleen (`hidden`-attribuutti togglataan, ei erillistä näkymää — sellaista ei ole olemassa tässä sovelluksessa).
+- **Viikkonäkymä:** osoiterivi POISTETTU palkista kokonaan (oli juuri rakennettu viestissä 1, kesti vain saman päivän ajan) — palkissa vain nimi, palkin koko pysyy sidottuna kestoon.
+- Data (`osoite`-sarake, `tapahtumanSijaintiteksti()`) pysyy täysin koskemattomana — vain näkyvyys muuttui.
+- "Luento:"-etuliitettä ei lisätty Lukkarin luentoihin (ei pyydetty, aiempi 24.8. päätös pysyy: näkyvät tavallisina Katrin menoina).
+
+**Ei vielä testattu livenä selaimessa** kumpaakaan erää. `node -c script.js` ja style.css-aaltosulkutasapaino tarkistettu molempien jälkeen, puhtaat.
+
+---
+
 ## Nykytila (päivitetty 2026-08-24)
 
-Uusin tässä istunnossa: yllä kuvattu kalenterin UI-uudistus + Lukkarikoneen osoite. Migraatio sql/138 ajettu MCP:llä. **Ei vielä testattu livenä selaimessa** — seuraava luonnollinen askel on avata Kalenteri-välilehti kaikissa kolmessa näkymässä (kuukausi/viikko/päivä) ja tarkistaa: väriselite näkyy kuukausinäkymässä, viikkonäkymän palkit näyttävät nimen JA sijainnin kokonaan ilman katkaisua kaikilla palkin korkeuksilla, päivänäkymän tapahtumat näyttävät osoitteen (erityisesti Lukkarikoneen luennot: "Joukahaisenkatu 3-5, Turku"), ja ettei mikään värin/kirjaimen yhdistelmä näytä ristiriitaiselta kun `vastuu_henkilo` on asetettu lapselle.
+Uusin tässä istunnossa: kalenterin merikartta-pinta + osoitteen näkyvyyskorjaus (ks. yllä), `sw.js` v182. Sitä ennen samana päivänä: kalenterin UI-uudistus + Lukkarikoneen osoite datatasolla (värit, viikon tekstibugi, `sql/138`), `sw.js` v181. **Ei vielä testattu livenä selaimessa** — seuraava luonnollinen askel on avata Kalenteri-välilehti kaikissa kolmessa näkymässä (kuukausi/viikko/päivä) ja tarkistaa: koko näkymä näyttää merikartta-paperilta eikä enää kuittiteemalta, tilanvaihdin/nav-napit tuntuvat lämpimän lasisilta, "tänään" näkyy ympyröitynä numerona ei täysvärisenä solun taustana, viikkopalkit näyttävät VAIN nimen (ei osoitetta), päivänäkymän rivit näyttävät nimen suoraan ja ⓘ-nappi paljastaa osoitteen napautuksesta (erityisesti Lukkarikoneen luennot: "Joukahaisenkatu 3-5, Turku"), ja ettei mikään värin/kirjaimen yhdistelmä näytä ristiriitaiselta kun `vastuu_henkilo` on asetettu lapselle.
 
-Auki: `.pv-kuorma`-tyylinen kuormakortti + `.kal-lippu-rivi`-ristiriitarivin mockup-visuaali päivänäkymän otsikkoon (tietoisesti rajattu pois tällä kierroksella, ks. yllä). Miro-kanvaasin tyhjä-tila-bugi 15min-Boostilla (vanha, ei vieläkään lisätietoa).
+Auki: `.pv-kuorma`-tyylinen kuormakortti + `.kal-lippu-rivi`-ristiriitarivin mockup-visuaali päivänäkymän otsikkoon (tietoisesti rajattu pois molemmilla kierroksilla, ei ole vielä olemassa). Miro-kanvaasin tyhjä-tila-bugi 15min-Boostilla (vanha, ei vieläkään lisätietoa).

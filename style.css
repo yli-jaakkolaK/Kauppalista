@@ -297,31 +297,64 @@ h1 {
   background: var(--border);
 }
 
+/* === KALENTERIN MERIKARTTA-PINTA (2026-08-24) === Kalenteri oli viimeinen
+   iso näkymä joka jäi vanhaan kuittiteemaan (Courier New, --ground/--text/
+   --accent/--border) sen jälkeen kun Ruori (.ruori, ks. alempana) siirtyi
+   merikartta/loki-kieleen 2026-08-08/09. Sama resepti tähän: negatiivinen
+   margin+padding+border-radius rikkoo .containerin 48px/20px-reunuksen
+   niin että paperi ulottuu näkymän reunaan asti, täsmälleen kuin .ruori. */
+#kalenteri-view {
+  font-family: var(--fontti-loki);
+  background: var(--paperi);
+  color: var(--muste);
+  margin: -24px -12px;
+  padding: 20px 12px 32px;
+  border-radius: 8px;
+}
+
 .kalenteri-tilat {
   display: flex;
   gap: 8px;
   margin-bottom: 16px;
 }
 
+/* .saadin-resepti (satama-design-system.css) kopioituna paikalleen — sama
+   tapa kuin .unohtuu-napilla yllä, ei jaettua geneeristä luokkaa. */
 .kalenteri-tila-btn {
   flex: 1;
-  font-family: 'Courier New', Courier, monospace;
-  font-size: 13px;
-  letter-spacing: 0.06em;
+  font-family: inherit;
+  font-size: 11.5px;
+  letter-spacing: 0.12em;
   text-transform: uppercase;
-  background: none;
-  border: 1px dashed var(--border-dash);
-  color: var(--muted);
-  padding: 10px 4px;
+  border-radius: var(--r-kosketettava);
   cursor: pointer;
+  color: var(--muste);
+  border: 1px solid rgba(156, 122, 67, .5);
+  background: linear-gradient(165deg, rgba(255, 252, 244, .72), rgba(234, 230, 220, .28));
+  backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .65);
+  padding: 10px 4px;
+  transition: transform var(--keski) var(--kelluu), box-shadow var(--keski) var(--kelluu), border-color var(--keski) var(--kelluu);
   appearance: none;
   -webkit-appearance: none;
   -webkit-tap-highlight-color: transparent;
 }
 
+.kalenteri-tila-btn:hover,
+.kalenteri-tila-btn:focus-visible {
+  transform: translateY(-2px);
+}
+.kalenteri-tila-btn:active {
+  transform: translateY(0) scale(.996);
+}
+.kalenteri-tila-btn:focus-visible {
+  outline: 2px solid var(--messinki);
+  outline-offset: 2px;
+}
+
 .kalenteri-tila-btn.active {
-  border-color: var(--accent);
-  color: var(--accent);
+  border-color: var(--messinki);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .65), 0 0 0 3px rgba(156, 122, 67, .15);
 }
 
 .kalenteri-nav {
@@ -338,18 +371,26 @@ h1 {
   border: none;
   outline: none;
   font-size: 26px;
-  color: var(--accent);
+  color: var(--messinki);
   cursor: pointer;
   appearance: none;
   -webkit-appearance: none;
   -webkit-tap-highlight-color: transparent;
+  transition: transform var(--keski) var(--kelluu);
+}
+.kalenteri-nav button:hover,
+.kalenteri-nav button:focus-visible {
+  transform: translateY(-2px);
+}
+.kalenteri-nav button:active {
+  transform: translateY(0) scale(.95);
 }
 
 .kalenteri-nav span {
-  font-size: 15px;
-  letter-spacing: 0.06em;
+  font-size: 12.5px;
+  letter-spacing: 0.16em;
   text-transform: uppercase;
-  color: var(--text);
+  color: var(--vaimea);
 }
 
 .kalenteri-paiva-otsikko {
@@ -359,7 +400,7 @@ h1 {
   font-size: 15px;
   letter-spacing: 0.1em;
   text-transform: uppercase;
-  color: var(--muted);
+  color: var(--vaimea);
   margin: 20px 0 4px;
 }
 
@@ -369,13 +410,14 @@ h1 {
 
 .kalenteri-tyhja {
   font-size: 14px;
-  color: var(--muted);
+  color: var(--vaimea);
   padding: 4px 0 16px;
 }
 
 .kalenteri-aika {
   font-size: 14px;
-  color: var(--accent-text);
+  font-weight: 700;
+  color: var(--muste);
   min-width: 48px;
   padding-left: 4px;
 }
@@ -422,39 +464,37 @@ h1 {
 .kalenteri-kuukausi-viikonpaivat span {
   font-size: 11px;
   letter-spacing: 0.06em;
-  color: var(--muted);
+  color: var(--vaimea);
   text-align: center;
 }
 
 .kalenteri-kuukausi-viikko {
   display: grid;
   grid-template-columns: repeat(7, 1fr);
-  border-top: 1px solid var(--border);
+  border-top: 1px solid var(--hius);
+  transition: background var(--keski) var(--kelluu);
 }
 
 .kalenteri-kuukausi-viikko:last-child {
-  border-bottom: 1px solid var(--border);
+  border-bottom: 1px solid var(--hius);
 }
 
 .kalenteri-kuukausi-paiva {
   position: relative;
   min-height: 60px;
   padding: 3px 4px;
-  border-right: 1px solid var(--border);
+  border-right: 1px solid var(--hius);
   cursor: pointer;
   overflow: hidden;
+  transition: background var(--keski) var(--kelluu);
 }
 
 .kalenteri-kuukausi-viikko .kalenteri-kuukausi-paiva:first-child {
-  border-left: 1px solid var(--border);
+  border-left: 1px solid var(--hius);
 }
 
 .kalenteri-kuukausi-paiva.ulkopuolinen {
   opacity: 0.35;
-}
-
-.kalenteri-kuukausi-paiva.tanaan {
-  background: var(--border);
 }
 
 .kalenteri-kuukausi-pvm {
@@ -462,7 +502,23 @@ h1 {
   z-index: 1;
   display: block;
   font-size: 10px;
-  color: var(--text);
+  color: var(--muste);
+}
+
+/* "Tänään" (2026-08-24, merikartta-pinta): EI enää tasaväri koko solussa —
+   kuormaväri (kevyt/keski/raskas, .pv-kuorma-*) on jo oikea tasavärinen
+   tausta ja tänään-solun oma täysvärinen tausta peitti sen alleen. Sen
+   sijaan pelkkä päivänumero ympyröitynä musteella (ks. mockup). */
+.kalenteri-kuukausi-paiva.tanaan .kalenteri-kuukausi-pvm {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 2px;
+  border-radius: 50%;
+  background: var(--muste);
+  color: var(--paperi);
 }
 
 /* === HENKSELIT (2026-08-05, ks. muistiinpanot.md "Henkselit") ===
@@ -633,7 +689,7 @@ h1 {
   right: 2px;
   transform: translateY(-50%);
   font-size: 9px;
-  color: var(--muted);
+  color: var(--vaimea);
 }
 
 .kalenteri-viikko-paiva {
@@ -646,8 +702,9 @@ h1 {
   height: 18px;
   font-size: 11px;
   text-align: center;
-  color: var(--text);
+  color: var(--muste);
   cursor: pointer;
+  transition: color var(--keski) var(--kelluu);
 }
 
 .kalenteri-viikko-kokopaiva {
@@ -665,12 +722,12 @@ h1 {
 .kalenteri-viikko-tuntialue {
   position: relative;
   height: 544px;
-  border-top: 1px solid var(--border);
-  border-left: 1px solid var(--border-dash);
+  border-top: 1px solid var(--hius);
+  border-left: 1px solid var(--hius-vahva);
   background-image: repeating-linear-gradient(
     to bottom,
-    var(--border-dash) 0,
-    var(--border-dash) 1px,
+    var(--hius-vahva) 0,
+    var(--hius-vahva) 1px,
     transparent 1px,
     transparent calc(100% / 16)
   );
@@ -704,14 +761,7 @@ h1 {
 .kalenteri-viikko-nimi {
   font-size: 11px;
   font-weight: 600;
-  color: var(--text);
-  white-space: normal;
-  overflow-wrap: break-word;
-}
-
-.kalenteri-viikko-sijainti {
-  font-size: 9.5px;
-  color: var(--muted);
+  color: var(--muste);
   white-space: normal;
   overflow-wrap: break-word;
 }
@@ -745,7 +795,7 @@ h1 {
   padding: 1px 5px;
   border: 1px dashed var(--kal-opiskelu);
   border-radius: 8px;
-  color: var(--muted);
+  color: var(--vaimea);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -754,7 +804,7 @@ h1 {
 
 .kalenteri-viikko-paiva.tanaan .kalenteri-viikko-paiva-otsikko {
   font-weight: bold;
-  color: var(--accent-text);
+  color: var(--messinki);
 }
 
 /* Reitti: lähestyvät määräajat + kertausjono (SATAMA_SPEKSI.md §5.1/§5.3,
@@ -835,12 +885,12 @@ h1 {
 .henkselit-banneri.henkselit-katri {
   background: rgba(255, 107, 82, 0.14);
   border-left-color: #D93B1F;
-  color: var(--text);
+  color: var(--muste);
 }
 .henkselit-banneri.henkselit-juha {
   background: rgba(59, 130, 214, 0.14);
   border-left-color: #1B4E91;
-  color: var(--text);
+  color: var(--muste);
 }
 @media (prefers-color-scheme: dark) {
   .henkselit-banneri.henkselit-katri {
@@ -1549,7 +1599,7 @@ h1 {
    päivänäkymän tapahtuman nimi JA Lukkarikoneen osoite (Katrin ohje:
    "teksti ei saa koskaan katketa piiloon") saavat oman rivityssäännön
    alempana, eivät yksirivistä ellipsis-katkaisua. */
-.list li:not(.varasto-rivi):not(.laituri-ehdotus-rivi):not(.anchor-candidate-row):not(.ankkuri-rivi):not(.elava-rivi):not(.laituri-jatkorivi-rivi) span:not(.kalenteri-aika):not(.kalenteri-vari):not(.kalenteri-uusi-merkki):not(.hytti-tanaan-aika):not(.hytti-tehtava-erapaiva):not(.hytti-rivi-erapaiva):not(.history-time):not(.muistutus-aika):not(.laituri-text):not(.laituri-meta):not(.kalenteri-teksti-wrap):not(.kalenteri-teksti):not(.kalenteri-sijainti) {
+.list li:not(.varasto-rivi):not(.laituri-ehdotus-rivi):not(.anchor-candidate-row):not(.ankkuri-rivi):not(.elava-rivi):not(.laituri-jatkorivi-rivi) span:not(.kalenteri-aika):not(.kalenteri-vari):not(.kalenteri-uusi-merkki):not(.hytti-tanaan-aika):not(.hytti-tehtava-erapaiva):not(.hytti-rivi-erapaiva):not(.history-time):not(.muistutus-aika):not(.laituri-text):not(.laituri-meta):not(.kalenteri-teksti-wrap):not(.kalenteri-teksti):not(.kalenteri-sijainti):not(.kalenteri-nimirivi) {
   flex: 1;
   min-width: 0;
   overflow: hidden;
@@ -2700,8 +2750,8 @@ h1 {
   padding: 0;
   line-height: 1;
   border-radius: 50%;
-  border: 1px solid var(--border-dash);
-  color: var(--muted);
+  border: 1px solid var(--hius-vahva);
+  color: var(--vaimea);
   font-size: 9px;
   font-weight: bold;
   margin-right: 6px;
@@ -2721,6 +2771,11 @@ h1 {
 .kalenteri-paiva-ryhma .list li {
   align-items: flex-start;
   padding: 6px 0;
+  border-bottom-color: var(--hius);
+  transition: background var(--keski) var(--kelluu);
+}
+.kalenteri-paiva-ryhma .list li:active {
+  background: rgba(156, 122, 67, .08);
 }
 .kalenteri-paiva-ryhma .list li .kalenteri-aika,
 .kalenteri-paiva-ryhma .list li .kalenteri-vari,
@@ -2733,19 +2788,43 @@ h1 {
   flex: 1;
   min-width: 0;
 }
+/* Nimirivi + ⓘ-nappi (2026-08-24, Katrin TARKENNUS): osoite/luokka on
+   piilossa oletuksena, vain nimi näkyy suoraan — ⓘ paljastaa osoitteen
+   napautuksesta laajentamalla sen paikalleen (ei erillistä näkymää). */
+.kalenteri-nimirivi {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  flex: 1;
+  min-width: 0;
+}
 .kalenteri-teksti {
+  flex: 1;
+  min-width: 0;
   white-space: normal;
   overflow-wrap: break-word;
   padding: 0;
+}
+.kalenteri-sijainti-nappi {
+  flex: none;
+  font-family: inherit;
+  font-size: 13px;
+  line-height: 1;
+  color: var(--messinki);
+  background: none;
+  border: none;
+  padding: 4px 2px;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
 }
 .kalenteri-sijainti {
   white-space: normal;
   overflow-wrap: break-word;
   padding: 0;
-  margin-top: 1px;
+  margin-top: 3px;
   font-size: 13px;
   font-weight: 400;
-  color: var(--muted);
+  color: var(--vaimea);
 }
 
 /* Hytti-scopen (oma opiskelu/työ) tapahtuma pääkalenterin agenda/viikko
@@ -2753,7 +2832,7 @@ h1 {
    himmeydellä — reunapalkki + pieni glyyfi (.kalenteri-hytti-glyyfi) korvaa
    feedin oman väripallon (.kalenteri-vari) hytti-riveillä. */
 .list li.kalenteri-rivi-hytti {
-  border-left: 3px solid var(--border);
+  border-left: 3px solid var(--hius-vahva);
   padding-left: 6px;
 }
 .kalenteri-hytti-glyyfi {
@@ -2768,8 +2847,8 @@ h1 {
   font-size: 10px;
   letter-spacing: 0.06em;
   text-transform: uppercase;
-  color: var(--accent);
-  border: 1px dashed var(--accent);
+  color: var(--messinki);
+  border: 1px dashed var(--messinki);
   border-radius: 3px;
   padding: 2px 5px;
   margin-right: 4px;

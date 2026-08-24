@@ -6715,26 +6715,44 @@ function piirraKalenteriRivi(rivi) {
 
   li.dataset.tuoteId = rivi.id;
 
-  // Nimi + sijainti samassa pystyladotussa span-parissa (2026-08-18,
-  // kalenterin UI-uudistus, Katrin ohje: "teksti ei saa koskaan katketa
-  // piiloon" ja lukkarikoneen luennot pitää näyttää osoitteineen). Molemmat
-  // omilla luokillaan (.kalenteri-teksti/.kalenteri-sijainti) ja rajattu
-  // pois .list li:n yleisestä yksirivis-ellipsis-säännöstä (ks. style.css:n
-  // .kalenteri-paiva-ryhma .list li -oma sääntö) — sama korjaustapa kuin
-  // #opinto-tehtava-ohje-lista sai 18.8.
+  // Nimi AINA näkyvissä kokonaan (2026-08-18, Katrin ohje: "teksti ei saa
+  // koskaan katketa piiloon" — koskee nimeä, ei rajattu pois .list li:n
+  // yleisestä yksirivis-ellipsis-säännöstä, ks. style.css:n
+  // .kalenteri-paiva-ryhma .list li -oma sääntö, sama korjaustapa kuin
+  // #opinto-tehtava-ohje-lista sai 18.8.). Sijainti/osoite EI enää näy
+  // rivillä oletuksena (Katrin TARKENNUS 24.8.2026, korvaa saman päivän
+  // aiemman "näytä aina" -ohjeen): vain tapahtuman nimi on relevanttia
+  // kaikille (esim. Juha ei tarvitse Katrin luokkatietoja), osoite on
+  // toissijainen tieto jonka vain Katri tarvitsee silloin tällöin —
+  // piilossa ⓘ-napin takana, laajenee paikalleen napautuksesta.
   const tekstiwrap = document.createElement('span');
   tekstiwrap.className = 'kalenteri-teksti-wrap';
+  const nimirivi = document.createElement('span');
+  nimirivi.className = 'kalenteri-nimirivi';
   const teksti = document.createElement('span');
   teksti.className = 'kalenteri-teksti';
   teksti.textContent = rivi.title;
-  tekstiwrap.appendChild(teksti);
+  nimirivi.appendChild(teksti);
   const sijainti = tapahtumanSijaintiteksti(rivi);
+  let sijaintiEl = null;
   if (sijainti) {
-    const sijaintiEl = document.createElement('span');
+    sijaintiEl = document.createElement('span');
     sijaintiEl.className = 'kalenteri-sijainti';
     sijaintiEl.textContent = sijainti;
-    tekstiwrap.appendChild(sijaintiEl);
+    sijaintiEl.hidden = true;
+    const infoNappi = document.createElement('button');
+    infoNappi.type = 'button';
+    infoNappi.className = 'kalenteri-sijainti-nappi';
+    infoNappi.textContent = 'ⓘ';
+    infoNappi.title = 'Näytä osoite';
+    infoNappi.addEventListener('click', function(e) {
+      e.stopPropagation();
+      sijaintiEl.hidden = !sijaintiEl.hidden;
+    });
+    nimirivi.appendChild(infoNappi);
   }
+  tekstiwrap.appendChild(nimirivi);
+  if (sijaintiEl) tekstiwrap.appendChild(sijaintiEl);
   li.appendChild(tekstiwrap);
 
   // "Yksi totuus, kaksi ikkunaa": tapahtuma näkyy AINA agendassa, mutta jos
@@ -7467,22 +7485,17 @@ function piirraViikkoTuntialue(paivanAjalliset, henkselitLista, iso, paivanSessi
     // Nimi näkyy AINA (2026-08-18, kalenterin UI-uudistus, Katrin ohje:
     // "teksti ei saa koskaan katketa piiloon" — ei enää title-tooltip-
     // vaihtoehtoa lyhyille palkeille, ks. poistettu VIIKKO_BADGE_NIMI_RAJA_PX).
-    // Osoite/sijainti näkyy toisena rivinä samalla periaatteella (mockup
-    // näytti sen vain jos korkeutta riitti — tiukennettu tähän AINA, koska
-    // kirjoitettu speksi kielsi "paikkojen" katkaisun nimenomaisesti).
-    // Palkki saa kasvaa visuaalisesti yli varatun ajan (min-height CSS:ssä,
-    // z-index nostaa naapurien päälle) sen sijaan että sisältö katoaisi.
+    // EI osoitetta/sijaintia palkissa (Katrin TARKENNUS 24.8.2026, korvaa
+    // saman päivän aiemman "näytä osoite aina toisena rivinä" -ohjeen):
+    // vain nimi on relevanttia yhdellä vilkaisulla, osoite on toissijainen
+    // ja katsotaan tapahtumaa avattaessa/napautettaessa (ks. päivänäkymän
+    // ⓘ-nappi). Palkin koko pysyy sidottuna todelliseen kestoon (top/height%
+    // yllä) — ei kasva tekstin takia; overflow:visible CSS:ssä on silti
+    // varalla ettei ITSE NIMIKÄÄN koskaan katkea piiloon lyhyellä palkilla.
     const nimi = document.createElement('span');
     nimi.className = 'kalenteri-viikko-nimi';
     nimi.textContent = t.title;
     palkki.appendChild(nimi);
-    const sijainti = tapahtumanSijaintiteksti(t);
-    if (sijainti) {
-      const sijaintiEl = document.createElement('span');
-      sijaintiEl.className = 'kalenteri-viikko-sijainti';
-      sijaintiEl.textContent = sijainti;
-      palkki.appendChild(sijaintiEl);
-    }
 
     alue.appendChild(palkki);
   });
