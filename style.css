@@ -364,23 +364,33 @@ h1 {
   margin-bottom: 12px;
 }
 
+/* Edellinen/seuraava-nuoli sai täyden kosketettava-painon (2026-08-24,
+   Katrin ohje: "nuoli saa saman painon kuin muutkin kosketettavat napit,
+   se ON kosketettava") — sama messinkilasi-resepti kuin #hytti-tabi-reitti
+   .kalenteri-nav button jo sai aiemmin, nyt myös perusluokassa (Kalenterin
+   omat #kalenteri-edellinen/-seuraava-napit, jotka eivät ennen tätä olleet
+   minkään skoopatun säännön piirissä). */
 .kalenteri-nav button {
   min-width: 44px;
   min-height: 44px;
-  background: none;
-  border: none;
+  border-radius: var(--r-kosketettava);
+  border: 1px solid rgba(156, 122, 67, .45);
+  background: linear-gradient(165deg, rgba(255, 252, 244, .7), rgba(234, 230, 220, .25));
+  backdrop-filter: blur(7px); -webkit-backdrop-filter: blur(7px);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .6);
   outline: none;
-  font-size: 26px;
-  color: var(--messinki);
+  font-size: 22px;
+  color: var(--muste);
   cursor: pointer;
   appearance: none;
   -webkit-appearance: none;
   -webkit-tap-highlight-color: transparent;
-  transition: transform var(--keski) var(--kelluu);
+  transition: transform var(--keski) var(--kelluu), box-shadow var(--keski) var(--kelluu);
 }
 .kalenteri-nav button:hover,
 .kalenteri-nav button:focus-visible {
   transform: translateY(-2px);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .7), 0 4px 12px rgba(34, 31, 26, .12);
 }
 .kalenteri-nav button:active {
   transform: translateY(0) scale(.95);
@@ -642,6 +652,26 @@ h1 {
   line-height: 1;
 }
 
+/* Kuorman pistemerkintä — VAIN tumma tila, ks. .pv-kuorma-keski/-raskas
+   yllä (2026-08-24). Valoisassa tilassa taustaväri riittää yksin, piste
+   pysyy DOM:issa mutta piilossa (ei kahta päällekkäistä signaalia). */
+.kalenteri-kuukausi-kuorma-piste {
+  display: none;
+  position: absolute;
+  right: 3px;
+  bottom: 1px;
+  z-index: 1;
+  font-size: 8px;
+  line-height: 1;
+  color: var(--matalikko);
+  letter-spacing: 1px;
+}
+@media (prefers-color-scheme: dark) {
+  .kalenteri-kuukausi-kuorma-piste {
+    display: block;
+  }
+}
+
 /* Ohennettu 5px -> 3px kun linjoja nostettiin kolmesta neljään (2026-08-05,
    "we are 4") — mahtuu samaan tilaan tiiviimmällä pitchillä (7px, ks.
    KUUKAUSI_LINJA_TOP_PX script.js:ssä). */
@@ -735,6 +765,20 @@ h1 {
   color: var(--muste);
   cursor: pointer;
   transition: color var(--keski) var(--kelluu);
+}
+
+/* Sama kuorman pistemerkintä kuin kuukausinäkymässä, VAIN tumma tila —
+   ks. .kalenteri-kuukausi-kuorma-piste-kommentti. */
+.kalenteri-viikko-kuorma-piste {
+  display: none;
+  font-size: 8px;
+  color: var(--matalikko);
+  letter-spacing: 1px;
+}
+@media (prefers-color-scheme: dark) {
+  .kalenteri-viikko-kuorma-piste {
+    display: inline;
+  }
 }
 
 .kalenteri-viikko-kokopaiva {
@@ -882,7 +926,19 @@ h1 {
    oletustaustaan). Porrastus tietoisesti pehmeä (keski ei tarvitse olla
    selvästi kevyempi kuin raskas) — luetaan sävyerona, ei tarkkana rajana.
    Deklaroitu TÄNNE (kuukausi/viikko-sääntöjen JÄLKEEN) jotta voittaa
-   samaspesifisyyksisen .tanaan-taustan kun molemmat osuvat samaan päivään. */
+   samaspesifisyyksisen .tanaan-taustan kun molemmat osuvat samaan päivään.
+
+   BUGIKORJAUS (2026-08-24, Katrin löydös "kuormapäivät mustia tumma-
+   tilassa"): dark-tilan taustasävyt (#1C3028/#2A4A38) olivat lähes
+   identtiset --groundin tumman arvon (#1A2928) kanssa — ei tekninen bugi
+   vaan valittu sävy oli liian lähellä taustaa erottuakseen, näytti mustalta.
+   Katrin ohje: "illalla yksinkertainen & simppeli tummatila, kuormapäivät
+   erottaa jostain muusta" — dark-tilassa EI enää taustaväriä ollenkaan
+   (`background: none` alla kumoaa yllä olevan värillisen perusarvon),
+   erottuu sen sijaan pienellä ●/●●-pistemerkinnällä (ks. script.js:n
+   dayLoadDots, .kalenteri-kuukausi-kuorma-piste/.kalenteri-viikko-kuorma-
+   piste alempana) joka DOM:issa on aina läsnä mutta piilotettu valoisassa
+   tilassa CSS:llä. */
 .pv-kuorma-keski {
   background: #F5D8C8;
 }
@@ -890,11 +946,9 @@ h1 {
   background: #E8A090;
 }
 @media (prefers-color-scheme: dark) {
-  .pv-kuorma-keski {
-    background: #1C3028;
-  }
+  .pv-kuorma-keski,
   .pv-kuorma-raskas {
-    background: #2A4A38;
+    background: none;
   }
 }
 

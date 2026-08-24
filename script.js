@@ -609,7 +609,7 @@ function avaaLista(lista) {
   currentList = lista;
   historyOpen = false;
   aktiivinenOtsikkoId = null;
-  document.getElementById('list-title').textContent = '✱ ' + lista.name + ' ✱';
+  document.getElementById('list-title').textContent = lista.name;
   paivitaNakyvyysIkoni();
   paivitaLisaysKohde();
   poistuValintatilasta();
@@ -825,7 +825,7 @@ let currentTeema = null;
 async function avaaTeemaView(lista) {
   currentTeema = lista;
   showTeemaView();
-  document.getElementById('teema-title').textContent = '✱ ' + lista.name + ' ✱';
+  document.getElementById('teema-title').textContent = lista.name;
   paivitaSovittuLinjaNaytto();
   paivitaTeemaPriorityNapit();
   paivitaTeemaNakyvyysNappi();
@@ -1028,7 +1028,7 @@ let currentVahdittu = null;
 async function avaaVahdittuView(lista) {
   currentVahdittu = lista;
   showVahdittuView();
-  document.getElementById('vahdittu-title').textContent = '✱ ' + lista.name + ' ✱';
+  document.getElementById('vahdittu-title').textContent = lista.name;
   document.getElementById('vahdittu-raja-input').value = lista.vahdittu_raja_paivia;
   paivitaVahdittuNakyvyysNappi();
   await lataaVahdittuSisalto();
@@ -1297,7 +1297,7 @@ let currentOpintoKurssi = null;
 async function avaaOpintoKurssi(kurssi) {
   currentOpintoKurssi = kurssi;
   showOpintoKurssiView();
-  document.getElementById('opinto-kurssi-title').textContent = '✱ ' + kurssi.name + ' ✱';
+  document.getElementById('opinto-kurssi-title').textContent = kurssi.name;
   piirraOpintoKurssiTilaLinkki();
   piirraOpintoTavoiteHoitotasoNapit();
   piirraOpintoOpMaara();
@@ -1752,7 +1752,7 @@ document.getElementById('opinto-tehtava-back-btn').addEventListener('click', fun
 });
 
 function paivitaOpintoTehtavaOtsikko() {
-  document.getElementById('opinto-tehtava-title').textContent = '✱ ' + currentOpintoAihe.name + ' ✱';
+  document.getElementById('opinto-tehtava-title').textContent = currentOpintoAihe.name;
   const tyyppiNimi = currentOpintoAihe.pacer_paatyyppi ? PACER_TYYPPI_NIMET[currentOpintoAihe.pacer_paatyyppi] : 'Tyyppi asettamatta';
   document.getElementById('opinto-tehtava-tyyppi-vaihe').textContent = tyyppiNimi + ' · ' + OPINTO_VAIHE_NIMET[currentOpintoAihe.pero_vaihe];
 }
@@ -2630,7 +2630,7 @@ async function lataaReittiDeadlinet() {
     liiteNappi.addEventListener('click', function(e) {
       e.stopPropagation();
       materiaaliKohdeDeadline = { id: d.id, teksti: d.teksti };
-      avaaJaettuEditori({ tyyppi: 'laituri', otsikko: '✱ LIITE ✱' });
+      avaaJaettuEditori({ tyyppi: 'laituri', otsikko: 'LIITE' });
     });
     li.appendChild(liiteNappi);
 
@@ -4706,7 +4706,7 @@ let currentTaitosolmu = null;
 async function avaaTaitosolmu(solmu) {
   currentTaitosolmu = solmu;
   showTaitosolmuView();
-  document.getElementById('taitosolmu-title').textContent = '✱ ' + solmu.name + ' ✱';
+  document.getElementById('taitosolmu-title').textContent = solmu.name;
   document.getElementById('taitosolmu-lahde-teksti').textContent = solmu.lahde || '';
 
   const vaiheSelect = document.getElementById('taitosolmu-vaihe-select');
@@ -5693,7 +5693,7 @@ const VIIKONPAIVA_NIMET = ['Su', 'Ma', 'Ti', 'Ke', 'To', 'Pe', 'La'];
 async function avaaLapsi(lapsi) {
   currentLapsi = lapsi;
   showLapsiView();
-  document.getElementById('lapsi-title').textContent = '✱ ' + lapsi.nimi.toUpperCase() + ' ✱';
+  document.getElementById('lapsi-title').textContent = lapsi.nimi.toUpperCase();
   document.getElementById('lapsi-nimi-input').value = lapsi.nimi;
   document.getElementById('lapsi-syntymapaiva-input').value = lapsi.syntymapaiva || '';
   document.getElementById('lapsi-hoitopaikka-select').value = lapsi.hoitopaikka_tyyppi || '';
@@ -5746,7 +5746,7 @@ document.getElementById('lapsi-tallenna-btn').addEventListener('click', async fu
   const { error } = await db.from('lapset').update(paivitys).eq('id', currentLapsi.id);
   if (ilmoitaKirjoitusvirheesta(error, 'Lapsen tiedon tallennus')) return;
   Object.assign(currentLapsi, paivitys);
-  document.getElementById('lapsi-title').textContent = '✱ ' + nimi.toUpperCase() + ' ✱';
+  document.getElementById('lapsi-title').textContent = nimi.toUpperCase();
   naytaIlmoitus('Tallennettu');
 });
 
@@ -6578,6 +6578,21 @@ function dayLoadCssClass(taso) {
   return '';
 }
 
+// Kuorman pistemerkintä tumman tilan varalle (2026-08-24, Katrin
+// bugiraportti: tummassa tilassa .pv-kuorma-keski/-raskas-taustaväri on
+// lähes identtinen --grundin tumman arvon kanssa, "kuormapäivät näyttävät
+// mustilta"). Ratkaisu: tumma tila EI enää värjää taustaa ollenkaan
+// (ks. style.css:n dark-media-lohko), vaan näyttää nämä pisteet sen sijaan
+// — piste luodaan AINA (DOM ei tiedä kumpi teema on käytössä), CSS piilottaa
+// sen valoisassa tilassa (jossa taustaväri riittää yksin) ja näyttää vain
+// tummassa. Sama ●-periaate kuin aiemmin hylätyssä .pv-kuorma-pisteet
+// -mockupissa (ei rakennettu silloin, sovelletaan nyt oikeaan tarpeeseen).
+function dayLoadDots(taso) {
+  if (taso === 'raskas') return '●●';
+  if (taso === 'keski') return '●';
+  return '';
+}
+
 function viikonAlku(d) {
   const kopio = new Date(d);
   const paiva = kopio.getDay();
@@ -6909,12 +6924,33 @@ async function lataaKalenteri() {
   // olevaa kuormaa). AINOA poikkeus: Kuittausjono (paivitaKuittausTila,
   // onkoUusiMinulle) jättää hytti-scopen edelleen erikseen pois — omaa
   // luentoa ei koskaan "kuitata".
-  const { data: haetut, error } = await db.from('kalenteri_tapahtumat')
-    .select('*, kalenteri_syotteet(vari, henkilo, scope, osoite)')
-    .gte('event_date', paivamaaraISO(haunAlku))
-    .lte('event_date', paivamaaraISO(haunLoppu))
-    .order('event_date')
-    .order('event_time', { nullsFirst: false });
+  // SUORITUSKYKYKORJAUS (2026-08-24, Katrin bugiraportti "kuukausinäkymän
+  // avaus voi kestää lähes 10 sekuntia"): nämä kuusi hakua olivat aiemmin
+  // KUUSI PERÄKKÄISTÄ (await yksi kerrallaan) verkkokutsua vaikka mikään
+  // niistä ei riipu toisen tuloksesta — jokainen kirjoittaa vain omaan,
+  // muista riippumattomaan muuttujaansa (ankkuroidutAvaimet/asetuksetKartta/
+  // cachedLapset ym./muistutuksetKartta/ristiriitaKuitatutAvaimet/data).
+  // Hitaalla yhteydellä 6 peräkkäistä edestakaista matkaa (n. 6 × verkon
+  // viive) selittää täsmälleen alunperin analysoidun "verkkohaku ilman
+  // välimuistia" -syyn pahenemisen datamäärän/viiveen kasvaessa — ei
+  // löytynyt mitään tämän istunnon aiemmista muutoksista (▫N-niputus,
+  // jaetut CSS-komponentit, Laituri-jäsennys) joka hidastaisi TÄTÄ polkua,
+  // taulussa on vain 396 riviä (tarkistettu suoraan), joten itse kysely on
+  // nopea — pullonkaula on nimenomaan PERÄKKÄISYYS. Promise.all ajaa kaikki
+  // rinnakkain, pudottaa kuusi matkaa yhdeksi.
+  const [{ data: haetut, error }] = await Promise.all([
+    db.from('kalenteri_tapahtumat')
+      .select('*, kalenteri_syotteet(vari, henkilo, scope, osoite)')
+      .gte('event_date', paivamaaraISO(haunAlku))
+      .lte('event_date', paivamaaraISO(haunLoppu))
+      .order('event_date')
+      .order('event_time', { nullsFirst: false }),
+    paivitaAnkkuroidutAvaimet(),
+    paivitaAsetukset(),
+    paivitaLapsidata(),
+    paivitaMuistutuksetKartta(),
+    paivitaRistiriitaKuittaukset(),
+  ]);
 
   if (error) {
     console.error('Kalenterin haku epäonnistui:', error);
@@ -6934,12 +6970,6 @@ async function lataaKalenteri() {
         _osoite: t.kalenteri_syotteet ? t.kalenteri_syotteet.osoite : null,
       });
     });
-
-  await paivitaAnkkuroidutAvaimet();
-  await paivitaAsetukset();
-  await paivitaLapsidata();
-  await paivitaMuistutuksetKartta();
-  await paivitaRistiriitaKuittaukset();
 
   const sisalto = document.getElementById('kalenteri-sisalto');
   sisalto.innerHTML = '';
@@ -7129,6 +7159,13 @@ function piirraKuukausiPaiva(pvm, paivittainYksipaivaiset, monipaivaiset, viikon
   if (iso === paivamaaraISO(new Date())) solu.classList.add('tanaan');
   const kuormaLuokka = dayLoadCssClass(kuormaTasot.get(iso));
   if (kuormaLuokka) solu.classList.add(kuormaLuokka);
+  const kuormaPisteet = dayLoadDots(kuormaTasot.get(iso));
+  if (kuormaPisteet) {
+    const pisteEl = document.createElement('span');
+    pisteEl.className = 'kalenteri-kuukausi-kuorma-piste';
+    pisteEl.textContent = kuormaPisteet;
+    solu.appendChild(pisteEl);
+  }
 
   const paivanYksipaivaiset = paivittainYksipaivaiset.get(iso) || [];
   const paivanMonipaivaisetKattavat = monipaivaiset.filter(function(t) { return tapahtumaKattaaPaivan(t, iso); });
@@ -7579,6 +7616,13 @@ function piirraViikkoAikajana(sisalto, data, viikonAlkuPvm, kuormaTasot, henksel
     const otsikko = document.createElement('div');
     otsikko.className = 'kalenteri-viikko-paiva-otsikko';
     otsikko.textContent = VIIKONPAIVA_LYHENTEET[(pvm.getDay() + 6) % 7] + ' ' + pvm.getDate() + '.' + (pvm.getMonth() + 1) + '.';
+    const viikonKuormaPisteet = dayLoadDots(kuormaTasot.get(iso));
+    if (viikonKuormaPisteet) {
+      const pisteEl = document.createElement('span');
+      pisteEl.className = 'kalenteri-viikko-kuorma-piste';
+      pisteEl.textContent = ' ' + viikonKuormaPisteet;
+      otsikko.appendChild(pisteEl);
+    }
     otsikko.addEventListener('click', function() {
       kalenteriPvm = new Date(pvm);
       kalenteriTila = 'paiva';
@@ -8298,7 +8342,7 @@ function piirraHyttiRivit() {
 // Piirtää korttinäkymän otsikon, seuraava askel -kentän ja arkistoi/palauta-napin
 function piirraHyttiKorttiUI() {
   const lukutila = currentHyttiKortti.status === 'arkistoitu';
-  document.getElementById('hytti-kortti-title').textContent = '✱ ' + currentHyttiKortti.name.toUpperCase() + ' ✱';
+  document.getElementById('hytti-kortti-title').textContent = currentHyttiKortti.name.toUpperCase();
   document.getElementById('hytti-kortti-tyyppi').textContent = currentHyttiKortti.card_type === 'paattyva' ? 'Päättyvä' : 'Jatkuva';
 
   const suodatinEl = document.getElementById('hytti-kortti-suodatin');
@@ -13378,7 +13422,7 @@ function avaaJaettuEditori(kohde) {
   pinta.value = '';
   const luonnos = localStorage.getItem(EDITORI_LUONNOS_KEY);
   if (luonnos) pinta.value = luonnos;
-  document.getElementById('editori-otsikko').textContent = editoriKohde.otsikko || '✱ UUSI ✱';
+  document.getElementById('editori-otsikko').textContent = editoriKohde.otsikko || 'UUSI';
   paivitaLaiturinMateriaaliBanneri();
   piilotaKaikkiNakymat();
   document.getElementById('editori-view').style.display = 'block';
