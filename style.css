@@ -2336,38 +2336,48 @@ h1 {
 
 /* "⋯"-rivivalikko (2026-07-16, ks. "Rivien UI-remontti" muistiinpanot.md:ssä):
    kokoaa harvemmin tarvitut rivitoiminnot (muistutus/muokkaus/poisto) yhden
-   napin taakse pienenä ankkuroituna pudotusvalikkona rivin alle. */
+   napin taakse pienenä ankkuroituna pudotusvalikkona rivin alle.
+   BUGIKORJAUS (2026-08-25, Katrin löydös: "in laituri 3 dots is different
+   size/shape than anchor") — createOverflowButton() istuu KÄYTÄNNÖSSÄ AINA
+   suoraan .anchor-btn:n vieressä samassa rivissä (Laituri, Muistilaput,
+   Hytin tehtävärivit — tarkistettu kaikki 6 käyttöpaikkaa script.js:ssä),
+   sama pariutuminen jonka Ruorin oma alkuperäinen skoopattu resepti aina
+   piti yhtenäisenä. Kun .anchor-btn sai oman kirjastopromootionsa (30x30/
+   6px) eikä .overflow-btn saanut samaa, pari erosi kaikkialla MUUALLA paitsi
+   Ruorissa. Nyt sama resepti kummallakin — .overflow-btn EI koskaan esiinny
+   check-btn/delete-btn/reminder-btn-perheen (32-52px/--r-kosketettava)
+   RINNALLA missään käyttöpaikassa, joten koon pienentäminen ei riko mitään
+   muuta paria. */
 .overflow-btn {
   position: relative;
-  min-width: 32px;
-  min-height: 44px;
-  border-radius: var(--r-kosketettava);
-  border: 1px solid rgba(156, 122, 67, .45);
-  background: linear-gradient(165deg, rgba(255, 252, 244, .72), rgba(234, 230, 220, .32));
-  backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
+  width: 30px;
+  height: 30px;
+  min-width: 0;
+  min-height: 0;
+  flex: none;
+  border-radius: 6px;
+  border: 1px solid rgba(156, 122, 67, .5);
+  background: linear-gradient(165deg, rgba(255, 252, 244, .72), rgba(234, 230, 220, .28));
+  backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .65);
   outline: none;
   appearance: none;
   -webkit-appearance: none;
-  font-size: 20px;
-  color: var(--muste);
+  font-size: 19px;
+  color: var(--vaimea);
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
   -webkit-tap-highlight-color: transparent;
-  opacity: 0.6;
-  flex-shrink: 0;
-  transition: transform var(--keski) var(--kelluu), opacity var(--keski) var(--kelluu), border-color var(--keski) var(--kelluu);
+  transition: background var(--keski) var(--kelluu), box-shadow var(--keski) var(--kelluu), transform var(--keski) var(--kelluu);
 }
-
-.overflow-btn:hover,
-.overflow-btn:focus-visible {
-  opacity: 1;
-  transform: translateY(-1px);
+.overflow-btn::after {
+  content: ''; position: absolute; top: 50%; left: 50%; width: 44px; height: 44px;
+  transform: translate(-50%, -50%);
 }
 .overflow-btn:active {
-  opacity: 1;
-  transform: translateY(0) scale(.94);
+  transform: scale(.92);
 }
 
 /* BUGIKORJAUS (2026-08-03, Katrin huomio Laiturista/Ankkureista): korkeintaan
@@ -4595,32 +4605,13 @@ h1 {
    44px keskipisteiden väliin ettei "painamisalue voi olla isompi, mutta
    ei päällekkäin" -vaatimus riko itseään. */
 .ruori .segmentti.ankkurit .ankkuri-toiminnot { display: flex; flex-direction: column; gap: 16px; flex: none; margin-top: 1px; }
-/* Ankkuri-napin (.anchor-btn/.anchor-btn.active/.anchor-btn-labeled) koko
-   resepti nostettu tästä Ruori-skoopatusta säännöstä globaaliksi
-   kirjastoksi 2026-08-24/25 (ks. .anchor-btn-kommentti style.css:n
-   alkupuolella kaikkine 2026-08-18-perusteluineen: neliömäinen muoto,
-   sinappi vain .active, säde suhteutettu alapalkin tabeihin). Jäljellä
-   VAIN ⋯-valikkonapin (.overflow-btn) samankokoinen, mutta erikseen
-   pidettävä versio — se ei siirtynyt globaaliksi koska muualla sovelluksessa
-   ⋯-nappi käyttää suurempaa jaettua kosketuskokoa (--r-kosketettava),
-   eikä sitä ole toistaiseksi pyydetty samaan 30px/6px-kieleen. */
-.ruori .segmentti.ankkurit .overflow-btn {
-  position: relative; min-width: 0; min-height: 0; width: 30px; height: 30px; flex: none;
-  border-radius: 6px; opacity: 1;
-  border: 1px solid rgba(156, 122, 67, .5);
-  background: linear-gradient(165deg, rgba(255, 252, 244, .72), rgba(234, 230, 220, .28));
-  backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .65);
-  color: var(--vaimea);
-  transition: background var(--keski) var(--kelluu), box-shadow var(--keski) var(--kelluu), transform var(--keski) var(--kelluu);
-}
-.ruori .segmentti.ankkurit .overflow-btn:active {
-  transform: scale(.92);
-}
-.ruori .segmentti.ankkurit .overflow-btn::after {
-  content: ''; position: absolute; top: 50%; left: 50%; width: 44px; height: 44px;
-  transform: translate(-50%, -50%);
-}
+/* Ankkuri-napin (.anchor-btn/.anchor-btn.active/.anchor-btn-labeled) JA
+   ⋯-valikkonapin (.overflow-btn) koko resepti nostettu tästä Ruori-
+   skoopatusta säännöstä globaaliksi kirjastoksi 2026-08-24/25 (ks.
+   .anchor-btn/.overflow-btn-kommentit style.css:n alkupuolella kaikkine
+   2026-08-18-perusteluineen: neliömäinen muoto, sinappi vain .active,
+   säde suhteutettu alapalkin tabeihin) — ei enää mitään jäljellä tässä,
+   molemmat identtiset globaalin kanssa. */
 
 /* .ankkuri-rivi/.anchor-candidate-row saivat tämän lasilaatikon 2026-08-18
    ensin TÄSSÄ Ruori-skoopattuna, ja 2026-08-24 se nostettiin globaaliksi

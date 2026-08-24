@@ -10971,7 +10971,23 @@ async function avaaKohdeValikko(rivi, li) {
 // 2b, ei erillistä logiikkaa) + "+ Uusi lista" jos yhtään sopivaa ei vielä
 // ole tai käyttäjä haluaa uuden.
 async function avaaKohdeAlivalikko(rivi, li, kategoria) {
+  // BUGIKORJAUS (2026-08-25, Katrin löydös: "somehow i still can't add muru
+  // to a specific list in varasto.. somehow i click through sections so
+  // that dropdown closes and cursor is blinking in another raw"): edellinen
+  // rivivalikon nappi sulkee valikon SYNKRONISESTI omassa click-
+  // käsittelijässään ennen kuin tämä funktio edes alkaa, ja haeKotiKohteet()
+  // on oikea verkkohaku (ei välimuistia) — näiden välissä ei ollut HETKEÄKÄÄN
+  // mitään valikkoa auki. Jos Katri napautti uudelleen tänä aikana (odottaen
+  // valikon avautuvan), napautus osui rivin ALLA olevaan seuraavaan riviin
+  // ja avasi SEN tekstinmuokkauksen — täsmälleen kuvattu oire. Näytetään nyt
+  // heti väliaikainen "Ladataan…"-valikko joka pitää kosketuspinnan
+  // varattuna koko haun ajan, korvataan oikealla listalla kun data saapuu.
+  openRowMenu(li, [{ label: 'Ladataan…', onClick: function() {} }]);
   const kaikki = await haeKotiKohteet();
+  // Jos Katri ehti napauttaa valikon kiinni (tai jonkin toisen rivin auki)
+  // haun ollessa kesken, ei tuputeta vanhaa listaa takaisin näkyviin —
+  // kunnioitetaan sitä ettei "Ladataan…" enää ole se mitä hän katsoo.
+  if (!openRowMenuEl || openRowMenuEl.dataset.forRow !== (li.dataset.tuoteId || '')) return;
   const kohteet = kaikki.filter(function(k) { return k.category === kategoria; });
   const ikoni = { teema: '🧵 ', vahdittu: '⏳ ', lista: '📓 ' };
   const items = kohteet.map(function(kohde) {
@@ -10981,7 +10997,7 @@ async function avaaKohdeAlivalikko(rivi, li, kategoria) {
     };
   });
   items.push({ label: '+ Uusi lista', onClick: function() { luoUusiKohdeJaAseta(rivi, li, kategoria); } });
-  openRowMenu(li, items);
+  openRowMenu(li, items, true);
 }
 
 // Kevyt kaksivaiheinen luonti (§16.5c kohta 3: "jos yksityistä kohdelistaa
@@ -12821,8 +12837,13 @@ function handleRowMenuOutsideClick(e) {
 
 // items: [{ label, danger, onClick }]. li tarvitsee position:relative (ks. style.css)
 // jotta valikko ankkuroituu juuri sen rivin alle, ei sivun kulmaan.
-function openRowMenu(li, items) {
-  const wasOpenForThisRow = openRowMenuEl && openRowMenuEl.dataset.forRow === li.dataset.tuoteId;
+// korvaaSamaRivi (2026-08-25, ks. avaaKohdeAlivalikko-bugikorjaus) — ohittaa
+// alla olevan "sama nappi kahdesti = sulje" -toggle-suojan, kun tämä funktio
+// kutsuu itseään SISÄISESTI korvatakseen jo auki olevan valikon (esim.
+// väliaikainen "Ladataan…"-tila) oikealla sisällöllä samalle riville. Ilman
+// tätä toinen kutsu vain sulkisi ensimmäisen eikä avaisi mitään.
+function openRowMenu(li, items, korvaaSamaRivi) {
+  const wasOpenForThisRow = !korvaaSamaRivi && openRowMenuEl && openRowMenuEl.dataset.forRow === li.dataset.tuoteId;
   closeRowMenu();
   if (wasOpenForThisRow) return;
 
