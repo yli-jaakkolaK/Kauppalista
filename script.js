@@ -75,6 +75,11 @@ function showAsetuksetView() {
   // poistu DOM:ista (vain #asetukset-view piiloutuu display:nonella), joten
   // ilman tätä se MUISTAISI edellisen auki-tilan koko istunnon ajan.
   document.getElementById('asetukset-lisa-details').removeAttribute('open');
+  // Laiturin arkisto asuu nyt tässä (2026-08-25, siirretty Laiturin sivulta)
+  // — päivitetään myös suoraan Asetusten avauksella, ei vain lataaLaituri()-
+  // kutsun sivuvaikutuksena, jotta määrä on oikein vaikka Laituria ei olisi
+  // vielä avattu tällä kertaa.
+  paivitaLaituriArkisto();
 }
 
 // Hytin välilehdet (2026-08-11, CODE_vaihe1b.md §1b) — renderöidään
@@ -10610,7 +10615,6 @@ async function lataaLaituri(hakusana) {
   });
 
   paivitaLaituriArkisto();
-  paivitaLaituriPiilotetut();
   paivitaLuoteLinkki();
 }
 
@@ -11178,56 +11182,16 @@ async function piilotaLaiturinRivi(rivi) {
   lataaLaituri(document.getElementById('laituri-search').value.trim());
 }
 
-async function palautaLaiturinRivi(rivi) {
-  const { error } = await db.from('laituri').update({ piilota_laiturista: false }).eq('id', rivi.id);
-  if (ilmoitaKirjoitusvirheesta(error, 'Piilotuksen palautus')) return;
-  naytaIlmoitus('Näytetään taas Laiturissa');
-  lataaLaituri(document.getElementById('laituri-search').value.trim());
-  paivitaLaituriPiilotetut();
-}
-
-// Kokoontaitettava "🙈 Piilotetut" -osio Laiturin oman listan alle — sama
-// UI-malli kuin "🗄 Arkisto" (paivitaLaituriArkisto), OMA mekanisminsa
-// (ei tulkita käsitellyksi, ks. sql/087-kommentti).
-async function paivitaLaituriPiilotetut() {
-  const osio = document.getElementById('laituri-piilotetut-osio');
-  const lista = document.getElementById('laituri-piilotetut-lista');
-  const oliAuki = lista.style.display !== 'none';
-
-  const { data, error } = await db.from('laituri').select().eq('piilota_laiturista', true).neq('status', 'arkistoitu').order('created_at', { ascending: false });
-  if (error) {
-    console.error('Piilotettujen haku epäonnistui:', error);
-    return;
-  }
-  const rivit = data || [];
-
-  osio.style.display = rivit.length > 0 ? 'block' : 'none';
-  document.getElementById('laituri-piilotetut-toggle').textContent = '🙈 Piilotetut (' + rivit.length + ')';
-
-  lista.innerHTML = '';
-  rivit.forEach(function(rivi) {
-    const li = document.createElement('li');
-    li.className = 'laituri-arkisto-rivi';
-    const teksti = document.createElement('span');
-    teksti.textContent = rivi.content;
-    li.appendChild(teksti);
-    const palautaNappi = document.createElement('button');
-    palautaNappi.className = 'restore-btn';
-    palautaNappi.textContent = '↺';
-    palautaNappi.title = 'Näytä taas Laiturissa';
-    palautaNappi.addEventListener('click', function() {
-      palautaLaiturinRivi(rivi);
-    });
-    li.appendChild(palautaNappi);
-    lista.appendChild(li);
-  });
-  lista.style.display = oliAuki ? 'block' : 'none';
-}
-
-document.getElementById('laituri-piilotetut-toggle').addEventListener('click', function() {
-  const lista = document.getElementById('laituri-piilotetut-lista');
-  lista.style.display = lista.style.display === 'none' ? 'block' : 'none';
-});
+// "🙈 Piilotetut" -katseluosio POISTETTU KOKONAAN Laiturin sivulta
+// (2026-08-25, Katrin pyyntö: "you can just remove hidden section from
+// bottom of laituri page") — piilotaLaiturinRivi() itse (⋯-valikon "🙈 Ei
+// tarvitse näkyä Laiturissa") toimii yhä, rivit vain katoavat aktiivisesta
+// näkymästä eikä niitä enää voi selata/palauttaa UI:sta (aiempi
+// palautaLaiturinRivi()/paivitaLaituriPiilotetut() poistettu käyttämättömänä
+// tämän mukana — ainoa kutsuja oli tämä sama poistettu näkymä). Eri
+// päätös kuin Arkisto (ks. paivitaLaituriArkisto alempana), joka SIIRRETTIIN
+// Asetuksiin säilytettävänä datana — Katrin oma erottelu näiden kahden
+// välillä.
 
 // laituri_piilota_oletus_kohteet -asetus POISTETTU kokonaan (2026-08-16,
 // SATAMA_SPEKSI.md §16.5c kohta 5: "Tarpeeton kun jokainen ei-Laituri-kohde
@@ -11281,10 +11245,13 @@ async function palautaLaituriArkistosta(rivi) {
 // erillinen dialog-overlay-arkisto vaihdettu Katrin testilöydöksen jälkeen
 // kokoontaitettavaksi osioksi Laiturin OMAN listan alle — arkisto asuu nyt
 // Laiturin sisällä, ei erillisenä "poissa silmistä" -paikkana ("se vain on
-// siinä" -periaate). Oletuksena kiinni (vilkaisuarvo: aktiivinen näkymä pysyy
-// puhtaana), napautus laajentaa saman näkymän sisällä. Kutsutaan aina
-// lataaLaituri()-kutsun yhteydessä, jotta määrä+rivit pysyvät tuoreina —
-// säilyttää käyttäjän auki/kiinni-valinnan, jos osio oli jo auki kesken istunnon.
+// siinä" -periaate).
+// SIIRRETTY Asetusten "⚙️ Lisäasetukset" -collapseen (2026-08-25, Katrin
+// pyyntö: "move archieved in settings") — harvoin katsottava säilytettävä
+// data sopii sinne paremmin kuin aktiivisen Laiturin alle. Kutsutaan yhä
+// jokaisen lataaLaituri()-kutsun yhteydessä (rivit pysyvät tuoreina vaikka
+// osio ei ole näkyvissä) JA showAsetuksetView()-avauksen yhteydessä (jotta
+// määrä on oikein vaikka Laituria ei olisi vielä avattu tällä kertaa).
 async function paivitaLaituriArkisto() {
   const osio = document.getElementById('laituri-arkisto-osio');
   const lista = document.getElementById('laituri-arkisto-lista');
@@ -11298,7 +11265,7 @@ async function paivitaLaituriArkisto() {
   const rivit = data || [];
 
   osio.style.display = rivit.length > 0 ? 'block' : 'none';
-  document.getElementById('laituri-arkisto-toggle').textContent = '🗄 Arkisto (' + rivit.length + ')';
+  document.getElementById('laituri-arkisto-toggle').textContent = 'Näytä (' + rivit.length + ')';
 
   lista.innerHTML = '';
   rivit.forEach(function(rivi) {

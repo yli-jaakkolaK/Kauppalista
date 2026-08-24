@@ -1194,6 +1194,20 @@
            välitön kun kohde asetetaan (ks. script.js asetaLaiturinKoti), ei
            jää mitään konfiguroitavaa. -->
 
+      <!-- Laiturin arkisto siirretty tänne Laiturin sivun alta (2026-08-25,
+           Katrin pyyntö: "move archieved in settings... remove hidden
+           section from bottom of laituri page as well as archieved") —
+           arkistoidut murut ovat harvoin katsottua, säilytettävää dataa
+           ("ei delete, palautus mahdollinen"), sopivat siis tänne muun
+           kertaluontoisen/harvoin-tarvitun sisällön joukkoon paremmin kuin
+           aktiivisen Laiturin alle. "Piilotetut" (eri, "ei tarvitse näkyä"
+           -täppä) POISTETTU kokonaan, ei siirretty — Katrin oma erottelu. -->
+      <div class="section-title">🗄 Laiturin arkisto</div>
+      <div class="laituri-arkisto-osio" id="laituri-arkisto-osio" style="display:none">
+        <button class="laituri-arkisto-toggle" id="laituri-arkisto-toggle">Näytä (0)</button>
+        <ul class="list" id="laituri-arkisto-lista" style="display:none"></ul>
+      </div>
+
       <div id="aly-log-osio" style="display:none">
         <div class="section-title">✨ Mitä äly on tehnyt</div>
         <button class="laituri-arkisto-toggle" id="aly-log-toggle" style="display:none">Näytä loki (0)</button>
@@ -1388,19 +1402,6 @@
     <hr class="divider">
 
     <ul class="list" id="laituri-list"></ul>
-
-    <div class="laituri-arkisto-osio" id="laituri-arkisto-osio" style="display:none">
-      <button class="laituri-arkisto-toggle" id="laituri-arkisto-toggle">🗄 Arkisto (0)</button>
-      <ul class="list" id="laituri-arkisto-lista" style="display:none"></ul>
-    </div>
-
-    <!-- 7c (2026-08-03, ks. KONSEPTIKIRJA.md): "ei tarvitse näkyä Laiturissa"
-         -täpän piilottamat rivit, sama kokoontaitettava malli kuin Arkisto
-         yllä — EI tulkita käsitellyksi, vain pois aktiivisesta näkymästä. -->
-    <div class="laituri-arkisto-osio" id="laituri-piilotetut-osio" style="display:none">
-      <button class="laituri-arkisto-toggle" id="laituri-piilotetut-toggle">🙈 Piilotetut (0)</button>
-      <ul class="list" id="laituri-piilotetut-lista" style="display:none"></ul>
-    </div>
   </div>
 
   <div class="container" id="app-view" style="display:none">

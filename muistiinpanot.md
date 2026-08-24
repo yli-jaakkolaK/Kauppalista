@@ -4748,4 +4748,13 @@ Katri elävässä testissä heti Asetusten rakenneuudistuksen jälkeen: "in sett
 
 **Ei vielä testattu livenä.** `node -c script.js` ja style.css-aaltosulkutasapaino puhtaat. Käytiin läpi kaikki muut `openRowMenu()`-ketjutuskohdat (`luoUusiKohdeJaAseta` ym.) — loput käyttävät synkronista `prompt()`:ia tai eivät ketjudu, ei samaa bugiluokkaa muualla.
 
-**Ei vielä testattu livenä.** style.css-aaltosulkutasapaino puhdas.
+---
+
+## Laiturin Arkisto siirretty Asetuksiin, Piilotetut poistettu kokonaan (2026-08-25, sama istunto jatkuu)
+
+Katri: "after you are done with previous move archieved in settings and you can just remove hidden section from bottom of laituri page as well as archieved" — kaksi ERI päätöstä kahdelle Laiturin sivun alaosan kokoontaitettavalle osiolle, tarkoituksellinen erottelu:
+
+- **"🗄 Arkisto" (arkistoidut murut, `status='arkistoitu'`) — SIIRRETTY, ei poistettu.** Nyt Asetusten "⚙️ Lisäasetukset" -collapsen sisällä, oma `.section-title` ("🗄 Laiturin arkisto") + sama kokoontaitettava lista kuin ennen. Perustelu (koodikommenteista): tämä on tarkoituksella SÄILYTETTÄVÄÄ dataa ("EI delete, palautus mahdollinen") — sopii siis harvoin-katsottavan asetusdatan joukkoon paremmin kuin aktiivisen Laiturin alle. `paivitaLaituriArkisto()` päivittyy edelleen jokaisen `lataaLaituri()`-kutsun sivuvaikutuksena JA nyt myös suoraan `showAsetuksetView()`-avauksella, jotta määrä on oikein vaikka Laituria ei olisi vielä avattu samalla kerralla.
+- **"🙈 Piilotetut" (ei tarvitse näkyä -täpän piilottamat rivit) — POISTETTU KOKONAAN, ei siirretty.** Itse piilotus (`piilotaLaiturinRivi`, ⋯-valikon "🙈 Ei tarvitse näkyä Laiturissa") toimii yhä — rivit vain katoavat aktiivisesta näkymästä eivätkä enää ole selattavissa/palautettavissa UI:sta. `palautaLaiturinRivi()` ja `paivitaLaituriPiilotetut()` poistettu käyttämättöminä (ainoa kutsuja oli juuri tämä poistettu osio).
+
+**Ei vielä testattu livenä.** `node -c script.js` puhdas, index.html:n div-tasapaino ja id-uniikkius tarkistettu, ei jääneitä viittauksia poistettuun `laituri-piilotetut-*`-koneistoon.
