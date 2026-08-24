@@ -4557,3 +4557,26 @@ Katri palasi tutkimusraportin pohjalta priorisoidulla jatkopyynnöllä: siirrä 
 **Koskemattomana jätetty tietoisesti:** Ruorin oma `.ruori .segmentti.ankkurit .anchor-btn/.overflow-btn`-skoopattu ylikirjoitus (jo oma, hienovaraisempi lasireseptinsä, täysin itsenäinen — perusluokan muutokset eivät vuoda läpi koska skoopattu sääntö asettaa kaikki tarvittavat ominaisuudet uudelleen). `.anchor-btn.leaving`-poistumisanimaatio koskematta (oma yksinkertainen transition, ei osa tätä pyyntöä). `.row-menu-item-danger`:n kiinteä `#e24b4a`-punainen koskematta (jo teemariippumaton, ei tarvinnut korjausta).
 
 **Ei vielä testattu livenä** — erityisesti tumma-teema-tapaus (jaettu nappi vanhan, tumma-teemaa seuraavan näkymän päällä) on uutta, ei aiemmin testattua aluetta, koska aiemmat migraatiot (Ruori/Kalenteri) ovat aina saaneet KOKO sivun oman kiinteän merikartta-taustan samalla kertaa eivätkä ole koskaan tarvinneet toimia mielivaltaisen (mahdollisesti tumman) taustan päällä. `node -c script.js` (ei JS-muutoksia tässä erässä) ja style.css-aaltosulkutasapaino puhtaat.
+
+---
+
+## Laituri-jäsennys OLI JO rakennettu — väärä tieto korjattu (2026-08-24, sama päivä jatkuu)
+
+Katri pyysi "Rakennusviesti Codelle — Laituri-jäsennys (kattaa_lapset/päiväpoikkeus-tulkinta)" -viestillä täyden uuden ominaisuuden rakentamista. Ennen rakentamista tarkistin koodin: **koko ominaisuus on jo olemassa, täysin rakennettuna ja kytkettynä, päivätty 2026-08-05** — `piirraHoitoJasennysKortti`/`pyydaHoitoJasennys`/`avaaHoitoJasennysDialogi`/`tallennaHoitoJasennys` (script.js ~11494-11742), kutsuttu joka Laiturin rivillä (`paivitaLaituri`-silmukan sisällä, rivi ~10536) muiden ehdotuskorttien (kauppa/hetki-silta/materiaali) rinnalla. Sama `/api/aly`-putki kuin "🌉 Etsi sillat", sama kolmiporras (paikallinen heuristiikka → "Tarkista"-nappi laukaisee älyn → muokattava dialogi → Tallenna kirjoittaa vasta silloin). Tallennus haarautuu oikein `kalenteri_tapahtumat.kattaa_lapset`:iin TAI `lapsi_paivapoikkeus`-upsertiin päätyypin mukaan. Tarkistin myös suoraan tietokannasta: `kattaa_lapset`, `lapsi_paivapoikkeus`, `lapsi_viikkopohja`, `lukuvuosijaksot`, `paivan_huolet.kalenteri_tapahtuma_id` ovat kaikki live'ssä, ja `lapsi_viikkopohja`/`lukuvuosijaksot`/`kattaa_lapset` ovat oikeasti kytkettyinä `paallekkaisyysVakavuus`-ristiriitalogiikkaan, ei vain olemassa käyttämättöminä.
+
+**Syy virheelliseen tietoon:** aiemmassa tutkimusraportissa (samana päivänä) toistin Katrin oman muistutusmerkinnän ("Laituri-jäsennys... ei ole vielä rakennettu") tarkistamatta sitä koodista itse — virhe minun puolellani, korjattu heti kun se kävi ilmi tästä uudesta pyynnöstä. **Ei rakennettu mitään uutta** — pelkkä tarkistus + korjaus, ja pyyntö kääntyi takaisin yhteiseksi elävän testin sopimiseksi (koko Ristiriitapaketti v2:n ensimmäinen oikea koeajo, Katrin oma alkuperäinen aikomus).
+
+---
+
+## Jaetut komponentit, 2. erä (2026-08-24, sama päivä jatkuu)
+
+Katri jatkoi samalla periaatteella kuin v187:ssä (jaetut ensin) — löysi loput vielä katkoviivakehystä (`dashed var(--accent)`/`var(--border-dash)`) käyttävät jaetut luokat:
+
+- **`.list li.ankkuri-rivi` / `.list li.anchor-candidate-row`** — näiden PERUSmäärittely oli vanha (litteä list-rivi), vain Ruorin `.ruori .segmentti.ankkurit`-skoopattu ylikirjoitus oli jo oikeassa lasipinnassa (sinapinlämmin nostetulle ankkurille, neutraali ehdokkaalle). **Nostettu Ruorin versio globaaliksi oletukseksi** — skoopatut kaksoiskappaleet poistettu, jäljellä vain Ruorin oma `:has(.ankkuri-toiminnot)`-rivi/sarake-layoutpoikkeus (ei visuaalinen duplikaatti, oikeasti eri asia).
+- **`.toast`/`.toast-kumottava`/`.toast-kumoa-btn`** — ilmoituspopup sai paperinsävyisen lasipinnan (`--r-kosketettava`, koska kelluva/kosketettava-tyyppinen elementti eikä rivimäinen luettava-pinta, Katrin oma perustelu), kumoa-nappi `.saadin`-reseptille.
+- **`.dialog-btn-cancel`** (42 käyttökohtaa index.html:ssä) — `.saadin`-resepti. **Huom Katrille:** `.dialog-btn` (paljas, ilman `-cancel`/`-danger`-luokkaa, esim. "Tallenna") ja `.dialog-btn-danger` EIVÄT olleet pyynnön listalla, joten ne jäivät koskemattomiksi — sama dialogi voi nyt näyttää PYÖRISTETYN Peruuta-napin SUORAKULMAISEN Tallenna-napin vieressä. Tarkoituksellinen rajaus pyynnön mukaan, mutta mainitsen koska se saattaa näkyä visuaalisena epäjohdonmukaisuutena elävässä testissä.
+- **`.login-btn`, `.muistutus-hoidettu-btn`, `.muistutus-viikonpaiva-btn`** (+ `.active`-valittu-tila) — kaikki `.saadin`-reseptille.
+
+Sama tumma-teema-varovaisuus kuin v187:ssä: kaikki saivat OMAN kiinteän lasitaustan (ei vain väriä), koska nämä ovat jaettuja ja näkyvät myös vielä-vanhojen näkymien päällä. Tarkistettu ettei mikään näistä luokista ollut minkään `@media (prefers-color-scheme: dark)` -erityissäännön kohteena (koko tiedostossa vain 4 tumma-teema-lohkoa, ei yksikään koskenut näitä).
+
+**Ei vielä testattu livenä.** `node -c script.js` (ei JS-muutoksia) ja style.css-aaltosulkutasapaino puhtaat.

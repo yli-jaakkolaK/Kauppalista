@@ -1719,15 +1719,31 @@ h1 {
    teksti saa rivittyä enintään 4 riville (testattu Piispanristin-esimerkillä, 3 ei riittänyt), ellipsis vasta jos senkin jälkeen jää
    ylimääräistä. `-webkit-line-clamp` on iOS Safarin (kohdealustan) täysin
    tukema, vaikka nimessä on vielä webkit-etuliite. */
+/* Sinapinlämmin lasilaatikko (2026-08-24, Katrin pyyntö "jaetut komponentit
+   2. erä") — nostettu tämän tiedoston aiemmasta .ruori .segmentti.ankkurit
+   -skoopatusta ylikirjoituksesta GLOBAALIKSI oletukseksi, koska .ankkuri-rivi
+   on jaettu luokka (näkyy myös Ruorin ulkopuolella) ja perusmäärittely oli
+   jäänyt vanhaan litteään list-riviin siitä huolimatta. */
 .list li.ankkuri-rivi {
   align-items: flex-start;
   min-height: 44px;
-  padding: 6px 0;
+  border-radius: var(--r-kosketettava);
+  background: linear-gradient(165deg, rgba(194, 154, 46, .20), rgba(194, 154, 46, .07));
+  border: 1px solid rgba(194, 154, 46, .38);
+  box-shadow: 0 2px 6px rgba(34, 31, 26, .10), inset 0 1px 0 rgba(255, 255, 255, .5);
+  padding: 8px 10px;
+  margin-bottom: 8px;
+  transition: transform var(--keski) var(--kelluu), box-shadow var(--keski) var(--kelluu);
   /* Viides ikoni (2026-07-18, ⋯-valikko "Ehdota [Nimi]:lle" -toiminnolle,
      ks. muistiinpanot.md "💬-ehdotuksen löydettävyys") ahtautti tekstisarakkeen
      entisestään — kaventuu ilman kosketuskohteiden pienentämistä, Playwright-
      kuvakaappauksella todennettu ero (5 vs. 6 riviä pitkälle tekstille). */
   gap: 3px;
+}
+.list li.ankkuri-rivi:last-child { margin-bottom: 0; }
+.list li.ankkuri-rivi:active {
+  transform: translateY(1px) scale(.99);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .5);
 }
 
 .list li.ankkuri-rivi span:not(.muistutus-aika):not(.muistutus-wrap) {
@@ -1798,9 +1814,12 @@ h1 {
 
 /* "✨-ehdokkaan erottuvuus" (2026-07-17, ks. muistiinpanot.md "E3 + Ankkurit"):
    väsynyt, ohikulkeva käyttäjä ei rekisteröinyt ehdokasriviä koska se ei
-   erottunut muusta sisällöstä millään tavalla. Korjattu MUODOLLA (kulta
-   katkoviivakehys), EI himmeydellä — opacity ei ole saavutettava viesti,
-   eikä sitä käytetä tässä. Teksti pysyy täydellä --text-värillä (ks. yllä). */
+   erottunut muusta sisällöstä millään tavalla. Korjattu MUODOLLA, EI
+   himmeydellä. Kulta katkoviivakehys korvattu 2026-08-24 neutraalilla
+   lasilaatikolla (nostettu Ruorin skoopatusta ylikirjoituksesta globaaliksi
+   oletukseksi, sama syy kuin .ankkuri-rivillä yllä) — EI sinapinvärinen
+   (se on varattu vain jo-nostetuille ankkureille, ks. .ankkuri-rivi), koska
+   ehdokas ei ole vielä noussut ankkuriksi. */
 /* BUGIKORJAUS (2026-07-17, "💬-ehdotuksen elinkaari" — ks. muistiinpanot.md):
    selkeät tekstilabelit ("⚓ Hyväksy", "⏭ Siirrä", "× Hylkää") eivät enää
    mahdu samalle riville tekstin kanssa kapealla puhelinnäytöllä — sama
@@ -1811,9 +1830,10 @@ h1 {
   flex-direction: column;
   align-items: stretch;
   gap: 6px;
-  border: 1px dashed var(--accent);
-  border-bottom: 1px dashed var(--accent);
-  border-radius: 4px;
+  border: 1px solid rgba(156, 122, 67, .38);
+  background: linear-gradient(165deg, rgba(255, 252, 244, .55), rgba(234, 230, 220, .22));
+  box-shadow: 0 2px 6px rgba(34, 31, 26, .10), inset 0 1px 0 rgba(255, 255, 255, .5);
+  border-radius: var(--r-kosketettava);
   padding: 6px 8px;
   margin-bottom: 6px;
 }
@@ -2186,23 +2206,27 @@ h1 {
    sama kolmiporras-henki kuin muualla: kuittaus on eksplisiittinen ihmisen
    teko, ei koskaan automaattinen. */
 .muistutus-hoidettu-btn {
-  font-family: 'Courier New', Courier, monospace;
+  font-family: var(--fontti-loki);
   font-size: 12px;
   letter-spacing: 0.04em;
-  color: var(--accent);
-  background: none;
-  border: 1px dashed var(--accent);
-  border-radius: 4px;
+  color: var(--muste);
+  border-radius: var(--r-kosketettava);
+  border: 1px solid rgba(156, 122, 67, .5);
+  background: linear-gradient(165deg, rgba(255, 252, 244, .72), rgba(234, 230, 220, .28));
+  backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
   padding: 4px 8px;
   cursor: pointer;
   -webkit-tap-highlight-color: transparent;
   white-space: nowrap;
+  transition: transform var(--keski) var(--kelluu), border-color var(--keski) var(--kelluu);
 }
 
-.muistutus-hoidettu-btn:hover,
+.muistutus-hoidettu-btn:hover {
+  transform: translateY(-1px);
+}
 .muistutus-hoidettu-btn:active {
-  background: var(--accent);
-  color: var(--ground);
+  transform: translateY(0) scale(.96);
+  border-color: var(--messinki);
 }
 
 /* Kolme osiota (2026-08-11 uudistus, Katrin pyyntö: "kolme selkeää osiota...
@@ -2437,21 +2461,32 @@ h1 {
 
 .muistutus-viikonpaiva-btn {
   flex: 1;
-  font-family: 'Courier New', Courier, monospace;
+  font-family: var(--fontti-loki);
   font-size: 12px;
-  background: none;
-  border: 1px dashed var(--border-dash);
-  color: var(--muted);
+  border-radius: var(--r-kosketettava);
+  border: 1px solid rgba(156, 122, 67, .5);
+  background: linear-gradient(165deg, rgba(255, 252, 244, .72), rgba(234, 230, 220, .28));
+  backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
+  color: var(--muste);
   padding: 8px 2px;
   cursor: pointer;
   appearance: none;
   -webkit-appearance: none;
   -webkit-tap-highlight-color: transparent;
+  transition: transform var(--keski) var(--kelluu), border-color var(--keski) var(--kelluu), box-shadow var(--keski) var(--kelluu);
+}
+
+.muistutus-viikonpaiva-btn:hover {
+  transform: translateY(-1px);
+}
+.muistutus-viikonpaiva-btn:active {
+  transform: translateY(0) scale(.96);
 }
 
 .muistutus-viikonpaiva-btn.active {
-  border-color: var(--accent);
-  color: var(--accent);
+  border-color: var(--messinki);
+  color: var(--muste);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .65), 0 0 0 3px rgba(156, 122, 67, .15);
 }
 
 .muistutus-toistuva-aika-rivi {
@@ -2612,10 +2647,13 @@ h1 {
   bottom: 32px;
   transform: translateX(-50%) translateY(12px);
   max-width: calc(100% - 48px);
-  background: var(--ground);
-  border: 1px dashed var(--accent);
-  color: var(--text);
-  font-family: 'Courier New', Courier, monospace;
+  border-radius: var(--r-kosketettava);
+  background: linear-gradient(165deg, rgba(255, 252, 244, .92), rgba(234, 230, 220, .68));
+  border: 1px solid rgba(156, 122, 67, .4);
+  backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+  box-shadow: 0 6px 18px rgba(34, 31, 26, .18), inset 0 1px 0 rgba(255, 255, 255, .6);
+  color: var(--muste);
+  font-family: var(--fontti-loki);
   font-size: 13px;
   padding: 12px 18px;
   text-align: center;
@@ -2644,23 +2682,27 @@ h1 {
 
 .toast-kumoa-btn {
   flex-shrink: 0;
-  font-family: 'Courier New', Courier, monospace;
+  font-family: var(--fontti-loki);
   font-size: 12px;
   letter-spacing: 0.04em;
   text-transform: uppercase;
-  background: none;
-  border: 1px dashed var(--accent);
-  color: var(--accent);
-  border-radius: 4px;
+  border-radius: var(--r-kosketettava);
+  border: 1px solid rgba(156, 122, 67, .5);
+  background: linear-gradient(165deg, rgba(255, 252, 244, .72), rgba(234, 230, 220, .28));
+  backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+  color: var(--muste);
   padding: 6px 10px;
   cursor: pointer;
   -webkit-tap-highlight-color: transparent;
+  transition: transform var(--keski) var(--kelluu), border-color var(--keski) var(--kelluu);
 }
 
-.toast-kumoa-btn:hover,
+.toast-kumoa-btn:hover {
+  transform: translateY(-2px);
+}
 .toast-kumoa-btn:active {
-  background: var(--accent);
-  color: var(--ground);
+  transform: translateY(0) scale(.996);
+  border-color: var(--messinki);
 }
 
 /* === VAHVISTUSDIALOGI === */
@@ -2811,14 +2853,21 @@ h1 {
 }
 
 .dialog-btn-cancel {
-  border: 1px dashed var(--accent);
-  color: var(--accent);
+  border-radius: var(--r-kosketettava);
+  border: 1px solid rgba(156, 122, 67, .5);
+  background: linear-gradient(165deg, rgba(255, 252, 244, .72), rgba(234, 230, 220, .28));
+  backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+  color: var(--muste);
+  transition: transform var(--keski) var(--kelluu), border-color var(--keski) var(--kelluu), box-shadow var(--keski) var(--kelluu);
 }
 
-.dialog-btn-cancel:hover,
+.dialog-btn-cancel:hover {
+  transform: translateY(-2px);
+}
 .dialog-btn-cancel:active {
-  background: var(--accent);
-  color: var(--ground);
+  transform: translateY(0) scale(.996);
+  border-color: var(--messinki);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .65), 0 0 0 3px rgba(156, 122, 67, .15);
 }
 
 .dialog-btn-danger {
@@ -3900,24 +3949,30 @@ h1 {
 }
 
 .login-btn {
-  font-family: 'Courier New', Courier, monospace;
+  font-family: var(--fontti-loki);
   font-size: 13px;
   letter-spacing: 0.12em;
   text-transform: uppercase;
-  background: none;
-  border: 1px dashed var(--accent);
-  color: var(--accent);
+  border-radius: var(--r-kosketettava);
+  border: 1px solid rgba(156, 122, 67, .5);
+  background: linear-gradient(165deg, rgba(255, 252, 244, .72), rgba(234, 230, 220, .28));
+  backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .65);
+  color: var(--muste);
   padding: 14px 28px;
   cursor: pointer;
   appearance: none;
   -webkit-appearance: none;
   -webkit-tap-highlight-color: transparent;
+  transition: transform var(--keski) var(--kelluu), border-color var(--keski) var(--kelluu);
 }
 
-.login-btn:hover,
+.login-btn:hover {
+  transform: translateY(-2px);
+}
 .login-btn:active {
-  background: var(--accent);
-  color: var(--ground);
+  transform: translateY(0) scale(.996);
+  border-color: var(--messinki);
 }
 
 .settings-action-btn {
@@ -4276,45 +4331,11 @@ h1 {
 .ruori .segmentti.ankkurit .anchor-btn-labeled svg { width: 15px; height: 15px; }
 .ruori .segmentti.ankkurit .anchor-btn-labeled span { font-size: 12px; font-weight: 700; color: var(--muste); white-space: nowrap; }
 
-/* Ankkuririvin oma painettava-pinta (2026-08-18, Katrin palaute: "ruori
-   anchors don't have painettavan muotokieli in them, rounding is off").
-   Rivi oli yhä vanhaa litteää list-riviä (pelkkä alaviiva) vaikka muu Ruori
-   on jo merikartta-lasipintaa — sama pysyvä koholla-varjo + pyöristys kuin
-   esim. .hytti-valilehti-btn:llä, sinapinkeltaisella (--sinappi) lämpimällä
-   lasilla erottumassa muista, neutraaleista pinnoista. */
-.ruori .segmentti.ankkurit .list li.ankkuri-rivi {
-  border-bottom: none;
-  border-radius: var(--r-kosketettava);
-  background: linear-gradient(165deg, rgba(194, 154, 46, .20), rgba(194, 154, 46, .07));
-  border: 1px solid rgba(194, 154, 46, .38);
-  box-shadow: 0 2px 6px rgba(34, 31, 26, .10), inset 0 1px 0 rgba(255, 255, 255, .5);
-  padding: 8px 10px;
-  margin-bottom: 8px;
-  transition: transform var(--keski) var(--kelluu), box-shadow var(--keski) var(--kelluu);
-}
-.ruori .segmentti.ankkurit .list li.ankkuri-rivi:last-child { margin-bottom: 0; }
-.ruori .segmentti.ankkurit .list li.ankkuri-rivi:active {
-  transform: translateY(1px) scale(.99);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .5);
-}
-
-/* Äly-ehdotukset (anchor-candidates-list) samaan kauniiseen LAATIKKOON
-   kuin .ankkuri-rivi (2026-08-18, Katrin pyyntö: "add every suggestion
-   from äly into that beautiful box"), MUTTA EI sinapinväriseksi (Katrin
-   täsmennys samana päivänä: "äly suggestion anchor should not be in
-   sinappi backround it is reserved only for items raised to anchor") —
-   ehdokas ei ole vielä noussut ankkuriksi, siis neutraali lasi-laatikko
-   samalla muodolla/korotuksella, ei sinappi-sävyä. — .anchor-candidate-row
-   on jaettu luokka (myös Laiturin ehdotuskorteissa muualla), joten
-   skoopattu tänne Ankkurit-segmenttiin ettei Laiturin oma kulta-
-   katkoviiva-tyyli muutu vahingossa. */
-.ruori .segmentti.ankkurit .list li.anchor-candidate-row {
-  border: 1px solid rgba(156, 122, 67, .38);
-  border-radius: var(--r-kosketettava);
-  background: linear-gradient(165deg, rgba(255, 252, 244, .55), rgba(234, 230, 220, .22));
-  box-shadow: 0 2px 6px rgba(34, 31, 26, .10), inset 0 1px 0 rgba(255, 255, 255, .5);
-  padding: 8px 10px;
-}
+/* .ankkuri-rivi/.anchor-candidate-row saivat tämän lasilaatikon 2026-08-18
+   ensin TÄSSÄ Ruori-skoopattuna, ja 2026-08-24 se nostettiin globaaliksi
+   oletukseksi (ks. .list li.ankkuri-rivi / .list li.anchor-candidate-row
+   style.css:n alkupäässä) — skoopatut kaksoiskappaleet poistettu tästä,
+   jäljellä vain Ruorin OMA lisäys, rivi-layoutin :has()-poikkeus alla. */
 /* Yleinen ✨/💬-ehdokas (ks. loadAnchorCandidates() script.js:ssä) rakentaa
    nyt saman ⚓+⋯-kaksoispinon (.ankkuri-toiminnot) kuin oikea ankkuririvi —
    rivi-layout (teksti + pino VIEREKKÄIN) sen sarake-layoutin sijaan jota
