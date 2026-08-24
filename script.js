@@ -6671,7 +6671,22 @@ function piirraKalenteriRivi(rivi) {
   // pääkalenterissa — MUODOLLA (reunapalkki + pieni glyyfi), ei himmeydellä,
   // samaa periaatetta noudattaen kuin ✨-ehdokkaan erottuvuuskorjaus (ks.
   // "Väsynyt käyttäjä ohikulkevalla vilkaisulla" -design-periaate).
-  if (rivi._scope === 'hytti') li.classList.add('kalenteri-rivi-hytti');
+  if (rivi._scope === 'hytti') {
+    li.classList.add('kalenteri-rivi-hytti');
+  } else if (rivi._vari) {
+    // Rivi kantaa värin SAMALLA tavalla kuin viikkonäkymän palkki
+    // (border-left + kevyt taustasävy, ks. .kalenteri-viikko-palkki) —
+    // 2026-08-24, Katrin ohje: "1 day view to look like one in week view".
+    // resolveEventOwnerColor (ei suoraan rivi._vari) jotta väri seuraa
+    // vastuu_henkilo-ylikirjoitusta (sql/135) samalla tavalla kuin
+    // viereinen omistaja-kirjain jo tekee. Korvaa aiemman erillisen pienen
+    // väripisteen (.kalenteri-vari) — reunaväri kantaa saman tiedon
+    // näkyvämmin eikä ole enää kahta erillistä väri-ilmaisinta rivillä.
+    const vari = resolveEventOwnerColor(rivi);
+    li.classList.add('kalenteri-rivi-varillinen');
+    li.style.borderLeftColor = vari;
+    li.style.backgroundColor = vari + '14';
+  }
 
   const aika = document.createElement('span');
   aika.className = 'kalenteri-aika';
@@ -6684,22 +6699,12 @@ function piirraKalenteriRivi(rivi) {
     glyyfi.textContent = '🚪';
     glyyfi.title = (rivi._henkilo ? rivi._henkilo.charAt(0).toUpperCase() + rivi._henkilo.slice(1) + ': ' : '') + 'opiskelu/työ (hytti)';
     li.appendChild(glyyfi);
-  } else if (rivi._vari) {
-    // resolveEventOwnerColor (2026-08-18, kalenterin UI-uudistus) eikä
-    // suoraan rivi._vari, jotta piste seuraa vastuu_henkilo-ylikirjoitusta
-    // (sql/135) samalla tavalla kuin viereinen omistaja-kirjain jo tekee —
-    // aiemmin nämä kaksi saattoivat näyttää RISTIRIITAISET tiedot (kirjain
-    // "R" mutta piste silti alkuperäisen syötteen punainen).
-    const vari = document.createElement('span');
-    vari.className = 'kalenteri-vari';
-    vari.style.backgroundColor = resolveEventOwnerColor(rivi);
-    li.appendChild(vari);
   }
 
   // Omistajamerkki (2026-07-17, ks. muistiinpanot.md "Ristiriitapaketti" —
-  // Katrin OSA X -löydös): väripiste (yllä) kertoo FEEDIN, ei KENEN meno on —
-  // käyttäjä ei voinut ennustaa ristiriitalogiikkaa ilman tätä. Kirjain EI
-  // luota pelkkään väriin ("muoto kertoo tilan, ei väri yksin") — P=perhe
+  // Katrin OSA X -löydös): rivin reunaväri (yllä) kertoo FEEDIN, ei KENEN
+  // meno on — käyttäjä ei voinut ennustaa ristiriitalogiikkaa ilman tätä.
+  // Kirjain EI luota pelkkään väriin ("muoto kertoo tilan, ei väri yksin") — P=perhe
   // (ei henkilo-tietoa, jaettu/käsin lisätty), muuten henkilön alkukirjain.
   // vastuu_henkilo (sql/135) ohittaa tämän kirjaimen/vihjeen kun asetettu —
   // ks. avaaVastuuHenkiloValikko(). Sama kirjain-periaate ("muoto kertoo
@@ -6764,7 +6769,8 @@ function piirraKalenteriRivi(rivi) {
     uusiMerkki.className = 'kalenteri-uusi-merkki';
     uusiMerkki.textContent = 'uusi';
     uusiMerkki.title = 'Kuittaa nähdyksi';
-    uusiMerkki.addEventListener('click', async function() {
+    uusiMerkki.addEventListener('click', async function(e) {
+      e.stopPropagation();
       await kuittaa(rivi.ical_uid);
       lataaKalenteri();
       paivitaKuittausTila();
@@ -6775,25 +6781,24 @@ function piirraKalenteriRivi(rivi) {
   const muistutusAika = reminderTimeBadge('kalenteri', rivi.id);
   if (muistutusAika) li.appendChild(muistutusAika);
 
-  const ankkurointiNappi = document.createElement('button');
-  ankkurointiNappi.innerHTML = ANKKURI_SVG;
-  ankkurointiNappi.className = 'anchor-btn' + (ankkuroidutAvaimet.has('kalenteri:' + rivi.id) ? ' active' : '');
-  ankkurointiNappi.addEventListener('click', async function() {
-    await vaihdaAnkkurointiYleinen('kalenteri', rivi.id, rivi.title, function() {});
-    lataaKalenteri();
-  });
-  li.appendChild(ankkurointiNappi);
-
-  // Harvemmin tarvitut toiminnot yhden hiljaisen "⋯"-napin taakse (ks.
-  // "Rivien UI-remontti" muistiinpanot.md:ssä) — vapauttaa tilaa tapahtuman
-  // nimelle samalla periaatteella kuin Muistilaput/Kauppalista.
-  // Synkatulla rivillä (ical_uid asetettu) EI näytetä poistoa lainkaan:
-  // "yksi totuus, kaksi ikkunaa" -periaatteen mukaan poisto kuuluu tehdä
-  // iPhonen Kalenterissa, ja peilisääntö (siivoaPoistetut, api/_lib/caldav-sync.js)
-  // poistaa rivin täältä automaattisesti seuraavassa synkassa. Ilman tätä
-  // rajausta poisto näytti poistavan tapahtuman "kokonaan", vaikka se vain
-  // katosi Satamasta hetkeksi ja synkka olisi tuonut sen takaisin.
+  // EI enää omia ⚓/⋯-nappeja rivillä (2026-08-24, Katrin ohje: päivänäkymä
+  // seuraa satama-design-system.css:n .kal-rivi-esikuvaa — pelkkä aika +
+  // merkki + teksti, ei nappirykelmää — ja saa muutenkin näyttää samalta
+  // kuin viikkonäkymä, jossa ei ole "weird ellipses" eli ⋯-nappeja joka
+  // rivillä). Kaikki harvemmin tarvitut toiminnot (mukaan lukien ankkurointi,
+  // joka aiemmin oli oma nappinsa) ovat nyt SAMASSA valikossa, joka avautuu
+  // koko rivin napautuksesta — sama "koko kortti on painettava" -periaate
+  // kuin .nyt-kortilla (ks. satama-design-system.css). ⓘ-nappi (osoite) ja
+  // "uusi"-merkki pysäyttävät tapahtuman etenemisen (stopPropagation) etteivät
+  // avaa valikkoa vahingossa niitä napauttaessa.
   const menuItems = [
+    {
+      label: ankkuroidutAvaimet.has('kalenteri:' + rivi.id) ? '⚓ Irrota ankkurista' : '⚓ Ankkuroi tämä',
+      onClick: async function() {
+        await vaihdaAnkkurointiYleinen('kalenteri', rivi.id, rivi.title, function() {});
+        lataaKalenteri();
+      },
+    },
     { label: '⏰ Muistutus', onClick: function() { avaaMuistutusPaneeli('kalenteri', rivi.id, rivi.title, rivi.event_date, rivi.event_time, lataaKalenteri); } },
     { label: '👶 Ketkä lapset katettu', onClick: function() { avaaKattaaLapsetValikko(rivi); } },
     { label: '🚩 Merkitse huoli tähän', onClick: function() { avaaHuoliTapahtumaValikko(rivi); } },
@@ -6802,6 +6807,12 @@ function piirraKalenteriRivi(rivi) {
       onClick: function() { avaaVastuuHenkiloValikko(rivi, li); },
     },
   ];
+  // Synkatulla rivillä (ical_uid asetettu) EI näytetä poistoa lainkaan:
+  // "yksi totuus, kaksi ikkunaa" -periaatteen mukaan poisto kuuluu tehdä
+  // iPhonen Kalenterissa, ja peilisääntö (siivoaPoistetut, api/_lib/caldav-sync.js)
+  // poistaa rivin täältä automaattisesti seuraavassa synkassa. Ilman tätä
+  // rajausta poisto näytti poistavan tapahtuman "kokonaan", vaikka se vain
+  // katosi Satamasta hetkeksi ja synkka olisi tuonut sen takaisin.
   if (!rivi.ical_uid) {
     menuItems.push({
       label: 'Poista',
@@ -6816,7 +6827,7 @@ function piirraKalenteriRivi(rivi) {
       },
     });
   }
-  li.appendChild(createOverflowButton(li, menuItems));
+  li.addEventListener('click', function() { openRowMenu(li, menuItems); });
 
   return li;
 }

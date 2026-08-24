@@ -4470,8 +4470,25 @@ Katri lähetti kaksi lisäviestiä samana päivänä, molemmat alunperin osoitet
 
 ---
 
+## Päivänäkymä lähemmäs viikkonäkymää + ⋯-napit pois (2026-08-24, sama päivä jatkuu)
+
+Katri: "i want 1 day view to look like one in week view especially those weird ellipses should be definitely removed... check satama speksi calendar section, css & html design system files and make changes to that 1 day view so that it as closely as possible follows satama style." "Weird ellipses" = päivänäkymän rivin oma "⋯"-ylivuotonappi (`createOverflowButton`, kirjaimellisesti kolme pistettä, sama komponentti jota käytetään Muistilapuissa/Kauppalistassa ym. — EI kalenterikohtainen, joten sitä ei poistettu globaalisti, vain kalenterin päivärivin omasta käytöstä).
+
+Tarkistin `satama-design-system.css`:n `.kal-rivi`-mallin (aika+merkki+teksti, ei nappirykelmää — ks. sen oma § "Kalenteririvi") ja SATAMA_SPEKSI.md:n §4-osion — spekin oma Kalenteri-osio (§5.1 viikkokalenteri, §4.1 "Kalenterimerkinnät eivät ole kortteja vaan viivalla merkittyjä rivejä") tukee samaa: rivi on luettava, ei nappien täyttämä.
+
+**Muutokset `piirraKalenteriRivi`:ssä (script.js):**
+- **⚓- ja ⋯-napit poistettu rivin päästä kokonaan.** Kaikki niiden takana olleet toiminnot (ankkurointi, muistutus, ketkä lapset katettu, huoli, kuka hoitaa, poisto) ovat nyt SAMASSA `openRowMenu`-valikossa joka avautuu KOKO RIVIN napautuksesta — sama "koko kortti on painettava" -periaate kuin `.nyt`-kortilla design-systemissä. ⓘ-nappi (osoite) ja "uusi"-merkki `stopPropagation`aavat etteivät avaa valikkoa vahingossa.
+- **Väripiste (`.kalenteri-vari`, pieni 8px pallo) poistettu**, korvattu rivin OMALLA reunaväri+taustasävyllä (`border-left: 3px solid <väri>` + `background: väri+14`) — sama resepti kuin viikkonäkymän palkilla (`.kalenteri-viikko-palkki`), suoraan "look like week view" -pyyntöön vastaten. Omistaja-kirjainmerkki (`.kalenteri-omistaja`) säilytetty ennallaan (eri tarkoitus: KUKA, ei pelkkä feedin väri).
+- Orvoksi jäänyt `.kalenteri-vari`-CSS poistettu kokonaan (myös yleisestä ellipsis-poissulkulistasta).
+
+**Ei muutettu:** hytti-scopen rivin oma ilme (🚪-glyyfi + neutraali reunapalkki, `.kalenteri-rivi-hytti`) — eri, tietoisesti erottuva tapaus, ei osa tätä pyyntöä. Kuukausi-/viikkonäkymä eivät koskeneet tätä erää (ne saivat oman kierroksensa juuri ennen tätä).
+
+**Ei vielä testattu livenä.** `node -c script.js` puhdas.
+
+---
+
 ## Nykytila (päivitetty 2026-08-24)
 
-Uusin tässä istunnossa: kalenterin merikartta-pinta + osoitteen näkyvyyskorjaus (ks. yllä), `sw.js` v182. Sitä ennen samana päivänä: kalenterin UI-uudistus + Lukkarikoneen osoite datatasolla (värit, viikon tekstibugi, `sql/138`), `sw.js` v181. **Ei vielä testattu livenä selaimessa** — seuraava luonnollinen askel on avata Kalenteri-välilehti kaikissa kolmessa näkymässä (kuukausi/viikko/päivä) ja tarkistaa: koko näkymä näyttää merikartta-paperilta eikä enää kuittiteemalta, tilanvaihdin/nav-napit tuntuvat lämpimän lasisilta, "tänään" näkyy ympyröitynä numerona ei täysvärisenä solun taustana, viikkopalkit näyttävät VAIN nimen (ei osoitetta), päivänäkymän rivit näyttävät nimen suoraan ja ⓘ-nappi paljastaa osoitteen napautuksesta (erityisesti Lukkarikoneen luennot: "Joukahaisenkatu 3-5, Turku"), ja ettei mikään värin/kirjaimen yhdistelmä näytä ristiriitaiselta kun `vastuu_henkilo` on asetettu lapselle.
+Uusin tässä istunnossa: päivänäkymän ⋯/⚓-nappien poisto + rivin oma väri (ks. yllä juuri ylle), `sw.js` v183. Sitä ennen samana päivänä: kalenterin merikartta-pinta + osoitteen näkyvyyskorjaus, `sw.js` v182. Sitä ennen: kalenterin UI-uudistus + Lukkarikoneen osoite datatasolla (värit, viikon tekstibugi, `sql/138`), `sw.js` v181. **Ei vielä testattu livenä selaimessa yhtäkään näistä kolmesta erästä** — seuraava luonnollinen askel on avata Kalenteri-välilehti kaikissa kolmessa näkymässä (kuukausi/viikko/päivä) ja tarkistaa: koko näkymä näyttää merikartta-paperilta, "tänään" ympyröitynä numerona, viikkopalkit näyttävät VAIN nimen, päivänäkymän rivit ovat siistejä (ei ⋯/⚓-nappeja, rivin reunaväri kertoo kenen meno), koko rivin napautus avaa toimintovalikon, ⓘ-nappi paljastaa osoitteen (Lukkarikoneen luennot: "Joukahaisenkatu 3-5, Turku"), ja ettei mikään värin/kirjaimen yhdistelmä näytä ristiriitaiselta kun `vastuu_henkilo` on asetettu lapselle.
 
-Auki: `.pv-kuorma`-tyylinen kuormakortti + `.kal-lippu-rivi`-ristiriitarivin mockup-visuaali päivänäkymän otsikkoon (tietoisesti rajattu pois molemmilla kierroksilla, ei ole vielä olemassa). Miro-kanvaasin tyhjä-tila-bugi 15min-Boostilla (vanha, ei vieläkään lisätietoa).
+Auki: `.pv-kuorma`-tyylinen kuormakortti + `.kal-lippu-rivi`-ristiriitarivin mockup-visuaali päivänäkymän otsikkoon (tietoisesti rajattu pois kaikilla kolmella kierroksella, ei ole vielä olemassa). Miro-kanvaasin tyhjä-tila-bugi 15min-Boostilla (vanha, ei vieläkään lisätietoa).

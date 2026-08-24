@@ -1599,7 +1599,7 @@ h1 {
    päivänäkymän tapahtuman nimi JA Lukkarikoneen osoite (Katrin ohje:
    "teksti ei saa koskaan katketa piiloon") saavat oman rivityssäännön
    alempana, eivät yksirivistä ellipsis-katkaisua. */
-.list li:not(.varasto-rivi):not(.laituri-ehdotus-rivi):not(.anchor-candidate-row):not(.ankkuri-rivi):not(.elava-rivi):not(.laituri-jatkorivi-rivi) span:not(.kalenteri-aika):not(.kalenteri-vari):not(.kalenteri-uusi-merkki):not(.hytti-tanaan-aika):not(.hytti-tehtava-erapaiva):not(.hytti-rivi-erapaiva):not(.history-time):not(.muistutus-aika):not(.laituri-text):not(.laituri-meta):not(.kalenteri-teksti-wrap):not(.kalenteri-teksti):not(.kalenteri-sijainti):not(.kalenteri-nimirivi) {
+.list li:not(.varasto-rivi):not(.laituri-ehdotus-rivi):not(.anchor-candidate-row):not(.ankkuri-rivi):not(.elava-rivi):not(.laituri-jatkorivi-rivi) span:not(.kalenteri-aika):not(.kalenteri-uusi-merkki):not(.hytti-tanaan-aika):not(.hytti-tehtava-erapaiva):not(.hytti-rivi-erapaiva):not(.history-time):not(.muistutus-aika):not(.laituri-text):not(.laituri-meta):not(.kalenteri-teksti-wrap):not(.kalenteri-teksti):not(.kalenteri-sijainti):not(.kalenteri-nimirivi) {
   flex: 1;
   min-width: 0;
   overflow: hidden;
@@ -2722,21 +2722,15 @@ h1 {
   color: var(--ground);
 }
 
-/* Kalenterisyötteen väri: sama pallo sekä agendan riveillä (.kalenteri-vari)
-   että hyväksyntäkorteissa (.kalenteri-kortti-vari). Väri tulee data-ohjatusti
-   kalenteri_syotteet.vari-sarakkeesta (JS asettaa background-colorin inline-
-   tyylillä, ei kovakoodattuja väriluokkia) — ks. muistiinpanot.md. */
-.kalenteri-vari {
-  display: inline-block;
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  margin-right: 8px;
-  flex-shrink: 0;
-}
+/* Kalenterisyötteen väri hyväksyntäkorteissa (.kalenteri-kortti-vari).
+   Väri tulee data-ohjatusti kalenteri_syotteet.vari-sarakkeesta (JS asettaa
+   background-colorin inline-tyylillä, ei kovakoodattuja väriluokkia) — ks.
+   muistiinpanot.md. Agendan rivin oma väripiste (.kalenteri-vari) korvattiin
+   2026-08-24 rivin omalla reunaväri+taustasävyllä, ks. .kalenteri-rivi-
+   varillinen alempana — sama periaate kuin viikkonäkymän palkilla. */
 
 /* Omistajamerkki (2026-07-17, ks. muistiinpanot.md "Ristiriitapaketti"):
-   kertoo KENEN meno rivi on (K/J/P) — ei luota pelkkään .kalenteri-vari-
+   kertoo KENEN meno rivi on (K/J/P) — ei luota pelkkään väriin
    väripisteeseen, koska väri kertoo FEEDIN eikä käyttäjä voinut aiemmin
    päätellä siitä henkilöä. Neutraali reunuskirjain, ei täytetty väri —
    erottuu MUODOLLA/tekstillä, ei väririippuvainen. */
@@ -2772,15 +2766,24 @@ h1 {
   align-items: flex-start;
   padding: 6px 0;
   border-bottom-color: var(--hius);
+  cursor: pointer;
   transition: background var(--keski) var(--kelluu);
 }
 .kalenteri-paiva-ryhma .list li:active {
   background: rgba(156, 122, 67, .08);
 }
 .kalenteri-paiva-ryhma .list li .kalenteri-aika,
-.kalenteri-paiva-ryhma .list li .kalenteri-vari,
 .kalenteri-paiva-ryhma .list li .kalenteri-omistaja {
   margin-top: 3px;
+}
+
+/* Rivin oma väri (2026-08-24, "1 day view to look like one in week view") —
+   reunaväri + kevyt taustasävy, sama resepti kuin .kalenteri-viikko-palkki.
+   border-left-width/padding kiinteänä täällä, JS asettaa vain värit
+   (borderLeftColor/backgroundColor) inline resolveEventOwnerColor():sta. */
+.list li.kalenteri-rivi-varillinen {
+  border-left: 3px solid transparent;
+  padding-left: 8px;
 }
 .kalenteri-teksti-wrap {
   display: flex;
@@ -2829,8 +2832,8 @@ h1 {
 
 /* Hytti-scopen (oma opiskelu/työ) tapahtuma pääkalenterin agenda/viikko
    -näkymässä (Katrin 2026-07-16 linjaus): toissijainen ilme MUODOLLA, ei
-   himmeydellä — reunapalkki + pieni glyyfi (.kalenteri-hytti-glyyfi) korvaa
-   feedin oman väripallon (.kalenteri-vari) hytti-riveillä. */
+   himmeydellä — neutraali reunapalkki + pieni glyyfi (.kalenteri-hytti-glyyfi)
+   korvaa feedin oman värin (.kalenteri-rivi-varillinen) hytti-riveillä. */
 .list li.kalenteri-rivi-hytti {
   border-left: 3px solid var(--hius-vahva);
   padding-left: 6px;
