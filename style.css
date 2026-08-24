@@ -1186,11 +1186,18 @@ h1 {
   flex-shrink: 0;
   background: none;
   border: none;
-  border-bottom: 1px solid var(--accent);
+  /* var(--accent) -> var(--sinappi) 2026-08-25 (Katrin löydös: "wrong
+     yellow colour instead of sinappi") — --accent on teemaa seuraava
+     token, tumma-tilassa selvästi kirkkaamman keltainen (#E8B84B) kuin
+     kiinteä --sinappi (#C29A2E), sama korjausperiaate kuin muualla tässä
+     erässä (.inline-badge, kalenterikuvake). Koskee jokaista numero-/
+     aika-/päivämäärä-/select-kenttää Asetuksissa JA Lapsi-näkymässä
+     (jaettu luokka). */
+  border-bottom: 1px solid var(--sinappi);
   outline: none;
   font-family: var(--fontti-loki);
   font-size: 16px;
-  color: var(--accent);
+  color: var(--sinappi);
   text-align: center;
   padding: 4px 0;
 }

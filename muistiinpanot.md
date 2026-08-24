@@ -4729,3 +4729,11 @@ Katrin erillinen rakennepyyntö (ei pintaa, joka on jo valmis v194:ssä) — siv
 **Ei käytetty valmista collapse-kirjastokomponenttia** — sovelluksessa oli ennestään yksi samantyyppinen kuvio (`.laituri-arkisto-toggle`, äly-loki), mutta se MUISTAA auki-tilan istunnon ajan (tarkoituksella, eri käyttötapaus) — täsmälleen päinvastainen vaatimus kuin Katri pyysi tälle. Natiivi `<details>` sopi paremmin: nollaus yhdellä `removeAttribute`-kutsulla on yksinkertaisempi kuin oman JS-tilan rakentaminen tyhjästä.
 
 **Ei vielä testattu livenä.** `node -c script.js` ja style.css-aaltosulkutasapaino puhtaat. Kaikkien siirrettyjen kenttien id:t tarkistettu (49 kpl) — jokainen esiintyy tiedostossa täsmälleen kerran, ei duplikaatteja eikä kadonneita.
+
+---
+
+## Kolmas sinappi-löydös: `.settings-numero-input` (2026-08-25, sama istunto jatkuu)
+
+Katri elävässä testissä heti Asetusten rakenneuudistuksen jälkeen: "in settings there is wrong yellow colour instead of sinappi we use in this app". Löytyi `.settings-numero-input` — Asetusten JA Lapsi-näkymän JOKAISEN numero-/aika-/päivämäärä-/select-kentän jaettu luokka (arviolta 30+ käyttökohtaa) — jonka reunaviiva ja teksti käyttivät `var(--accent)`:ia. `--accent`:n tumma-tilan arvo (`#E8B84B`, kirkas keltainen) on selvästi eri sävy kuin kiinteä `--sinappi` (`#C29A2E`, ruskehtavampi sinappi) — sama bugiluokka kolmatta kertaa samana päivänä (`.anchor-btn`, `.inline-badge`/kalenterikuvake, nyt tämä). Vaihdettu `var(--sinappi)`:iin sekä reunalle että tekstille.
+
+**Ei vielä testattu livenä.** style.css-aaltosulkutasapaino puhdas.
