@@ -3987,6 +3987,30 @@ h1 {
   outline: 2px solid var(--sinappi);
   background: #fff;
 }
+/* Leveyskahva (2026-08-26, Katrin pyyntö: reunasta vedettävä leveys, koska
+   laatikko ennen vain kasvoi oikealle tekstin mukana eikä koskaan
+   rivittynyt). Oikean reunan koko korkeuden kattava kapea alue, ew-resize-
+   kursori kertoo mitä siitä voi tehdä. contentEditable="false" (asetettu
+   JS:ssä) pitää sen kirjoituksen ulkopuolella. */
+.kasitekartta-teksti-resize {
+  position: absolute;
+  top: 0; right: -6px; bottom: 0;
+  width: 12px;
+  cursor: ew-resize;
+  touch-action: none;
+}
+.kasitekartta-teksti-resize::after {
+  content: '';
+  position: absolute;
+  top: 50%; left: 50%;
+  width: 3px; height: 60%;
+  transform: translate(-50%, -50%);
+  background: rgba(153, 153, 153, .6);
+  border-radius: 2px;
+}
+.kasitekartta-teksti-laatikko:not(:focus) .kasitekartta-teksti-resize {
+  display: none;
+}
 
 /* Opintopolku VAIHE 2 (2026-07-21, ks. muistiinpanot.md "Opintopolku VAIHE 2")
    — otsikko/vaihe-tyylit, jaettu "Minulla on aikaa" -tuloskortin kanssa

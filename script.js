@@ -3905,25 +3905,60 @@ async function piirraNytLoki(askeleet) {
     ateriaSijoitus = { alku: ateriaAlku, loppu: ateriaAlku + ateriaKesto };
   }
 
-  // Opiskelupätkät täyttävät loput — kiinteä kestoarvio per PERO-vaihe
-  // (haeOpintoKestoMinuutteina, säädettävissä Asetuksista). Jos jokin ei
-  // mahdu enää tänään (täysi päivä), se jää lokista pois — harvinaista
-  // 1-2 askeleen päivämäärällä, ei virhetila.
-  const opiskelupatkat = [];
-  askeleet.forEach(function(askel) {
+  // Opiskelupätkät LEVITETÄÄN tasaisesti koko ikkunaan (2026-08-26, Katrin
+  // havainto: "ei laita opiskeluslotteja lounaan jälkeen, pitäisi laittaa
+  // ikään kuin koko päivälle") — vanha versio pakkasi jokaisen pätkän
+  // ahneesti ENSIMMÄISEEN vapaaseen kohtaan ikkunan alusta, joten päivänä
+  // jolloin tarjottujen askelten yhteiskesto ei riittänyt täyttämään koko
+  // ikkunaa (esim. 9.15-15.30), kaikki opiskelu päätyi aamuun ja lounaan
+  // jälkeinen aika jäi kokonaan tyhjäksi, vaikka ikkuna ulottui reilusti
+  // sen yli. Lasketaan nyt ensin ikkunan vapaa kokonaisaika (kiinteät menot/
+  // lounas/siirtymät jo merkitty varatuiksi yllä) ja jaetaan ylijäämä
+  // (vapaa miinus opiskelun yhteiskesto) tasaisiksi väleiksi peräkkäisten
+  // pätkien eteen — pätkät itse pysyvät AINA yhtenäisinä (ei koskaan
+  // pilkota esim. lounastauon yli), vain niiden alkukohtaa siirretään
+  // myöhemmäksi. Jos yhteiskesto jo täyttää tai ylittää ikkunan, väli on 0
+  // ja lopputulos on sama ahne peräkkäispakkaus kuin ennen.
+  const askelKohteet = askeleet.map(function(askel) {
     const kohde = askel.opinto_aiheet || askel.taitosolmut;
-    if (!kohde) return;
+    if (!kohde) return null;
     const vaihe = kohdeVaihe(kohde);
-    const kesto = haeOpintoKestoMinuutteina(vaihe);
+    return { askel: askel, kohde: kohde, vaihe: vaihe, kesto: haeOpintoKestoMinuutteina(vaihe) };
+  }).filter(Boolean);
+
+  let vapaaYhteensa = 0;
+  for (let m = ikkunaAlku; m < ikkunaLoppu; m++) { if (!varattu[m]) vapaaYhteensa++; }
+  const opiskeluYhteensa = askelKohteet.reduce(function(s, a) { return s + a.kesto; }, 0);
+  const valiMin = askelKohteet.length > 0
+    ? Math.max(0, Math.floor((vapaaYhteensa - opiskeluYhteensa) / askelKohteet.length))
+    : 0;
+
+  // Siirtää kohdan eteenpäin kunnes N VAPAATA minuuttia (ei kellonaikaa —
+  // lounas/siirtymät ohitetaan matkalla eivätkä kuluta väli-budjettia) on
+  // kuljettu, käytetään väli-tauon toteuttamiseen ennen seuraavaa pätkää.
+  function ohitaVapaataAikaa(alkaen, maara) {
+    let m = alkaen, ohitettu = 0;
+    while (ohitettu < maara && m < ikkunaLoppu) {
+      if (!varattu[m]) ohitettu++;
+      m++;
+    }
+    return m;
+  }
+
+  const opiskelupatkat = [];
+  let haku = ikkunaAlku;
+  askelKohteet.forEach(function(a) {
+    haku = ohitaVapaataAikaa(haku, valiMin);
     let loytyi = -1;
-    for (let m = ikkunaAlku; m <= ikkunaLoppu - kesto; m++) {
+    for (let m = haku; m <= ikkunaLoppu - a.kesto; m++) {
       let vapaa = true;
-      for (let k = m; k < m + kesto; k++) { if (varattu[k]) { vapaa = false; break; } }
+      for (let k = m; k < m + a.kesto; k++) { if (varattu[k]) { vapaa = false; break; } }
       if (vapaa) { loytyi = m; break; }
     }
-    if (loytyi < 0) return;
-    for (let k = loytyi; k < loytyi + kesto; k++) varattu[k] = true;
-    opiskelupatkat.push({ askel: askel, kohde: kohde, vaihe: vaihe, kesto: kesto, alku: loytyi, loppu: loytyi + kesto });
+    if (loytyi < 0) return; // ei mahdu enää tänään — harvinaista, ei virhetila
+    for (let k = loytyi; k < loytyi + a.kesto; k++) varattu[k] = true;
+    opiskelupatkat.push({ askel: a.askel, kohde: a.kohde, vaihe: a.vaihe, kesto: a.kesto, alku: loytyi, loppu: loytyi + a.kesto });
+    haku = loytyi + a.kesto;
   });
 
   let rivit = kiinteatMenot.map(function(m) { return { tyyppi: 'live', alku: m.alku, loppu: m.loppu, title: m.title }; });
@@ -4084,21 +4119,44 @@ async function naytaHuomisenEsikatselu() {
   const pyydettavaMaara = Math.min(10, Math.max(1, Math.ceil(vapaaMin / 15)));
   const ehdokkaat = await laskeOpintoPaivanAskeleet(pyydettavaMaara, null, null, null, huominenIso);
 
-  const opiskelupatkat = [];
-  ehdokkaat.forEach(function(e) {
+  // Sama tasainen levitys kuin piirraNytLoki:ssa (2026-08-26, ei
+  // rinnakkaista laskukonetta — sama korjaus molempiin ettei esikatselu
+  // valehtele mitä huominen oikeasti näyttäisi).
+  const ehdokasKohteet = ehdokkaat.map(function(e) {
     const kohde = e.item;
     const vaihe = kohdeVaihe(kohde);
-    const kesto = haeOpintoKestoMinuutteina(vaihe);
+    return { e: e, kohde: kohde, vaihe: vaihe, kesto: haeOpintoKestoMinuutteina(vaihe) };
+  });
+  let vapaaMinYht = 0;
+  for (let m = ikkunaAlku; m < ikkunaLoppu; m++) { if (!varattu[m]) vapaaMinYht++; }
+  const opiskeluYhtEsikatselu = ehdokasKohteet.reduce(function(s, a) { return s + a.kesto; }, 0);
+  const valiMinEsikatselu = ehdokasKohteet.length > 0
+    ? Math.max(0, Math.floor((vapaaMinYht - opiskeluYhtEsikatselu) / ehdokasKohteet.length))
+    : 0;
+  function ohitaVapaataAikaaEsikatselu(alkaen, maara) {
+    let m = alkaen, ohitettu = 0;
+    while (ohitettu < maara && m < ikkunaLoppu) {
+      if (!varattu[m]) ohitettu++;
+      m++;
+    }
+    return m;
+  }
+
+  const opiskelupatkat = [];
+  let hakuEsikatselu = ikkunaAlku;
+  ehdokasKohteet.forEach(function(a) {
+    hakuEsikatselu = ohitaVapaataAikaaEsikatselu(hakuEsikatselu, valiMinEsikatselu);
     let loytyi = -1;
-    for (let m = ikkunaAlku; m <= ikkunaLoppu - kesto; m++) {
+    for (let m = hakuEsikatselu; m <= ikkunaLoppu - a.kesto; m++) {
       let vapaa = true;
-      for (let k = m; k < m + kesto; k++) { if (varattu[k]) { vapaa = false; break; } }
+      for (let k = m; k < m + a.kesto; k++) { if (varattu[k]) { vapaa = false; break; } }
       if (vapaa) { loytyi = m; break; }
     }
     if (loytyi < 0) return;
-    for (let k = loytyi; k < loytyi + kesto; k++) varattu[k] = true;
-    const kurssi = e.tyyppi === 'aihe' ? (kohde.opinto_kurssit ? kohde.opinto_kurssit.name : '') : (kohde.lahde || '');
-    opiskelupatkat.push({ tyyppi: 'opiskelu-esikatselu', nimi: kohde.name, kurssi: kurssi, vaihe: vaihe, alku: loytyi, loppu: loytyi + kesto });
+    for (let k = loytyi; k < loytyi + a.kesto; k++) varattu[k] = true;
+    const kurssi = a.e.tyyppi === 'aihe' ? (a.kohde.opinto_kurssit ? a.kohde.opinto_kurssit.name : '') : (a.kohde.lahde || '');
+    opiskelupatkat.push({ tyyppi: 'opiskelu-esikatselu', nimi: a.kohde.name, kurssi: kurssi, vaihe: a.vaihe, alku: loytyi, loppu: loytyi + a.kesto });
+    hakuEsikatselu = loytyi + a.kesto;
   });
 
   let rivit = kiinteatMenot.map(function(m) { return { tyyppi: 'live', alku: m.alku, loppu: m.loppu, title: m.title }; });
@@ -4982,7 +5040,7 @@ function kasitekarttaPisteesta(e) {
   };
 }
 
-function luoKasitekarttaTekstilaatikko(xProsentti, yProsentti, teksti) {
+function luoKasitekarttaTekstilaatikko(xProsentti, yProsentti, teksti, leveysProsentti) {
   const wrap = document.getElementById('kasitekartta-wrap');
   const laatikko = document.createElement('div');
   laatikko.className = 'kasitekartta-teksti-laatikko';
@@ -4990,6 +5048,10 @@ function luoKasitekarttaTekstilaatikko(xProsentti, yProsentti, teksti) {
   laatikko.textContent = teksti || '';
   laatikko.style.left = xProsentti + '%';
   laatikko.style.top = yProsentti + '%';
+  // Leveys asetettu = rivittyy sen sisällä (white-space: pre-wrap).
+  // Leveys asettamatta = vanha käytös, kutistuu/kasvaa sisällön mukaan
+  // (ainoa reuna joka näkyi liikkuvan ennen leveyskahvan lisäystä).
+  if (leveysProsentti) laatikko.style.width = leveysProsentti + '%';
 
   // Raahaus vain kun laatikko EI ole jo fokuksessa kirjoittamassa — sama
   // erottelu kuin useimmissa piirto-appeissa (napautus = raahaa, toinen
@@ -5019,6 +5081,33 @@ function luoKasitekarttaTekstilaatikko(xProsentti, yProsentti, teksti) {
   laatikko.addEventListener('pointerup', function() { raahataan = false; });
   laatikko.addEventListener('dblclick', function(e) { if (e.shiftKey) laatikko.remove(); });
 
+  // Leveyskahva (2026-08-26, Katrin pyyntö: "voi muotoilla tekstilaatikkoa
+  // vetämällä reunasta ku nyt automaattisesti tasaa vain toisessa reunassa")
+  // — ilman kiinteää leveyttä laatikko vain kasvoi oikealle tekstin mukana,
+  // eikä koskaan rivittynyt. contentEditable="false" jottei kahva itse
+  // muutu kirjoitettavaksi eikä käynnistä yllä olevaa raahausta.
+  const kahva = document.createElement('div');
+  kahva.className = 'kasitekartta-teksti-resize';
+  kahva.contentEditable = 'false';
+  let koonMuutos = false;
+  let koonAlkuX = 0, koonAlkuLeveys = 0;
+  kahva.addEventListener('pointerdown', function(e) {
+    koonMuutos = true;
+    koonAlkuX = e.clientX;
+    koonAlkuLeveys = laatikko.getBoundingClientRect().width;
+    kahva.setPointerCapture(e.pointerId);
+    e.preventDefault();
+    e.stopPropagation();
+  });
+  kahva.addEventListener('pointermove', function(e) {
+    if (!koonMuutos) return;
+    const wrapRect = wrap.getBoundingClientRect();
+    const uusiLeveys = Math.max(40, koonAlkuLeveys + (e.clientX - koonAlkuX));
+    laatikko.style.width = Math.min(100, uusiLeveys / wrapRect.width * 100) + '%';
+  });
+  kahva.addEventListener('pointerup', function(e) { koonMuutos = false; e.stopPropagation(); });
+  laatikko.appendChild(kahva);
+
   wrap.appendChild(laatikko);
   return laatikko;
 }
@@ -5032,7 +5121,7 @@ function lataaKasitekartta(solmu) {
     img.src = solmu.kasitekartta;
   }
   (solmu.kasitekartta_tekstit || []).forEach(function(t) {
-    luoKasitekarttaTekstilaatikko(t.x, t.y, t.text);
+    luoKasitekarttaTekstilaatikko(t.x, t.y, t.text, t.w);
   });
 }
 
@@ -5108,7 +5197,11 @@ kasitekarttaCanvasEl.addEventListener('pointercancel', function() { kasitekartta
 document.getElementById('kasitekartta-tallenna-btn').addEventListener('click', async function() {
   if (!currentTaitosolmu) return;
   const tekstit = Array.from(document.querySelectorAll('.kasitekartta-teksti-laatikko')).map(function(el) {
-    return { x: parseFloat(el.style.left), y: parseFloat(el.style.top), text: el.textContent };
+    return {
+      x: parseFloat(el.style.left), y: parseFloat(el.style.top),
+      text: el.textContent, // kahva (resize-kahva) ei sisällä tekstiä, ei vaikuta
+      w: el.style.width ? parseFloat(el.style.width) : null,
+    };
   });
   const kuva = document.getElementById('kasitekartta-canvas').toDataURL('image/png');
   const { error } = await db.from('taitosolmut').update({ kasitekartta: kuva, kasitekartta_tekstit: tekstit }).eq('id', currentTaitosolmu.id);
