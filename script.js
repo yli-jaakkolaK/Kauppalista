@@ -9655,31 +9655,80 @@ async function loadAnchorCandidates() {
       sisaltoRivi.appendChild(text);
       li.appendChild(sisaltoRivi);
 
-      if (!candidate.parisuhde_hyvaksytty) {
-        const acceptButton = document.createElement('button');
-        acceptButton.textContent = '💞 Hyväksy';
-        acceptButton.className = 'dialog-btn';
-        acceptButton.addEventListener('click', async function() {
-          // Confirmation gate (2026-08-04, Katri's request): once BOTH
-          // people accept, the proposal closes and there is no "peru"
-          // option left anywhere — an accidental tap here would be
-          // unrecoverable, so a genuine confirm dialog guards it, not just
-          // a dismissable toast.
-          const confirmed = await naytaVahvistus(
-            'Hyväksytäänkö parisuhdeaika ' + dateText + ' klo ' + timeText + '?',
-            'Kun kumppanisikin hyväksyy, ehdotus sulkeutuu eikä sitä voi enää perua täältä.',
-            'Hyväksy'
-          );
-          if (!confirmed) return;
+      // Yksi ainoa hyväksymispolku (2026-08-26, Katrin pyyntö: "no other
+      // option to save it than through that button") — ei enää erillistä
+      // ✎ Muokkaa -tilaa/Tallenna-nappia jonka olemassaolo itsessään
+      // hämärsi mikä nappi oikeasti hyväksyy jotain. Aika on aina suoraan
+      // näkyvissä ja muokattavissa; sama "💞 Hyväksy" -nappi lukee kentät
+      // klikkaushetkellä: jos ne täsmäävät ehdotettuun aikaan, kyseessä on
+      // tavallinen hyväksyntä (acceptCoupleTimeProposal, sama vahvistusdialogi
+      // kuin ennen); jos ne on muutettu, kyseessä on uuden ajan ehdotus
+      // (editCoupleTimeProposal — laskee tämän puolen hyväksynnäksi suoraan,
+      // nollaa kumppanin, ei siis koskaan lopullinen heti eikä siis tarvitse
+      // samaa "ei voi enää perua" -vahvistusta).
+      const aikaRivi = document.createElement('div');
+      aikaRivi.className = 'parisuhdeaika-muokkaus';
+      const pvmInput = document.createElement('input');
+      pvmInput.type = 'date';
+      pvmInput.value = candidate.event_date;
+      const aikaInput = document.createElement('input');
+      aikaInput.type = 'time';
+      aikaInput.value = timeText;
+      aikaRivi.appendChild(pvmInput);
+      aikaRivi.appendChild(aikaInput);
+      li.appendChild(aikaRivi);
+
+      const acceptButton = document.createElement('button');
+      acceptButton.className = 'dialog-btn';
+      const onMuutettu = function() {
+        return pvmInput.value !== candidate.event_date || aikaInput.value !== timeText;
+      };
+      const paivitaHyvaksyNappi = function() {
+        // Jo hyväksytty JA aikaa ei ole muutettu: ei ole mitään uutta
+        // hyväksyttävää täältä käsin juuri nyt (odotetaan kumppania) —
+        // nappi piiloon, "× Peru" jää ainoaksi toiminnoksi.
+        if (candidate.parisuhde_hyvaksytty && !onMuutettu()) {
+          acceptButton.style.display = 'none';
+          return;
+        }
+        acceptButton.style.display = '';
+        acceptButton.textContent = onMuutettu() ? '💞 Hyväksy uusi aika' : '💞 Hyväksy';
+      };
+      paivitaHyvaksyNappi();
+      pvmInput.addEventListener('input', paivitaHyvaksyNappi);
+      aikaInput.addEventListener('input', paivitaHyvaksyNappi);
+      acceptButton.addEventListener('click', async function() {
+        if (!pvmInput.value || !aikaInput.value) return;
+        if (onMuutettu()) {
           acceptButton.disabled = true;
-          acceptCoupleTimeProposal(candidate);
-        });
-        napitRivi.appendChild(acceptButton);
-      }
+          await editCoupleTimeProposal(candidate, pvmInput.value, aikaInput.value);
+          return;
+        }
+        // Confirmation gate (2026-08-04, Katri's request): once BOTH
+        // people accept, the proposal closes and there is no "peru"
+        // option left anywhere — an accidental tap here would be
+        // unrecoverable, so a genuine confirm dialog guards it, not just
+        // a dismissable toast.
+        const confirmed = await naytaVahvistus(
+          'Hyväksytäänkö parisuhdeaika ' + dateText + ' klo ' + timeText + '?',
+          'Kun kumppanisikin hyväksyy, ehdotus sulkeutuu eikä sitä voi enää perua täältä.',
+          'Hyväksy'
+        );
+        if (!confirmed) return;
+        acceptButton.disabled = true;
+        acceptCoupleTimeProposal(candidate);
+      });
+      napitRivi.appendChild(acceptButton);
 
       const rejectButton = document.createElement('button');
-      rejectButton.textContent = candidate.parisuhde_hyvaksytty ? '× Peru' : '× Ei sovi';
-      rejectButton.className = 'delete-btn';
+      // "× Hylkää" eikä "× Ei sovi" (2026-08-26, Katrin löytämä epäselvyys) —
+      // teksti täsmää nyt vahvistusdialogin omaan nappiin (ks. alla, sama
+      // 'Peru'/'Hylkää'-jako). Luokka vaihdettu delete-btn:stä (ikoninappi,
+      // ei tarkoitettu tekstille — siitä puuttuva font-family/uppercase
+      // aiheutti fonttiristiriidan) dialog-btn dialog-btn-danger:ksi, sama
+      // kuin mitä vahvistusdialogin oma nappi käyttää.
+      rejectButton.textContent = candidate.parisuhde_hyvaksytty ? '× Peru' : '× Hylkää';
+      rejectButton.className = 'dialog-btn dialog-btn-danger';
       rejectButton.addEventListener('click', async function() {
         // Same confirmation gate as accept — rejecting cancels the proposal
         // for BOTH people, not just this device, so it needs the stronger
@@ -9695,56 +9744,6 @@ async function loadAnchorCandidates() {
         rejectCoupleTimeProposal(candidate);
       });
       napitRivi.appendChild(rejectButton);
-
-      // Muokkaa aikaa (2026-08-11, Katrin pyyntö) — ei erillistä
-      // kalenterinäkymää, pelkkä muokattava laatikko samassa lapussa.
-      // Tallennus laskee muokkaajan oman hyväksynnäksi (ks.
-      // editCoupleTimeProposal), kumppanin hyväksyntä nollautuu
-      // palvelimella — hän näkee ehdotuksen taas uutena, uudella ajalla.
-      const muokkausLomake = document.createElement('div');
-      muokkausLomake.className = 'parisuhdeaika-muokkaus';
-      muokkausLomake.style.display = 'none';
-      const pvmInput = document.createElement('input');
-      pvmInput.type = 'date';
-      pvmInput.value = candidate.event_date;
-      const aikaInput = document.createElement('input');
-      aikaInput.type = 'time';
-      aikaInput.value = candidate.event_time.slice(0, 5);
-      const tallennaNappi = document.createElement('button');
-      // "Tallenna ja hyväksy", ei pelkkä "Tallenna" (2026-08-26, Katrin
-      // löytämä epäselvyys) — nappi todella myös hyväksyy uuden ajan omalta
-      // puolelta samalla kertaa (ks. yllä oleva kommentti/api/parisuhdeaika.js:n
-      // muokkaa()), pelkkä "Tallenna" antoi virheellisen kuvan ettei tämä
-      // laskisi hyväksynnäksi.
-      tallennaNappi.textContent = 'Tallenna ja hyväksy';
-      tallennaNappi.className = 'dialog-btn';
-      const peruutaNappi = document.createElement('button');
-      peruutaNappi.textContent = 'Peruuta';
-      peruutaNappi.className = 'delete-btn';
-      muokkausLomake.appendChild(pvmInput);
-      muokkausLomake.appendChild(aikaInput);
-      muokkausLomake.appendChild(tallennaNappi);
-      muokkausLomake.appendChild(peruutaNappi);
-      li.appendChild(muokkausLomake);
-
-      const muokkaaNappi = document.createElement('button');
-      muokkaaNappi.textContent = '✎ Muokkaa aikaa';
-      muokkaaNappi.className = 'dialog-btn dialog-btn-cancel';
-      muokkaaNappi.addEventListener('click', function() {
-        napitRivi.style.display = 'none';
-        muokkausLomake.style.display = 'flex';
-      });
-      napitRivi.appendChild(muokkaaNappi);
-
-      peruutaNappi.addEventListener('click', function() {
-        muokkausLomake.style.display = 'none';
-        napitRivi.style.display = '';
-      });
-      tallennaNappi.addEventListener('click', function() {
-        if (!pvmInput.value || !aikaInput.value) return;
-        tallennaNappi.disabled = true;
-        editCoupleTimeProposal(candidate, pvmInput.value, aikaInput.value);
-      });
 
       li.appendChild(napitRivi);
       listEl.appendChild(li);

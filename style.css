@@ -2262,21 +2262,12 @@ h1 {
 /* Ankkuri-ikoni: alustan oma ⚓-emoji SVG:n sisällä, EI käsinpiirretty
    vektoripolku (Katrin nimenomainen linjaus — käsinpiirretty muutti
    muodon, se oli alkuperäinen valitus, ks. ANKKURI_SVG:n kommentti
-   script.js:ssä). Emoji-fontit eivät noudata color/currentColor-
-   ominaisuutta ollenkaan, joten väri pakotetaan filter()-ketjulla
-   `.ankkuri-emoji`-luokan kautta (2026-08-24, korvaa riittämättömän
-   pelkän grayscale(1):n). Katrin täsmennys: väri kuuluu NAPIN TAUSTAAN
-   (ks. .anchor-btn yllä, sinapinlämmin lasi), ei itse ikoniin — ikoni
-   pysyy neutraalina (tumma lepotilassa, vaalea täytetyllä tummalla
-   messinki-taustalla aktiivisena), samalla periaatteella kuin muidenkin
-   jaettujen nappien ikonit (check/delete/overflow ym., kiinteä --muste). */
+   script.js:ssä). 2026-08-24 pakotettiin väri filter()-ketjulla neutraaliksi
+   (harmaa/tumma), mutta 2026-08-26 Katri halusi emojin OMAN alkuperäisen
+   värityksen takaisin kaikkialla — litteä/"viivapiirros"-lopputulos ei
+   miellyttänyt. Ei siis enää mitään filter()-pakotusta, emoji näkyy
+   sellaisenaan sekä lepo- että aktiivitilassa. */
 .anchor-btn svg { width: 21px; height: 21px; display: block; }
-.ankkuri-emoji {
-  filter: grayscale(1) brightness(.4) contrast(1.2);
-}
-.anchor-btn.active .ankkuri-emoji {
-  filter: grayscale(1) brightness(2.2) contrast(1.1);
-}
 
 /* BUGIKORJAUS ("Laiturin ⚓-tilan näkyvyys", ks. muistiinpanot.md): pelkkä
    väri/opacity-ero (kulta vs. himmeä) ei erottunut vilkaisulla — sama
