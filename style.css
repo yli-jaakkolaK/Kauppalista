@@ -3985,6 +3985,12 @@ h1 {
   padding: 2px 4px;
   cursor: move;
   white-space: pre-wrap;
+  /* Kumoaa .kasitekartta-wrap:n touch-action:none (piirtoa varten) tälle
+     yhdelle lapselle — muuten kirjoittaminen/kosketuskohdistus voi jäädä
+     puolitiehen kosketusnäytöllä (2026-08-26). */
+  touch-action: auto;
+  user-select: text;
+  -webkit-user-select: text;
 }
 .kasitekartta-teksti-laatikko:focus {
   outline: 2px solid var(--sinappi);

@@ -1,5 +1,18 @@
-const CACHE = 'kauppalista-v200';
+const CACHE = 'kauppalista-v201';
 const APP_FILES = ['/', '/index.html', '/style.css', '/script.js', '/manifest.json', '/icon.png'];
+
+// Sama julkinen avain kuin script.js:ssä (VAPID_PUBLIC_KEY) — kaksi kopiota
+// koska service worker ei voi importata script.js:ää. Julkinen avain saa
+// näkyä tässä (ks. script.js:n kommentti samasta vakiosta).
+const VAPID_PUBLIC_KEY = 'BBnARMtYtTabRROSxmKux3RG3LBcWsWTBhFB805RJgUKcROtJFdX6mQfUa1U2jxXBDcHK4GgkI9ZkJ8o_udhspg';
+function urlBase64ToUint8Array(base64String) {
+  const padding = '='.repeat((4 - base64String.length % 4) % 4);
+  const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
+  const rawData = atob(base64);
+  const outputArray = new Uint8Array(rawData.length);
+  for (let i = 0; i < rawData.length; i++) outputArray[i] = rawData.charCodeAt(i);
+  return outputArray;
+}
 
 self.addEventListener('install', event => {
   event.waitUntil(caches.open(CACHE).then(cache => cache.addAll(APP_FILES)));
@@ -52,6 +65,28 @@ self.addEventListener('push', event => {
       icon: '/icon.png',
       badge: '/icon.png',
     })
+  );
+});
+
+// Selain voi vaihtaa tilauksen endpointin ilman käyttäjän tekemistä (esim.
+// push-palvelun sisäinen kierrätys) — ilman tätä kuuntelijaa tilaus katoaa
+// hiljaa ja ilmoitukset lakkaavat tulematta kunnes käyttäjä huomaa ja painaa
+// "Salli ilmoitukset" uudelleen (Katrin toistuva ongelma 2026-08-26).
+// Tilataan heti uudelleen samalla avaimella, ja pyydetään auki olevaa
+// sivua tallentamaan uusi endpoint Supabaseen (service workerilla ei ole
+// kirjautuneen käyttäjän tunnistetta/tokenia, joten kirjoitus tehdään aina
+// sivun puolelta — ks. script.js:n 'push-resubscribed'-viestin käsittely).
+// Jos sivu ei ole auki juuri sillä hetkellä, script.js:n oma itsekorjaus
+// (paivitaPushTila, ajetaan joka avauksella/fokusoinnilla) huomaa ja korjaa
+// tilanteen seuraavan kerran kun appi avataan.
+self.addEventListener('pushsubscriptionchange', event => {
+  event.waitUntil(
+    self.registration.pushManager.subscribe({
+      userVisibleOnly: true,
+      applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY),
+    }).then(() => self.clients.matchAll())
+      .then(clientList => clientList.forEach(client => client.postMessage({ type: 'push-resubscribed' })))
+      .catch(err => console.error('Push-uudelleentilaus epäonnistui:', err))
   );
 });
 

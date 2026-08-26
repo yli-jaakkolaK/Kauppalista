@@ -956,7 +956,6 @@
     <hr class="divider">
 
     <div class="section-title">👤 Tili</div>
-    <p class="section-empty" id="tili-sposti">Tarkistetaan...</p>
     <button class="login-btn settings-action-btn" id="asetukset-signout-btn">Kirjaudu ulos</button>
 
     <hr class="divider">
@@ -964,23 +963,34 @@
     <div class="section-title">🔔 Ilmoitukset</div>
     <p class="section-empty" id="push-tila-teksti">Tarkistetaan...</p>
     <button class="login-btn settings-action-btn" id="push-lupa-btn" style="display:none">Salli ilmoitukset</button>
-    <button class="login-btn settings-action-btn" id="push-testi-btn" style="display:none">Lähetä testi-ilmoitus</button>
 
     <hr class="divider">
 
-    <!-- Versio+päivitys+synkka+äly-testi koottu YHDEKSI 📱 Sovellus
-         -osioksi (2026-08-25, rakenneuudistus) — versiorivi oli aiemmin
-         oma erillinen kappaleensa sivun yläreunassa ilman otsikkoa
-         ("ensin nähtävä tieto"), nyt osa samaa toiminto-osiota jonka
-         kanssa se sisällöllisesti kuuluu yhteen. Yhä sivun yläosassa,
-         ei koskaan Lisäasetusten collapse-taakse. -->
+    <!-- Ruokatauko siirretty tänne sivun yläosaan (2026-08-26, Katrin
+         pyyntö) — nämä kaksi kenttää haetaan usein tarpeen mukaan, toisin
+         kuin loput 🕐 Hytin ikkunat -kentät jotka pysyvät kertaluontoisena
+         viritteenä ⚙️ Lisäasetusten alla (ks. sinne jäänyt kommentti). -->
+    <div class="section-title">🍽️ Ruokatauko</div>
+    <div class="settings-row">
+      <span>Aterian alku</span>
+      <input type="time" class="settings-numero-input" id="aterian-alku-input">
+    </div>
+    <div class="settings-row">
+      <span>Aterian kesto (min)</span>
+      <input type="number" class="settings-numero-input" id="aterian-kesto-input" min="1" step="1">
+    </div>
+
+    <hr class="divider">
+
+    <!-- Versio+päivitys koottu 📱 Sovellus-osioksi (2026-08-25, rakenne-
+         uudistus), sivun yläosassa koska sitä kosketetaan silloin tällöin.
+         Synkka/äly-testi siirretty ⚙️ Lisäasetuksiin 2026-08-26 (Katrin
+         pyyntö: nämä ovat diagnostiikkaa, ei tarvitse näkyä etusivulla) —
+         tili-sposti ja "Lähetä testi-ilmoitus" samasta syystä samalla,
+         ks. ⚙️ Lisäasetukset. -->
     <div class="section-title">📱 Sovellus</div>
     <p class="section-empty" id="sovellus-versio">Tarkistetaan...</p>
     <button class="login-btn settings-action-btn" id="sovellus-paivita-btn">Päivitä sovellus</button>
-    <p class="section-empty" id="sovellus-synkka-tila">Tarkistetaan...</p>
-    <button class="login-btn settings-action-btn" id="sovellus-synkkaa-btn">Hae kalenteri nyt</button>
-    <button class="login-btn settings-action-btn" id="aly-testi-btn">Testaa äly</button>
-    <p class="section-empty" id="aly-testi-tulos" style="display:none"></p>
 
     <hr class="divider">
 
@@ -1061,6 +1071,20 @@
          Sisältö on muuten TÄYSIN entisellään, vain siirretty tänne. -->
     <details id="asetukset-lisa-details">
       <summary class="section-title asetukset-lisa-summary">⚙️ Lisäasetukset</summary>
+
+      <!-- Diagnostiikka (2026-08-26, siirretty tänne etusivulta Katrin
+           pyynnöstä) — tili/synkka/äly-testi ja testi-ilmoitus tarvitaan
+           vain silloin kun jotain ollaan selvittämässä, ei jatkuvaan
+           katseluun etusivulla. -->
+      <div class="section-title">🔧 Diagnostiikka</div>
+      <p class="section-empty" id="tili-sposti">Tarkistetaan...</p>
+      <button class="login-btn settings-action-btn" id="push-testi-btn" style="display:none">Lähetä testi-ilmoitus</button>
+      <p class="section-empty" id="sovellus-synkka-tila">Tarkistetaan...</p>
+      <button class="login-btn settings-action-btn" id="sovellus-synkkaa-btn">Hae kalenteri nyt</button>
+      <button class="login-btn settings-action-btn" id="aly-testi-btn">Testaa äly</button>
+      <p class="section-empty" id="aly-testi-tulos" style="display:none"></p>
+
+      <hr class="divider">
 
       <div class="section-title">⚠️ Ristiriitapaketti</div>
       <div class="settings-row">
@@ -1147,16 +1171,10 @@
 
       <!-- Hytin ikkunat (2026-08-10, ks. HYTTI_SPEKSI.md §4.5/§4.5b, sql/112)
            — Vaihe 1a: pelkkä tallennus/hallinta, generaattori (Vaihe 3) ei
-           vielä lue näitä mihinkään. -->
+           vielä lue näitä mihinkään. Aterian alku/kesto siirretty pois
+           tästä 2026-08-26 (Katrin pyyntö, ne haetaan usein) — ks. 🍽️
+           Ruokatauko sivun yläosassa, samat elementti-id:t, sama sidonta. -->
       <div class="section-title">🕐 Hytin ikkunat</div>
-      <div class="settings-row">
-        <span>Aterian alku</span>
-        <input type="time" class="settings-numero-input" id="aterian-alku-input">
-      </div>
-      <div class="settings-row">
-        <span>Aterian kesto (min)</span>
-        <input type="number" class="settings-numero-input" id="aterian-kesto-input" min="1" step="1">
-      </div>
 
       <!-- Arkipäivien pikatäyttö (2026-08-18, Katrin palaute: "9.15-15.30 on
            opiskeluaika... toi taitaa olla asetuksissa säädettävissä mut ei

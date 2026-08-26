@@ -1182,6 +1182,14 @@ function kohdeVaihe(kohde) {
   return kohde.pero_vaihe !== undefined ? kohde.pero_vaihe : kohde.vaihe;
 }
 
+// Sama erottelu kuin kohdeVaihe(), nimettynä — käytetään Tehtävänäkymässä
+// (avaaOpintoTehtava ym.) päättämään mihin tauluun/kenttiin kirjoitetaan,
+// koska "silta" (taitosolmu) ei jaa opinto_aiheet:n uudempia kenttiä
+// (pero_vaihe, pacer_paatyyppi, priming_tehty, retrieval_kierrokset...).
+function onkoTaitosolmu(kohde) {
+  return kohde.pero_vaihe === undefined;
+}
+
 // Kokonaiskartan kolme väriryhmää (2c:n speksi: "hallussa/työn alla/edessä").
 // kertausjonossa (2026-08-10, vain opinto_aiheet) korvaa vanhan
 // "vaihe==='yllapito'"-tarkistuksen tässä — solmu joka on kertausjonossa on
@@ -1708,6 +1716,12 @@ async function avaaOpintoTehtava(aihe, paivanAskel) {
   paivitaOpintoTehtavaMateriaali();
   paivitaOpintoTehtavaPerustussolmuNappi();
   document.getElementById('opinto-tehtava-jumi-vastaus').style.display = 'none';
+  // Perustussolmu ja "En pääse alkuun" ovat opinto_aiheet-kenttiä/-tauluja
+  // (ei taitosolmuilla vastinetta, ks. onkoTaitosolmu-kommentti) — piilotettu
+  // kokonaan sillalle sen sijaan että napautus kirjoittaisi vahingossa
+  // väärään tauluun.
+  document.getElementById('opinto-tehtava-perustussolmu-btn').style.display = onkoTaitosolmu(aihe) ? 'none' : '';
+  document.getElementById('opinto-tehtava-jumi-btn').style.display = onkoTaitosolmu(aihe) ? 'none' : '';
 
   // Ajanotto: automaattinen alku. Session-loki EI salli kahta samanaikaista
   // avointa istuntoa (haeKeskenaOlevaSessio-periaate) — jos jokin muu istunto
@@ -1718,8 +1732,14 @@ async function avaaOpintoTehtava(aihe, paivanAskel) {
     await db.from('opinto_sessiot').update({ loppui_at: new Date().toISOString() }).eq('id', kesken.id);
   }
   const alkoiAt = new Date().toISOString();
+  // Silta (taitosolmu) kirjataan taitosolmu_id-sarakkeeseen, ei aihe_id:hen —
+  // muuten sessio joko rikkoisi FK:n tai (pahempi) osuisi vahingossa
+  // samalla numerolla olevaan opinto_aiheet-riviin (2026-08-26, Katrin
+  // löytämä bugi: sillan opiskeluaika ei tallentunut minnekään).
+  const sessioRivi = { owner_id: currentUserId, vaihe: kohdeVaihe(aihe), alkoi_at: alkoiAt };
+  sessioRivi[onkoTaitosolmu(aihe) ? 'taitosolmu_id' : 'aihe_id'] = aihe.id;
   const { data: uusiSessio, error } = await db.from('opinto_sessiot')
-    .insert({ owner_id: currentUserId, vaihe: aihe.pero_vaihe, aihe_id: aihe.id, alkoi_at: alkoiAt })
+    .insert(sessioRivi)
     .select().single();
   if (error) {
     console.error('Tehtävänäkymän ajanoton aloitus epäonnistui:', error);
@@ -1767,9 +1787,13 @@ document.getElementById('opinto-tehtava-back-btn').addEventListener('click', fun
 });
 
 function paivitaOpintoTehtavaOtsikko() {
-  document.getElementById('opinto-tehtava-title').textContent = currentOpintoAihe.name;
-  const tyyppiNimi = currentOpintoAihe.pacer_paatyyppi ? PACER_TYYPPI_NIMET[currentOpintoAihe.pacer_paatyyppi] : 'Tyyppi asettamatta';
-  document.getElementById('opinto-tehtava-tyyppi-vaihe').textContent = tyyppiNimi + ' · ' + OPINTO_VAIHE_NIMET[currentOpintoAihe.pero_vaihe];
+  const aihe = currentOpintoAihe;
+  document.getElementById('opinto-tehtava-title').textContent = aihe.name;
+  const vaiheNimi = OPINTO_VAIHE_NIMET[kohdeVaihe(aihe)];
+  // PACER-tyyppi on opinto_aiheet-käsite, silloilla ei sitä ole — näytetään
+  // silloin pelkkä vaihe eikä harhaanjohtavaa "Tyyppi asettamatta".
+  const teksti = onkoTaitosolmu(aihe) ? vaiheNimi : (aihe.pacer_paatyyppi ? PACER_TYYPPI_NIMET[aihe.pacer_paatyyppi] : 'Tyyppi asettamatta') + ' · ' + vaiheNimi;
+  document.getElementById('opinto-tehtava-tyyppi-vaihe').textContent = teksti;
 }
 
 // Retrieval: kierros = tehdyt kierrokset + 1 (seuraava tehtävä kierros),
@@ -1797,9 +1821,17 @@ async function paivitaOpintoTehtavaOhje() {
 
   const naytaYleisohje = function() {
     listEl.innerHTML = '';
-    tyhjaEl.textContent = OPINTO_VAIHE_OHJE[aihe.pero_vaihe] || '';
+    tyhjaEl.textContent = OPINTO_VAIHE_OHJE[kohdeVaihe(aihe)] || '';
     tyhjaEl.style.display = 'block';
   };
+
+  // Ohjematriisi on PACER-tyyppikohtainen (opinto_aiheet-käsite) — sillalla
+  // ei ole pacer_paatyyppi:ä eikä ohjematriisirivejä koskaan, joten se saa
+  // aina yleisohjeen sen omasta vaihe-kentästä, ei tyhjää (2026-08-26).
+  if (onkoTaitosolmu(aihe)) {
+    naytaYleisohje();
+    return;
+  }
 
   if (aihe.pero_vaihe !== 'priming' && aihe.pero_vaihe !== 'reference' && !aihe.pacer_paatyyppi) {
     naytaYleisohje();
@@ -1903,8 +1935,11 @@ document.getElementById('opinto-tehtava-ai-prompti-btn').addEventListener('click
 // -funktiosta, päivittää vain oman kehyksensä kun/jos valmistuu.
 async function paivitaOpintoTehtavaMiroKoukku() {
   const aihe = currentOpintoAihe;
-  const vaihe = aihe.pero_vaihe;
   const kehys = document.getElementById('opinto-tehtava-miro-koukku');
+  // Miro-Frame on kurssikohtainen (opinto_aiheet.kurssi_id) — silloilla ei
+  // ole kurssia eikä Frame-mappausta, piilotetaan aina.
+  if (onkoTaitosolmu(aihe)) { kehys.style.display = 'none'; return; }
+  const vaihe = aihe.pero_vaihe;
   if (vaihe !== 'encoding' && vaihe !== 'overlearning' && vaihe !== 'retrieval') {
     kehys.style.display = 'none';
     kehys.innerHTML = '';
@@ -2043,7 +2078,7 @@ function paivitaOpintoTehtavaPerustussolmuNappi() {
 }
 
 document.getElementById('opinto-tehtava-perustussolmu-btn').addEventListener('click', async function() {
-  if (!currentOpintoAihe) return;
+  if (!currentOpintoAihe || onkoTaitosolmu(currentOpintoAihe)) return;
   const uusi = !currentOpintoAihe.perustussolmu;
   const { error } = await db.from('opinto_aiheet').update({ perustussolmu: uusi }).eq('id', currentOpintoAihe.id);
   if (ilmoitaKirjoitusvirheesta(error, 'Perustussolmu-merkinnän tallennus')) return;
@@ -2065,12 +2100,17 @@ function paivitaOpintoTehtavaKierros() {
 function paivitaOpintoTehtavaMuutVaiheet() {
   const listEl = document.getElementById('opinto-tehtava-vaihe-lista');
   listEl.innerHTML = '';
-  const nykyinenIdx = PERO_VAIHE_JARJESTYS.indexOf(currentOpintoAihe.pero_vaihe);
-  PERO_VAIHE_JARJESTYS.forEach(function(v, i) {
+  const aihe = currentOpintoAihe;
+  // Silta (taitosolmu) käyttää OPINTO_VAIHE_JARJESTYS:ää (päättyy 'yllapito'),
+  // aihe PERO_VAIHE_JARJESTYS:ää (päättyy 'overlearning') — ks. onkoTaitosolmu.
+  const jarjestys = onkoTaitosolmu(aihe) ? OPINTO_VAIHE_JARJESTYS : PERO_VAIHE_JARJESTYS;
+  const nykyinenVaihe = kohdeVaihe(aihe);
+  const nykyinenIdx = jarjestys.indexOf(nykyinenVaihe);
+  jarjestys.forEach(function(v, i) {
     const li = document.createElement('li');
-    li.className = 'opinto-tehtava-muu-vaihe' + (v === currentOpintoAihe.pero_vaihe ? ' nykyinen' : '');
+    li.className = 'opinto-tehtava-muu-vaihe' + (v === nykyinenVaihe ? ' nykyinen' : '');
     const teksti = document.createElement('span');
-    teksti.textContent = (i < nykyinenIdx ? '✓ ' : v === currentOpintoAihe.pero_vaihe ? '▶ ' : '· ') + OPINTO_VAIHE_NIMET[v];
+    teksti.textContent = (i < nykyinenIdx ? '✓ ' : v === nykyinenVaihe ? '▶ ' : '· ') + OPINTO_VAIHE_NIMET[v];
     li.appendChild(teksti);
     // Paluu aiempaan vaiheeseen (2026-08-18, Katrin palaute: "mitä jos
     // vahingossa painaa opiskelluksi? klikkaamalla edellistä vaihetta...
@@ -2084,11 +2124,12 @@ function paivitaOpintoTehtavaMuutVaiheet() {
   });
 }
 
-// Palaa aiempaan PERO-vaiheeseen (2026-08-18) — korjaa vahingossa liian
-// pitkälle edenneen aiheen ilman että historiaa tuhotaan tarpeettomasti:
-// nollaa VAIN 'reference'-siirtymän liput (reference_tehty/kertausjonossa,
-// asetettu etenetaOpintoKohde():ssa juuri reference-vaiheeseen tultaessa)
-// jos palataan sitä edeltävään vaiheeseen. retrieval_kierrokset/sr_*-kentät
+// Palaa aiempaan vaiheeseen (2026-08-18, laajennettu 2026-08-26 kattamaan
+// myös sillat) — korjaa vahingossa liian pitkälle edenneen kohteen ilman
+// että historiaa tuhotaan tarpeettomasti: nollaa VAIN 'reference'-siirtymän
+// liput (reference_tehty/kertausjonossa, aihe-only, asetettu
+// etenetaOpintoKohde():ssa juuri reference-vaiheeseen tultaessa) jos
+// palataan sitä edeltävään vaiheeseen. retrieval_kierrokset/sr_*-kentät
 // jätetään koskematta — ne kuvaavat toteutunutta kertaushistoriaa, joka on
 // yhä totta vaikka vaihe palautetaan, ei jotain jota "vahinko" mitätöisi.
 async function palaaOpintoVaiheeseen(vaihe) {
@@ -2101,16 +2142,21 @@ async function palaaOpintoVaiheeseen(vaihe) {
   );
   if (!vahvistus) return;
 
-  const paivitys = { pero_vaihe: vaihe };
-  const referenceIdx = PERO_VAIHE_JARJESTYS.indexOf('reference');
-  if (PERO_VAIHE_JARJESTYS.indexOf(vaihe) < referenceIdx) {
-    paivitys.reference_tehty = false;
-    paivitys.kertausjonossa = false;
+  if (onkoTaitosolmu(aihe)) {
+    const { error } = await db.from('taitosolmut').update({ vaihe: vaihe }).eq('id', aihe.id);
+    if (ilmoitaKirjoitusvirheesta(error, 'Sillan vaiheeseen palaaminen')) return;
+    aihe.vaihe = vaihe;
+  } else {
+    const paivitys = { pero_vaihe: vaihe };
+    const referenceIdx = PERO_VAIHE_JARJESTYS.indexOf('reference');
+    if (PERO_VAIHE_JARJESTYS.indexOf(vaihe) < referenceIdx) {
+      paivitys.reference_tehty = false;
+      paivitys.kertausjonossa = false;
+    }
+    const { error } = await db.from('opinto_aiheet').update(paivitys).eq('id', aihe.id);
+    if (ilmoitaKirjoitusvirheesta(error, 'Vaiheeseen palaaminen')) return;
+    Object.assign(aihe, paivitys);
   }
-
-  const { error } = await db.from('opinto_aiheet').update(paivitys).eq('id', aihe.id);
-  if (ilmoitaKirjoitusvirheesta(error, 'Vaiheeseen palaaminen')) return;
-  Object.assign(aihe, paivitys);
   naytaIlmoitus('Palautettu vaiheeseen: ' + OPINTO_VAIHE_NIMET[vaihe]);
 
   paivitaOpintoTehtavaOtsikko();
@@ -2121,13 +2167,20 @@ async function palaaOpintoVaiheeseen(vaihe) {
 }
 
 function paivitaOpintoTehtavaMateriaali() {
+  const aihe = currentOpintoAihe;
   const el = document.getElementById('opinto-tehtava-materiaali');
-  if (currentOpintoAihe.materiaali) {
+  // Silloilla ei ole materiaali-kenttää — sama rooli on linkki-kentällä
+  // (sama kaava kuin naytaOpintoOhje: kohde.materiaali || kohde.linkki).
+  const linkki = aihe.materiaali || aihe.linkki;
+  if (linkki) {
     el.style.display = 'block';
-    el.textContent = '🔗 ' + currentOpintoAihe.materiaali;
+    el.textContent = '🔗 ' + linkki;
   } else {
     el.style.display = 'none';
   }
+  // "Kurssin materiaalit →" ei koske siltoja (ei kurssi_id:tä) — piilotettu
+  // ettei nappi lupaa jotain mitä ei ole.
+  document.getElementById('opinto-tehtava-kurssi-materiaali-linkki').style.display = onkoTaitosolmu(aihe) ? 'none' : '';
 }
 
 // "Kurssin materiaalit →" (2026-08-18 bugikorjaus, Katrin havainto: "ku
@@ -2163,6 +2216,41 @@ document.getElementById('opinto-tehtava-valmis-btn').addEventListener('click', a
     const { error: askelError } = await db.from('opinto_paivan_askeleet')
       .update({ tila: 'tehty' }).eq('id', currentOpintoTehtavaPaivanAskel.id);
     if (askelError) console.error('Päivän askeleen kuittaus epäonnistui:', askelError);
+  }
+
+  // Yksi totuus -korjaus (2026-08-26, Katrin havaitsema ristiriita: Ruori
+  // näytti kohteen yhä "tänään tarjolla" -tilassa vaikka se oli jo edistynyt
+  // Reitin kautta) — Reitti-sivulta avattaessa currentOpintoTehtavaPaivanAskel
+  // on aina null, joten ilman tätä mikään päivän askelrivi ei koskaan
+  // sulkeutunut kun kohde edistyi sitä kautta. Suljetaan siis KAIKKI tälle
+  // kohteelle vielä auki olevat 'tarjolla'-rivit (miltä tahansa päivältä),
+  // ei vain se jolla tämä näkymä avattiin.
+  const { error: muutAskeleetError } = await db.from('opinto_paivan_askeleet')
+    .update({ tila: 'tehty' })
+    .eq(onkoTaitosolmu(aihe) ? 'taitosolmu_id' : 'aihe_id', aihe.id)
+    .eq('tila', 'tarjolla');
+  if (muutAskeleetError) console.error('Muiden päivien askelrivien sulkeminen epäonnistui:', muutAskeleetError);
+
+  // Silta (taitosolmu) — vanha, yksinkertaisempi malli (ei PACER-kierroksia/
+  // reference_tehty-lippuja). Käyttää SAMAA etenetaOpintoKohde/
+  // seuraavaOpintoVaiheKuvaus-paria kuin muukin sovellus (esim.
+  // merkitseOpintoAskel) sen sijaan että vaiheenvaihto kirjoitettaisiin
+  // toiseen kertaan tässä eri tavalla.
+  if (onkoTaitosolmu(aihe)) {
+    const kuvaus = seuraavaOpintoVaiheKuvaus(aihe);
+    if (!kuvaus) {
+      naytaIlmoitus('Merkitty — ei etene tästä automaattisesti tässä vaiheessa');
+      return;
+    }
+    await etenetaOpintoKohde(aihe, 'taitosolmut');
+    const { data: paivitetty, error: hakuError } = await db.from('taitosolmut').select().eq('id', aihe.id).single();
+    if (hakuError) { console.error('Sillan päivitetyn tilan haku epäonnistui:', hakuError); return; }
+    Object.assign(aihe, paivitetty);
+    naytaIlmoitus('Siirtyi vaiheeseen: ' + kuvaus);
+    paivitaOpintoTehtavaOtsikko();
+    await paivitaOpintoTehtavaOhje();
+    paivitaOpintoTehtavaMuutVaiheet();
+    return;
   }
 
   if (aihe.pero_vaihe === 'overlearning') {
@@ -2214,7 +2302,11 @@ document.getElementById('opinto-tehtava-valmis-btn').addEventListener('click', a
 // (sql/124), ei älyä. Näkymä/analyysi on B-osan laajuutta, ei tässä.
 document.getElementById('opinto-tehtava-jumi-btn').addEventListener('click', async function() {
   const aihe = currentOpintoAihe;
-  if (!aihe) return;
+  // opinto_jumi_merkinnat.aihe_id on NOT NULL eikä taulussa ole
+  // taitosolmu_id-saraketta — silloille (taitosolmuille) ei siis ole vielä
+  // tukea tässä, piilotettu napista (avaaOpintoTehtava) mutta suojattu
+  // tässäkin ettei kirjoitus koskaan osu vahingossa väärään aihe_id:hen.
+  if (!aihe || onkoTaitosolmu(aihe)) return;
   const aikaKaytettyS = opintoTehtavaAlkoiAt ? Math.round((Date.now() - new Date(opintoTehtavaAlkoiAt).getTime()) / 1000) : null;
   const { error } = await db.from('opinto_jumi_merkinnat').insert({
     owner_id: currentUserId, aihe_id: aihe.id, pero_vaihe: aihe.pero_vaihe, pacer_tyyppi: aihe.pacer_paatyyppi,
@@ -4092,17 +4184,16 @@ function laskeNytPerustelu(rivi) {
   return null; // muut ehdot (palautus 3-5pv, kevyt kuorma) lasketaan piirraNytLoki:n kutsujassa tarvittaessa
 }
 
-// Kohteen avaus Nyt-lokista — aihe (opinto_aiheet) avaa uuden
-// A4-Tehtävänäkymän (§4.9, automaattinen ajanotto). Taitosolmu (silta) EI
-// vielä ole siirretty samaan malliin (eri, vanhempi tietomuoto — ei
-// pero_vaihe/pacer_paatyyppi/retrieval_kierrokset-kenttiä, ks. sql/092) —
-// tarkoituksellinen rajaus, sama kuin muuallakin sovelluksessa (Vaihe 2).
+// Kohteen avaus Nyt-lokista — sekä aihe (opinto_aiheet) että silta
+// (taitosolmu) avaavat saman A4-Tehtävänäkymän (§4.9, automaattinen
+// ajanotto). Ennen 2026-08-26 silta avasi vain kevyen naytaOpintoOhje-
+// esikatseludialogin (Peru/Sulje) — Katrin havainto: silloin ei
+// käynnistynyt mitään ajanottoa eikä "✓ Merkitse tehdyksi" ollut edes
+// saatavilla, joten sillan opiskeluun käytetty aika ei koskaan tallentunut
+// mihinkään. avaaOpintoTehtava ja sen alifunktiot on tehty tyyppitietoisiksi
+// (ks. kohdeVaihe, onkoTaitosolmu) juuri tätä varten.
 function avaaNytKortinKohde(rivi) {
-  if (rivi.askel.opinto_aiheet) {
-    avaaOpintoTehtava(rivi.kohde, rivi.askel);
-  } else {
-    naytaOpintoOhje(rivi.vaihe, rivi.kohde);
-  }
+  avaaOpintoTehtava(rivi.kohde, rivi.askel);
 }
 
 // Boost (§4.8) — täydennys/päiväkaton ylitysmekanismi, EI suunnitelman
@@ -4976,17 +5067,13 @@ document.getElementById('kasitekartta-tyhjenna-btn').addEventListener('click', a
 
 const kasitekarttaCanvasEl = document.getElementById('kasitekartta-canvas');
 kasitekarttaCanvasEl.addEventListener('pointerdown', function(e) {
-  if (kasitekarttaTyokalu === 'teksti') {
-    const wrap = document.getElementById('kasitekartta-wrap');
-    const wrapRect = wrap.getBoundingClientRect();
-    const laatikko = luoKasitekarttaTekstilaatikko(
-      (e.clientX - wrapRect.left) / wrapRect.width * 100,
-      (e.clientY - wrapRect.top) / wrapRect.height * 100,
-      ''
-    );
-    laatikko.focus();
-    return;
-  }
+  // Tekstilaatikko luodaan ja fokusoidaan VASTA pointerup:ssa (2026-08-26,
+  // Katrin löytämä bugi: ei pystynyt kirjoittamaan juuri luotuun laatikkoon
+  // ollenkaan) — iOS Safari avaa näppäimistön luotettavasti vain kun
+  // .focus() kutsutaan valmiiksi päättyneen napautuksen (pointerup/click)
+  // yhteydessä, ei kesken olevan pointerdown:in, joten alkuperäinen versio
+  // toimi työpöydällä muttei kosketusnäytöllä.
+  if (kasitekarttaTyokalu === 'teksti') return;
   kasitekarttaPiirtaa = true;
   const ctx = kasitekarttaCtx();
   const piste = kasitekarttaPisteesta(e);
@@ -5004,7 +5091,18 @@ kasitekarttaCanvasEl.addEventListener('pointermove', function(e) {
   ctx.lineTo(piste.x, piste.y);
   ctx.stroke();
 });
-kasitekarttaCanvasEl.addEventListener('pointerup', function() { kasitekarttaPiirtaa = false; });
+kasitekarttaCanvasEl.addEventListener('pointerup', function(e) {
+  kasitekarttaPiirtaa = false;
+  if (kasitekarttaTyokalu !== 'teksti') return;
+  const wrap = document.getElementById('kasitekartta-wrap');
+  const wrapRect = wrap.getBoundingClientRect();
+  const laatikko = luoKasitekarttaTekstilaatikko(
+    (e.clientX - wrapRect.left) / wrapRect.width * 100,
+    (e.clientY - wrapRect.top) / wrapRect.height * 100,
+    ''
+  );
+  laatikko.focus();
+});
 kasitekarttaCanvasEl.addEventListener('pointercancel', function() { kasitekarttaPiirtaa = false; });
 
 document.getElementById('kasitekartta-tallenna-btn').addEventListener('click', async function() {
@@ -14321,6 +14419,22 @@ function urlBase64ToUint8Array(base64String) {
   return outputArray;
 }
 
+// Kirjoittaa tilauksen push_tilaukset-tauluun. Yhteinen sekä käsin
+// hyväksyttävälle tilaukselle (pyydaIlmoitusLupa) että hiljaiselle
+// itsekorjaukselle (paivitaPushTila, sw.js:n 'push-resubscribed' -viesti) —
+// sama upsert-kirjoitus riippumatta mistä tilaus tuli.
+async function tallennaPushTilaus(tilaus) {
+  const json = tilaus.toJSON();
+  const { error } = await db.from('push_tilaukset').upsert({
+    user_id: currentUserId,
+    endpoint: json.endpoint,
+    p256dh: json.keys.p256dh,
+    auth: json.keys.auth,
+  }, { onConflict: 'endpoint' });
+  if (error) console.error('Push-tilauksen tallennus epäonnistui:', error);
+  return error;
+}
+
 // Päivittää Asetukset-näkymän ilmoitustekstin ja nappien näkyvyyden.
 async function paivitaPushTila() {
   const teksti = document.getElementById('push-tila-teksti');
@@ -14342,7 +14456,29 @@ async function paivitaPushTila() {
   }
 
   const rekisterointi = await navigator.serviceWorker.ready;
-  const tilaus = await rekisterointi.pushManager.getSubscription();
+  let tilaus = await rekisterointi.pushManager.getSubscription();
+
+  // Itsekorjaus (2026-08-26, Katri joutui toistuvasti painamaan "Salli
+  // ilmoitukset" uudelleen sekä koneella että puhelimella): selain voi
+  // pudottaa tilauksen hiljaa vaikka lupa on yhä 'granted' (esim. push-
+  // palvelun sisäinen tilauskierrätys ilman että sw.js:n
+  // pushsubscriptionchange-kuuntelija ehti reagoida). subscribe() EI vaadi
+  // tuoretta käyttäjän elettä kun lupa on JO myönnetty (vain
+  // requestPermission() vaatii sen), joten tilaus voidaan luoda hiljaa
+  // uudelleen aina kun Asetukset-näkymä avataan sen sijaan että pakotetaan
+  // käyttäjä huomaamaan ja painamaan nappia.
+  if (Notification.permission === 'granted' && !tilaus) {
+    try {
+      tilaus = await rekisterointi.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY),
+      });
+      await tallennaPushTilaus(tilaus);
+    } catch (e) {
+      console.error('Push-tilauksen itsekorjaus epäonnistui:', e.message);
+      tilaus = null;
+    }
+  }
 
   if (Notification.permission === 'granted' && tilaus) {
     teksti.textContent = 'Ilmoitukset ovat käytössä tällä laitteella.';
@@ -14353,6 +14489,19 @@ async function paivitaPushTila() {
     lupaNappi.style.display = 'block';
     testiNappi.style.display = 'none';
   }
+}
+
+// sw.js:n pushsubscriptionchange-kuuntelija tilaa selaimen puolesta
+// uudelleen mutta ei voi itse kirjoittaa Supabaseen (ei kirjautuneen
+// käyttäjän tokenia service workerin puolella) — se pyytää tätä auki
+// olevaa sivua tekemään kirjoituksen sen sijaan.
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.addEventListener('message', async function(e) {
+    if (!e.data || e.data.type !== 'push-resubscribed') return;
+    const rekisterointi = await navigator.serviceWorker.ready;
+    const tilaus = await rekisterointi.pushManager.getSubscription();
+    if (tilaus) await tallennaPushTilaus(tilaus);
+  });
 }
 
 // Kutsutaan VAIN napin klikkauksesta — iOS vaatii että lupakysely lähtee
@@ -14381,16 +14530,8 @@ async function pyydaIlmoitusLupa() {
       applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY),
     });
 
-    const json = tilaus.toJSON();
-    const { error } = await db.from('push_tilaukset').upsert({
-      user_id: currentUserId,
-      endpoint: json.endpoint,
-      p256dh: json.keys.p256dh,
-      auth: json.keys.auth,
-    }, { onConflict: 'endpoint' });
-
+    const error = await tallennaPushTilaus(tilaus);
     if (error) {
-      console.error('Push-tilauksen tallennus epäonnistui:', error);
       document.getElementById('push-tila-teksti').textContent = 'Tilauksen tallennus epäonnistui, yritä uudelleen.';
       return;
     }
