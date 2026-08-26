@@ -9711,7 +9711,12 @@ async function loadAnchorCandidates() {
       aikaInput.type = 'time';
       aikaInput.value = candidate.event_time.slice(0, 5);
       const tallennaNappi = document.createElement('button');
-      tallennaNappi.textContent = 'Tallenna';
+      // "Tallenna ja hyväksy", ei pelkkä "Tallenna" (2026-08-26, Katrin
+      // löytämä epäselvyys) — nappi todella myös hyväksyy uuden ajan omalta
+      // puolelta samalla kertaa (ks. yllä oleva kommentti/api/parisuhdeaika.js:n
+      // muokkaa()), pelkkä "Tallenna" antoi virheellisen kuvan ettei tämä
+      // laskisi hyväksynnäksi.
+      tallennaNappi.textContent = 'Tallenna ja hyväksy';
       tallennaNappi.className = 'dialog-btn';
       const peruutaNappi = document.createElement('button');
       peruutaNappi.textContent = 'Peruuta';
