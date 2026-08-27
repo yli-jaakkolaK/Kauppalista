@@ -141,11 +141,36 @@ async function supabaseFetch(polku, valinnat) {
 // getDate()-haku siirtäisi päivämäärän yhdellä taaksepäin (todennettu käsin
 // ennen tämän tiedoston kirjoittamista). Ajallisille tapahtumille kellonaika
 // muunnetaan Suomen aikaan Intl:llä, ei palvelimen omalla aikavyöhykkeellä.
+//
+// BUGIKORJAUS (2026-08-27, Katrin löytämä: Lukkarikoneen 10-12/13-15 näkyi
+// Satamassa 13-15/16-18, täsmälleen +3h siirtymä): Lukkarikone (ja moni muu
+// suomalainen lukujärjestelmä/LMS) ei koskaan merkitse VEVENTin DTSTARTiin
+// aikavyöhykettä ollenkaan ("floating" time, ei Z-loppua eikä TZID-viittausta)
+// — luvut OVAT jo Suomen kellonaikaa sellaisenaan (RFC 5545: floating time
+// tulkitaan "kalenterin käyttäjän omassa aikavyöhykkeessä", ja tämän sovelluksen
+// ainoa käyttäjäkunta on Suomessa). ical.js:n toJSDate() EI tiedä tätä —
+// floating-ajalle se olettaa luvut ajoympäristön OMAKSI paikalliseksi ajaksi,
+// ja koska Vercel ajaa UTC:ssä, "10:00" tulkittiin "10:00 UTC:ssä" ja
+// muunnettiin SITTEN vielä +3h (kesäaika) Helsinkiin — todennettu käsin
+// pakottamalla TZ=UTC paikallisesti ennen korjausta, täsmäsi bugiin täydellisesti.
+// Kehittäjän omalla koneella (Suomen aikavyöhyke) tämä ei koskaan näkynyt,
+// koska floating->UTC->Helsinki-kierros sattui menemään oikein vain silloin.
+// Korjaus: floating-ajalle luetaan komponentit SUORAAN kuten isDate-haaralla,
+// EI reititetä JS Date/Intl:n kautta ollenkaan. Oikeasti aikavyöhykkeellisille
+// (Z-loppuinen UTC tai TZID-viitattu, esim. iCloud/Itslearning) alempi
+// Intl-muunnos toimii edelleen muuttumattomana — testattu kaikki kolme
+// tapausta erikseen ennen käyttöönottoa.
 function pvmJaAika(hetki) {
   if (hetki.isDate) {
     return {
       event_date: hetki.year + '-' + String(hetki.month).padStart(2, '0') + '-' + String(hetki.day).padStart(2, '0'),
       event_time: null,
+    };
+  }
+  if (!hetki.zone || hetki.zone.tzid === 'floating') {
+    return {
+      event_date: hetki.year + '-' + String(hetki.month).padStart(2, '0') + '-' + String(hetki.day).padStart(2, '0'),
+      event_time: String(hetki.hour).padStart(2, '0') + ':' + String(hetki.minute).padStart(2, '0') + ':00',
     };
   }
   const jsHetki = hetki.toJSDate();
