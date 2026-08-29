@@ -108,6 +108,16 @@ const OSIO_SLUGIT = {
   },
   'calculus-volume-2': {
     '4.1': '4-1-basics-of-differential-equations',
+    '6.3': '6-3-taylor-and-maclaurin-series',
+  },
+  'introductory-statistics-2e': {
+    '2.3': '2-3-measures-of-the-location-of-the-data',
+    '2.5': '2-5-measures-of-the-center-of-the-data',
+    '4.1': '4-1-probability-distribution-function-pdf-for-a-discrete-random-variable',
+    '6.1': '6-1-the-standard-normal-distribution',
+    '8.1': '8-1-a-single-population-mean-using-the-normal-distribution',
+    '9.6': '9-6-hypothesis-testing-of-a-single-mean-and-single-proportion',
+    '11.1': '11-1-facts-about-the-chi-square-distribution',
   },
   // Discrete-matiikka-aiheille ei ole omaa OpenStax-kirjaa — Contemporary
   // Mathematics kattaa logiikan, lukuteorian ja graafiteorian yhdessä
