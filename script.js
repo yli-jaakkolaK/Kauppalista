@@ -2363,7 +2363,10 @@ async function lataaOpintoKurssinDeadlinet() {
   (data || []).forEach(function(dl) {
     const li = document.createElement('li');
     const teksti = document.createElement('span');
-    teksti.textContent = (dl.tyyppi === 'koe' ? '📝 Koe' : '📤 Palautus') + ' — ' + muotoileOpintoPvm(dl.pvm);
+    // nimi on valinnainen (sql/141) — annettuna korvaa geneerisen "Koe"/
+    // "Palautus"-sanan (tyyppi näkyy silti emojista), muuten ennallaan.
+    const tyyppiSana = dl.tyyppi === 'koe' ? 'Koe' : 'Palautus';
+    teksti.textContent = (dl.tyyppi === 'koe' ? '📝 ' : '📤 ') + (dl.nimi ? dl.nimi : tyyppiSana) + ' — ' + muotoileOpintoPvm(dl.pvm);
     li.appendChild(teksti);
     const poisto = document.createElement('button');
     poisto.className = 'delete-btn';
@@ -2382,13 +2385,15 @@ document.getElementById('opinto-kurssi-deadline-lisaa-btn').addEventListener('cl
   if (!currentOpintoKurssi) return;
   const pvm = document.getElementById('opinto-kurssi-deadline-pvm').value;
   const tyyppi = document.getElementById('opinto-kurssi-deadline-tyyppi').value;
+  const nimi = document.getElementById('opinto-kurssi-deadline-nimi').value.trim();
   if (!pvm) {
     naytaIlmoitus('Valitse päivämäärä');
     return;
   }
-  const { error } = await db.from('opinto_deadlinet').insert({ kurssi_id: currentOpintoKurssi.id, pvm: pvm, tyyppi: tyyppi });
+  const { error } = await db.from('opinto_deadlinet').insert({ kurssi_id: currentOpintoKurssi.id, pvm: pvm, tyyppi: tyyppi, nimi: nimi || null });
   if (ilmoitaKirjoitusvirheesta(error, 'Deadlinen lisäys')) return;
   document.getElementById('opinto-kurssi-deadline-pvm').value = '';
+  document.getElementById('opinto-kurssi-deadline-nimi').value = '';
   lataaOpintoKurssinDeadlinet();
 });
 
@@ -3795,18 +3800,21 @@ async function piirraNytDeadlineRivi() {
   (kurssit || []).forEach(function(k) { kurssiKartta[k.id] = k.name; });
 
   const [{ data: kurssiDl }, { data: aiheDl }] = await Promise.all([
-    db.from('opinto_deadlinet').select('kurssi_id, pvm, tyyppi').in('kurssi_id', kurssiIdt),
-    db.from('opinto_deadlinet').select('pvm, tyyppi, opinto_aiheet!inner(name, kurssi_id)').in('opinto_aiheet.kurssi_id', kurssiIdt),
+    db.from('opinto_deadlinet').select('kurssi_id, pvm, tyyppi, nimi').in('kurssi_id', kurssiIdt),
+    db.from('opinto_deadlinet').select('pvm, tyyppi, nimi, opinto_aiheet!inner(name, kurssi_id)').in('opinto_aiheet.kurssi_id', kurssiIdt),
   ]);
+  // nimi (sql/141, valinnainen) korvaa geneerisen "koe"/"palautus"-sanan
+  // annettuna, muuten ennallaan.
+  const tyyppiTaiNimi = function(d) { return d.nimi || (d.tyyppi === 'koe' ? 'koe' : 'palautus'); };
 
   const ehdokkaat = [];
   (kurssiDl || []).forEach(function(d) {
     const paivia = Math.round((new Date(d.pvm + 'T00:00:00') - tanaanD) / 86400000);
-    ehdokkaat.push({ paivia: paivia, teksti: kurssiKartta[d.kurssi_id] + ', ' + (d.tyyppi === 'koe' ? 'koe' : 'palautus') });
+    ehdokkaat.push({ paivia: paivia, teksti: kurssiKartta[d.kurssi_id] + ', ' + tyyppiTaiNimi(d) });
   });
   (aiheDl || []).forEach(function(d) {
     const paivia = Math.round((new Date(d.pvm + 'T00:00:00') - tanaanD) / 86400000);
-    ehdokkaat.push({ paivia: paivia, teksti: kurssiKartta[d.opinto_aiheet.kurssi_id] + ' — ' + d.opinto_aiheet.name + ', ' + (d.tyyppi === 'koe' ? 'koe' : 'palautus') });
+    ehdokkaat.push({ paivia: paivia, teksti: kurssiKartta[d.opinto_aiheet.kurssi_id] + ' — ' + d.opinto_aiheet.name + ', ' + tyyppiTaiNimi(d) });
   });
 
   const kiireisin = ehdokkaat.filter(function(e) { return e.paivia >= 1 && e.paivia <= 2; }).sort(function(a, b) { return a.paivia - b.paivia; })[0];
@@ -12268,7 +12276,7 @@ function rakennaMateriaaliJasennysPrompti(teksti, monessaOsassa) {
     '{\n' +
     '  "kurssi_nimi": "kurssin nimi jos pääteltävissä, muuten paras arvaus",\n' +
     '  "aiheet": [{ "nimi": "väliotsikon/aiheen nimi", "tavoiteikkuna": "VVVV-KK-PP tai null", "tyyppi": "procedural" tai "analogous" tai "conceptual" }],\n' +
-    '  "deadlinet": [{ "pvm": "VVVV-KK-PP", "tyyppi": "koe" tai "palautus" }]\n' +
+    '  "deadlinet": [{ "pvm": "VVVV-KK-PP", "tyyppi": "koe" tai "palautus", "nimi": "tehtävän/kokeen oma nimi jos materiaalissa mainittu (esim. \'Harjoitustyö 2\', \'Välikoe\'), muuten null" }]\n' +
     '}\n' +
     'Poimi VAIN materiaalissa oikeasti mainitut asiat, älä keksi. Aiheiden pitää olla väliotsikkotason kokonaisuuksia ' +
     '(ei liian pieniä yksittäisiä käsitteitä, ei liian isoja koko-kurssin-kokoisia).\n\n' +
@@ -12394,9 +12402,17 @@ function avaaMateriaaliJasennysDialogi(rivit, jasennetty) {
       tyyppiSelect.appendChild(optio);
     });
     li.appendChild(tyyppiSelect);
+    // nimi (sql/141, valinnainen) — esitäytetty jos äly poimi sen
+    // materiaalista, muokattavissa/tyhjennettävissä ennen tallennusta.
+    const nimiInput = document.createElement('input');
+    nimiInput.type = 'text';
+    nimiInput.placeholder = 'nimi (valinnainen)...';
+    nimiInput.value = dl.nimi || '';
+    li.appendChild(nimiInput);
     li._checkbox = checkbox;
     li._pvmInput = pvmInput;
     li._tyyppiSelect = tyyppiSelect;
+    li._nimiInput = nimiInput;
     deadlineLista.appendChild(li);
   });
 
@@ -12446,7 +12462,7 @@ async function tallennaMateriaaliJasennys(rivit) {
 
   const valitutDeadlinet = Array.from(document.getElementById('materiaali-jasennys-deadline-lista').children)
     .filter(function(li) { return li._checkbox.checked && li._pvmInput.value; })
-    .map(function(li) { return { kurssi_id: kurssi.id, pvm: li._pvmInput.value, tyyppi: li._tyyppiSelect.value }; });
+    .map(function(li) { return { kurssi_id: kurssi.id, pvm: li._pvmInput.value, tyyppi: li._tyyppiSelect.value, nimi: li._nimiInput.value.trim() || null }; });
   if (valitutDeadlinet.length > 0) {
     const { error } = await db.from('opinto_deadlinet').insert(valitutDeadlinet);
     if (ilmoitaKirjoitusvirheesta(error, 'Deadlinejen tallennus')) return;

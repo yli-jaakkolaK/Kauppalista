@@ -3648,6 +3648,7 @@ h1 {
 
 .opinto-deadline-lisays {
   display: flex;
+  flex-wrap: wrap;
   gap: 6px;
   margin: 10px 0;
 }
@@ -3666,6 +3667,7 @@ h1 {
 }
 
 .opinto-deadline-lisays input[type="date"],
+.opinto-deadline-lisays input[type="text"],
 .opinto-deadline-lisays select {
   font-family: var(--fontti-loki);
   font-size: 13px;
@@ -3676,6 +3678,12 @@ h1 {
   padding: 6px;
   flex: 1;
   min-width: 0;
+}
+/* Nimi (valinnainen, sql/141) omalle rivilleen kapealla näytöllä sen
+   sijaan että ahtaisi kolmatta kenttää samaan riviin pvm+tyyppi-parin
+   kanssa (ks. flex-wrap yllä). */
+.opinto-deadline-lisays input[type="text"] {
+  flex-basis: 100%;
 }
 
 .opinto-vaihe-select {
