@@ -239,6 +239,10 @@ function jasennaTapahtumat(icsTeksti, alkuRaja, loppuRaja) {
       if (!event.isRecurring()) {
         const pvmAika = pvmJaAika(event.startDate);
         const loppuAika = event.endDate ? pvmJaAika(event.endDate) : { event_time: null, event_date: pvmAika.event_date };
+        // STATUS:CANCELLED yhden kerran tapahtumalla (2026-08-29, ks.
+        // peruttu-kentän yläkommentti) — EI enää ohiteta, tallennetaan
+        // peruttu=true jotta se jää näkyviin harmaana katoamisen sijaan.
+        const tila = vevent.getFirstPropertyValue('status');
         tapahtumat.push({
           uid: event.uid,
           title: siistiOtsikko(event.summary || '(nimetön)'),
@@ -254,6 +258,7 @@ function jasennaTapahtumat(icsTeksti, alkuRaja, loppuRaja) {
           // vain tallennus puuttui aiemmin. Vapaamuotoinen teksti, täsmäys
           // Föli-pysäkkeihin tehdään sovelluspuolella.
           location: event.location || null,
+          cancelled: !!(tila && String(tila).toUpperCase() === 'CANCELLED'),
         });
         return;
       }
@@ -270,11 +275,12 @@ function jasennaTapahtumat(icsTeksti, alkuRaja, loppuRaja) {
           // jos tälle nimenomaiselle kerralle on poikkeus, muuten palauttaa
           // saman ajan takaisin muuttumattomana.
           const tiedot = event.getOccurrenceDetails(esiintyma);
+          // STATUS:CANCELLED (2026-08-29) — EI enää ohiteta (ks. peruttu-
+          // kentän yläkommentti): tallennetaan peruttu=true, jää näkyviin
+          // harmaana. tiedot.startDate on tässä tapauksessa alkuperäinen
+          // (ei-korvattu) aika, koska peruutuksella ei ole uutta aikaa
+          // johon siirtyä.
           const tila = tiedot.item.component.getFirstPropertyValue('status');
-          if (tila && String(tila).toUpperCase() === 'CANCELLED') {
-            esiintyma = iteraattori.next();
-            continue;
-          }
           const pvmAika = pvmJaAika(tiedot.startDate);
           const loppuAika = tiedot.endDate ? pvmJaAika(tiedot.endDate) : { event_time: null, event_date: pvmAika.event_date };
           tapahtumat.push({
@@ -294,6 +300,7 @@ function jasennaTapahtumat(icsTeksti, alkuRaja, loppuRaja) {
             // kerta on voitu siirtää eri paikkaan (samalla periaatteella
             // kuin tila/otsikko-luku yllä).
             location: tiedot.item.component.getFirstPropertyValue('location') || null,
+            cancelled: !!(tila && String(tila).toUpperCase() === 'CANCELLED'),
           });
         }
         esiintyma = iteraattori.next();
@@ -412,6 +419,8 @@ function taydeksiTapahtumaksi(t) {
     // periaate kuin nimi/osallistujat: vain_varattu-tilan tapahtuma ei saa
     // vuotaa mitään yksityiskohtaa (ks. varattuTapahtumaksi()-kommentti alla).
     location: t.location,
+    // ks. sql/139_kalenteri_peruutus.sql yläkommentti.
+    peruttu: !!t.cancelled,
   };
 }
 
@@ -432,40 +441,176 @@ function varattuTapahtumaksi(t) {
     event_end_time: t.event_end_time,
     event_end_date: t.event_end_date,
     ical_uid: t.uid,
+    peruttu: !!t.cancelled,
   };
 }
 
-// PEILISÄÄNTÖ, poisto-osuus: hakee TÄMÄN syötteen olemassa olevat rivit
-// tarkistetulta aikaväliltä ja poistaa ne joiden ical_uid EI löytynyt tällä
-// synkkauskerralla (nahdytUidit) — eli tapahtuma on poistettu/siirtynyt pois
-// iCloudin päässä. Rajattu syote_id:hen ja samaan aikaväliin joka tällä
-// kertaa oikeasti haettiin, jottei poisteta rivejä joita ei yritetty hakea.
-// LISÄKSI rajattu created_at < syncStartedAt (ks. kutsupaikan kommentti) —
-// suojaa rinnakkaisen, limittäisen ajon KESKEN tätä ajoa lisäämää riviä
-// tulemasta virheellisesti poistetuksi.
-async function siivoaPoistetut(syoteId, alkuPvm, loppuPvm, nahdytUidit, syncStartedAt) {
+// PEILISÄÄNTÖ, poisto/peruutus-osuus (laajennettu 2026-08-29, Katrin pyyntö:
+// "leave cancelled lecture greyish and point to where it got moved into" —
+// ei koskaan enää katoamaan jäljettömiin): hakee TÄMÄN syötteen olemassa
+// olevat, EI VIELÄ peruutetuksi merkityt rivit tarkistetulta aikaväliltä ja
+// käsittelee ne joiden ical_uid EI löytynyt tällä synkkauskerralla
+// (nahdytUidit) — eli tapahtuma on poistunut/siirtynyt pois lähteen päässä
+// (esim. Lukkarikone/iCloud).
+//   TULEVAT (event_date >= tänään): merkitään peruttu=true, EI poisteta —
+//   jäävät näkyviin harmaana Kalenterissa/Hytissä (ks. script.js), eikä
+//   ajossa palauteta enää uudelleen koska kysely ottaa mukaan vain
+//   peruttu=false-rivit.
+//   MENNEET (jo ohi): poistetaan edelleen suoraan kuten ennen tätä
+//   laajennusta — jo tapahtuneella peruutuksella ei ole enää käytännön
+//   arvoa, eikä taulun haluta kasvaa loputtomiin koko lukuvuoden ajalta
+//   kertyvällä harmaalla historialla.
+// Rajattu syote_id:hen ja samaan aikaväliin joka tällä kertaa oikeasti
+// haettiin, jottei kosketa rivejä joita ei yritetty hakea. LISÄKSI rajattu
+// created_at < syncStartedAt (ks. kutsupaikan kommentti) — suojaa
+// rinnakkaisen, limittäisen ajon KESKEN tätä ajoa lisäämää riviä tulemasta
+// virheellisesti käsitellyksi. Palauttaa juuri peruutetuiksi merkityt rivit
+// (id/title/event_date/event_time) — kutsuja käyttää näitä "mihin siirtyi"
+// -arvauksen tekemiseen ja peruutusilmoituksen lähettämiseen.
+async function siivoaPoistetut(syoteId, alkuPvm, loppuPvm, nahdytUidit, syncStartedAt, tanaanPvm) {
   const vastaus = await supabaseFetch(
-    'kalenteri_tapahtumat?select=id,ical_uid&syote_id=eq.' + syoteId +
+    'kalenteri_tapahtumat?select=id,ical_uid,title,event_date,event_time&syote_id=eq.' + syoteId +
     '&event_date=gte.' + alkuPvm + '&event_date=lte.' + loppuPvm + '&ical_uid=not.is.null' +
+    '&peruttu=eq.false' +
     '&created_at=lt.' + encodeURIComponent(syncStartedAt)
   );
   const olemassaOlevat = await vastaus.json();
-  const poistettavat = (olemassaOlevat || []).filter(function(r) { return !nahdytUidit.has(r.ical_uid); });
-  if (poistettavat.length === 0) return 0;
-  const idLista = poistettavat.map(function(r) { return r.id; }).join(',');
-  const poistoRes = await supabaseFetch('kalenteri_tapahtumat?id=in.(' + idLista + ')', {
-    method: 'DELETE',
-    headers: { Prefer: 'return=minimal' },
-  });
+  const poistuneet = (olemassaOlevat || []).filter(function(r) { return !nahdytUidit.has(r.ical_uid); });
+  if (poistuneet.length === 0) return { poistettu: 0, peruttu: [] };
+
+  const tulevat = poistuneet.filter(function(r) { return r.event_date >= tanaanPvm; });
+  const menneet = poistuneet.filter(function(r) { return r.event_date < tanaanPvm; });
+
+  let peruttuMerkityt = [];
+  if (tulevat.length > 0) {
+    const idLista = tulevat.map(function(r) { return r.id; }).join(',');
+    const merkintaRes = await supabaseFetch('kalenteri_tapahtumat?id=in.(' + idLista + ')', {
+      method: 'PATCH',
+      headers: { Prefer: 'return=minimal' },
+      body: JSON.stringify({ peruttu: true }),
+    });
+    if (!merkintaRes.ok) {
+      console.error('[caldav-sync] Peruutusmerkintä epäonnistui (syote ' + syoteId + '):', merkintaRes.status, await merkintaRes.text());
+    } else {
+      peruttuMerkityt = tulevat;
+    }
+  }
+
   // BUGIKORJAUS (2026-07-19, ks. muistiinpanot.md "Kirjoituspolkujen
   // auditointi" — sama laji virhe kuin historiallinen upsert-duplikaattibugi
   // tässä samassa tiedostossa): palautettu määrä EI SAA väittää poistoa
   // tehdyksi jos DELETE-pyyntö itsessään epäonnistui.
-  if (!poistoRes.ok) {
-    console.error('[caldav-sync] Poistettujen tapahtumien siivous epäonnistui (syote ' + syoteId + '):', poistoRes.status, await poistoRes.text());
-    return 0;
+  let poistettuMaara = 0;
+  if (menneet.length > 0) {
+    const idLista = menneet.map(function(r) { return r.id; }).join(',');
+    const poistoRes = await supabaseFetch('kalenteri_tapahtumat?id=in.(' + idLista + ')', {
+      method: 'DELETE',
+      headers: { Prefer: 'return=minimal' },
+    });
+    if (!poistoRes.ok) {
+      console.error('[caldav-sync] Menneiden poistuneiden tapahtumien siivous epäonnistui (syote ' + syoteId + '):', poistoRes.status, await poistoRes.text());
+    } else {
+      poistettuMaara = menneet.length;
+    }
   }
-  return poistettavat.length;
+
+  return { poistettu: poistettuMaara, peruttu: peruttuMerkityt };
+}
+
+// Muotoilee peruutusilmoituksen tekstin — jaettu sekä syote_id:llisen
+// (kasitteleUudetPeruutukset) että mahdollisten myöhempien kutsujien kesken.
+function muotoilePvm(pvmStr) {
+  const d = new Date(pvmStr + 'T00:00:00Z');
+  return String(d.getUTCDate()).padStart(2, '0') + '.' + String(d.getUTCMonth() + 1).padStart(2, '0') + '.';
+}
+function paivaaSiirretty(pvmStr, n) {
+  const d = new Date(pvmStr + 'T00:00:00Z');
+  d.setUTCDate(d.getUTCDate() + n);
+  return d.toISOString().slice(0, 10);
+}
+
+// Uuden peruutuksen käsittely (2026-08-29, Katrin pyyntö) — kaksi asiaa:
+// (1) PARAS ARVAUS mihin tunti siirtyi: sama syote, ei (vielä) peruttu, SAMA
+//     siivottu otsikko (siistiOtsikko ajettu jo tallennushetkellä, joten
+//     suora tasa-täsmäys riittää), enintään 5 päivän päässä alkuperäisestä
+//     kumpaankin suuntaan. EI VARMAA tietoa — vain heuristiikka, siksi UI:n
+//     (script.js) pitää merkitä se "arvio"/"todennäköisesti" eikä väittää
+//     varmaa faktaa.
+// (2) VÄLITÖN ilmoitus MYÖS silloin kun kukaan ei ole sillä hetkellä avannut
+//     sovellusta: kirjoitetaan muistutukset-riviksi remind_at=nyt, jonka jo
+//     olemassa oleva /api/cron?task=muistutukset (SAMA 5 min -GitHub Actions
+//     -kadenssi, ks. .github/workflows/) poimii ja lähettää seuraavalla
+//     ajollaan — EI rakenneta rinnakkaista push-lähetystä tähän tiedostoon,
+//     käytetään jo olemassa olevaa, todistettua claim/retry-putkea.
+//     Idempotentti luonnostaan: tämä ajetaan vain juuri nyt peruttu=true:ksi
+//     merkityille riveille, eikä sama rivi voi enää löytyä uudelleen
+//     seuraavalla kierroksella (ei ole enää peruttu=false-joukossa).
+// henkiloKartta: { 'katri': user_id, 'juha': user_id, ... } (hytti_omistajat).
+// kohdeHenkilot: syotteen henkilo-kenttä JOS asetettu (henkilökohtainen
+// syöte, esim. Lukkarikone) — MUUTEN null, jolloin ilmoitus menee KAIKILLE
+// (jaettu perhekalenteri, kuka tahansa voi olla se joka olisi mennyt paikalle).
+async function kasitteleUudetPeruutukset(peruutukset, syoteId, henkiloKartta, kohdeHenkilo) {
+  const kohdeUserIdt = kohdeHenkilo
+    ? (henkiloKartta[kohdeHenkilo] ? [henkiloKartta[kohdeHenkilo]] : [])
+    : Object.keys(henkiloKartta).map(function(h) { return henkiloKartta[h]; });
+
+  for (const p of peruutukset) {
+    let siirtynyt = null;
+    try {
+      const alku = paivaaSiirretty(p.event_date, -5);
+      const loppu = paivaaSiirretty(p.event_date, 5);
+      const ehdokasRes = await supabaseFetch(
+        'kalenteri_tapahtumat?select=id,event_date,event_time&syote_id=eq.' + syoteId +
+        '&peruttu=eq.false&title=eq.' + encodeURIComponent(p.title) +
+        '&event_date=gte.' + alku + '&event_date=lte.' + loppu +
+        '&order=event_date.asc&limit=1'
+      );
+      const ehdokkaat = ehdokasRes.ok ? await ehdokasRes.json() : [];
+      siirtynyt = Array.isArray(ehdokkaat) && ehdokkaat[0] ? ehdokkaat[0] : null;
+      if (siirtynyt) {
+        const paivitysRes = await supabaseFetch('kalenteri_tapahtumat?id=eq.' + p.id, {
+          method: 'PATCH', headers: { Prefer: 'return=minimal' },
+          body: JSON.stringify({ siirtyi_tapahtuma_id: siirtynyt.id }),
+        });
+        if (!paivitysRes.ok) console.error('[caldav-sync] siirtyi_tapahtuma_id-merkintä epäonnistui (tapahtuma ' + p.id + '):', paivitysRes.status);
+      }
+    } catch (e) {
+      console.error('[caldav-sync] Siirtokohteen haku epäonnistui (tapahtuma ' + p.id + '):', e.message);
+    }
+
+    if (kohdeUserIdt.length === 0) continue; // ei tiedetä kenelle ilmoittaa — peruttu=true jäi silti näkyviin kalenteriin
+
+    const aikaTeksti = p.event_time ? ' klo ' + p.event_time.slice(0, 5) : '';
+    const siirtoTeksti = siirtynyt
+      ? (' — siirtynyt (arvio) ' + muotoilePvm(siirtynyt.event_date) + (siirtynyt.event_time ? ' klo ' + siirtynyt.event_time.slice(0, 5) : ''))
+      : '';
+    const sisalto = '🚫 Peruttu: ' + p.title + ' (' + muotoilePvm(p.event_date) + aikaTeksti + ')' + siirtoTeksti;
+
+    for (const userId of kohdeUserIdt) {
+      const muistutusRes = await supabaseFetch('muistutukset', {
+        method: 'POST',
+        headers: { Prefer: 'return=minimal' },
+        body: JSON.stringify({
+          user_id: userId,
+          source: 'kalenteri_peruutus',
+          source_ref: String(p.id) + ':' + userId,
+          content: sisalto,
+          remind_at: new Date().toISOString(),
+        }),
+      });
+      if (!muistutusRes.ok) {
+        console.error('[caldav-sync] Peruutusilmoituksen luonti epäonnistui (tapahtuma ' + p.id + ', user ' + userId + '):', muistutusRes.status, await muistutusRes.text());
+      }
+    }
+  }
+}
+
+async function haeHenkiloKartta() {
+  const vastaus = await supabaseFetch('hytti_omistajat?select=henkilo,user_id');
+  const rivit = await vastaus.json();
+  const kartta = {};
+  (rivit || []).forEach(function(r) { kartta[r.henkilo] = r.user_id; });
+  return kartta;
 }
 
 module.exports = async function handler(req, res) {
@@ -556,12 +701,22 @@ module.exports = async function handler(req, res) {
   // tyylinen reilu mitoitus), tarkka päivä ratkeaa aina jasennaTapahtumat():ssa.
   const alkuPvm = alkuISO.slice(0, 10);
   const loppuPvm = loppuISO.slice(0, 10);
+  // Sama kevyt tarkkuus kuin alkuPvm/loppuPvm:llä yllä (muutaman tunnin
+  // epätarkkuus vuorokauden rajalla ei haittaa) — ratkaisee vain merkitäänkö
+  // löytymätön tapahtuma peruttu=true (tuleva) vai poistetaanko se suoraan
+  // (mennyt), ks. siivoaPoistetut().
+  const tanaanPvm = new Date().toISOString().slice(0, 10);
   const alkuRaja = ICAL.Time.fromJSDate(alku, true);
   const loppuRaja = ICAL.Time.fromJSDate(loppu, true);
 
   const tekijaKartta = await haeTekijaKartta();
   const tulokset = [];
   const kaikkiUudetRivit = [];
+  // { syoteId, henkilo, rivit: [...] } per syöte — käsitellään "mihin
+  // siirtyi" -arvaus + ilmoitus vasta KAIKKIEN syötteiden upsertin JÄLKEEN
+  // (kasitteleUudetPeruutukset), koska siirtokohde-ehdokas voi olla juuri
+  // TÄSSÄ samassa ajossa lisätty rivi jonkin toisen syötteen alta.
+  const kaikkiPeruutuserat = [];
 
   const kaikki = await Promise.allSettled(syotteet.map(async function(syote) {
     const icsTekstit = await haeSyoteTekstit(syote, alkuISO, loppuISO);
@@ -587,10 +742,13 @@ module.exports = async function handler(req, res) {
     });
     kaikkiUudetRivit.push.apply(kaikkiUudetRivit, uudetRivit);
 
-    // PEILISÄÄNTÖ, poisto-osuus: tällä kertaa löytymättömät (poistettu/siirtynyt
-    // pois iCloudissa) poistuvat myös Satamasta, rajattuna tälle syötteelle
-    // tarkistettuun aikaväliin.
-    const poistettuja = await siivoaPoistetut(syote.id, alkuPvm, loppuPvm, nahdytUidit, syncStartedAt);
+    // PEILISÄÄNTÖ, poisto/peruutus-osuus: tällä kertaa löytymättömät
+    // (poistettu/siirtynyt pois lähteen päässä) joko merkitään peruttu=true
+    // (tuleva) tai poistetaan (mennyt) — ks. siivoaPoistetut() yläkommentti.
+    const poistoTulos = await siivoaPoistetut(syote.id, alkuPvm, loppuPvm, nahdytUidit, syncStartedAt, tanaanPvm);
+    if (poistoTulos.peruttu.length > 0) {
+      kaikkiPeruutuserat.push({ syoteId: syote.id, henkilo: syote.henkilo, rivit: poistoTulos.peruttu });
+    }
 
     const aikaleimaRes = await supabaseFetch('kalenteri_syotteet?id=eq.' + syote.id, {
       method: 'PATCH',
@@ -601,7 +759,7 @@ module.exports = async function handler(req, res) {
       console.error('[caldav-sync] last_synced_at-päivitys epäonnistui syötteelle ' + syote.name + ':', aikaleimaRes.status, await aikaleimaRes.text());
     }
 
-    return { syote: syote.name, loydettyja: tapahtumat.length, poistettuja: poistettuja };
+    return { syote: syote.name, loydettyja: tapahtumat.length, poistettuja: poistoTulos.poistettu, peruttu_uutena: poistoTulos.peruttu.length };
   }));
 
   kaikki.forEach(function(tulos, i) {
@@ -666,11 +824,28 @@ module.exports = async function handler(req, res) {
     }
   }
 
+  // "Mihin siirtyi" -arvaus + peruutusilmoitukset VASTA nyt, kaikkien
+  // syötteiden upsertin jälkeen (ks. kaikkiPeruutuserat-kommentti yllä) —
+  // yksi jaettu henkilökartta riittää koko ajolle.
+  let peruutuksiaIlmoitettu = 0;
+  if (kaikkiPeruutuserat.length > 0) {
+    try {
+      const henkiloKartta = await haeHenkiloKartta();
+      for (const era of kaikkiPeruutuserat) {
+        await kasitteleUudetPeruutukset(era.rivit, era.syoteId, henkiloKartta, era.henkilo);
+        peruutuksiaIlmoitettu += era.rivit.length;
+      }
+    } catch (e) {
+      console.error('[caldav-sync] Peruutusten jälkikäsittely epäonnistui:', e.message);
+    }
+  }
+
   return res.status(kirjoitusVirhe ? 500 : 200).json({
     success: !kirjoitusVirhe,
     syotteet: tulokset,
     kirjoitettuja: kirjoitusVirhe ? 0 : yhdistetytRivit.length,
     kaksoiskappaleita_poistettu: kaksoiskappaleitaPoistettu,
     kirjoitusvirhe: kirjoitusVirhe,
+    peruutuksia_uutena: peruutuksiaIlmoitettu,
   });
 };

@@ -3314,6 +3314,29 @@ h1 {
   color: var(--vaimea);
 }
 
+/* Peruttu tapahtuma (2026-08-29, ks. sql/139_kalenteri_peruutus.sql) — jää
+   näkyviin harmaana/yliviivattuna sen sijaan että katoaisi jäljettömiin.
+   Yliviivaus VAIN nimitekstissä, ei koko rivillä (aika/siirto-teksti pysyy
+   luettavana). */
+.list li.kalenteri-rivi-peruttu {
+  opacity: .55;
+  border-left-color: var(--muted) !important;
+  background-color: transparent !important;
+}
+.list li.kalenteri-rivi-peruttu .kalenteri-teksti {
+  text-decoration: line-through;
+  text-decoration-color: var(--vaara, #c0392b);
+}
+.kalenteri-siirtynyt {
+  white-space: normal;
+  overflow-wrap: break-word;
+  padding: 0;
+  margin-top: 3px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--messinki);
+}
+
 /* Hytti-scopen (oma opiskelu/työ) tapahtuma pääkalenterin agenda/viikko
    -näkymässä (Katrin 2026-07-16 linjaus): toissijainen ilme MUODOLLA, ei
    himmeydellä — neutraali reunapalkki + pieni glyyfi (.kalenteri-hytti-glyyfi)

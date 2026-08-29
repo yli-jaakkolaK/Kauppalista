@@ -3841,7 +3841,10 @@ async function piirraNytLoki(askeleet) {
     // EI koske Katria vaikka olisikin perhetapahtuma — ratkaiseva on kumman
     // kalenterissa se on, ei tapahtuman scope. Vain jaettu perhekalenteri
     // (henkilo=null) tai Katrin oma (henkilo=katri) laskee hänen esteekseen.
-    db.from('kalenteri_tapahtumat').select('title, event_time, event_end_time, vastuu_henkilo, kalenteri_syotteet!inner(henkilo)').eq('event_date', tanaan).order('event_time'),
+    // peruttu=false (2026-08-29, ks. sql/139_kalenteri_peruutus.sql): peruttu
+    // luento ei enää varaa opiskeluslottia, koska rivi jää nyt tauluun
+    // näkyviin (aiemmin poisto vapautti ajan automaattisesti).
+    db.from('kalenteri_tapahtumat').select('title, event_time, event_end_time, vastuu_henkilo, kalenteri_syotteet!inner(henkilo)').eq('event_date', tanaan).eq('peruttu', false).order('event_time'),
     db.from('hytti_suljetut_ikkunat').select('alkaa, paattyy').eq('owner_id', currentUserId).eq('viikonpaiva', viikonpaiva),
     db.from('hytti_opiskeluaika').select('alkaa, paattyy').eq('owner_id', currentUserId).eq('viikonpaiva', viikonpaiva),
   ]);
@@ -4078,7 +4081,7 @@ async function naytaHuomisenEsikatselu() {
     // Sama korjaus kuin piirraNytLoki:ssa (2026-08-18) — kalenteri_tapahtumat.
     // user_id on käytännössä aina tyhjä, suodatus liitetyn syötteen
     // henkilo-kentän mukaan (null = jaettu perhekalenteri, kuuluu Katrille).
-    db.from('kalenteri_tapahtumat').select('title, event_time, event_end_time, vastuu_henkilo, kalenteri_syotteet!inner(henkilo)').eq('event_date', huominenIso).order('event_time'),
+    db.from('kalenteri_tapahtumat').select('title, event_time, event_end_time, vastuu_henkilo, kalenteri_syotteet!inner(henkilo)').eq('event_date', huominenIso).eq('peruttu', false).order('event_time'),
     db.from('hytti_suljetut_ikkunat').select('alkaa, paattyy').eq('owner_id', currentUserId).eq('viikonpaiva', viikonpaiva),
     db.from('hytti_opiskeluaika').select('alkaa, paattyy').eq('owner_id', currentUserId).eq('viikonpaiva', viikonpaiva),
   ]);
@@ -6920,6 +6923,12 @@ function piirraKalenteriRivi(rivi) {
     return li;
   }
 
+  // Peruttu tapahtuma jää näkyviin harmaana/yliviivattuna katoamisen sijaan
+  // (2026-08-29, Katrin pyyntö, ks. sql/139_kalenteri_peruutus.sql) — EI
+  // koskaan enää täysin hiljaa poistuva, näkyy tässä samalla rivillä missä
+  // se ennenkin olisi ollut niin ettei sitä voi jäädä huomaamatta.
+  if (rivi.peruttu) li.classList.add('kalenteri-rivi-peruttu');
+
   // Hytti-scopen (oma opiskelu/työ) tapahtuma saa toissijaisen ilmeen
   // pääkalenterissa — MUODOLLA (reunapalkki + pieni glyyfi), ei himmeydellä,
   // samaa periaatetta noudattaen kuin ✨-ehdokkaan erottuvuuskorjaus (ks.
@@ -6979,8 +6988,20 @@ function piirraKalenteriRivi(rivi) {
   nimirivi.className = 'kalenteri-nimirivi';
   const teksti = document.createElement('span');
   teksti.className = 'kalenteri-teksti';
-  teksti.textContent = rivi.title;
+  teksti.textContent = (rivi.peruttu ? '🚫 Peruttu: ' : '') + rivi.title;
   nimirivi.appendChild(teksti);
+  // "Paras arvaus", ei varma tieto (ks. api/_lib/caldav-sync.js:n
+  // kasitteleUudetPeruutukset()-kommentti) — sanamuoto kertoo tämän, ei
+  // väitä suoraan että kyse on TÄSMÄLLEEN sama tunti. Sama sijoittelu kuin
+  // sijaintiEl:llä alla (oma rivi tekstin alla, ei ahdettuna nimirivin sisään).
+  let siirtoEl = null;
+  if (rivi.peruttu && rivi._siirtynytKohde) {
+    const k = rivi._siirtynytKohde;
+    const kPvm = new Date(k.event_date + 'T00:00:00');
+    siirtoEl = document.createElement('span');
+    siirtoEl.className = 'kalenteri-siirtynyt';
+    siirtoEl.textContent = '→ siirtynyt (arvio): ' + kPvm.getDate() + '.' + (kPvm.getMonth() + 1) + '.' + (k.event_time ? ' klo ' + k.event_time.slice(0, 5) : '');
+  }
   const sijainti = tapahtumanSijaintiteksti(rivi);
   let sijaintiEl = null;
   if (sijainti) {
@@ -7000,6 +7021,7 @@ function piirraKalenteriRivi(rivi) {
     nimirivi.appendChild(infoNappi);
   }
   tekstiwrap.appendChild(nimirivi);
+  if (siirtoEl) tekstiwrap.appendChild(siirtoEl);
   if (sijaintiEl) tekstiwrap.appendChild(sijaintiEl);
   li.appendChild(tekstiwrap);
 
@@ -7220,8 +7242,22 @@ async function lataaKalenteri() {
         event_end_time: t.event_end_time, syote_id: t.syote_id, _henkilo: t._henkilo,
         _vari: t._vari, _scope: t._scope, ical_uid: t.ical_uid, user_id: t.user_id,
         vastuu_henkilo: t.vastuu_henkilo, location: t.location, _osoite: t._osoite,
+        peruttu: t.peruttu, siirtyi_tapahtuma_id: t.siirtyi_tapahtuma_id,
       };
     });
+
+    // Peruttu-tapahtumien mahdollinen siirtokohde (sql/139_kalenteri_peruutus.sql,
+    // Katrin pyyntö: "point to where it got moved into") — yksi haku kaikille
+    // tämän päivän peruutuksille kerralla sen sijaan että jokainen rivi
+    // hakisi omansa erikseen piirtohetkellä.
+    const siirtyneidenIdt = rivit.filter(function(r) { return r.siirtyi_tapahtuma_id; }).map(function(r) { return r.siirtyi_tapahtuma_id; });
+    if (siirtyneidenIdt.length > 0) {
+      const { data: kohteet, error: kohdeError } = await db.from('kalenteri_tapahtumat').select('id, title, event_date, event_time').in('id', siirtyneidenIdt);
+      if (kohdeError) console.error('Siirtokohteiden haku epäonnistui:', kohdeError);
+      const kohdeKartta = {};
+      (kohteet || []).forEach(function(k) { kohdeKartta[k.id] = k; });
+      rivit.forEach(function(r) { if (r.siirtyi_tapahtuma_id) r._siirtynytKohde = kohdeKartta[r.siirtyi_tapahtuma_id] || null; });
+    }
 
     const paivanHenkselit = await fetchVisibleHenkselit(tanaanIso, tanaanIso);
 
@@ -8038,7 +8074,10 @@ async function paivitaRistiriitaPallura() {
     .select('id, event_date, event_time, event_end_time, syote_id, vastuu_henkilo, kalenteri_syotteet(henkilo, scope)')
     .gte('event_date', tanaan)
     .lte('event_date', paivamaaraISO(loppu))
-    .not('event_time', 'is', null);
+    .not('event_time', 'is', null)
+    // peruttu (2026-08-29, sql/139): peruttu meno ei voi olla ristiriidassa
+    // minkään kanssa, koska sitä ei enää oikeasti ole.
+    .eq('peruttu', false);
   if (error) {
     console.error('Ristiriitapalluran haku epäonnistui:', error);
     return;
@@ -8073,6 +8112,7 @@ async function laskeMuutaMenoaPaivalle(pvm, oma_id) {
     .select('id', { count: 'exact', head: true })
     .eq('event_date', pvm)
     .not('event_time', 'is', null)
+    .eq('peruttu', false)
     .neq('id', oma_id);
   if (error) {
     console.error('Kuormavahdin laskenta epäonnistui:', error);
@@ -8208,6 +8248,7 @@ async function lataaHyttiTanaanKaista() {
     .select('id, title, event_time, kalenteri_syotteet!inner(scope)')
     .eq('kalenteri_syotteet.scope', 'hytti')
     .eq('event_date', tanaanIso)
+    .eq('peruttu', false)
     .order('event_time', { nullsFirst: false });
 
   if (error) {
@@ -8698,6 +8739,7 @@ async function lataaHyttiKorttiKalenteri() {
     .eq('kalenteri_syotteet.scope', 'hytti')
     .gte('event_date', tanaanIso)
     .lte('event_date', loppuIso)
+    .eq('peruttu', false)
     .ilike('title', '%' + currentHyttiKortti.kalenterisuodatin + '%')
     .order('event_date')
     .order('event_time', { nullsFirst: false });
@@ -9145,6 +9187,7 @@ async function lataaRuoriKalenteri() {
     .select('*, kalenteri_syotteet(vari, henkilo, scope)')
     .gte('event_date', paivamaaraISO(puskuriAlku))
     .lte('event_date', tanaanIso)
+    .eq('peruttu', false)
     .order('event_time', { nullsFirst: false });
 
   if (error) {
