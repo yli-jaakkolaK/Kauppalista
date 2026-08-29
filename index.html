@@ -956,11 +956,6 @@
     </div>
     <hr class="divider">
 
-    <div class="section-title">👤 Tili</div>
-    <button class="login-btn settings-action-btn" id="asetukset-signout-btn">Kirjaudu ulos</button>
-
-    <hr class="divider">
-
     <div class="section-title">🔔 Ilmoitukset</div>
     <p class="section-empty" id="push-tila-teksti">Tarkistetaan...</p>
     <button class="login-btn settings-action-btn" id="push-lupa-btn" style="display:none">Salli ilmoitukset</button>
@@ -1076,9 +1071,13 @@
       <!-- Diagnostiikka (2026-08-26, siirretty tänne etusivulta Katrin
            pyynnöstä) — tili/synkka/äly-testi ja testi-ilmoitus tarvitaan
            vain silloin kun jotain ollaan selvittämässä, ei jatkuvaan
-           katseluun etusivulla. -->
+           katseluun etusivulla. "Kirjaudu ulos" siirtyi mukaan 2026-08-29
+           (Katrin täsmennys) — Ilmoitukset-osio (tila + "Salli ilmoitukset")
+           jäi tarkoituksella etusivulle, koska sitä on tarvittu toistuvasti
+           nopeasti kun ilmoitukset ovat pudonneet pois. -->
       <div class="section-title">🔧 Diagnostiikka</div>
       <p class="section-empty" id="tili-sposti">Tarkistetaan...</p>
+      <button class="login-btn settings-action-btn" id="asetukset-signout-btn">Kirjaudu ulos</button>
       <button class="login-btn settings-action-btn" id="push-testi-btn" style="display:none">Lähetä testi-ilmoitus</button>
       <p class="section-empty" id="sovellus-synkka-tila">Tarkistetaan...</p>
       <button class="login-btn settings-action-btn" id="sovellus-synkkaa-btn">Hae kalenteri nyt</button>
