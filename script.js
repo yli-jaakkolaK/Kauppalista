@@ -4724,7 +4724,13 @@ async function etsiSiltojaKurssille(kurssi) {
   const tulos = await suoritaSiltaHaku();
   teksti.textContent = alkuperainenTeksti;
   if (tulos.virhe) {
-    naytaIlmoitus('Siltatunnistus epäonnistui: ' + tulos.virhe);
+    // "Solmutunnistus" tässä, EI "Siltatunnistus" (2026-08-29, Katrin
+    // huomio): kurssisivun näkökulmasta etsitään TÄMÄN kurssin solmuja
+    // (mitkä sen käsitteet toimivat siltana muualle) — sanamuoto "silta"
+    // kuuluu vain globaaliin, kursseja VÄLILTÄ etsivään versioon (ks.
+    // etsiSiltoja() yllä), joka pysyy ennallaan. Sama moottori molemmilla
+    // (suoritaSiltaHaku), vain käyttäjälle näkyvä sana eroaa kontekstin mukaan.
+    naytaIlmoitus('Solmutunnistus epäonnistui: ' + tulos.virhe);
     return;
   }
 
@@ -4735,7 +4741,7 @@ async function etsiSiltojaKurssille(kurssi) {
     });
   });
   if (taman_kurssin.length === 0) {
-    naytaIlmoitus('Ei löytynyt siltoja tälle kurssille tällä kertaa.');
+    naytaIlmoitus('Ei löytynyt solmuja tälle kurssille tällä kertaa.');
     return;
   }
   odottavatSiltaRivitIdt = [];
