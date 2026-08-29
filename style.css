@@ -3200,6 +3200,12 @@ h1 {
   margin-bottom: 12px;
 }
 
+.harjoittele-vaihe-viesti {
+  color: var(--sinappi-text);
+  font-weight: 600;
+  margin-top: 10px;
+}
+
 /* Perus-.dialog-btn on sovelluksen ainoa "päätoiminto"-nappi (Tallenna/
    Merkitse tehdyksi/Aseta/Valmis, ks. index.html) — sama vahvempi,
    peittävämpi lasiresepti (.8/.4) jonka #muistutus-lisaa-btn ym. kolme

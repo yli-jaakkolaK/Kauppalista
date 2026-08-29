@@ -1768,17 +1768,43 @@ async function avaaHarjoittele(aihe) {
 
   // PACER-vaihe ei ole enää käsin valittavissa (2026-08-29, Katrin pyyntö:
   // "the student never sees or touches it") — luetaan suoraan aiheen omasta
-  // pacer_vaihe_nyt-sarakkeesta (ks. sql/145). Automaattinen eteneminen
-  // (montako tehtävää per vaihe ennen seuraavaan siirtymistä) on oma,
-  // myöhempi rakennuspalanen — tämä lukee vain nykyisen tilan.
-  const valittuVaihe = aihe.pacer_vaihe_nyt || 'encoding';
+  // pacer_vaihe_nyt-sarakkeesta (ks. sql/145) ja etenee AUTOMAATTISESTI
+  // (ks. tarkistaVaiheenEteneminen alla) — siksi let, ei const.
+  let valittuVaihe = aihe.pacer_vaihe_nyt || 'encoding';
+  const vaiheViestiEl = document.getElementById('harjoittele-vaihe-viesti');
 
   overlay.style.display = 'flex';
+
+  // 5 ratkaisunpaljastusta nykyisessä vaiheessa -> automaattinen siirtymä
+  // seuraavaan (Katrin pyyntö 2026-08-29: paljastukset, ei generointeja,
+  // ovat etenemisen mittari — "how many problems you've actually engaged
+  // with", ei kuinka monta on luotu). Viimeisessä vaiheessa (connection) ei
+  // ole minne edetä, jää hiljaa paikalleen.
+  const HARJOITTELE_VAIHE_JARJESTYS = ['priming', 'encoding', 'retrieval', 'connection'];
+  async function tarkistaVaiheenEteneminen() {
+    const { count, error: laskuError } = await db.from('harjoitustehtavat')
+      .select('id', { count: 'exact', head: true })
+      .eq('aihe_id', aihe.id)
+      .eq('pacer_vaihe', valittuVaihe)
+      .eq('ratkaisu_paljastettu', true);
+    if (laskuError) { console.error('Paljastusten laskenta epäonnistui:', laskuError); return; }
+    if ((count || 0) < 5) return;
+    const nykyinenIndeksi = HARJOITTELE_VAIHE_JARJESTYS.indexOf(valittuVaihe);
+    if (nykyinenIndeksi === -1 || nykyinenIndeksi === HARJOITTELE_VAIHE_JARJESTYS.length - 1) return;
+    const seuraava = HARJOITTELE_VAIHE_JARJESTYS[nykyinenIndeksi + 1];
+    const { error: paivitysError } = await db.from('opinto_aiheet').update({ pacer_vaihe_nyt: seuraava }).eq('id', aihe.id);
+    if (paivitysError) { console.error('pacer_vaihe_nyt-päivitys epäonnistui:', paivitysError); return; }
+    aihe.pacer_vaihe_nyt = seuraava;
+    valittuVaihe = seuraava;
+    vaiheViestiEl.textContent = 'Hyvä — siirryt seuraavaan vaiheeseen.';
+    vaiheViestiEl.style.display = 'block';
+  }
 
   async function luoUusiTehtava() {
     sisalto.style.display = 'none';
     vihjeEl.style.display = 'none';
     ratkaisuEl.style.display = 'none';
+    vaiheViestiEl.style.display = 'none';
     vihjeBtn.disabled = false;
     ratkaisuBtn.disabled = false;
     ratkaisuBtn.textContent = '👁 Näytä ratkaisu';
@@ -1860,6 +1886,7 @@ async function avaaHarjoittele(aihe) {
       ratkaisuEl.textContent = tulos.ratkaisu;
       ratkaisuEl.style.display = 'block';
       ratkaisuBtn.textContent = '✓ Ratkaisu näkyvissä';
+      tarkistaVaiheenEteneminen();
     } catch (e) {
       naytaIlmoitus('Ratkaisun haku epäonnistui — yritä uudelleen');
       ratkaisuBtn.disabled = false;
