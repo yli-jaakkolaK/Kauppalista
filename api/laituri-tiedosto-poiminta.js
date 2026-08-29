@@ -11,29 +11,28 @@
 // Laituri-kirjoituksilla) — tämä reitti ei koske tietokantaa ollenkaan,
 // vain lukee Storagesta ja soittaa Anthropicille.
 //
-// pdf: KAKSI reittiä, ei vain yksi (2026-08-29, Katrin tarve: 185-sivuinen
-// matikkakirja, ei API-saldoa juuri nyt) —
+// pdf: KAKSI reittiä (2026-08-29, laajennettu samana päivänä Katrin
+// kustannustehokkuus-huomiosta) —
 //   1) PAIKALLINEN (pdf-parse, ei mitään verkkokutsua ulos) — pdf.js:n
 //      päälle rakennettu tekstikerroksen poiminta, EI vaadi Anthropic-
 //      saldoa eikä ANTHROPIC_API_KEYä ollenkaan. Ei myöskään 100 sivun
 //      rajaa (se rajoitus tulee VAIN Anthropicin document-API:n omasta
 //      rajasta, ei mistään paikallisesta syystä). Karkeampi kuin Anthropic-
 //      reitti monimutkaisen asettelun/kaavojen kanssa (lukee vain tekstin,
-//      ei "näe" sivua), mutta riittää tavalliselle leipätekstille.
+//      ei "näe" sivua), mutta riittää tavalliselle leipätekstille. TÄMÄ ON
+//      OLETUS — Katrin huomio "olisko kustannustehokkainta jos ensin
+//      paikallinen ja äly korjaa tarvittaessa/if available": ei enää
+//      automaattista Anthropic-yritystä ollenkaan, koska paikallinen on
+//      aina ilmainen eikä sitä kannata ohittaa "varmuuden vuoksi".
 //   2) ANTHROPIC (Messages API, document-lohko) — parempi laatu (näkee
-//      sivun, osaa taulukot/asettelun paremmin), mutta vaatii saldoa ja
-//      rajoittuu 100 sivuun (platform.claude.com, tarkistettu 2026-08-11).
-// Valinta: jos sivumäärä (pdf-parse kertoo sen ilmaiseksi samalla poiminta-
-// ajolla) ylittää 100, mennään SUORAAN paikalliseen — Anthropic-yritys
-// epäonnistuisi joka tapauksessa, turha kutsu. Muuten yritetään ensin
-// Anthropicia (parempi laatu) ja jos SE epäonnistuu MISTÄ TAHANSA syystä
-// (saldo, raja, verkko), pudotaan automaattisesti paikalliseen sen sijaan
-// että koko poiminta epäonnistuisi — tiedosto ei silti koskaan jää ilman
-// tekstiä pelkän tilapäisen API-ongelman takia. Vastaus kertoo kummalla
-// tavalla teksti lopulta saatiin (menetelma), jotta selain voi kertoa
-// käyttäjälle jos tulos on karkeampi.
+//      sivun, osaa taulukot/asettelun/kaavat paremmin), mutta vaatii saldoa
+//      ja rajoittuu 100 sivuun (platform.claude.com, tarkistettu
+//      2026-08-11). Käytetään VAIN kun kutsuja pyytää sitä erikseen
+//      (body.paranna=true, script.js:n "✨ Paranna tekoälyllä" -valikkokohta
+//      olemassa olevalle liitteelle) — EI koskaan automaattisesti.
 // pptx: jszip purkaa zip-paketin, <a:t>-tekstisolmut jokaisesta
-// ppt/slides/slideN.xml:stä, dian numeron mukaan järjestettynä.
+// ppt/slides/slideN.xml:stä, dian numeron mukaan järjestettynä (aina
+// paikallinen, ei koskaan tarvinnut Anthropicia).
 
 const JSZip = require('jszip');
 const pdfParse = require('pdf-parse');
@@ -99,28 +98,43 @@ async function poimiPdfTekstiPaikallisesti(tavut) {
   return { teksti: tulos.text, sivuja: tulos.numpages };
 }
 
-// Orkestroi kahden PDF-poimintatavan valinnan (ks. tiedoston yläkommentti).
-// Palauttaa AINA jotain jos tiedosto ylipäätään on kelvollinen PDF —
-// tilapäinen Anthropic-ongelma (saldo/raja/verkko) ei koskaan estä
-// paikallista tulosta, koska se on jo laskettu valmiiksi sivumäärän
-// selvittämistä varten.
-async function poimiPdfTeksti(tavut) {
+// Orkestroi PDF-poiminnan (ks. tiedoston yläkommentti). pyydaAnthropic=false
+// (oletus, uusi tiedosto) -> AINA paikallinen, ei koskaan verkkokutsua ulos.
+// pyydaAnthropic=true ("✨ Paranna tekoälyllä" olemassa olevalle liitteelle)
+// -> yritetään Anthropicia, mutta vain jos avain on asetettu JA sivuja on
+// enintään PDF_ANTHROPIC_MAX_SIVUA — muuten kerrotaan käyttäjälle SUORAAN
+// miksi parannus ei onnistu (ei hiljaista paikalliseen palaamista, koska
+// tässä tapauksessa käyttäjä nimenomaan PYYSI parempaa tulosta eikä
+// paikallinen enää olisi mitään uutta).
+async function poimiPdfTeksti(tavut, pyydaAnthropic) {
   if (tavut.length > PDF_MAX_TAVUA) {
     const virhe = new Error('PDF on liian iso (' + Math.round(tavut.length / 1024 / 1024) + ' MB, raja 32 MB)');
     virhe.kayttajalle = true;
     throw virhe;
   }
-  const paikallinen = await poimiPdfTekstiPaikallisesti(tavut);
-
-  if (!ANTHROPIC_API_KEY || paikallinen.sivuja > PDF_ANTHROPIC_MAX_SIVUA) {
+  if (!pyydaAnthropic) {
+    const paikallinen = await poimiPdfTekstiPaikallisesti(tavut);
     return { teksti: paikallinen.teksti, menetelma: 'paikallinen' };
+  }
+
+  if (!ANTHROPIC_API_KEY) {
+    const virhe = new Error('ANTHROPIC_API_KEY puuttuu Vercelistä — tekoälyparannus ei ole käytössä juuri nyt');
+    virhe.kayttajalle = true;
+    throw virhe;
+  }
+  const paikallinen = await poimiPdfTekstiPaikallisesti(tavut);
+  if (paikallinen.sivuja > PDF_ANTHROPIC_MAX_SIVUA) {
+    const virhe = new Error('PDF:ssä on ' + paikallinen.sivuja + ' sivua — Anthropicin oma raja on ' + PDF_ANTHROPIC_MAX_SIVUA + ', joten tekoälyparannus ei ole mahdollinen tälle tiedostolle');
+    virhe.kayttajalle = true;
+    throw virhe;
   }
   try {
     const teksti = await poimiPdfTekstiAnthropic(tavut);
     return { teksti: teksti, menetelma: 'anthropic' };
   } catch (e) {
-    console.error('[laituri-tiedosto-poiminta] Anthropic epäonnistui, käytetään paikallista poimintaa varalla:', e.message);
-    return { teksti: paikallinen.teksti, menetelma: 'paikallinen' };
+    const virhe = new Error('Tekoälyparannus epäonnistui (' + e.message + ') — paikallinen teksti säilyy ennallaan');
+    virhe.kayttajalle = true;
+    throw virhe;
   }
 }
 
@@ -162,7 +176,7 @@ module.exports = async function handler(req, res) {
   const userId = await getUserId(token);
   if (!userId) return res.status(401).json({ error: 'Virheellinen tai vanhentunut kirjautuminen' });
 
-  const { storage_polku, mime_tyyppi } = req.body || {};
+  const { storage_polku, mime_tyyppi, paranna } = req.body || {};
   if (!storage_polku || !mime_tyyppi) {
     return res.status(400).json({ error: 'storage_polku tai mime_tyyppi puuttuu' });
   }
@@ -170,7 +184,7 @@ module.exports = async function handler(req, res) {
   try {
     const tavut = await lataaStoragesta(storage_polku);
     if (mime_tyyppi === 'application/pdf') {
-      const tulos = await poimiPdfTeksti(tavut);
+      const tulos = await poimiPdfTeksti(tavut, !!paranna);
       return res.status(200).json({ teksti: tulos.teksti, menetelma: tulos.menetelma });
     }
     if (mime_tyyppi === 'application/vnd.openxmlformats-officedocument.presentationml.presentation') {

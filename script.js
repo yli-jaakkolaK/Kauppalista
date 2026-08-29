@@ -10682,6 +10682,10 @@ async function lataaLaituri(hakusana) {
   // kyselyä per rivi). Ryhmitellään muru_id:n mukaan, aikajärjestykseen
   // (order asc) jo kannassa, joten piirtokohdassa ei tarvitse lajitella uudelleen.
   const jatkorivitKartta = {};
+  // Liitetiedostojen kartta (2026-08-29, ✨ Paranna tekoälyllä -valikkokohtaa
+  // varten) — samalla "yksi erällinen haku kaikille näytettäville" -periaate
+  // kuin jatkoriveillä juuri yllä, muru_id:n mukaan.
+  const tiedostoKartta = {};
   if (data && data.length > 0) {
     const { data: jatkorivit, error: jatkoriviError } = await db.from('laituri_jatkorivit').select()
       .in('muru_id', data.map(function(r) { return r.id; })).order('created_at', { ascending: true });
@@ -10692,6 +10696,13 @@ async function lataaLaituri(hakusana) {
         if (!jatkorivitKartta[jr.muru_id]) jatkorivitKartta[jr.muru_id] = [];
         jatkorivitKartta[jr.muru_id].push(jr);
       });
+    }
+    const { data: tiedostot, error: tiedostoError } = await db.from('laituri_tiedostot')
+      .select('muru_id, storage_polku, mime_tyyppi, poiminta_menetelma').in('muru_id', data.map(function(r) { return r.id; }));
+    if (tiedostoError) {
+      console.error('Liitetiedostojen haku epäonnistui:', tiedostoError);
+    } else {
+      (tiedostot || []).forEach(function(t) { tiedostoKartta[t.muru_id] = t; });
     }
   }
 
@@ -10860,6 +10871,42 @@ async function lataaLaituri(hakusana) {
     // Arkistointi (2026-07-19, ks. muistiinpanot.md "Murun arkistointi") oli
     // täällä ensin — ✨/💬 siirretty mukaan 2026-07-20 rivin ahtauskorjauksessa.
     const menuKohdat = [];
+    // "✨ Paranna tekoälyllä" (2026-08-29, Katrin pyyntö: pdf-poiminta on
+    // oletuksena paikallinen/ilmainen — ks. api/laituri-tiedosto-poiminta.js —
+    // tämä on ERILLINEN, käyttäjän oma pyyntö korvata se Anthropicin
+    // dokumenttiluvulla kun saldoa on/sitä halutaan käyttää). Näkyy VAIN
+    // pdf-liitteille joiden teksti on yhä paikallisesti poimittu — katoaa
+    // itsestään kun parannus on tehty (poiminta_menetelma vaihtuu).
+    const tiedosto = tiedostoKartta[rivi.id];
+    if (tiedosto && tiedosto.mime_tyyppi === 'application/pdf' && tiedosto.poiminta_menetelma === 'paikallinen') {
+      menuKohdat.push({
+        label: '✨ Paranna tekoälyllä',
+        onClick: async function() {
+          naytaIlmoitus('Parannetaan tekoälyllä...');
+          const { data: sessionData } = await db.auth.getSession();
+          const token = sessionData.session ? sessionData.session.access_token : null;
+          let tulos = null;
+          try {
+            const vastaus = await fetch('/api/laituri-tiedosto-poiminta', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
+              body: JSON.stringify({ storage_polku: tiedosto.storage_polku, mime_tyyppi: tiedosto.mime_tyyppi, paranna: true }),
+            });
+            tulos = await vastaus.json();
+            if (!vastaus.ok) { naytaIlmoitus('Parannus epäonnistui: ' + (tulos.error || 'tuntematon virhe')); return; }
+          } catch (e) {
+            naytaIlmoitus('Parannus epäonnistui — yritä uudelleen');
+            return;
+          }
+          const { error: sisaltoError } = await db.from('laituri').update({ content: tulos.teksti }).eq('id', rivi.id);
+          if (ilmoitaKirjoitusvirheesta(sisaltoError, 'Parannetun tekstin tallennus')) return;
+          const { error: tiedostoUpdError } = await db.from('laituri_tiedostot').update({ poimittu_teksti: tulos.teksti, poiminta_menetelma: tulos.menetelma }).eq('muru_id', rivi.id);
+          if (tiedostoUpdError) console.error('Tiedoston poiminta_menetelma-päivitys epäonnistui:', tiedostoUpdError);
+          naytaIlmoitus('Teksti parannettu tekoälyllä');
+          lataaLaituri(document.getElementById('laituri-search').value.trim());
+        },
+      });
+    }
     if (rivi.status !== 'sijoitettu') {
       menuKohdat.push({
         label: '✨ Kysy ehdotus',
@@ -14017,6 +14064,7 @@ async function kasitteleEditoriTiedosto(file, tilaElId) {
       mime_tyyppi: file.type || 'application/octet-stream',
       koko_tavua: file.size,
       poimittu_teksti: poimittuTeksti,
+      poiminta_menetelma: poimintaMenetelma,
     });
     if (tiedostoError) console.error('Tiedoston metatiedon tallennus epäonnistui (tiedosto silti Storagessa ja murussa):', tiedostoError);
 
