@@ -185,6 +185,19 @@ function pvmJaAika(hetki) {
   };
 }
 
+// Riisuu Lukkarikone-tyylisen kurssikoodin otsikon lopusta (2026-08-29,
+// Katrin pyyntö: "Introduction to mathematical sciences TE00CQ15-3042" ei
+// tarvitse näkyä perhekalenterissa, pelkkä kurssin nimi riittää). Koodin
+// muoto vaihtelee syötteessä (esim. "TE00CQ15-3042" TAI pelkkä numero-
+// muotoinen "5051115-3031"), joten tunnistetaan rakenteen perusteella: väli,
+// sitten 5-10 kirjain/numeromerkkiä, viiva, 3-5 numeroa, rivin loppuun asti.
+// Ei kosketa otsikkoa jos loppu ei täsmää tähän tarkkaan kuvioon (esim.
+// "Practical Training - update" jää koskemattomaksi, koska viivan jälkeinen
+// osa ei ole pelkkiä numeroita).
+function siistiOtsikko(otsikko) {
+  return otsikko.replace(/\s+[A-Za-z0-9]{5,10}-\d{3,5}$/, '');
+}
+
 // Jäsentää yhden .ics-tekstin (joko yksittäinen CalDAV-objekti tai koko
 // ics_url-tiedosto, jossa voi olla monta VEVENTiä) ja palauttaa listan
 // { uid, title, event_date, event_time, event_end_time, organizer }.
@@ -228,7 +241,7 @@ function jasennaTapahtumat(icsTeksti, alkuRaja, loppuRaja) {
         const loppuAika = event.endDate ? pvmJaAika(event.endDate) : { event_time: null, event_date: pvmAika.event_date };
         tapahtumat.push({
           uid: event.uid,
-          title: event.summary || '(nimetön)',
+          title: siistiOtsikko(event.summary || '(nimetön)'),
           event_date: pvmAika.event_date,
           event_time: pvmAika.event_time,
           event_end_time: loppuAika.event_time,
@@ -270,7 +283,7 @@ function jasennaTapahtumat(icsTeksti, alkuRaja, loppuRaja) {
             // siirtyisi toiseen päivään, muuten samasta kerrasta syntyisi
             // eri UID jokaisella synkkauksella kun se joskus siirretään.
             uid: event.uid + '#' + esiintyma.toString(),
-            title: tiedot.item.summary || '(nimetön)',
+            title: siistiOtsikko(tiedot.item.summary || '(nimetön)'),
             event_date: pvmAika.event_date,
             event_time: pvmAika.event_time,
             event_end_time: loppuAika.event_time,
