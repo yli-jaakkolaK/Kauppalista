@@ -3206,6 +3206,18 @@ h1 {
   margin-top: 10px;
 }
 
+.harjoittele-itsearvio {
+  display: flex;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.harjoittele-tarkkuus {
+  font-size: 0.85em;
+  opacity: 0.7;
+  margin-top: 4px;
+}
+
 /* Perus-.dialog-btn on sovelluksen ainoa "päätoiminto"-nappi (Tallenna/
    Merkitse tehdyksi/Aseta/Valmis, ks. index.html) — sama vahvempi,
    peittävämpi lasiresepti (.8/.4) jonka #muistutus-lisaa-btn ym. kolme

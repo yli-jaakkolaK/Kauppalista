@@ -1505,6 +1505,15 @@
       <p class="dialog-body" id="harjoittele-lataus">Luodaan tehtävää...</p>
       <div id="harjoittele-sisalto" style="display:none">
         <p class="dialog-body" id="harjoittele-kysymys"></p>
+        <!-- Itsearvio (sql/151, 2026-08-30) — vapaaehtoinen, EI vaikuta
+             vaiheen etenemiseen (se pysyy paljastusmäärän mukaisena, ks.
+             tarkistaVaiheenEteneminen). Antaa vain näkyvyyden siihen osaako
+             oikeasti, paljastuksista riippumatta. -->
+        <div class="harjoittele-itsearvio" id="harjoittele-itsearvio">
+          <button class="dialog-btn dialog-btn-cancel" id="harjoittele-osasin-btn">✅ Osasin</button>
+          <button class="dialog-btn dialog-btn-cancel" id="harjoittele-en-osannut-btn">❌ En osannut</button>
+        </div>
+        <p class="harjoittele-tarkkuus" id="harjoittele-tarkkuus" style="display:none"></p>
         <p class="dialog-body harjoittele-vihje" id="harjoittele-vihje" style="display:none"></p>
         <p class="dialog-body harjoittele-ratkaisu" id="harjoittele-ratkaisu" style="display:none"></p>
         <p class="dialog-body harjoittele-vaihe-viesti" id="harjoittele-vaihe-viesti" style="display:none"></p>

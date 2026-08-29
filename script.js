@@ -1827,6 +1827,9 @@ async function avaaHarjoittele(aihe) {
   const uusiBtn = document.getElementById('harjoittele-uusi-btn');
   const suljeBtn = document.getElementById('harjoittele-sulje-btn');
   const perustaVihje = document.getElementById('harjoittele-perusta-vihje');
+  const osasinBtn = document.getElementById('harjoittele-osasin-btn');
+  const enOsannutBtn = document.getElementById('harjoittele-en-osannut-btn');
+  const tarkkuusEl = document.getElementById('harjoittele-tarkkuus');
 
   otsikko.textContent = '🧠 ' + aihe.name;
   // Perustaidot-aihe (esim. "1 - Fundamental Physics Skills") — EI "10 –
@@ -1868,6 +1871,39 @@ async function avaaHarjoittele(aihe) {
     vaiheViestiEl.style.display = 'block';
   }
 
+  // Itsearvion tarkkuuslukema (sql/151, 2026-08-30) — VAIN näkyvyyttä
+  // varten, ei syötä mihinkään logiikkaan. Laskee nykyisen aihe+vaihe-parin
+  // yli kaikki tehtävät joihin on annettu itsearvio (jonossa olevat/vielä
+  // arvioimattomat eivät vaikuta osoittajaan eivätkä nimittäjään).
+  async function paivitaTarkkuus() {
+    const { data, error } = await db.from('harjoitustehtavat')
+      .select('itse_arvioitu_oikein')
+      .eq('aihe_id', aihe.id)
+      .eq('pacer_vaihe', valittuVaihe)
+      .not('itse_arvioitu_oikein', 'is', null);
+    if (error || !data || data.length === 0) { tarkkuusEl.style.display = 'none'; return; }
+    const oikein = data.filter(function(r) { return r.itse_arvioitu_oikein === true; }).length;
+    tarkkuusEl.textContent = 'Tarkkuus tässä vaiheessa: ' + oikein + '/' + data.length + ' (' + Math.round(100 * oikein / data.length) + ' %)';
+    tarkkuusEl.style.display = 'block';
+  }
+
+  async function tallennaItsearvio(oikein) {
+    const tehtavaId = sisalto.dataset.tehtavaId;
+    if (!tehtavaId) return;
+    osasinBtn.disabled = true;
+    enOsannutBtn.disabled = true;
+    const { error } = await db.from('harjoitustehtavat').update({ itse_arvioitu_oikein: oikein }).eq('id', tehtavaId);
+    if (ilmoitaKirjoitusvirheesta(error, 'Itsearvion tallennus')) {
+      osasinBtn.disabled = false;
+      enOsannutBtn.disabled = false;
+      return;
+    }
+    (oikein ? osasinBtn : enOsannutBtn).textContent = oikein ? '✅ Merkitty' : '❌ Merkitty';
+    paivitaTarkkuus();
+  }
+  osasinBtn.onclick = function() { tallennaItsearvio(true); };
+  enOsannutBtn.onclick = function() { tallennaItsearvio(false); };
+
   // Käsin "Vaikeampi"-nappi (2026-08-29, Katrin pyyntö) — sama vaiheketju
   // kuin automaattisessa etenemisessä, mutta laukaistaan heti napautuksesta
   // eikä 5 paljastuksen jälkeen. Hyödyllinen kun aihe tuntuu jo liian
@@ -1895,6 +1931,10 @@ async function avaaHarjoittele(aihe) {
     vihjeBtn.disabled = false;
     ratkaisuBtn.disabled = false;
     ratkaisuBtn.textContent = '👁 Näytä ratkaisu';
+    osasinBtn.disabled = false;
+    enOsannutBtn.disabled = false;
+    osasinBtn.textContent = '✅ Osasin';
+    enOsannutBtn.textContent = '❌ En osannut';
     lataus.style.display = 'block';
     lataus.textContent = 'Haetaan tehtävää...';
 
@@ -1944,6 +1984,7 @@ async function avaaHarjoittele(aihe) {
     sisalto.dataset.tehtavaId = tulos.id;
     kysymysEl.textContent = tulos.kysymys;
     vihjeEl.textContent = tulos.vihje || '';
+    paivitaTarkkuus();
   }
 
   vihjeBtn.onclick = function() {
@@ -6144,6 +6185,28 @@ function analysoiPaivanRistiriidat(rivit, isoPvm) {
   return { vakavuus: vakavuus, fullIds: fullIds };
 }
 
+// Kuvaa kahden tapahtuman ajallisen suhteen ihmisluettavana tekstinä
+// (2026-08-30, Katrin huomio: "nowhere shows how things are overlapping or
+// by how much"). Käyttää RAAKOJA (puskurittomia) aikoja — siirtymäpuskuri
+// (ks. onkoAjallisestiPaallekkainen) on vain matka-ajan MARGINAALI, ei osa
+// todellista päällekkäisyyttä, joten tämä erottaa selvästi kaksi eri
+// tilannetta jotka onkoAjallisestiPaallekkainen niputtaa yhteen: oikean
+// aikapäällekkäisyyden ja pelkän liian tiukan siirtymän.
+function kuvaaAjallinenSuhde(a, b) {
+  const aAlku = aikaMinuutteina(a.event_time);
+  const aLoppu = aikaMinuutteina(a.event_end_time || a.event_time);
+  const bAlku = aikaMinuutteina(b.event_time);
+  const bLoppu = aikaMinuutteina(b.event_end_time || b.event_time);
+  const paallekkaisAlku = Math.max(aAlku, bAlku);
+  const paallekkaisLoppu = Math.min(aLoppu, bLoppu);
+  if (paallekkaisLoppu > paallekkaisAlku) {
+    return 'päällekkäin ' + minutesToHHMM(paallekkaisAlku) + '–' + minutesToHHMM(paallekkaisLoppu) + ' (' + (paallekkaisLoppu - paallekkaisAlku) + ' min)';
+  }
+  const valiMin = aAlku <= bAlku ? (bAlku - aLoppu) : (aAlku - bLoppu);
+  if (valiMin <= 0) return 'peräkkäin, ei siirtymäaikaa';
+  return 'vain ' + valiMin + ' min siirtymäaikaa (suositus ' + haeAsetusNumero('siirtymapuskuri_min', 30) + ' min)';
+}
+
 function minutesToHHMM(min) {
   const h = Math.floor(min / 60) % 24;
   const m = Math.round(min % 60);
@@ -6657,12 +6720,27 @@ function avaaRistiriitaVahvistus(isoPvm, rivit, fullIds) {
   // törmää keneen) ei ollut aiemmin pääteltävissä pelkästä listasta.
   const kuvaus = osalliset.map(function(r) {
     const aika = r.event_time ? r.event_time.slice(0, 5) : '';
+    const loppuaika = r.event_end_time ? r.event_end_time.slice(0, 5) : aika;
     const omistaja = r._henkilo ? henkiloNimi(r._henkilo) : 'perhe';
-    return r.title + ' (' + omistaja + ') ' + aika;
+    return r.title + ' (' + omistaja + ') ' + aika + (loppuaika !== aika ? '–' + loppuaika : '');
   }).join('\n');
 
+  // Mikä menee päällekkäin ja kuinka paljon (2026-08-30, Katrin huomio:
+  // "nowhere shows how things are overlapping or by how much") — ilman tätä
+  // näkyi vain osallistuvien tapahtumien lista, ei niiden VÄLINEN suhde.
+  // Käydään läpi jokainen pari osallisista jotka oikeasti menevät ajallisesti
+  // päällekkäin (ks. onkoAjallisestiPaallekkainen).
+  const parikuvaukset = [];
+  for (let i = 0; i < osalliset.length; i++) {
+    for (let j = i + 1; j < osalliset.length; j++) {
+      if (!onkoAjallisestiPaallekkainen(osalliset[i], osalliset[j])) continue;
+      parikuvaukset.push(osalliset[i].title + ' / ' + osalliset[j].title + ': ' + kuvaaAjallinenSuhde(osalliset[i], osalliset[j]));
+    }
+  }
+  const kuvausKokonaan = parikuvaukset.length > 0 ? kuvaus + '\n\n' + parikuvaukset.join('\n') : kuvaus;
+
   const jo = onkoRistiriitaKuitattu(isoPvm, fullIds);
-  document.getElementById('ristiriita-body').textContent = kuvaus;
+  document.getElementById('ristiriita-body').textContent = kuvausKokonaan;
   const keskusteltuNappi = document.getElementById('ristiriita-keskusteltu-btn');
   keskusteltuNappi.style.display = jo ? 'none' : '';
   const ehdotaNappi = document.getElementById('ristiriita-ehdota-btn');
