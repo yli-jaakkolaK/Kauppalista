@@ -1545,9 +1545,45 @@ async function lataaOpintoKurssiMateriaalit() {
   rivit.forEach(function(rivi) {
     const li = document.createElement('li');
     const teksti = document.createElement('span');
+    const onTiedosto = !!tiedostoKartta[rivi.id];
     const nimi = tiedostoKartta[rivi.id] || rivi.content;
     teksti.textContent = nimi.length > 60 ? nimi.slice(0, 60) + '…' : nimi;
     li.appendChild(teksti);
+
+    // Tekstirivin (ei tiedoston) korjausmuokkaus (2026-08-29, Katrin
+    // huomio: linkki jäi ilman aihenumeroa eikä sitä pystynyt korjaamaan
+    // enää mistään — tämä lista oli täysin kertakirjoitettava). Tiedostoon
+    // perustuvat rivit (rivi.content = koko poimittu dokumenttiteksti)
+    // jätetään ulos: napautus avaisi ison tekstikentän jota ei ole
+    // tarkoitettu muokattavaksi, sama rajaus kuin Laiturin omassa
+    // korjausmuokkauksessa (ks. lataaLaituri, otsikkoOnMuru).
+    if (!onTiedosto) {
+      teksti.title = 'Napauta korjataksesi';
+      teksti.addEventListener('click', function() {
+        const inputti = document.createElement('input');
+        inputti.type = 'text';
+        inputti.value = rivi.content;
+        inputti.className = 'edit-input';
+        teksti.replaceWith(inputti);
+        inputti.focus();
+        inputti.setSelectionRange(inputti.value.length, inputti.value.length);
+
+        async function tallenna() {
+          const uusi = inputti.value.trim();
+          if (uusi && uusi !== rivi.content) {
+            const { error } = await db.from('laituri').update({ content: uusi }).eq('id', rivi.id);
+            ilmoitaKirjoitusvirheesta(error, 'Materiaalin muokkaus');
+          }
+          lataaOpintoKurssiMateriaalit();
+        }
+
+        inputti.addEventListener('blur', tallenna);
+        inputti.addEventListener('keydown', function(e) {
+          if (e.key === 'Enter') inputti.blur();
+          if (e.key === 'Escape') { inputti.value = rivi.content; inputti.blur(); }
+        });
+      });
+    }
 
     const tila = document.createElement('span');
     tila.className = 'opinto-materiaali-tila' + (rivi.materiaali_kasitelty ? ' kasitelty' : '');
