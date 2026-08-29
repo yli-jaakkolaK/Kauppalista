@@ -3164,6 +3164,35 @@ h1 {
   margin-top: 20px;
 }
 
+/* Harjoittele-tehtävänäkymä (2026-08-29) — laajempi ja vasemmalle tasattu
+   verrattuna tavalliseen lyhyeen vahvistusdialogiin, koska sisältö on
+   kokonaisia fysiikan tehtävänantoja/ratkaisuja, ei yhtä lausetta. */
+#harjoittele-overlay .dialog-box {
+  max-width: 520px;
+  text-align: left;
+}
+#harjoittele-overlay .dialog-body {
+  text-align: left;
+  white-space: pre-wrap;
+  font-size: 14px;
+  line-height: 1.5;
+}
+#harjoittele-kysymys {
+  color: var(--muste);
+}
+.harjoittele-vihje {
+  color: var(--vaimea);
+  font-style: italic;
+}
+.harjoittele-ratkaisu {
+  border-top: 1px dashed var(--hius-vahva);
+  padding-top: 10px;
+  margin-top: 10px;
+}
+.harjoittele-toiminnot {
+  flex-wrap: wrap;
+}
+
 /* Perus-.dialog-btn on sovelluksen ainoa "päätoiminto"-nappi (Tallenna/
    Merkitse tehdyksi/Aseta/Valmis, ks. index.html) — sama vahvempi,
    peittävämpi lasiresepti (.8/.4) jonka #muistutus-lisaa-btn ym. kolme

@@ -3,6 +3,7 @@
   "private": true,
   "description": "Vercel serverless -funktioiden riippuvuudet (etusivun vanilla-JS-puoli ei tarvitse näitä)",
   "dependencies": {
+    "html-to-text": "^9.0.5",
     "ical.js": "^2.2.1",
     "jszip": "^3.10.1",
     "pdf-parse": "^1.1.1",

@@ -1471,6 +1471,30 @@
     </div>
   </div>
 
+  <!-- Harjoittele-tehtävänäkymä (2026-08-29, ks. api/luo-harjoitustehtava.js
+       yläkommentti) — oma overlay dialog-overlayn kaavan mukaan, koska
+       tarvitsee enemmän kuin kaksi nappia (Vihje / Näytä ratkaisu / Uusi
+       tehtävä / Sulje) eikä siksi sovi jaettuun #dialog-overlayyn. -->
+  <div class="dialog-overlay" id="harjoittele-overlay" style="display:none">
+    <div class="dialog-box">
+      <p class="dialog-title" id="harjoittele-otsikko"></p>
+      <p class="dialog-body" id="harjoittele-lataus">Luodaan tehtävää...</p>
+      <div id="harjoittele-sisalto" style="display:none">
+        <p class="dialog-body" id="harjoittele-kysymys"></p>
+        <p class="dialog-body harjoittele-vihje" id="harjoittele-vihje" style="display:none"></p>
+        <p class="dialog-body harjoittele-ratkaisu" id="harjoittele-ratkaisu" style="display:none"></p>
+        <div class="dialog-buttons harjoittele-toiminnot">
+          <button class="dialog-btn dialog-btn-cancel" id="harjoittele-vihje-btn">💡 Vihje</button>
+          <button class="dialog-btn dialog-btn-cancel" id="harjoittele-ratkaisu-btn">👁 Näytä ratkaisu</button>
+          <button class="dialog-btn dialog-btn-cancel" id="harjoittele-uusi-btn">🔄 Uusi tehtävä</button>
+        </div>
+      </div>
+      <div class="dialog-buttons">
+        <button class="dialog-btn dialog-btn-cancel" id="harjoittele-sulje-btn">Sulje</button>
+      </div>
+    </div>
+  </div>
+
   <div class="dialog-overlay" id="ristiriita-overlay" style="display:none">
     <div class="dialog-box">
       <p class="dialog-title">Päällekkäin tänä päivänä</p>

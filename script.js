@@ -1711,6 +1711,23 @@ async function lataaOpintoAiheet() {
     });
     li.appendChild(materiaaliNappi);
 
+    // Harjoittele-nappi (2026-08-29, ks. api/luo-harjoitustehtava.js) — vain
+    // niille aiheille joilla on käyttökelpoinen konteksti generaattorille:
+    // joko opettajan otsikkoon merkitsemät OpenStax-osiot, tai (aiheille
+    // joilla ei sellaista ole, esim. "ICT and sustainability") aiheen oma
+    // materiaali_teksti-varakonteksti (ks. tämän ominaisuuden migraatio).
+    if ((aihe.openstax_sections && aihe.openstax_sections.length > 0) || aihe.materiaali_teksti) {
+      const harjoitteleNappi = document.createElement('button');
+      harjoitteleNappi.className = 'link-btn';
+      harjoitteleNappi.textContent = '🧠 Harjoittele';
+      harjoitteleNappi.title = 'Luo harjoitustehtävä tästä aiheesta';
+      harjoitteleNappi.addEventListener('click', function(e) {
+        e.stopPropagation();
+        avaaHarjoittele(aihe);
+      });
+      li.appendChild(harjoitteleNappi);
+    }
+
     const poisto = document.createElement('button');
     poisto.className = 'delete-btn';
     poisto.textContent = '×';
@@ -1723,6 +1740,105 @@ async function lataaOpintoAiheet() {
 
     listEl.appendChild(li);
   });
+}
+
+// Harjoittele-tehtävänäkymä (2026-08-29, ks. api/luo-harjoitustehtava.js ja
+// api/nayta-ratkaisu.js). PACER-vaihe on toistaiseksi aina "encoding" —
+// kytkentä aiheen omaan seurattuun vaiheeseen on myöhempi vaihe (Katrin
+// build brief, kohta 6: "wire it to tracked progress later").
+async function avaaHarjoittele(aihe) {
+  const overlay = document.getElementById('harjoittele-overlay');
+  const otsikko = document.getElementById('harjoittele-otsikko');
+  const lataus = document.getElementById('harjoittele-lataus');
+  const sisalto = document.getElementById('harjoittele-sisalto');
+  const kysymysEl = document.getElementById('harjoittele-kysymys');
+  const vihjeEl = document.getElementById('harjoittele-vihje');
+  const ratkaisuEl = document.getElementById('harjoittele-ratkaisu');
+  const vihjeBtn = document.getElementById('harjoittele-vihje-btn');
+  const ratkaisuBtn = document.getElementById('harjoittele-ratkaisu-btn');
+  const uusiBtn = document.getElementById('harjoittele-uusi-btn');
+  const suljeBtn = document.getElementById('harjoittele-sulje-btn');
+
+  otsikko.textContent = '🧠 ' + aihe.name;
+  overlay.style.display = 'flex';
+
+  async function luoUusiTehtava() {
+    sisalto.style.display = 'none';
+    vihjeEl.style.display = 'none';
+    ratkaisuEl.style.display = 'none';
+    vihjeBtn.disabled = false;
+    ratkaisuBtn.disabled = false;
+    ratkaisuBtn.textContent = '👁 Näytä ratkaisu';
+    lataus.style.display = 'block';
+    lataus.textContent = 'Luodaan tehtävää...';
+
+    const { data: sessionData } = await db.auth.getSession();
+    const token = sessionData.session ? sessionData.session.access_token : null;
+    let tulos = null;
+    try {
+      const vastaus = await fetch('/api/luo-harjoitustehtava', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
+        body: JSON.stringify({ aihe_id: aihe.id, pacer_vaihe: 'encoding' }),
+      });
+      tulos = await vastaus.json();
+      if (!vastaus.ok) {
+        lataus.textContent = tulos.error || 'Tehtävän luonti epäonnistui';
+        return;
+      }
+    } catch (e) {
+      lataus.textContent = 'Tehtävän luonti epäonnistui — yritä uudelleen';
+      return;
+    }
+
+    lataus.style.display = 'none';
+    sisalto.style.display = 'block';
+    sisalto.dataset.tehtavaId = tulos.id;
+    kysymysEl.textContent = tulos.kysymys;
+    vihjeEl.textContent = tulos.vihje || '';
+  }
+
+  vihjeBtn.onclick = function() {
+    vihjeEl.style.display = vihjeEl.style.display === 'none' ? 'block' : 'none';
+  };
+
+  ratkaisuBtn.onclick = async function() {
+    const tehtavaId = sisalto.dataset.tehtavaId;
+    if (!tehtavaId) return;
+    ratkaisuBtn.disabled = true;
+    ratkaisuBtn.textContent = 'Haetaan...';
+    const { data: sessionData } = await db.auth.getSession();
+    const token = sessionData.session ? sessionData.session.access_token : null;
+    try {
+      const vastaus = await fetch('/api/nayta-ratkaisu', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
+        body: JSON.stringify({ tehtava_id: tehtavaId }),
+      });
+      const tulos = await vastaus.json();
+      if (!vastaus.ok) {
+        naytaIlmoitus(tulos.error || 'Ratkaisun haku epäonnistui');
+        ratkaisuBtn.disabled = false;
+        ratkaisuBtn.textContent = '👁 Näytä ratkaisu';
+        return;
+      }
+      ratkaisuEl.textContent = tulos.ratkaisu;
+      ratkaisuEl.style.display = 'block';
+      ratkaisuBtn.textContent = '✓ Ratkaisu näkyvissä';
+    } catch (e) {
+      naytaIlmoitus('Ratkaisun haku epäonnistui — yritä uudelleen');
+      ratkaisuBtn.disabled = false;
+      ratkaisuBtn.textContent = '👁 Näytä ratkaisu';
+    }
+  };
+
+  uusiBtn.onclick = luoUusiTehtava;
+
+  suljeBtn.onclick = function() {
+    overlay.style.display = 'none';
+  };
+
+  await luoUusiTehtava();
 }
 
 document.getElementById('opinto-uusi-aihe-btn').addEventListener('click', async function() {
