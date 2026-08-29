@@ -1787,25 +1787,47 @@ async function avaaHarjoittele(aihe) {
     ratkaisuBtn.disabled = false;
     ratkaisuBtn.textContent = '👁 Näytä ratkaisu';
     lataus.style.display = 'block';
-    lataus.textContent = 'Luodaan tehtävää...';
+    lataus.textContent = 'Haetaan tehtävää...';
 
-    const { data: sessionData } = await db.auth.getSession();
-    const token = sessionData.session ? sessionData.session.access_token : null;
+    // Jono ensin (2026-08-29, "minimising API calls") — yksi funktiokutsu
+    // tuottaa 10 tehtävää kerralla (ks. api/luo-harjoitustehtava.js),
+    // suurin osa niistä jää jonossa=true-tilaan odottamaan tulevia
+    // napautuksia, jopa päiviä/viikkoja. Ei ratkaisu-saraketta mukaan tähän
+    // hakuun — se paljastuu vasta api/nayta-ratkaisu.js:n kautta erikseen.
+    const { data: jonorivit, error: jonoError } = await db.from('harjoitustehtavat')
+      .select('id, kysymys, vihje')
+      .eq('aihe_id', aihe.id)
+      .eq('pacer_vaihe', valittuVaihe)
+      .eq('jonossa', true)
+      .order('id', { ascending: true })
+      .limit(1);
+    if (jonoError) console.error('Jonotehtävän haku epäonnistui:', jonoError);
+
     let tulos = null;
-    try {
-      const vastaus = await fetch('/api/luo-harjoitustehtava', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
-        body: JSON.stringify({ aihe_id: aihe.id, pacer_vaihe: valittuVaihe }),
-      });
-      tulos = await vastaus.json();
-      if (!vastaus.ok) {
-        lataus.textContent = tulos.error || 'Tehtävän luonti epäonnistui';
+    if (jonorivit && jonorivit.length > 0) {
+      const jonoRivi = jonorivit[0];
+      const { error: jonoPaivitysError } = await db.from('harjoitustehtavat').update({ jonossa: false }).eq('id', jonoRivi.id);
+      if (jonoPaivitysError) console.error('Jonotehtävän merkintä epäonnistui:', jonoPaivitysError);
+      tulos = { id: jonoRivi.id, kysymys: jonoRivi.kysymys, vihje: jonoRivi.vihje };
+    } else {
+      lataus.textContent = 'Luodaan uusi tehtäväerä (10 kpl)...';
+      const { data: sessionData } = await db.auth.getSession();
+      const token = sessionData.session ? sessionData.session.access_token : null;
+      try {
+        const vastaus = await fetch('/api/luo-harjoitustehtava', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
+          body: JSON.stringify({ aihe_id: aihe.id, pacer_vaihe: valittuVaihe }),
+        });
+        tulos = await vastaus.json();
+        if (!vastaus.ok) {
+          lataus.textContent = tulos.error || 'Tehtävän luonti epäonnistui';
+          return;
+        }
+      } catch (e) {
+        lataus.textContent = 'Tehtävän luonti epäonnistui — yritä uudelleen';
         return;
       }
-    } catch (e) {
-      lataus.textContent = 'Tehtävän luonti epäonnistui — yritä uudelleen';
-      return;
     }
 
     lataus.style.display = 'none';
@@ -2215,6 +2237,15 @@ function paivitaOpintoTehtavaPriming() {
   const aihe = currentOpintoAihe;
   const kirjoitusOsio = document.getElementById('opinto-tehtava-priming-kysymykset-osio');
   const naytto = document.getElementById('opinto-tehtava-priming-kysymykset-nayto');
+
+  const miroOhjeEl = document.getElementById('opinto-tehtava-miro-priming-ohje');
+  if (aihe.pero_vaihe === 'priming' && aihe.miro_priming_ohje) {
+    miroOhjeEl.textContent = '🧭 ' + aihe.miro_priming_ohje;
+    miroOhjeEl.style.display = 'block';
+  } else {
+    miroOhjeEl.style.display = 'none';
+  }
+
   if (aihe.pero_vaihe === 'priming') {
     kirjoitusOsio.style.display = 'block';
     naytto.style.display = 'none';

@@ -68,12 +68,16 @@ function rakennaSystemPrompti(pacerVaihe) {
     '- ' + PACER_KUVAUKSET.encoding + '\n' +
     '- ' + PACER_KUVAUKSET.retrieval + '\n' +
     '- ' + PACER_KUVAUKSET.connection + '\n\n' +
-    'Generate ONE problem at the appropriate level.\n' +
+    'Generate TEN distinct problems at the appropriate level, batched into one\n' +
+    'response (this minimizes API calls — the student works through them one at\n' +
+    'a time over the following days/weeks).\n' +
     'The textbook sections and end-of-chapter problem sets provided below are for\n' +
     'CONTEXT ONLY — never copy an existing problem verbatim or reuse its exact\n' +
-    'numbers. Always invent a new scenario and new numeric values, distinct from\n' +
-    'both the source material and the "already generated" list below.\n' +
-    'Respond in JSON: { "skenaario": "...", "kysymys": "...", "ratkaisu": "...", "vihje": "..." }\n' +
+    'numbers. Always invent new scenarios and new numeric values, distinct from\n' +
+    'both the source material and the "already generated" list below, AND\n' +
+    'distinct from each other within this batch of ten.\n' +
+    'Respond in JSON: { "ongelmat": [ { "skenaario": "...", "kysymys": "...", "ratkaisu": "...", "vihje": "..." }, ... ] }\n' +
+    'with exactly 10 items in the ongelmat array.\n' +
     '- skenaario: 8-12 words capturing the physical scenario and key numbers\n' +
     '- kysymys:   the problem as the student sees it — no solution, no hint\n' +
     '- ratkaisu:  full worked solution with every step shown\n' +
@@ -176,7 +180,7 @@ module.exports = async function handler(req, res) {
       },
       body: JSON.stringify({
         model: ANTHROPIC_MODEL,
-        max_tokens: 1500,
+        max_tokens: 8000, // 10 tehtävää + täydet ratkaisut per erä (ks. yläkommentti)
         system: rakennaSystemPrompti(pacerVaihe),
         messages: [{ role: 'user', content: userPrompti }],
       }),
@@ -187,34 +191,52 @@ module.exports = async function handler(req, res) {
       return res.status(502).json({ error: 'Tehtävän luonti epäonnistui — yritä uudelleen' });
     }
     const raakaTeksti = (anthropicData.content || []).map(function(block) { return block.text || ''; }).join('');
-    const tehtava = parseAiJson(raakaTeksti);
-    if (!tehtava || !tehtava.kysymys || !tehtava.ratkaisu) {
+    const vastaus = parseAiJson(raakaTeksti);
+    const ongelmat = (vastaus && Array.isArray(vastaus.ongelmat)) ? vastaus.ongelmat.filter(function(o) { return o && o.kysymys && o.ratkaisu; }) : [];
+    if (ongelmat.length === 0) {
       console.error('[luo-harjoitustehtava] Vastauksen jäsennys epäonnistui:', raakaTeksti.slice(0, 500));
       return res.status(502).json({ error: 'Tehtävän luonti epäonnistui — yritä uudelleen' });
     }
 
+    // Koko 10 kpl -erä (tai vähemmän jos malli palautti harvemman) tallennetaan
+    // KERRALLA jonossa=true (sarakkeen oletusarvo, ks. sql/144) — vain
+    // ensimmäinen merkitään heti jonossa=false ja palautetaan käyttäjälle.
+    // Loput odottavat seuraavia "Uusi tehtävä" -napautuksia (script.js hakee
+    // ne suoraan Supabase-clientilla, ei tätä funktiota uudelleen kutsumalla).
     const insertRes = await supabaseFetch('harjoitustehtavat', {
       method: 'POST',
       headers: { Prefer: 'return=representation' },
-      body: JSON.stringify({
-        aihe_id: aiheId,
-        kurssi_id: aihe.kurssi_id,
-        pacer_vaihe: pacerVaihe,
-        kysymys: tehtava.kysymys,
-        ratkaisu: tehtava.ratkaisu,
-        vihje: tehtava.vihje || null,
-        skenaario: tehtava.skenaario || null,
-        owner_id: userId,
-      }),
+      body: JSON.stringify(ongelmat.map(function(o) {
+        return {
+          aihe_id: aiheId,
+          kurssi_id: aihe.kurssi_id,
+          pacer_vaihe: pacerVaihe,
+          kysymys: o.kysymys,
+          ratkaisu: o.ratkaisu,
+          vihje: o.vihje || null,
+          skenaario: o.skenaario || null,
+          owner_id: userId,
+        };
+      })),
     });
     const insertRows = await insertRes.json();
-    const uusi = Array.isArray(insertRows) ? insertRows[0] : null;
-    if (!insertRes.ok || !uusi) {
+    if (!insertRes.ok || !Array.isArray(insertRows) || insertRows.length === 0) {
       console.error('[luo-harjoitustehtava] Tallennus epäonnistui:', JSON.stringify(insertRows));
       return res.status(500).json({ error: 'Tehtävän tallennus epäonnistui' });
     }
 
-    return res.status(200).json({ id: uusi.id, kysymys: uusi.kysymys, vihje: uusi.vihje });
+    const jarjestetyt = insertRows.slice().sort(function(a, b) { return a.id - b.id; });
+    const ensimmainen = jarjestetyt[0];
+    const paivitysRes = await supabaseFetch('harjoitustehtavat?id=eq.' + ensimmainen.id, {
+      method: 'PATCH',
+      headers: { Prefer: 'return=minimal' },
+      body: JSON.stringify({ jonossa: false }),
+    });
+    if (!paivitysRes.ok) {
+      console.error('[luo-harjoitustehtava] Ensimmäisen tehtävän jono-merkinnän poisto epäonnistui:', ensimmainen.id);
+    }
+
+    return res.status(200).json({ id: ensimmainen.id, kysymys: ensimmainen.kysymys, vihje: ensimmainen.vihje });
   } catch (e) {
     console.error('[luo-harjoitustehtava] Odottamaton virhe:', e.message);
     return res.status(500).json({ error: 'Tehtävän luonti epäonnistui' });
