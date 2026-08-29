@@ -88,6 +88,10 @@ const OSIO_SLUGIT = {
     '9.5': '9-5-matrices-and-matrix-operations',
     '9.7': '9-7-solving-systems-with-inverses',
     '9.8': '9-8-solving-systems-with-cramers-rule',
+    '11.1': '11-1-sequences-and-their-notations',
+    '11.4': '11-4-series-and-their-notations',
+    '11.5': '11-5-counting-principles',
+    '11.6': '11-6-binomial-theorem',
   },
   'calculus-volume-3': {
     '2.4': '2-4-the-cross-product',
@@ -97,6 +101,24 @@ const OSIO_SLUGIT = {
     '2.4': '2-4-continuity',
     '3.1': '3-1-defining-the-derivative',
     '3.2': '3-2-the-derivative-as-a-function',
+    '4.2': '4-2-linear-approximations-and-differentials',
+    '4.7': '4-7-applied-optimization-problems',
+    '5.2': '5-2-the-definite-integral',
+    '5.3': '5-3-the-fundamental-theorem-of-calculus',
+  },
+  'calculus-volume-2': {
+    '4.1': '4-1-basics-of-differential-equations',
+  },
+  // Discrete-matiikka-aiheille ei ole omaa OpenStax-kirjaa — Contemporary
+  // Mathematics kattaa logiikan, lukuteorian ja graafiteorian yhdessä
+  // teoksessa (2026-08-30).
+  'contemporary-mathematics': {
+    '2.2': '2-2-compound-statements',
+    '2.3': '2-3-constructing-truth-tables',
+    '3.1': '3-1-prime-and-composite-numbers',
+    '3.7': '3-7-clock-arithmetic',
+    '12.1': '12-1-graph-basics',
+    '12.2': '12-2-graph-structures',
   },
 };
 
