@@ -3200,30 +3200,6 @@ h1 {
   margin-bottom: 12px;
 }
 
-.harjoittele-vaihe-valitsin {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  margin-bottom: 16px;
-}
-
-.harjoittele-vaihe-btn {
-  font-family: var(--fontti-loki);
-  font-size: 12px;
-  padding: 6px 10px;
-  border-radius: var(--r-kosketettava);
-  border: 1px solid var(--hius-vahva);
-  background: transparent;
-  color: var(--vaimea);
-  cursor: pointer;
-}
-
-.harjoittele-vaihe-btn.active {
-  background: var(--sinappi);
-  color: var(--sinappi-text);
-  border-color: var(--sinappi);
-}
-
 /* Perus-.dialog-btn on sovelluksen ainoa "päätoiminto"-nappi (Tallenna/
    Merkitse tehdyksi/Aseta/Valmis, ks. index.html) — sama vahvempi,
    peittävämpi lasiresepti (.8/.4) jonka #muistutus-lisaa-btn ym. kolme

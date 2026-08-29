@@ -1759,8 +1759,6 @@ async function avaaHarjoittele(aihe) {
   const uusiBtn = document.getElementById('harjoittele-uusi-btn');
   const suljeBtn = document.getElementById('harjoittele-sulje-btn');
   const perustaVihje = document.getElementById('harjoittele-perusta-vihje');
-  const vaiheValitsin = document.getElementById('harjoittele-vaihe-valitsin');
-  const vaiheBtnit = vaiheValitsin.querySelectorAll('.harjoittele-vaihe-btn');
 
   otsikko.textContent = '🧠 ' + aihe.name;
   // Perustaidot-aihe (esim. "1 - Fundamental Physics Skills") — EI "10 –
@@ -1768,14 +1766,12 @@ async function avaaHarjoittele(aihe) {
   // pelkkä startsWith('1')).
   perustaVihje.style.display = /^1[\s\-–]/.test(aihe.name.trim()) ? 'block' : 'none';
 
-  let valittuVaihe = 'encoding';
-  vaiheBtnit.forEach(function(btn) {
-    btn.classList.toggle('active', btn.dataset.vaihe === valittuVaihe);
-    btn.onclick = function() {
-      valittuVaihe = btn.dataset.vaihe;
-      vaiheBtnit.forEach(function(b) { b.classList.toggle('active', b === btn); });
-    };
-  });
+  // PACER-vaihe ei ole enää käsin valittavissa (2026-08-29, Katrin pyyntö:
+  // "the student never sees or touches it") — luetaan suoraan aiheen omasta
+  // pacer_vaihe_nyt-sarakkeesta (ks. sql/145). Automaattinen eteneminen
+  // (montako tehtävää per vaihe ennen seuraavaan siirtymistä) on oma,
+  // myöhempi rakennuspalanen — tämä lukee vain nykyisen tilan.
+  const valittuVaihe = aihe.pacer_vaihe_nyt || 'encoding';
 
   overlay.style.display = 'flex';
 
