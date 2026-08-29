@@ -7046,6 +7046,29 @@ function piirraKalenteriRivi(rivi) {
   const muistutusAika = reminderTimeBadge('kalenteri', rivi.id);
   if (muistutusAika) li.appendChild(muistutusAika);
 
+  // "✓ Nähty" -kuittaus peruutetulle riville (2026-08-29, Katrin pyyntö) —
+  // TARKOITUKSELLA ERI toiminto kuin alla oleva synkatun rivin normaali
+  // poisto-esto (ks. seuraavan kommentin "yksi totuus, kaksi ikkunaa"):
+  // sitä koskeva peruste ("synkka toisi sen takaisin, poista iPhonen
+  // Kalenterista") EI päde tässä, koska lähde on JO kertonut tapahtuman
+  // olevan poissa — rivi vain jäi tänne näkyviin nimenomaan odottamaan tätä
+  // kuittausta. Poisto on siis lopullinen eikä palaa itsestään, paitsi jos
+  // lähde joskus oikeasti tuo saman ical_uid:n takaisin (silloin se on
+  // aidosti uusi tieto, ei virhe).
+  if (rivi.peruttu) {
+    const poistaNappi = document.createElement('button');
+    poistaNappi.className = 'kalenteri-peruttu-poista-btn';
+    poistaNappi.textContent = '✓ Nähty';
+    poistaNappi.title = 'Kuittaa nähdyksi ja poista tämä rivi';
+    poistaNappi.addEventListener('click', async function(e) {
+      e.stopPropagation();
+      const { error } = await db.from('kalenteri_tapahtumat').delete().eq('id', rivi.id);
+      if (ilmoitaKirjoitusvirheesta(error, 'Peruutuksen kuittaus')) return;
+      lataaKalenteri();
+    });
+    li.appendChild(poistaNappi);
+  }
+
   // EI enää omia ⚓/⋯-nappeja rivillä (2026-08-24, Katrin ohje: päivänäkymä
   // seuraa satama-design-system.css:n .kal-rivi-esikuvaa — pelkkä aika +
   // merkki + teksti, ei nappirykelmää — ja saa muutenkin näyttää samalta

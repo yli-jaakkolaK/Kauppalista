@@ -3315,18 +3315,40 @@ h1 {
 }
 
 /* Peruttu tapahtuma (2026-08-29, ks. sql/139_kalenteri_peruutus.sql) — jää
-   näkyviin harmaana/yliviivattuna sen sijaan että katoaisi jäljettömiin.
-   Yliviivaus VAIN nimitekstissä, ei koko rivillä (aika/siirto-teksti pysyy
-   luettavana). */
+   näkyviin sen sijaan että katoaisi jäljettömiin. KORJATTU samana päivänä
+   (Katrin huomio): harmaa/himmeä on tässä sovelluksessa "valmis, ei tarvitse
+   enää huomiota" -kieltä (ks. .list li.done) — peruutus on PÄINVASTOIN,
+   tuore muutos joka nimenomaan vaatii huomiota. Sama vaara-resepti
+   (täytetty vaara-ground-tausta + yhtenäinen vaara-reuna) kuin
+   .paiva-merkki--ristiriita, jonka oma kommentti sanoo punaisen olevan
+   varattu YKSINOMAAN "ei saa mennä ohi silmää" -tapauksille — peruutus
+   kuuluu samaan kategoriaan, ei rikoista tarkoitusta laajentaa se tänne.
+   Ei opacityä: rivin PITÄÄ erottua, ei hälvetä taustaan. */
 .list li.kalenteri-rivi-peruttu {
-  opacity: .55;
-  border-left-color: var(--muted) !important;
-  background-color: transparent !important;
+  border-left: 3px solid var(--vaara) !important;
+  background-color: var(--vaara-ground) !important;
+  padding-left: 8px;
 }
 .list li.kalenteri-rivi-peruttu .kalenteri-teksti {
   text-decoration: line-through;
-  text-decoration-color: var(--vaara, #c0392b);
+  text-decoration-color: var(--vaara);
+  color: var(--vaara);
 }
+.kalenteri-peruttu-poista-btn {
+  flex: none;
+  font-family: inherit;
+  font-size: 13px;
+  line-height: 1;
+  color: var(--vaara);
+  background: none;
+  border: 1px solid var(--vaara);
+  border-radius: var(--r-kosketettava, 6px);
+  padding: 4px 8px;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  white-space: nowrap;
+}
+.kalenteri-peruttu-poista-btn:active { background: var(--vaara); color: var(--paperi, #fff); }
 .kalenteri-siirtynyt {
   white-space: normal;
   overflow-wrap: break-word;
