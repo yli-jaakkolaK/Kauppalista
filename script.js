@@ -7062,6 +7062,20 @@ function piirraKalenteriRivi(rivi) {
     poistaNappi.title = 'Kuittaa nähdyksi ja poista tämä rivi';
     poistaNappi.addEventListener('click', async function(e) {
       e.stopPropagation();
+      // Sammuttaa myös kerran tunnissa toistuvan push-sarjan (2026-08-29,
+      // Katrin pyyntö) — api/_lib/caldav-sync.js:n kasitteleUudetPeruutukset
+      // loi tälle tapahtumalle "sinnikkään" muistutukset-rivin (source=
+      // 'kalenteri_peruutus', source_ref=tämän rivin id). acked_at pysäyttää
+      // sarjan HETI seuraavalla 5 min -cron-ajolla (ks. muistutukset-laheta.js:n
+      // "Kuittaus tarkistetaan AINA ensin" -kommentti) — ei vaadi RLS-
+      // oikeutta poistaa itse muistutus-riviä, pelkkä oman rivin päivitys
+      // riittää. RLS rajaa tämän joka tapauksessa vain kirjautuneen OMAAN
+      // riviin, joten jaetulla kalenterilla kumppanin oma rivi (jos
+      // sellainen luotiin) ei vaikutu tästä.
+      const { error: muistutusError } = await db.from('muistutukset')
+        .update({ acked_at: new Date().toISOString() })
+        .eq('source', 'kalenteri_peruutus').eq('source_ref', String(rivi.id));
+      if (muistutusError) console.error('Peruutusmuistutuksen kuittaus epäonnistui:', muistutusError);
       const { error } = await db.from('kalenteri_tapahtumat').delete().eq('id', rivi.id);
       if (ilmoitaKirjoitusvirheesta(error, 'Peruutuksen kuittaus')) return;
       lataaKalenteri();

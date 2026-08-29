@@ -135,6 +135,25 @@ async function supabaseFetch(polku, valinnat) {
   }));
 }
 
+// Helsingin seinäkellonajan komponentit -> todellinen UTC-hetki. Sama
+// kahden kierroksen temppu kuin api/_lib/muistutukset-laheta.js:n
+// helsinkiWallClockToUtc():ssä — kopioitu tänne erikseen (tämä tiedosto ei
+// jaa moduuleja _lib:n kanssa, sama tietoinen rajaus kuin siellä muuallakin)
+// koska sitä tarvitaan peruutusilmoituksen "sinnikkään" katon laskentaan
+// (ks. kasitteleUudetPeruutukset).
+function helsinkiWallClockToUtc(year, month, day, hour, minute) {
+  const arvaus = new Date(Date.UTC(year, month - 1, day, hour, minute, 0));
+  const osat = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'Europe/Helsinki', hour12: false,
+    year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit',
+  }).formatToParts(arvaus).reduce(function(acc, o) { acc[o.type] = o.value; return acc; }, {});
+  const arvausUtcNa = Date.UTC(
+    parseInt(osat.year, 10), parseInt(osat.month, 10) - 1, parseInt(osat.day, 10),
+    osat.hour === '24' ? 0 : parseInt(osat.hour, 10), parseInt(osat.minute, 10), 0
+  );
+  return new Date(arvaus.getTime() + (arvaus.getTime() - arvausUtcNa));
+}
+
 // ICAL.Time -> { event_date, event_time }. Koko päivän tapahtumille (isDate)
 // luetaan vuosi/kk/pv suoraan ICAL.Time-komponenteista, EI JS Dateksi
 // muunnettuna — Vercel ajaa funktiot UTC-aikavyöhykkeellä, joten paikallinen
@@ -536,12 +555,24 @@ function paivaaSiirretty(pvmStr, n) {
 //     kumpaankin suuntaan. EI VARMAA tietoa — vain heuristiikka, siksi UI:n
 //     (script.js) pitää merkitä se "arvio"/"todennäköisesti" eikä väittää
 //     varmaa faktaa.
-// (2) VÄLITÖN ilmoitus MYÖS silloin kun kukaan ei ole sillä hetkellä avannut
-//     sovellusta: kirjoitetaan muistutukset-riviksi remind_at=nyt, jonka jo
-//     olemassa oleva /api/cron?task=muistutukset (SAMA 5 min -GitHub Actions
-//     -kadenssi, ks. .github/workflows/) poimii ja lähettää seuraavalla
-//     ajollaan — EI rakenneta rinnakkaista push-lähetystä tähän tiedostoon,
-//     käytetään jo olemassa olevaa, todistettua claim/retry-putkea.
+// (2) TOISTUVA ilmoitus KERRAN TUNNISSA kunnes kuitattu (2026-08-29, Katrin
+//     jatkopyyntö "push kerran tunnissa kunnes painettu nähdyksi") — käyttää
+//     muistutukset-taulun jo olemassa olevaa "sinnikäs"-mallia
+//     (persistent=true + window_minutes/frequency, ks.
+//     api/_lib/muistutukset-laheta.js:n yläkommentti) EIKÄ rakenneta uutta
+//     rinnakkaista toistologiikkaa tätä varten: ensimmäinen tärähdys lähtee
+//     HETI (ikkuna alkaa nyt-hetkestä), loput tasavälein noin tunnin välein,
+//     KUNNES joko (a) rivi kuitataan (acked_at, ks. script.js:n "✓ Nähty"
+//     -nappi peruutetulla kalenteririvillä — poistaa tapahtuman JA kuittaa
+//     tämän) tai (b) kohdehetki (remind_at) menee ohi. Kohdehetkeksi
+//     asetetaan PERUTUN tunnin oma alkuperäinen kellonaika (sen jälkeen
+//     muistuttaminen olisi jo turhaa — tunti olisi joka tapauksessa ohi),
+//     KUITENKIN katolla enintään 24h nyt-hetkestä, jottei kaukana etukäteen
+//     ilmoitettu peruutus (esim. viikkoa ennen) tuottaisi vuorokausien
+//     mittaista joka-tunnin-hälytyssarjaa.
+//     Ei rakenneta rinnakkaista push-lähetystä tähän tiedostoon — sama jo
+//     olemassa oleva, todistettu claim/retry-putki (5 min -GitHub Actions
+//     -kadenssi, ks. .github/workflows/) poimii ja lähettää tämänkin.
 //     Idempotentti luonnostaan: tämä ajetaan vain juuri nyt peruttu=true:ksi
 //     merkityille riveille, eikä sama rivi voi enää löytyä uudelleen
 //     seuraavalla kierroksella (ei ole enää peruttu=false-joukossa).
@@ -586,6 +617,18 @@ async function kasitteleUudetPeruutukset(peruutukset, syoteId, henkiloKartta, ko
       : '';
     const sisalto = '🚫 Peruttu: ' + p.title + ' (' + muotoilePvm(p.event_date) + aikaTeksti + ')' + siirtoTeksti;
 
+    // Kohdehetki + katto (ks. yllä oleva kommentti) — päivä/kk/vuosi
+    // event_date-merkkijonosta, kellonaika joko peruutetun tunnin oma
+    // alkuperäinen aika tai (koko päivän tapahtumalle) illalla klo 23:59.
+    const [vuosi, kk, pv] = p.event_date.split('-').map(function(s) { return parseInt(s, 10); });
+    const [tunti, minuutti] = (p.event_time || '23:59:00').split(':').map(function(s) { return parseInt(s, 10); });
+    const alkuperainenHetki = helsinkiWallClockToUtc(vuosi, kk, pv, tunti, minuutti);
+    const nytMs = Date.now();
+    const KATTO_MS = 24 * 3600000;
+    const remindAtMs = Math.max(nytMs + 60000, Math.min(alkuperainenHetki.getTime(), nytMs + KATTO_MS));
+    const windowMinutes = Math.round((remindAtMs - nytMs) / 60000);
+    const frequency = Math.max(1, Math.round(windowMinutes / 60));
+
     for (const userId of kohdeUserIdt) {
       const muistutusRes = await supabaseFetch('muistutukset', {
         method: 'POST',
@@ -593,9 +636,12 @@ async function kasitteleUudetPeruutukset(peruutukset, syoteId, henkiloKartta, ko
         body: JSON.stringify({
           user_id: userId,
           source: 'kalenteri_peruutus',
-          source_ref: String(p.id) + ':' + userId,
+          source_ref: String(p.id),
           content: sisalto,
-          remind_at: new Date().toISOString(),
+          remind_at: new Date(remindAtMs).toISOString(),
+          persistent: true,
+          window_minutes: windowMinutes,
+          frequency: frequency,
         }),
       });
       if (!muistutusRes.ok) {
