@@ -13975,6 +13975,7 @@ async function kasitteleEditoriTiedosto(file, tilaElId) {
     }
 
     let poimittuTeksti = null;
+    let poimintaMenetelma = null;
     if (tyyppi === 'pdf' || tyyppi === 'pptx') {
       const { data: sessionData } = await db.auth.getSession();
       const token = sessionData.session ? sessionData.session.access_token : null;
@@ -13994,6 +13995,7 @@ async function kasitteleEditoriTiedosto(file, tilaElId) {
           naytaEditoriTiedostoTila((tulos.error || 'Tekstin poiminta epäonnistui') + ' — tiedosto silti tallennettu.', true, tilaElId);
         } else {
           poimittuTeksti = tulos.teksti;
+          poimintaMenetelma = tulos.menetelma;
         }
       } catch (poimintaVirhe) {
         console.error('Poimintapyyntö epäonnistui (verkko?):', poimintaVirhe.message);
@@ -14018,7 +14020,15 @@ async function kasitteleEditoriTiedosto(file, tilaElId) {
     });
     if (tiedostoError) console.error('Tiedoston metatiedon tallennus epäonnistui (tiedosto silti Storagessa ja murussa):', tiedostoError);
 
-    naytaEditoriTiedostoTila('"' + file.name + '" lisätty' + (poimittuTeksti ? ' ja teksti poimittu' : '') + '.', false, tilaElId);
+    // "paikallinen" pdf-poiminta (2026-08-29, ks. api/laituri-tiedosto-
+    // poiminta.js) = pdf-parse luki vain tekstikerroksen ilman Anthropicia
+    // (ei saldoa/sivurajaa, mutta karkeampi kaavojen/asettelun kanssa) —
+    // kerrotaan tämä ettei käyttäjä luota tulokseen sokeasti kaavaraskaassa
+    // materiaalissa (esim. matikkakirjassa).
+    const menetelmaHuomautus = tyyppi === 'pdf' && poimintaMenetelma === 'paikallinen'
+      ? ' (poimittu paikallisesti ilman tekoälyä — tarkista kaavat/asettelu tarvittaessa)'
+      : '';
+    naytaEditoriTiedostoTila('"' + file.name + '" lisätty' + (poimittuTeksti ? ' ja teksti poimittu' + menetelmaHuomautus : '') + '.', false, tilaElId);
   } catch (e) {
     console.error('Tiedoston käsittely epäonnistui:', e.message);
     naytaEditoriTiedostoTila('Tiedoston käsittely epäonnistui — yritä uudelleen.', true, tilaElId);
