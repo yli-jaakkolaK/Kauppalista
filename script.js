@@ -1353,9 +1353,42 @@ async function avaaOpintoKurssi(kurssi) {
   piirraOpintoTavoiteHoitotasoNapit();
   piirraOpintoOpMaara();
   piirraOpintoAikataulu();
+  piirraOpintoKurssinYhteysLinkit();
   await lataaOpintoKurssiMateriaalit();
   await lataaOpintoAiheet();
   await lataaOpintoKurssinDeadlinet();
+}
+
+// Kurssitason "yhdistämis"-Miro-alueet (2026-08-29, Katrin pyyntö) — EI sido
+// yhteenkään yksittäiseen aiheeseen, koska nämä nimenomaan yhdistelevät
+// useaa aihetta (esim. "Exam A" = topics 1-5 mixed to form connections).
+// Sama napauta-lisää/muokkaa-kaava kuin muillakin Miro-linkeillä, mutta
+// napin OMA teksti kertoo onko linkki jo asetettu (🔗 vs ➕🔗, sama merkki-
+// kaava kuin aihe.materiaali-napilla).
+function piirraOpintoKurssinYhteysLinkit() {
+  const kurssi = currentOpintoKurssi;
+  ['a', 'b'].forEach(function(kirjain) {
+    const kentta = 'miro_exam_' + kirjain + '_url';
+    const btn = document.getElementById('opinto-kurssi-exam-' + kirjain + '-btn');
+    const url = kurssi[kentta];
+    btn.textContent = (url ? '🔗' : '➕🔗') + ' Exam ' + kirjain.toUpperCase() + ': yhteydet';
+    // Jos linkki on jo asetettu, napautus AVAA sen suoraan (napin pääkäyttö-
+    // tarkoitus) — muokkaus/lisäys vain kun sitä ei vielä ole, sama kaava
+    // kuin aihe.materiaali-napilla mutta ei pakota prompt-dialogia joka
+    // kerta kun linkki on jo kunnossa.
+    btn.onclick = url
+      ? function() { window.open(url, '_blank', 'noopener'); }
+      : function() {
+          const uusi = prompt('Miro-linkki — Exam ' + kirjain.toUpperCase() + ' yhteydet:', '');
+          if (uusi === null) return;
+          const arvo = uusi.trim() || null;
+          db.from('opinto_kurssit').update({ [kentta]: arvo }).eq('id', kurssi.id).then(function(res) {
+            if (ilmoitaKirjoitusvirheesta(res.error, 'Miro-linkin tallennus')) return;
+            kurssi[kentta] = arvo;
+            piirraOpintoKurssinYhteysLinkit();
+          });
+        };
+  });
 }
 
 // Opiskelumoottori OSA A1 (2026-08-17): tavoite ja hoitotaso ovat ERI
