@@ -250,27 +250,55 @@ function paivitaAlapalkkiKalenteriPaiva() {
   document.querySelectorAll('[data-role="alapalkki-kal-pv"]').forEach(function(el) { el.textContent = pv; });
 }
 
+// Leveys josta ylöspäin kaikki seitsemän mahtuvat suoraan riviin ilman
+// ⋯-ylivuotoa (2026-08-29, Katrin pyyntö: "when using in browser page from
+// computer there is no need for 3 dots since all the icons can fit nicely
+// without it") — 7 tabia á max 68px + välit vaativat karkeasti ~500px,
+// 560px jättää reilun marginaalin eikä silti osu tavalliseen tabletti-
+// leveyteen kesken. Vain KUINKA MONTA näytetään muuttuu leveyden mukaan,
+// ei mikään muu (järjestys/raahaus toimii ennallaan ⋯-arkin kautta silloin
+// kun se on näkyvissä).
+const ALAPALKKI_LEVEYS_KAIKKI_MAHTUU = 560;
+
 // Ruori on koko sovelluksen "koti" ja siksi AINA näkyvissä alapalkissa
 // riippumatta käyttäjän raahaamasta järjestyksestä (2026-08-12, Katrin
 // löydös: raahasi Ruorin vahingossa ⋯-arkin taakse eikä päässyt enää
-// suoraan kotiin) — kiinnitetty ensimmäiseksi tässä, loput kolme
-// kiinnitettyä paikkaa täyttyvät alapalkkiJarjestys-taulukon muista kuudesta.
+// suoraan kotiin) — kiinnitetty ensimmäiseksi tässä, loput kiinnitetyt
+// paikat täyttyvät alapalkkiJarjestys-taulukon muista kuudesta (3 kapealla
+// näytöllä + ⋯, kaikki 6 jos leveyttä on tarpeeksi).
 function piirraAlapalkki() {
   const kontti = document.getElementById('alapalkki-kiinnitetyt');
   if (!kontti) return;
   kontti.innerHTML = '';
   kontti.appendChild(luoAlapalkkiNappi('ruori'));
-  alapalkkiJarjestys.filter(function(id) { return id !== 'ruori'; }).slice(0, 3).forEach(function(id) { kontti.appendChild(luoAlapalkkiNappi(id)); });
-  const lisaaNappi = document.createElement('button');
-  lisaaNappi.className = 'alapalkki-tabi alapalkki-lisaa';
-  lisaaNappi.title = 'Lisää';
-  lisaaNappi.setAttribute('aria-label', 'Lisää');
-  lisaaNappi.innerHTML = ALAPALKKI_IKONIT.lisaa + '<span class="alapalkki-alleviiva"></span>';
-  lisaaNappi.addEventListener('click', avaaAlapalkkiArkki);
-  kontti.appendChild(lisaaNappi);
+  const kaikkiMahtuu = window.innerWidth >= ALAPALKKI_LEVEYS_KAIKKI_MAHTUU;
+  const muut = alapalkkiJarjestys.filter(function(id) { return id !== 'ruori'; });
+  (kaikkiMahtuu ? muut : muut.slice(0, 3)).forEach(function(id) { kontti.appendChild(luoAlapalkkiNappi(id)); });
+  if (!kaikkiMahtuu) {
+    const lisaaNappi = document.createElement('button');
+    lisaaNappi.className = 'alapalkki-tabi alapalkki-lisaa';
+    lisaaNappi.title = 'Lisää';
+    lisaaNappi.setAttribute('aria-label', 'Lisää');
+    lisaaNappi.innerHTML = ALAPALKKI_IKONIT.lisaa + '<span class="alapalkki-alleviiva"></span>';
+    lisaaNappi.addEventListener('click', avaaAlapalkkiArkki);
+    kontti.appendChild(lisaaNappi);
+  }
   paivitaAlapalkkiKalenteriPaiva();
   paivitaKalenteriBadge();
 }
+
+// Uudelleenpiirtää alapalkin jos ikkunan koko ylittää/alittaa
+// ALAPALKKI_LEVEYS_KAIKKI_MAHTUU-rajan sitten viime piirron — esim. selain-
+// ikkunan koon muutos tietokoneella. Ei piirrä joka resize-tapahtumalla
+// turhaan, vain kun raja-arvo todella ylittyy/alittuu.
+let alapalkkiEdellinenKaikkiMahtuu = null;
+window.addEventListener('resize', function() {
+  if (!document.getElementById('alapalkki') || document.getElementById('alapalkki').style.display === 'none') return;
+  const nyt = window.innerWidth >= ALAPALKKI_LEVEYS_KAIKKI_MAHTUU;
+  if (nyt === alapalkkiEdellinenKaikkiMahtuu) return;
+  alapalkkiEdellinenKaikkiMahtuu = nyt;
+  piirraAlapalkki();
+});
 
 function naytaAlapalkki(aktiivinenId) {
   alapalkkiAktiivinen = aktiivinenId;

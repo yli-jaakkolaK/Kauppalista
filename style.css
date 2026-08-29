@@ -4829,8 +4829,10 @@ h1 {
 }
 .alapalkki-tabi svg { width: 84%; height: 84%; display: block; margin: 0 auto; }
 .alapalkki-tabi.alapalkki-lisaa svg { width: 60%; height: 60%; }
-/* Ruori hieman vasemmalle omassa kehyksessään (elävä testaus). */
-.alapalkki-tabi[data-id="ruori"] svg { transform: translateX(-6%); }
+/* Ruori-kuvakkeen translateX(-6%)-siirto (vanha "elävä testaus" -korjaus)
+   poistettu (2026-08-29, Katrin löytämä epäkeskeisyys) — itse SVG (14,14-
+   keskeinen 8-pinnan ratas 28x28-viewBoxissa) on jo täysin symmetrinen,
+   siirto vain työnsi sen pois keskeltä. */
 /* Alkuperäiset ruudukon emoji-kuvakkeet (2026-08-11, Katrin pyyntö) —
    samat merkit kuin sql/008_home_sections.sql:n icon-sarakkeessa, ei
    kokosääntöä svg:lle koska emoji ei ole svg — fonttikoolla vastaava
