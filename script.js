@@ -1758,8 +1758,25 @@ async function avaaHarjoittele(aihe) {
   const ratkaisuBtn = document.getElementById('harjoittele-ratkaisu-btn');
   const uusiBtn = document.getElementById('harjoittele-uusi-btn');
   const suljeBtn = document.getElementById('harjoittele-sulje-btn');
+  const perustaVihje = document.getElementById('harjoittele-perusta-vihje');
+  const vaiheValitsin = document.getElementById('harjoittele-vaihe-valitsin');
+  const vaiheBtnit = vaiheValitsin.querySelectorAll('.harjoittele-vaihe-btn');
 
   otsikko.textContent = '🧠 ' + aihe.name;
+  // Perustaidot-aihe (esim. "1 - Fundamental Physics Skills") — EI "10 –
+  // Momentum..." (siksi vaadittu välilyönti/viiva heti "1":n perässä, ei
+  // pelkkä startsWith('1')).
+  perustaVihje.style.display = /^1[\s\-–]/.test(aihe.name.trim()) ? 'block' : 'none';
+
+  let valittuVaihe = 'encoding';
+  vaiheBtnit.forEach(function(btn) {
+    btn.classList.toggle('active', btn.dataset.vaihe === valittuVaihe);
+    btn.onclick = function() {
+      valittuVaihe = btn.dataset.vaihe;
+      vaiheBtnit.forEach(function(b) { b.classList.toggle('active', b === btn); });
+    };
+  });
+
   overlay.style.display = 'flex';
 
   async function luoUusiTehtava() {
@@ -1779,7 +1796,7 @@ async function avaaHarjoittele(aihe) {
       const vastaus = await fetch('/api/luo-harjoitustehtava', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
-        body: JSON.stringify({ aihe_id: aihe.id, pacer_vaihe: 'encoding' }),
+        body: JSON.stringify({ aihe_id: aihe.id, pacer_vaihe: valittuVaihe }),
       });
       tulos = await vastaus.json();
       if (!vastaus.ok) {
