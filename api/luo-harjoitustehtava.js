@@ -14,7 +14,7 @@
 // api/nayta-ratkaisu.js palauttaa sen, erikseen pyydettäessä (script.js:n
 // "Näytä ratkaisu" -nappi).
 
-const { haeOpenstaxOsio, haeLuvunHarjoitussivut } = require('./_lib/openstax-osiot');
+const { haeOpenstaxOsio, haeLuvunHarjoitussivut, jaaOsio } = require('./_lib/openstax-osiot');
 
 const SUPABASE_URL = 'https://uctmxxeewoeydabuepye.supabase.co';
 const SUPABASE_KEY = process.env.SUPABASE_SERVICE_KEY;
@@ -61,8 +61,8 @@ const PACER_KUVAUKSET = {
 };
 
 function rakennaSystemPrompti(pacerVaihe) {
-  return 'You are a physics tutor generating practice problems for an ICT engineering\n' +
-    'student (Finnish, adult learner, no advanced maths background).\n\n' +
+  return 'You are a STEM tutor (mathematics and physics) generating practice problems\n' +
+    'for an ICT engineering student (Finnish, adult learner).\n\n' +
     'The student is in the ' + pacerVaihe + ' phase:\n' +
     '- ' + PACER_KUVAUKSET.priming + '\n' +
     '- ' + PACER_KUVAUKSET.encoding + '\n' +
@@ -78,7 +78,7 @@ function rakennaSystemPrompti(pacerVaihe) {
     'distinct from each other within this batch of ten.\n' +
     'Respond in JSON: { "ongelmat": [ { "skenaario": "...", "kysymys": "...", "ratkaisu": "...", "vihje": "..." }, ... ] }\n' +
     'with exactly 10 items in the ongelmat array.\n' +
-    '- skenaario: 8-12 words capturing the physical scenario and key numbers\n' +
+    '- skenaario: 8-12 words capturing the scenario/setup and key numbers\n' +
     '- kysymys:   the problem as the student sees it — no solution, no hint\n' +
     '- ratkaisu:  full worked solution with every step shown\n' +
     '- vihje:     one sentence that nudges without giving the answer\n' +
@@ -127,19 +127,25 @@ module.exports = async function handler(req, res) {
     const sections = aihe.openstax_sections || [];
 
     if (sections.length > 0) {
-      for (const osio of sections) {
-        if (!cache[osio]) {
-          const teksti = await haeOpenstaxOsio(osio);
-          cache[osio] = teksti || '';
+      for (const merkinta of sections) {
+        if (!cache[merkinta]) {
+          const teksti = await haeOpenstaxOsio(merkinta);
+          cache[merkinta] = teksti || '';
           cacheMuuttui = true;
         }
-        if (cache[osio]) kontekstiPalat.push(cache[osio]);
+        if (cache[merkinta]) kontekstiPalat.push(cache[merkinta]);
       }
-      const luvut = Array.from(new Set(sections.map(function(s) { return s.split('.')[0]; })));
-      for (const luku of luvut) {
-        const avain = 'ch' + luku;
+      // Ryhmitellään kirja+luku-pareittain (esim. "college-algebra-2e:ch2"),
+      // koska useampi kirja voi käyttää samaa lukunumeroa (ks. jaaOsio).
+      const lukuAvaimet = new Map();
+      sections.forEach(function(merkinta) {
+        const { kirja, osio } = jaaOsio(merkinta);
+        const luku = osio.split('.')[0];
+        lukuAvaimet.set(kirja + ':ch' + luku, { kirja, luku });
+      });
+      for (const [avain, tiedot] of lukuAvaimet) {
         if (!(avain in cache)) {
-          const teksti = await haeLuvunHarjoitussivut(luku);
+          const teksti = await haeLuvunHarjoitussivut(tiedot.kirja, tiedot.luku);
           cache[avain] = teksti || '';
           cacheMuuttui = true;
         }

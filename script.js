@@ -1354,6 +1354,7 @@ async function avaaOpintoKurssi(kurssi) {
   piirraOpintoOpMaara();
   piirraOpintoAikataulu();
   piirraOpintoKurssinYhteysLinkit();
+  await piirraOpintoKurssinYhteysalueet();
   await lataaOpintoKurssiMateriaalit();
   await lataaOpintoAiheet();
   await lataaOpintoKurssinDeadlinet();
@@ -1388,6 +1389,40 @@ function piirraOpintoKurssinYhteysLinkit() {
             piirraOpintoKurssinYhteysLinkit();
           });
         };
+  });
+}
+
+// Yleiskäyttöiset kurssitason "yhdistämis"-alueet (sql/150, 2026-08-26) —
+// N kappaletta per kurssi, toisin kuin kiinteä kaksipaikkainen Exam A/B
+// (yllä), koska esim. Math Roadmapilla on neljä klusteria (Precalculus/
+// Calculus/Applied Mathematics/Statistics) eikä yhtään oikeaa tenttiä.
+// Sama avaa-tai-kysy-promptilla-kaava kuin Exam A/B -napeissa.
+async function piirraOpintoKurssinYhteysalueet() {
+  const kurssi = currentOpintoKurssi;
+  const cont = document.getElementById('opinto-kurssi-yhteysalueet');
+  const res = await db.from('opinto_yhteysalueet').select('id, nimi, miro_url').eq('kurssi_id', kurssi.id).order('sort_order');
+  if (res.error || !res.data || res.data.length === 0) {
+    cont.innerHTML = '';
+    return;
+  }
+  cont.innerHTML = '';
+  res.data.forEach(function(alue) {
+    const btn = document.createElement('button');
+    btn.className = 'dialog-btn dialog-btn-cancel';
+    btn.textContent = (alue.miro_url ? '🔗 ' : '➕🔗 ') + alue.nimi;
+    btn.onclick = alue.miro_url
+      ? function() { window.open(alue.miro_url, '_blank', 'noopener'); }
+      : function() {
+          const uusi = prompt('Miro-linkki — ' + alue.nimi + ':', '');
+          if (uusi === null) return;
+          const arvo = uusi.trim() || null;
+          db.from('opinto_yhteysalueet').update({ miro_url: arvo }).eq('id', alue.id).then(function(r) {
+            if (ilmoitaKirjoitusvirheesta(r.error, 'Miro-linkin tallennus')) return;
+            alue.miro_url = arvo;
+            piirraOpintoKurssinYhteysalueet();
+          });
+        };
+    cont.appendChild(btn);
   });
 }
 
