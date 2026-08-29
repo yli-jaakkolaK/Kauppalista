@@ -3,6 +3,14 @@ const SUPABASE_URL = 'https://uctmxxeewoeydabuepye.supabase.co';
 // service_role-avaimen (ohittaa RLS:n). Asetettava Vercelin ympäristömuuttujaksi
 // SUPABASE_SERVICE_KEY — EI koskaan koodiin tai selaimen puolelle.
 const SUPABASE_KEY = process.env.SUPABASE_SERVICE_KEY;
+// Jaettu salaisuus (2026-08-30, tietoturvakatselmuksen löydös) — tämä reitti
+// EI voi vaatia oikeaa kirjautumista, koska Siri-pikakomento ei osaa tehdä
+// interaktiivista login-vuota. Ainoa suoja aiemmin oli "osoitetta ei ole
+// julkaistu missään" — tämä lisää toisen kerroksen: pyynnön mukana pitää
+// tulla ?secret=... joka täsmää Vercelin SIRI_SHORTCUT_SECRET-muuttujaan.
+// Jos muuttujaa EI ole asetettu, reitti hylkää KAIKKI pyynnöt (turvallinen
+// oletus — ei koskaan vahingossa auki jos joku unohtaa asettaa sen).
+const SIRI_SECRET = process.env.SIRI_SHORTCUT_SECRET;
 
 async function haeKauppalistaId() {
   const response = await fetch(`${SUPABASE_URL}/rest/v1/lists?name=eq.Kauppalista&select=id`, {
@@ -26,6 +34,10 @@ module.exports = async function handler(req, res) {
 
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
+  }
+
+  if (!SIRI_SECRET || req.query.secret !== SIRI_SECRET) {
+    return res.status(401).json({ error: 'Ei valtuutusta' });
   }
 
   if (!SUPABASE_KEY) {

@@ -35,6 +35,11 @@
 const SUPABASE_URL = 'https://uctmxxeewoeydabuepye.supabase.co';
 const SUPABASE_KEY = process.env.SUPABASE_SERVICE_KEY;
 const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
+// Jaettu salaisuus (2026-08-30, tietoturvakatselmuksen löydös) — sama kaava
+// kuin api/add.js:ssä, ks. sen kommentti. Tämä reitti erityisesti hyötyy
+// suojasta koska se voi kirjoittaa KUMMAN TAHANSA vanhemman nimissä
+// (henkilo-parametri) ja laukaisee Anthropic-kutsun joka pyynnöllä.
+const SIRI_SECRET = process.env.SIRI_SHORTCUT_SECRET;
 const DEFAULT_MODEL = 'claude-sonnet-4-6';
 const MAX_TOKENS = 600;
 // Sama oletus kuin api/_lib/aly-nightly.js:ssä (HETKI_ENNAKKO_PAIVAT_OLETUS) —
@@ -242,6 +247,9 @@ module.exports = async function handler(req, res) {
   }
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
+  }
+  if (!SIRI_SECRET || req.query.secret !== SIRI_SECRET) {
+    return res.status(401).json({ error: 'Ei valtuutusta' });
   }
   if (!SUPABASE_KEY) {
     return res.status(500).json({ error: 'SUPABASE_SERVICE_KEY puuttuu Vercelin ympäristömuuttujista' });
