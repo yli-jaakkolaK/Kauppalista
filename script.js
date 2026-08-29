@@ -1833,6 +1833,25 @@ async function avaaHarjoittele(aihe) {
     vaiheViestiEl.style.display = 'block';
   }
 
+  // Käsin "Vaikeampi"-nappi (2026-08-29, Katrin pyyntö) — sama vaiheketju
+  // kuin automaattisessa etenemisessä, mutta laukaistaan heti napautuksesta
+  // eikä 5 paljastuksen jälkeen. Hyödyllinen kun aihe tuntuu jo liian
+  // helpolta eikä halua odottaa laskuria (esim. helpot matikka-aiheet).
+  const vaikeampiBtn = document.getElementById('harjoittele-vaikeampi-btn');
+  async function siirrySeuraavaanVaiheeseen() {
+    const nykyinenIndeksi = HARJOITTELE_VAIHE_JARJESTYS.indexOf(valittuVaihe);
+    if (nykyinenIndeksi === -1 || nykyinenIndeksi === HARJOITTELE_VAIHE_JARJESTYS.length - 1) {
+      naytaIlmoitus('Jo vaikeimmassa vaiheessa.');
+      return;
+    }
+    const seuraava = HARJOITTELE_VAIHE_JARJESTYS[nykyinenIndeksi + 1];
+    const { error: paivitysError } = await db.from('opinto_aiheet').update({ pacer_vaihe_nyt: seuraava }).eq('id', aihe.id);
+    if (ilmoitaKirjoitusvirheesta(paivitysError, 'Vaiheen vaihto')) return;
+    aihe.pacer_vaihe_nyt = seuraava;
+    valittuVaihe = seuraava;
+    await luoUusiTehtava();
+  }
+
   async function luoUusiTehtava() {
     sisalto.style.display = 'none';
     vihjeEl.style.display = 'none';
@@ -1928,6 +1947,7 @@ async function avaaHarjoittele(aihe) {
   };
 
   uusiBtn.onclick = luoUusiTehtava;
+  vaikeampiBtn.onclick = siirrySeuraavaanVaiheeseen;
 
   suljeBtn.onclick = function() {
     overlay.style.display = 'none';
