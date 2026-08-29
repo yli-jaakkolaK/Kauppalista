@@ -85,6 +85,18 @@ const OSIO_SLUGIT = {
     '8.1': '8-1-non-right-triangles-law-of-sines',
     '8.2': '8-2-non-right-triangles-law-of-cosines',
     '8.8': '8-8-vectors',
+    '9.5': '9-5-matrices-and-matrix-operations',
+    '9.7': '9-7-solving-systems-with-inverses',
+    '9.8': '9-8-solving-systems-with-cramers-rule',
+  },
+  'calculus-volume-3': {
+    '2.4': '2-4-the-cross-product',
+  },
+  'calculus-volume-1': {
+    '2.2': '2-2-the-limit-of-a-function',
+    '2.4': '2-4-continuity',
+    '3.1': '3-1-defining-the-derivative',
+    '3.2': '3-2-the-derivative-as-a-function',
   },
 };
 
