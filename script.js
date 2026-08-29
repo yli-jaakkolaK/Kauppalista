@@ -2182,7 +2182,7 @@ document.getElementById('opinto-tehtava-ai-prompti-btn').addEventListener('click
 // Satama tallentaa vain kaksi käsin syötettävää URL-kenttää per aihe
 // (opinto_aiheet.miro_opiskeluurl / .miro_retrievalurl, sql/147) — sama
 // kevyt "napauta lisätäksesi linkki" -kaava kuin aihe.materiaali-kentällä.
-function paivitaOpintoTehtavaMiroKoukku() {
+async function paivitaOpintoTehtavaMiroKoukku() {
   const aihe = currentOpintoAihe;
   const kehys = document.getElementById('opinto-tehtava-miro-koukku');
   // Taulu 1/2 ovat kurssikohtaisia (opinto_aiheet-rivejä) — silloilla ei ole
@@ -2216,7 +2216,22 @@ function paivitaOpintoTehtavaMiroKoukku() {
     });
   }
 
-  const url = aihe[kentta];
+  // Kurssitason varalinkki (2026-08-29, Katrin huomio: kurssilla on oma
+  // Frame Taulu 1:ssä RIIPPUMATTA siitä onko sillä vielä yhtään ainettakaan,
+  // ks. sql/148) — VAIN miro_opiskeluurl:lle, retrieval-taulu on joka
+  // tapauksessa sama kaikille eikä tarvitse kurssikohtaista oletusta. Haetaan
+  // AINA tuoreena aihe.kurssi_id:n perusteella (ei currentOpintoKurssi-
+  // globaalia, joka voi olla eri kurssi jos tehtävänäkymä avattiin suoraan
+  // Nyt-tabin kortista kurssisivun kautta navigoimatta). Muokkaus kirjoittaa
+  // AINA aiheen omaan kenttään (luo tarkemman ohituksen tästä eteenpäin),
+  // ei koskaan kurssin kenttään.
+  let kurssinOletusarvo = null;
+  if (kentta === 'miro_opiskeluurl' && !aihe[kentta] && aihe.kurssi_id) {
+    const { data: kurssi } = await db.from('opinto_kurssit').select('miro_opiskeluurl').eq('id', aihe.kurssi_id).maybeSingle();
+    kurssinOletusarvo = kurssi ? kurssi.miro_opiskeluurl : null;
+    if (currentOpintoAihe !== aihe) return; // navigoitu pois odottaessa
+  }
+  const url = aihe[kentta] || kurssinOletusarvo;
   if (!url) {
     const lisaaBtn = document.createElement('button');
     lisaaBtn.className = 'link-btn';
