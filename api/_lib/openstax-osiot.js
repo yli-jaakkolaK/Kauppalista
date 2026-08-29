@@ -116,7 +116,8 @@ const OSIO_SLUGIT = {
     '4.1': '4-1-probability-distribution-function-pdf-for-a-discrete-random-variable',
     '6.1': '6-1-the-standard-normal-distribution',
     '8.1': '8-1-a-single-population-mean-using-the-normal-distribution',
-    '9.6': '9-6-hypothesis-testing-of-a-single-mean-and-single-proportion',
+    '9.1': '9-1-null-and-alternative-hypotheses',
+    '9.5': '9-5-additional-information-and-full-hypothesis-test-examples',
     '11.1': '11-1-facts-about-the-chi-square-distribution',
   },
   // Discrete-matiikka-aiheille ei ole omaa OpenStax-kirjaa — Contemporary
@@ -183,8 +184,13 @@ async function haeJaSiistiOpenstaxSivu(url) {
         { selector: 'script', format: 'skip' },
         { selector: 'style', format: 'skip' },
         { selector: 'nav', format: 'skip' },
-        { selector: 'header', format: 'skip' },
         { selector: 'footer', format: 'skip' },
+        // EI 'header': monen kirjan (esim. college-algebra-2e, calculus-
+        // volume-3, introductory-statistics-2e) sivupohja pakkaa itse osion
+        // otsikon JA "LEARNING OBJECTIVES" -listan semanttisen <header>-tagin
+        // sisään - sen skippaaminen poisti koko osion sisällön (havaittu
+        // testaamalla 2026-08-30, ks. siistiRajat-kommentti). 'nav'/'footer'
+        // riittävät sivuston omaan kehykseen.
         { selector: 'img', format: 'skip' },
         { selector: 'a', options: { ignoreHref: true } },
       ],
@@ -204,7 +210,16 @@ async function haeJaSiistiOpenstaxSivu(url) {
 function siistiRajat(teksti) {
   let tulos = teksti;
   const alku = tulos.indexOf('LEARNING OBJECTIVES');
-  if (alku !== -1) tulos = tulos.slice(alku);
+  if (alku !== -1) {
+    tulos = tulos.slice(alku);
+  } else {
+    // Osa kirjoista (esim. introductory-statistics-2e) ei listaa LEARNING
+    // OBJECTIVES -osiota joka sivulla — silloin "Close\nSearch" (haku-
+    // widgetin oma teksti) on viimeinen toistuva roskamerkki ennen itse
+    // sisältöä, tarkistettu 2026-08-30.
+    const varaAlku = tulos.search(/Close\s*Search/);
+    if (varaAlku !== -1) tulos = tulos.slice(varaAlku);
+  }
   const loppuHaku = tulos.search(/How to cite|Authors:|Book URL:/);
   if (loppuHaku !== -1) tulos = tulos.slice(0, loppuHaku);
   return tulos.trim().slice(0, 8000);
