@@ -65,6 +65,13 @@ const OSIO_SLUGIT = {
   },
   'college-algebra-2e': {
     '2.5': '2-5-quadratic-equations',
+    '3.1': '3-1-functions-and-function-notation',
+    '3.2': '3-2-domain-and-range',
+    '3.4': '3-4-composition-of-functions',
+    '3.7': '3-7-inverse-functions',
+    '6.1': '6-1-exponential-functions',
+    '6.3': '6-3-logarithmic-functions',
+    '7.1': '7-1-systems-of-linear-equations-two-variables',
   },
   'intermediate-algebra-2e': {
     '9.8': '9-8-solve-quadratic-inequalities',
@@ -77,6 +84,7 @@ const OSIO_SLUGIT = {
     '7.5': '7-5-solving-trigonometric-equations',
     '8.1': '8-1-non-right-triangles-law-of-sines',
     '8.2': '8-2-non-right-triangles-law-of-cosines',
+    '8.8': '8-8-vectors',
   },
 };
 
