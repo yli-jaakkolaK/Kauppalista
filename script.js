@@ -2169,88 +2169,88 @@ document.getElementById('opinto-tehtava-ai-prompti-btn').addEventListener('click
   }
 });
 
-// §4.9: "Miro-embed vain kun sitä tarvitaan, esim. encoding ja retrieval."
-// Board A (encoding+overlearning, kurssikohtainen Frame) / Board B
-// (retrieval, kierroskohtainen Frame) — ks. sql/130/131, api/miro.js.
-// Ei estä muuta näkymän avautumista jos Miro-osa epäonnistuu (esim. Frame-
-// luonti kaatuu verkkovirheeseen) — kutsutaan ilman awaitia avaaOpintoTehtava
-// -funktiosta, päivittää vain oman kehyksensä kun/jos valmistuu.
-async function paivitaOpintoTehtavaMiroKoukku() {
+// Miro-taulut (uudelleensuunniteltu 2026-08-29, Katrin oma 3-taulu-jako —
+// korvaa KOKONAAN aiemman OAuth/Frame-automaation, joka jäi Katrin oman
+// Miro-asennusvaiheen taakse eikä koskaan valmistunut, ks. api/miro.js
+// [poistettu tässä muutoksessa] ja sql/147):
+//   Taulu 1 "Opiskelutaulu" — yksi iso taulu, kurssilla oma Frame, aiheella
+//     oma alue Framen sisällä. Kaikki priming+encoding(+overlearning)
+//     -muokkaukset. "Elävä muistiinpano", kasvaa ajan myötä.
+//   Taulu 2 "Retrieval-taulu" — pysyy tyhjänä lähtötilanteessa, avautuu
+//     retrievalissa, siivotaan käsin seuraavaa kertaa varten (ei automaatiota).
+//   Taulu 3 "Retrieval-arkisto" — puhdasta Miro-työtä, EI integraatiota.
+// Satama tallentaa vain kaksi käsin syötettävää URL-kenttää per aihe
+// (opinto_aiheet.miro_opiskeluurl / .miro_retrievalurl, sql/147) — sama
+// kevyt "napauta lisätäksesi linkki" -kaava kuin aihe.materiaali-kentällä.
+function paivitaOpintoTehtavaMiroKoukku() {
   const aihe = currentOpintoAihe;
   const kehys = document.getElementById('opinto-tehtava-miro-koukku');
-  // Miro-Frame on kurssikohtainen (opinto_aiheet.kurssi_id) — silloilla ei
-  // ole kurssia eikä Frame-mappausta, piilotetaan aina.
-  if (onkoTaitosolmu(aihe)) { kehys.style.display = 'none'; return; }
+  // Taulu 1/2 ovat kurssikohtaisia (opinto_aiheet-rivejä) — silloilla ei ole
+  // kumpaakaan URL-kenttää, piilotetaan aina.
+  if (onkoTaitosolmu(aihe)) { kehys.style.display = 'none'; kehys.innerHTML = ''; return; }
   const vaihe = aihe.pero_vaihe;
-  if (vaihe !== 'encoding' && vaihe !== 'overlearning' && vaihe !== 'retrieval') {
+  let kentta, otsikko;
+  if (vaihe === 'priming' || vaihe === 'encoding' || vaihe === 'overlearning') {
+    kentta = 'miro_opiskeluurl';
+    otsikko = 'Opiskelutaulu (Taulu 1)';
+  } else if (vaihe === 'retrieval') {
+    kentta = 'miro_retrievalurl';
+    otsikko = 'Retrieval-taulu (Taulu 2)';
+  } else {
     kehys.style.display = 'none';
     kehys.innerHTML = '';
     return;
   }
+
   kehys.style.display = 'block';
-  kehys.innerHTML = '<p class="selite">Ladataan kanvaasia…</p>';
+  kehys.innerHTML = '';
 
-  try {
-    const boardId = vaihe === 'retrieval' ? haeAsetusTeksti('miro_board_b_id', null) : haeAsetusTeksti('miro_board_a_id', null);
-    const frameId = vaihe === 'retrieval' ? await haeTaiLuoRetrievalMiroFrame(aihe) : await haeTaiLuoKurssinMiroFrame(aihe);
-    if (!boardId || !frameId) throw new Error('Board tai Frame puuttuu');
-    // Vain currentOpintoAihe on yhä sama kanvaasi auki (käyttäjä ei ole
-    // ehtinyt navigoida pois odottaessa) — muuten vanha lataus kirjoittaisi
-    // uuden näkymän päälle.
-    if (currentOpintoAihe !== aihe) return;
-    kehys.innerHTML = '<iframe class="opinto-miro-iframe" src="https://miro.com/app/live-embed/' + encodeURIComponent(boardId) + '/?moveToWidget=' + encodeURIComponent(frameId) + '&embedAutoplay=true" frameborder="0" allow="fullscreen" allowfullscreen></iframe>';
-  } catch (e) {
-    console.error('Miro-kanvaasin lataus epäonnistui:', e.message);
-    if (currentOpintoAihe !== aihe) return;
-    kehys.innerHTML = '<p class="section-empty">Kanvaasin lataus epäonnistui — voit silti jatkaa paperilla.</p>';
+  function avaaLinkinMuokkaus(nykyinenUrl) {
+    const uusi = prompt('Miro-linkki — ' + otsikko + ':', nykyinenUrl || '');
+    if (uusi === null) return;
+    const arvo = uusi.trim() || null;
+    db.from('opinto_aiheet').update({ [kentta]: arvo }).eq('id', aihe.id).then(function(res) {
+      if (ilmoitaKirjoitusvirheesta(res.error, 'Miro-linkin tallennus')) return;
+      aihe[kentta] = arvo;
+      if (currentOpintoAihe === aihe) paivitaOpintoTehtavaMiroKoukku();
+    });
   }
-}
 
-// Board A: YKSI Frame per kurssi, luodaan kerran ja pysyy koko kurssin ajan
-// (§10.1: "kukin solmu avautuu siitä kohdasta jota on tarkoitus työstää"
-// samalla jaetulla Framella).
-async function haeTaiLuoKurssinMiroFrame(aihe) {
-  const { data: kurssi, error } = await db.from('opinto_kurssit').select('id, name, miro_frame_id').eq('id', aihe.kurssi_id).single();
-  if (error || !kurssi) throw new Error('Kurssin haku epäonnistui Miro-framea varten');
-  if (kurssi.miro_frame_id) return kurssi.miro_frame_id;
-
-  const frameId = await luoMiroFrame('a', kurssi.name);
-  const { error: tallennusError } = await db.from('opinto_kurssit').update({ miro_frame_id: frameId }).eq('id', kurssi.id);
-  if (tallennusError) console.error('Kurssin Miro-framen tallennus epäonnistui (frame silti luotu, käytetään tätä kertaa):', tallennusError);
-  return frameId;
-}
-
-// Board B: Frame per retrieval-kierros — "jokainen kierros alkaa täysin
-// tyhjältä" (sung-metodi §6d). Kierrosta ei ole omana rivinään, joten
-// miro_retrieval_frame_kierros muistaa MILLE kierrosnumerolle tallennettu
-// frame_id kuuluu; jos retrieval_kierrokset on edennyt sen ohi, vanha ei
-// enää täsmää ja uusi Frame luodaan.
-async function haeTaiLuoRetrievalMiroFrame(aihe) {
-  const nykyinenKierros = opintoNykyinenKierros(aihe);
-  if (aihe.miro_retrieval_frame_id && aihe.miro_retrieval_frame_kierros === nykyinenKierros) {
-    return aihe.miro_retrieval_frame_id;
+  const url = aihe[kentta];
+  if (!url) {
+    const lisaaBtn = document.createElement('button');
+    lisaaBtn.className = 'link-btn';
+    lisaaBtn.textContent = '➕ Lisää Miro-linkki (' + otsikko + ')';
+    lisaaBtn.addEventListener('click', function() { avaaLinkinMuokkaus(null); });
+    kehys.appendChild(lisaaBtn);
+    return;
   }
-  const { data: kurssi } = await db.from('opinto_kurssit').select('name').eq('id', aihe.kurssi_id).single();
-  const otsikko = (kurssi ? kurssi.name : '') + ' · ' + aihe.name + ' · kierros ' + nykyinenKierros;
-  const frameId = await luoMiroFrame('b', otsikko);
-  const { error } = await db.from('opinto_aiheet').update({ miro_retrieval_frame_id: frameId, miro_retrieval_frame_kierros: nykyinenKierros }).eq('id', aihe.id);
-  if (error) console.error('Retrieval-Miro-framen tallennus epäonnistui (frame silti luotu, käytetään tätä kertaa):', error);
-  aihe.miro_retrieval_frame_id = frameId;
-  aihe.miro_retrieval_frame_kierros = nykyinenKierros;
-  return frameId;
-}
 
-async function luoMiroFrame(board, otsikko) {
-  const { data: sessioData } = await db.auth.getSession();
-  const token = sessioData.session ? sessioData.session.access_token : null;
-  const vastaus = await fetch('/api/miro?action=create-frame', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
-    body: JSON.stringify({ board: board, title: otsikko }),
-  });
-  const data = await vastaus.json();
-  if (!vastaus.ok) throw new Error(data.error || 'Framen luonti epäonnistui');
-  return data.id;
+  const iframe = document.createElement('iframe');
+  iframe.className = 'opinto-miro-iframe';
+  iframe.src = url;
+  iframe.setAttribute('frameborder', '0');
+  iframe.setAttribute('allow', 'fullscreen');
+  iframe.setAttribute('allowfullscreen', '');
+  kehys.appendChild(iframe);
+
+  const rivi = document.createElement('div');
+  rivi.className = 'opinto-miro-toiminnot';
+  const avaaLinkki = document.createElement('a');
+  avaaLinkki.href = url;
+  avaaLinkki.target = '_blank';
+  avaaLinkki.rel = 'noopener';
+  avaaLinkki.className = 'selite';
+  avaaLinkki.textContent = 'Avaa Miro uudessa välilehdessä ↗';
+  rivi.appendChild(avaaLinkki);
+
+  const muokkaaBtn = document.createElement('button');
+  muokkaaBtn.className = 'link-btn';
+  muokkaaBtn.textContent = '✎';
+  muokkaaBtn.title = 'Muokkaa Miro-linkkiä (' + otsikko + ')';
+  muokkaaBtn.addEventListener('click', function() { avaaLinkinMuokkaus(url); });
+  rivi.appendChild(muokkaaBtn);
+  kehys.appendChild(rivi);
 }
 
 // Priming-vaiheessa kirjoitetaan kysymykset; encoding-vaiheesta eteenpäin

@@ -5134,3 +5134,11 @@ h1 {
     height: min(85vh, 1200px);
   }
 }
+
+.opinto-miro-toiminnot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 4px;
+}

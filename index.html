@@ -643,12 +643,13 @@
 
   <!-- Tehtävänäkymä (opiskelumoottori OSA A4, 2026-08-17; sisältöjärjestys
        tarkennettu §4.9:ään 17.8.2026: ohje → ohjelista täpättävänä → Miro
-       (vain encoding/retrieval) → materiaalit). Ajanotto käynnistyy
-       automaattisesti taustalla ilman näkyvää laskuria (§4.3: "Ei näkyvää
-       edistymisviivaa"). Miron LIVE-upotus vaatii Miron oman API-sovelluksen
-       (OAuth-tunnukset) joita ei vielä ole — Katrin päätös 17.8.2026: koko
-       muu näkymä rakennetaan nyt, Miro-osa myöhemmin kun tunnukset on
-       hankittu. #opinto-tehtava-miro-koukku on se paikka. -->
+       (priming/encoding/overlearning/retrieval) → materiaalit). Ajanotto
+       käynnistyy automaattisesti taustalla ilman näkyvää laskuria (§4.3:
+       "Ei näkyvää edistymisviivaa"). Miro-osa (ks. #opinto-tehtava-miro-
+       koukku) käyttää 2026-08-29 lähtien Katrin omaa kolmen taulun jakoa
+       (Opiskelutaulu/Retrieval-taulu/Retrieval-arkisto, ks. sql/147) — ei
+       enää OAuth-automaatiota, vain kaksi käsin syötettävää linkkiä per
+       aihe. -->
   <div class="container" id="opinto-tehtava-view" style="display:none">
     <div class="list-header">
       <button class="back-btn" id="opinto-tehtava-back-btn">‹</button>
@@ -685,17 +686,17 @@
          Ei API-kutsua, ei maksa mitään. -->
     <button class="dialog-btn dialog-btn-cancel" id="opinto-tehtava-ai-prompti-btn" style="width:100%; margin-bottom:12px;">📋 Kopioi tekoälykehote</button>
 
-    <!-- Miro-koukku (§4.9: "Miro-embed vain kun sitä tarvitaan, esim.
-         encoding ja retrieval") — paikka olemassa, itse upotus odottaa
-         Miron API-tunnuksia (ei rakennettu 17.8.2026, ks. yllä oleva
-         kommentti). Näytetään vain encoding/retrieval-vaiheissa. -->
     <!-- Miro-priming-kehote (2026-08-29, ks. sql/144) — pelkkä opettajan/
          käsin kirjoitettu teksti opinto_aiheet.miro_priming_ohje-sarakkeesta,
          EI tekoälykutsua. Näkyy vain priming-vaiheessa, Miro-kehyksen
-         yläpuolella (kehys itse ei tällä hetkellä avaudu priming-vaiheessa,
-         ks. paivitaOpintoTehtavaMiroKoukku — tämä teksti ei riipu siitä). -->
+         yläpuolella (kehys ITSE näytetään nyt myös priming-vaiheessa, ks.
+         paivitaOpintoTehtavaMiroKoukku — Opiskelutaulu kattaa 2026-08-29
+         lähtien priming+encoding+overlearning). -->
     <p class="selite" id="opinto-tehtava-miro-priming-ohje" style="display:none"></p>
 
+    <!-- Miro-koukku: Opiskelutaulu (priming/encoding/overlearning) tai
+         Retrieval-taulu (retrieval), riippuen vaiheesta — ks.
+         paivitaOpintoTehtavaMiroKoukku ja sql/147. -->
     <div id="opinto-tehtava-miro-koukku" style="display:none"></div>
 
     <!-- Priming: kysymykset kirjataan tähän, nousevat esiin encodingissa
