@@ -2273,11 +2273,15 @@ h1 {
    vektoripolku (Katrin nimenomainen linjaus — käsinpiirretty muutti
    muodon, se oli alkuperäinen valitus, ks. ANKKURI_SVG:n kommentti
    script.js:ssä). 2026-08-24 pakotettiin väri filter()-ketjulla neutraaliksi
-   (harmaa/tumma), mutta 2026-08-26 Katri halusi emojin OMAN alkuperäisen
-   värityksen takaisin kaikkialla — litteä/"viivapiirros"-lopputulos ei
-   miellyttänyt. Ei siis enää mitään filter()-pakotusta, emoji näkyy
-   sellaisenaan sekä lepo- että aktiivitilassa. */
+   (harmaa/tumma), 2026-08-26 Katri halusi emojin OMAN alkuperäisen
+   värityksen takaisin (litteä/"viivapiirros"-lopputulos ei miellyttänyt),
+   mutta 2026-08-30 Katri huomasi Ruorissa toistuvasti näkyvät SINISET
+   ankkurit (alustan emoji-fontin oma sävy) ja pyysi harmaaksi. Ratkaisu on
+   siis KESKITIE: grayscale(1) poistaa VÄRIN mutta säilyttää emojin oman
+   muodon/varjostuksen (ei litteä käsinpiirretty polku) — eri asia kuin
+   2026-08-24:n täysi neutraali-filtteri jota Katri ei pitänyt. */
 .anchor-btn svg { width: 21px; height: 21px; display: block; }
+.ankkuri-emoji { filter: grayscale(1); }
 
 /* BUGIKORJAUS ("Laiturin ⚓-tilan näkyvyys", ks. muistiinpanot.md): pelkkä
    väri/opacity-ero (kulta vs. himmeä) ei erottunut vilkaisulla — sama
