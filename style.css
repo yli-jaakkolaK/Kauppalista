@@ -947,6 +947,16 @@ h1 {
   flex-wrap: wrap;
   gap: 3px;
   padding: 2px 2px 0;
+  /* Kiinteä min-height (2026-08-30, Katrin löytö: "one varying day per week
+     is not aligned with grid/time") — tämä rivi liitettiin aiemmin VAIN
+     päiville joilla oli suunniteltu aihe, ilman varattua korkeutta. Koska
+     jokainen viikonpäivä on oma pystysuora flex-item, tuon rivin puuttuminen
+     sai sen päivän tuntiruudukon alkamaan eri korkeudelta kuin muilla
+     päivillä — sama bugi kuin päällekkäisyyskorjauksessa, mutta rivien
+     välillä pylväiden sisällä. Rivi liitetään nyt AINA (ks. script.js),
+     tämä min-height varmistaa ettei sen todellinen korkeus vaihtele sen
+     mukaan onko sisällä chippi vai ei. */
+  min-height: 19px;
 }
 .kalenteri-viikko-suunniteltu-chip {
   font-size: 9.5px;

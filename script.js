@@ -8175,7 +8175,11 @@ function piirraViikkoAikajana(sisalto, data, viikonAlkuPvm, kuormaTasot, henksel
     const paivanTehdytAiheIdt = new Set(paivanSessiot.map(function(s) { return s.aihe_id; }).filter(Boolean));
     const paivanSuunnitellut = (suunnitellutAiheet || [])
       .filter(function(a) { return a.tavoiteikkuna === iso && !paivanTehdytAiheIdt.has(a.id); });
-    if (paivanSuunnitellut.length > 0) sarake.appendChild(piirraViikkoSuunniteltuRivi(paivanSuunnitellut));
+    // Liitetään AINA, ei vain kun sisältöä on (2026-08-30, ks. .kalenteri-
+    // viikko-suunniteltu-rivi:n kommentti style.cssissä) — muuten tämän
+    // päivän tuntiruudukko alkaisi eri korkeudelta kuin muiden päivien,
+    // koska jokainen päivä on oma pystysuora sarake.
+    sarake.appendChild(piirraViikkoSuunniteltuRivi(paivanSuunnitellut));
 
     sarake.appendChild(piirraViikkoKokopaivaRivi(paivanKaikki, iso));
     sarake.appendChild(piirraViikkoTuntialue(paivanAjalliset, henkselitLista, iso, paivanSessiot));
