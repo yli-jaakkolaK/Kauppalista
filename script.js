@@ -155,6 +155,21 @@ function showHyttiKorttiView() {
 // loput kolme ⋯:n takana järjestysarkissa (§5.2). Kuvakkeet ovat
 // TARKOITUKSELLA värillisiä (poikkeus design-kuvaukseen, ks.
 // satama-design-kuvaus.md "Alapalkin poikkeus").
+// Muistilaput-kuvake: leikepöytä + tarkistuslista (2026-08-30, Katrin
+// pyyntö — "checkbox vibes" mutta "in the clip board list itself" ja Saman
+// omalla värillä, ei emojin natiivilla värillä). Käsinpiirretty
+// stroke="var(--sinappi)":lla, jaettu vakio koska käytössä sekä alapalkin
+// kuvakkeena (ALAPALKKI_IKONIT.muistilaput) että Laiturin kohdevalikossa.
+const MUISTILAPUT_SVG = '<svg viewBox="0 0 24 24" fill="none" stroke="var(--sinappi)" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">' +
+  '<rect x="9" y="2" width="6" height="3" rx="1"/>' +
+  '<rect x="4" y="4" width="16" height="17" rx="2"/>' +
+  '<rect x="7.2" y="9" width="3.2" height="3.2" rx="0.6"/>' +
+  '<path d="M7.9 10.6l0.7 0.7 1.3-1.4"/>' +
+  '<line x1="12.5" y1="10.6" x2="17" y2="10.6"/>' +
+  '<rect x="7.2" y="14.8" width="3.2" height="3.2" rx="0.6"/>' +
+  '<line x1="12.5" y1="16.4" x2="17" y2="16.4"/>' +
+  '</svg>';
+
 const ALAPALKKI_IKONIT = {
   ruori: '<svg viewBox="0 0 28 28" fill="none"><circle cx="14" cy="14" r="8.5" stroke="var(--messinki)" stroke-width="2.4"/><circle cx="14" cy="14" r="2" fill="var(--messinki)"/><path d="M22.5 14L26 14M20 20L22.5 22.5M14 22.5L14 26M8 20L5.5 22.5M5.5 14L2 14M8 8L5.5 5.5M14 5.5L14 2M20 8L22.5 5.5" stroke="var(--messinki)" stroke-width="2.4" stroke-linecap="round"/></svg>',
   // Alkuperäiset ikonit palautettu käyttöön (2026-08-11, Katrin pyyntö) —
@@ -178,11 +193,16 @@ const ALAPALKKI_IKONIT = {
   // ulkopuolella — siksi se lisätään erikseen luoAlapalkkiNappi():ssa.
   kalenteri: '<span class="alapalkki-kal-ikoni"><span class="alapalkki-kal-kk" data-role="alapalkki-kal-kk"></span><span class="alapalkki-kal-pv" data-role="alapalkki-kal-pv"></span></span>',
   hytti: '<span class="alapalkki-emoji">🚪</span>',
-  // Vaihdettu spiraalimuistilehtiöstä (🗒️) sitten leikepöytään (📋), lopulta
-  // rastitettuun valintaruutuun (2026-08-30, Katri: "i want some sort of
-  // check box vibes" - muoto (spiraali/leikepöytä) ei ollut oleellista,
-  // itse täpän puuttuminen oli).
-  muistilaput: '<span class="alapalkki-emoji">☑️</span>',
+  // Muistilaput-kuvake: kokeiltu spiraalimuistilehtiötä (🗒️), leikepöytää
+  // (📋) ja rastitettua valintaruutua (☑️) emojina (2026-08-30) ennen kuin
+  // Katri tarkensi: itse rasti-idea oli oikea, mutta 1) sen pitää olla
+  // leikepöydän/listan SISÄLLÄ, ei pelkkä irrallinen ruutu, ja 2) väri pitää
+  // olla Saman värimaailmasta (ei emojin omaa vihreää). Emoji-glyfit eivät
+  // tottele CSS-väriä (ks. muisti feedback_emoji_ignores_css_color), joten
+  // tämä on nyt oikea käsinpiirretty SVG stroke="var(--sinappi)":lla, sama
+  // "lisaa"-napin (yllä) kanssa jaettu käytäntö. Käytetty myös Laiturin
+  // kohdevalikossa (ks. MUISTILAPUT_SVG).
+  muistilaput: '<span class="alapalkki-emoji">' + MUISTILAPUT_SVG + '</span>',
   varasto: '<span class="alapalkki-emoji">📦</span>',
   asetukset: '<span class="alapalkki-emoji">⚙️</span>',
   lisaa: '<svg viewBox="0 0 28 28" fill="none"><circle cx="8" cy="14" r="2" fill="var(--vaimea)"/><circle cx="14" cy="14" r="2" fill="var(--vaimea)"/><circle cx="20" cy="14" r="2" fill="var(--vaimea)"/></svg>',
@@ -11357,7 +11377,7 @@ async function haeKotiKohteet() {
 async function avaaKohdeValikko(rivi, li) {
   openRowMenu(li, [
     { label: '📦 Varasto', onClick: function() { avaaKohdeAlivalikko(rivi, li, 'varasto'); } },
-    { label: '☑️ Muistilaput', onClick: function() { avaaKohdeAlivalikko(rivi, li, 'muistilaput'); } },
+    { icon: MUISTILAPUT_SVG, label: 'Muistilaput', onClick: function() { avaaKohdeAlivalikko(rivi, li, 'muistilaput'); } },
     { label: '🗄 Arkistoi', onClick: function() { arkistoiLaituriRivi(rivi); } },
   ]);
 }

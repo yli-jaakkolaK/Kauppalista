@@ -2487,7 +2487,7 @@ h1 {
 .row-menu-item-icon {
   display: flex; align-items: center; gap: 10px;
 }
-.row-menu-item-icon svg { flex: none; }
+.row-menu-item-icon svg { flex: none; width: 18px; height: 18px; }
 
 .muistutus-aika {
   font-size: 11px;
@@ -4578,7 +4578,7 @@ h1 {
    otsakkeen ja Sään väliin. */
 .ruori .otsake { display: flex; justify-content: space-between; align-items: flex-start; padding: 6px 2px 0; }
 .ruori .otsake-vas { flex: 1; min-width: 0; }
-.ruori .otsake-ylarivi { display: flex; align-items: center; gap: 12px; }
+.ruori .otsake-ylarivi { display: flex; align-items: center; gap: 12px; justify-content: space-between; }
 /* SATAMA sinapilla (2026-08-11, Katrin pyyntö) — sama --sinappi joka on
    muutenkin käytössä sovelluksessa, ei uusi väri. Kirjainväli tiivistetty
    .34em -> .14em (2026-08-18, Katrin palaute: teksti näytti siltä että
@@ -4586,22 +4586,25 @@ h1 {
    myös kirjainten välissä oikeat välilyönnit ("S A T A M A"), jotka
    TUPLASIVAT ison letter-spacingin kanssa syntyvän raon. Poistettu
    välilyönnit (index.html: "SATAMA") ja kevennetty letter-spacing samalla
-   — pelkkä jommankumman korjaus ei olisi riittänyt. */
-.ruori .tunnus { font-size: 22px; letter-spacing: .14em; color: var(--sinappi); font-weight: 700; margin: 0; }
+   — pelkkä jommankumman korjaus ei olisi riittänyt.
+   flex:1 + text-align:center (2026-08-30, Katrin pyyntö: kuormakytkin pois
+   "koko ajan päällimmäisenä" -paikaltaan, SATAMA keskemmälle) — täyttää
+   otsake-ylarivin jäljelle jäävän tilan kuormakytkimen viereltä ja keskittyy
+   siihen, sen sijaan että se olisi tiukasti kytkimen vieressä vasemmassa
+   laidassa. */
+.ruori .tunnus { font-size: 22px; letter-spacing: .14em; color: var(--sinappi); font-weight: 700; margin: 0; flex: 1; text-align: center; }
 
 /* Kuormitustila-kytkin — itse painettava pinta (--r-kosketettava), ei
    erillistä laatikkoa/tekstiä. Pois päältä: lämmin lasi + messinkikehys.
    Päällä: koko kytkin --vaara, nuppi vaalea.
-   Kiinnitetty ruudun vasempaan yläkulmaan (2026-08-17, Katrin pyyntö) —
-   irti .otsake-ylarivin normaalista virtauksesta ja bodyn 48px/20px-
-   täytteestä, samalla position:fixed-periaatteella kuin .alapalkki
-   (z-index 40, safe-area-turvattu samaan tapaan kuin alapalkin
-   env(safe-area-inset-bottom)). */
+   PALAUTETTU .otsake-ylarivin normaaliin virtaukseen (2026-08-30, Katrin
+   pyyntö: "irrottaa se siitä et on koko ajan päällimmäisenä") — 2026-08-17
+   se kiinnitettiin position:fixed ruudun vasempaan yläkulmaan, mutta se
+   piti sen aina päällimmäisenä/paikallaan riippumatta muusta otsakkeesta,
+   mikä nyt koettiin häiritseväksi. position:relative pitää edelleen
+   ::after-nupin ankkuroituna itse kytkimeen, ei enää sivuun. */
 .ruori .kuormakytkin {
-  position: fixed;
-  top: calc(8px + env(safe-area-inset-top, 0px));
-  left: calc(8px + env(safe-area-inset-left, 0px));
-  z-index: 40;
+  position: relative;
   flex: none; width: 52px; height: 30px; border-radius: 13px; padding: 3px;
   cursor: pointer; font-family: inherit;
   border: 1px solid rgba(156, 122, 67, .5);
