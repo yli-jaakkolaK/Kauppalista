@@ -3821,6 +3821,10 @@ h1 {
   stroke: var(--hius-vahva);
   stroke-width: 1;
 }
+.opinto-kartta-verkko line {
+  stroke: var(--hius-vahva);
+  stroke-width: 1;
+}
 
 .opinto-kartta-deadline {
   font-size: 12px;

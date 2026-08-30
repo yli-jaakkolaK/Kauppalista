@@ -2455,7 +2455,15 @@ function opintoSolmunVari(aihe) {
 // Yksinkertainen ruudukkolayout sort_order-järjestyksessä — EI speksin
 // käsin aseteltu käsitekartta (ei sijainti-/yhteysdataa skeemassa vielä),
 // vaan tietoinen vaihe 1-2 -yksinkertaistus: riittää gradientin ja
-// solmutason erottelun näyttämiseen. Verkko/yhteydet tulevat vaiheessa 3.
+// solmutason erottelun näyttämiseen.
+//
+// VAIHE 3 (2026-08-30): yhdistävät viivat solmujen välillä, sort_order-
+// järjestyksessä (aiheet-taulukko on jo tässä järjestyksessä, ks.
+// lataaOpintoKartta:n .order('sort_order')). EI oikea käsin muokattava
+// käsitekartta — approksimoi speksin "verkkoa" yhdellä polulla per kurssi,
+// koska skeemassa ei ole erillistä yhteys-/edge-taulua. Ks. muistin
+// project_kartta_speksi_v2: jos Katri haluaa oikeat käsin piirretyt
+// yhteydet myöhemmin, se vaatii uuden taulun eikä ole tässä vaiheessa.
 function piirraOpintoKarttaSolmuverkko(aiheet) {
   const COLS = Math.min(6, Math.max(1, aiheet.length));
   const CELL = 40;
@@ -2464,19 +2472,36 @@ function piirraOpintoKarttaSolmuverkko(aiheet) {
   const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
   svg.setAttribute('viewBox', '0 0 ' + (COLS * CELL) + ' ' + (rows * CELL));
   svg.classList.add('opinto-kartta-verkko');
-  aiheet.forEach(function(aihe, i) {
+
+  const pisteet = aiheet.map(function(aihe, i) {
     const col = i % COLS;
     const row = Math.floor(i / COLS);
+    return { aihe: aihe, cx: col * CELL + CELL / 2, cy: row * CELL + CELL / 2 };
+  });
+
+  for (let i = 1; i < pisteet.length; i++) {
+    const edellinen = pisteet[i - 1];
+    const nykyinen = pisteet[i];
+    const viiva = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+    viiva.setAttribute('x1', String(edellinen.cx));
+    viiva.setAttribute('y1', String(edellinen.cy));
+    viiva.setAttribute('x2', String(nykyinen.cx));
+    viiva.setAttribute('y2', String(nykyinen.cy));
+    svg.appendChild(viiva);
+  }
+
+  pisteet.forEach(function(piste) {
     const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
-    circle.setAttribute('cx', String(col * CELL + CELL / 2));
-    circle.setAttribute('cy', String(row * CELL + CELL / 2));
+    circle.setAttribute('cx', String(piste.cx));
+    circle.setAttribute('cy', String(piste.cy));
     circle.setAttribute('r', String(R));
-    circle.setAttribute('fill', opintoSolmunVari(aihe));
+    circle.setAttribute('fill', opintoSolmunVari(piste.aihe));
     const otsikko = document.createElementNS('http://www.w3.org/2000/svg', 'title');
-    otsikko.textContent = aihe.name;
+    otsikko.textContent = piste.aihe.name;
     circle.appendChild(otsikko);
     svg.appendChild(circle);
   });
+
   return svg;
 }
 
