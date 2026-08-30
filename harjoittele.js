@@ -120,6 +120,25 @@ async function avaaHarjoittele(aihe) {
     await luoUusiTehtava();
   }
 
+  // Käsin "Helpompi"-nappi (2026-08-30, Katrin pyyntö) — symmetrinen
+  // Vaikeampi-napin kanssa, siirtää yhden PACER-vaiheen TAAKSEPÄIN heti.
+  // Hyödyllinen kun automaattinen eteneminen (5 paljastusta) on vienyt liian
+  // vaikeaan vaiheeseen eikä halua odottaa/vaihtaa aihetta kokonaan.
+  const helpompiBtn = document.getElementById('harjoittele-helpompi-btn');
+  async function siirryEdelliseenVaiheeseen() {
+    const nykyinenIndeksi = HARJOITTELE_VAIHE_JARJESTYS.indexOf(valittuVaihe);
+    if (nykyinenIndeksi <= 0) {
+      naytaIlmoitus('Jo helpoimmassa vaiheessa.');
+      return;
+    }
+    const edellinen = HARJOITTELE_VAIHE_JARJESTYS[nykyinenIndeksi - 1];
+    const { error: paivitysError } = await db.from('opinto_aiheet').update({ pacer_vaihe_nyt: edellinen }).eq('id', aihe.id);
+    if (ilmoitaKirjoitusvirheesta(paivitysError, 'Vaiheen vaihto')) return;
+    aihe.pacer_vaihe_nyt = edellinen;
+    valittuVaihe = edellinen;
+    await luoUusiTehtava();
+  }
+
   async function luoUusiTehtava() {
     sisalto.style.display = 'none';
     vihjeEl.style.display = 'none';
@@ -221,6 +240,7 @@ async function avaaHarjoittele(aihe) {
 
   uusiBtn.onclick = luoUusiTehtava;
   vaikeampiBtn.onclick = siirrySeuraavaanVaiheeseen;
+  helpompiBtn.onclick = siirryEdelliseenVaiheeseen;
 
   suljeBtn.onclick = function() {
     overlay.style.display = 'none';
