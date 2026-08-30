@@ -27,6 +27,15 @@
 // kun ollaan lähempänä sitä, "95% jompikumpi näistä kahdesta" -tilanteessa.
 const FOLI_OLETUSPYSAKKI = '6011';
 
+// Kotiosoite luettavaa tekstiä varten (2026-08-30, Katrin ohje: "if it is so
+// difficult to see where i am located then expect it to be our home
+// address erkkilänkatu 5, kaarina") — käytetään paluumatkan näyttötekstissä
+// SIRI:n oman (usein vaikeasti tulkittavan bussilinjan pääteaseman nimen,
+// esim. "Sorro-Piispanristi-Keskusta") sijaan, ei muuta pysäkkilogiikkaa:
+// FOLI_OLETUSPYSAKKI (Marsukatu) on jo käytännössä lähin pysäkki tälle
+// osoitteelle.
+const FOLI_KOTIOSOITE = 'Erkkilänkatu 5, Kaarina';
+
 const FOLI_PYSAKIT_KEY = 'kauppalista_foli_pysakit';
 const FOLI_PYSAKIT_MAX_IKA_MS = 24 * 3600000; // 1 vrk — "älä pollaa tiheästi" (§8.1), pysäkit eivät muutu usein
 
@@ -167,9 +176,19 @@ const FOLI_TUNNETUT_MATKAT = [
   },
 ];
 
+// KORJAUS (2026-08-30, Katrin löytö: "no travel time is showing") — käytti
+// aiemmin VAIN tapahtuma.location:ia. Lukkarikone-luennoilla ON oma
+// location (huoneen tunnus, esim. "ICT_B1033 - Oppimistila - ICT-City"),
+// joten se EI ollut tyhjä eikä siis "location || _osoite" -korjaus (aiempi
+// yritys) auttanut — huonetunnus ei vain koskaan sisällä sanaa
+// "joukahaisenkatu". Todellinen katuosoite on syötteen OMASSA osoite-
+// kentässä (t._osoite, "Joukahaisenkatu 3-5, Turku" Lukkarikoneelle).
+// Katrin vahvistus: "everything from Lukkarikone should be potential one"
+// — siis TARKISTETAAN MOLEMMAT (huone JA syötteen osoite) yhdessä, ei
+// jompikumpi varalla, koska tunnistin voi osua kumpaan tahansa.
 function etsiTunnettuFoliMatka(tapahtuma) {
-  if (!tapahtuma.location) return null; // ei sijaintia = ei matkaa (esim. "meillä")
-  const teksti = tapahtuma.location.toLowerCase();
+  const teksti = ((tapahtuma.location || '') + ' ' + (tapahtuma._osoite || '')).toLowerCase();
+  if (!teksti.trim()) return null; // ei sijaintia lainkaan = ei matkaa (esim. "meillä")
   return FOLI_TUNNETUT_MATKAT.find(function(m) { return teksti.indexOf(m.tunnistin) !== -1; }) || null;
 }
 

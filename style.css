@@ -3329,6 +3329,16 @@ h1 {
   margin-top: 3px;
 }
 
+/* Föli-siirtymärivi (2026-08-30) — laskettu apuri, ei oikea tapahtuma eikä
+   napautettava (ei omaa avausnäkymää), joten eri kursori ja hillitympi
+   ilme kuin oikeilla riveillä erottamaan sen selvästi niistä. */
+.kalenteri-rivi-siirtyma {
+  cursor: default;
+  opacity: .75;
+  font-style: italic;
+}
+.kalenteri-rivi-siirtyma:active { background: transparent !important; }
+
 /* Rivin oma väri (2026-08-24, "1 day view to look like one in week view") —
    reunaväri + kevyt taustasävy, sama resepti kuin .kalenteri-viikko-palkki.
    border-left-width/padding kiinteänä täällä, JS asettaa vain värit

@@ -4008,7 +4008,12 @@ async function piirraNytLoki(askeleet) {
     // peruttu=false (2026-08-29, ks. sql/139_kalenteri_peruutus.sql): peruttu
     // luento ei enää varaa opiskeluslottia, koska rivi jää nyt tauluun
     // näkyviin (aiemmin poisto vapautti ajan automaattisesti).
-    db.from('kalenteri_tapahtumat').select('title, event_time, event_end_time, vastuu_henkilo, kalenteri_syotteet!inner(henkilo)').eq('event_date', tanaan).eq('peruttu', false).order('event_time'),
+    // location + kalenteri_syotteet.osoite lisätty (2026-08-30, Katrin löytö:
+    // "no travel time is showing" — puuttuivat kokonaan, joten
+    // etsiTunnettuFoliMatka() ei koskaan voinut täsmätä mihinkään tässä,
+    // Lukkarikone-luentojen oma osoite tulee AINA syötteen osoite-kentästä
+    // eikä tapahtuman omasta location-kentästä, ks. tapahtumanSijaintiteksti()).
+    db.from('kalenteri_tapahtumat').select('title, event_time, event_end_time, location, vastuu_henkilo, kalenteri_syotteet!inner(henkilo, osoite)').eq('event_date', tanaan).eq('peruttu', false).order('event_time'),
     db.from('hytti_suljetut_ikkunat').select('alkaa, paattyy').eq('owner_id', currentUserId).eq('viikonpaiva', viikonpaiva),
     db.from('hytti_opiskeluaika').select('alkaa, paattyy').eq('owner_id', currentUserId).eq('viikonpaiva', viikonpaiva),
   ]);
@@ -4016,6 +4021,12 @@ async function piirraNytLoki(askeleet) {
   const omatTapahtumat = (tapahtumat || []).filter(function(t) {
     const h = t.vastuu_henkilo || (t.kalenteri_syotteet ? t.kalenteri_syotteet.henkilo : null);
     return h === omaHenkilo || h === null;
+  }).map(function(t) {
+    // _osoite (2026-08-30, sama korjaus kuin selectiin yllä) —
+    // etsiTunnettuFoliMatka() käyttää tapahtumanSijaintiteksti():ä
+    // (location || _osoite), ei pelkkää location-kenttää.
+    t._osoite = t.kalenteri_syotteet ? t.kalenteri_syotteet.osoite : null;
+    return t;
   });
   const opiskeluIkkuna = (opiskeluajat && opiskeluajat[0]) || { alkaa: '09:00', paattyy: '15:30' };
   const ikkunaAlku = aikaMinuutteina(opiskeluIkkuna.alkaa.slice(0, 5));
@@ -4245,7 +4256,10 @@ async function naytaHuomisenEsikatselu() {
     // Sama korjaus kuin piirraNytLoki:ssa (2026-08-18) — kalenteri_tapahtumat.
     // user_id on käytännössä aina tyhjä, suodatus liitetyn syötteen
     // henkilo-kentän mukaan (null = jaettu perhekalenteri, kuuluu Katrille).
-    db.from('kalenteri_tapahtumat').select('title, event_time, event_end_time, vastuu_henkilo, kalenteri_syotteet!inner(henkilo)').eq('event_date', huominenIso).eq('peruttu', false).order('event_time'),
+    // location + osoite lisätty (2026-08-30, sama korjaus kuin
+    // piirraNytLoki:ssa — puuttuivat, joten Föli-siirtymät eivät koskaan
+    // voineet täsmätä huomisen ennakkokatsauksessakaan).
+    db.from('kalenteri_tapahtumat').select('title, event_time, event_end_time, location, vastuu_henkilo, kalenteri_syotteet!inner(henkilo, osoite)').eq('event_date', huominenIso).eq('peruttu', false).order('event_time'),
     db.from('hytti_suljetut_ikkunat').select('alkaa, paattyy').eq('owner_id', currentUserId).eq('viikonpaiva', viikonpaiva),
     db.from('hytti_opiskeluaika').select('alkaa, paattyy').eq('owner_id', currentUserId).eq('viikonpaiva', viikonpaiva),
   ]);
@@ -4253,6 +4267,9 @@ async function naytaHuomisenEsikatselu() {
   const omatTapahtumat = (tapahtumat || []).filter(function(t) {
     const h = t.vastuu_henkilo || (t.kalenteri_syotteet ? t.kalenteri_syotteet.henkilo : null);
     return h === omaHenkilo || h === null;
+  }).map(function(t) {
+    t._osoite = t.kalenteri_syotteet ? t.kalenteri_syotteet.osoite : null;
+    return t;
   });
   const opiskeluIkkuna = (opiskeluajat && opiskeluajat[0]) || { alkaa: '09:00', paattyy: '15:30' };
   const ikkunaAlku = aikaMinuutteina(opiskeluIkkuna.alkaa.slice(0, 5));
@@ -6834,6 +6851,23 @@ function siirraKalenteria(suunta) {
 function piirraKalenteriRivi(rivi) {
   const li = document.createElement('li');
 
+  // Föli-siirtymä perhekalenterissa (2026-08-30, Katrin pyyntö: "it should
+  // show in our family calendar as transition time block") — sama
+  // laskenta (haeFoliSiirtymatTapahtumalle) jota Hytin Nyt-loki jo käytti,
+  // nyt myös oikeassa päivänäkymässä. Pelkkä lukurivi, ei täppäystä/
+  // ankkurointia (ei oma "tapahtuma", vain laskettu apuri).
+  if (rivi._tyyppi === 'foli-siirtyma') {
+    li.className = 'kalenteri-rivi-siirtyma';
+    const aika = document.createElement('span');
+    aika.className = 'kalenteri-aika';
+    aika.textContent = rivi.event_time ? rivi.event_time.slice(0, 5) : '';
+    li.appendChild(aika);
+    const teksti = document.createElement('span');
+    teksti.textContent = rivi.title;
+    li.appendChild(teksti);
+    return li;
+  }
+
   // Oma Hytin tänään erääntyvä tehtävä, sulautettu tänään-agendaan (ks.
   // hyttiNakyyKalenterissa() -asetuskytkin). Sama tietue kuin kortilla —
   // täppäys tässä täppää sen myös kortin sisällä, ei kopiota.
@@ -7319,6 +7353,32 @@ async function lataaKalenteri() {
         }
       }
     }
+
+    // Föli-siirtymät perhekalenterissa (2026-08-30, Katrin pyyntö) — lisätty
+    // viimeisenä, ENNEN piirtoa mutta JÄLKEEN paivitaPaivanOtsikko(rivit,...)
+    // yllä, tarkoituksella: nämä ovat laskettuja apureita, eivät oikeita
+    // tapahtumia, eivätkä siis saa vaikuttaa kuormalaskuun/ristiriitamerkkiin.
+    // "varattu" (1440 min) on tässä pelkkä kertakäyttöinen sivuvaikutuslista,
+    // ei tarvita muualla kuin haeFoliSiirtymatTapahtumalle():n sisällä.
+    const foliVarattu = new Array(1440).fill(false);
+    const foliListat = await Promise.all(
+      rivit.filter(function(r) { return r._tyyppi === 'tapahtuma' && r.event_time; })
+        .map(function(t) { return haeFoliSiirtymatTapahtumalle(t, tanaanIso, foliVarattu); })
+    );
+    foliListat.forEach(function(lista) {
+      lista.forEach(function(s) {
+        const alkuAika = minutesToHHMM(Math.max(0, s.alku));
+        let title;
+        if (s.tyyppi === 'siirtyma') {
+          title = s.suunta === 'paluu'
+            ? '🚌 ' + s.linja + ' → Kotiin (' + FOLI_KOTIOSOITE + ')'
+            : '🚌 ' + s.linja + ' → ' + s.kohde;
+        } else {
+          title = '🚌 Bussi — tarkentuu lähempänä lähtöä';
+        }
+        rivit.push({ _tyyppi: 'foli-siirtyma', title: title, event_time: alkuAika + ':00' });
+      });
+    });
 
     piirraHenkselitBanneri(sisalto, paivanHenkselit, tanaanIso);
     piirraKalenteriPaivaRyhma(sisalto, jarjestaAjanMukaan(rivit), null);
