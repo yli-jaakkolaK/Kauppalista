@@ -1833,5 +1833,12 @@
   </script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="script.js"></script>
+  <!-- harjoittele.js (2026-08-30) - script.js:n pilkkomisen ensimmäinen
+       askel, ks. muistin project_scriptjs_split_plan. Lataa script.js:n
+       jälkeen mutta järjestyksellä ei ole väliä: avaaHarjoittele() käyttää
+       vain sellaisia globaaleja (db, naytaIlmoitus, ilmoitaKirjoitusvirheesta)
+       jotka ratkeavat vasta funktiota KUTSUTTAESSA, ei script-latauksen
+       aikana. -->
+  <script src="harjoittele.js"></script>
 </body>
 </html>
