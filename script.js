@@ -2449,8 +2449,11 @@ function piirraOpintoVerkkoLanka(svg, pisteA, pisteB) {
 // kurssit rakentuvat, näille saa antaa enemmän aikaa" (ks. script.js:n oma
 // kommentti kohdassa A3 perustussolmu).
 function piirraOpintoKarttaSolmuverkko(aiheet) {
-  const COLS = Math.min(6, Math.max(1, aiheet.length));
-  const CELL = 40;
+  // COLS isompi kuin per-kurssi-versiossa (oli 6) — nyt YKSI verkko kattaa
+  // kaikkien kurssien solmut, tarvitsee leveämmän ruudukon ettei näytä
+  // yhdeltä pitkältä pylväältä.
+  const COLS = Math.min(10, Math.max(1, aiheet.length));
+  const CELL = 36;
   const rows = Math.ceil(aiheet.length / COLS);
   const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
   svg.setAttribute('viewBox', '0 0 ' + (COLS * CELL) + ' ' + (rows * CELL));
@@ -2480,7 +2483,7 @@ function piirraOpintoKarttaSolmuverkko(aiheet) {
     circle.setAttribute('fill', opintoSolmunVari(piste.aihe));
     if (piste.aihe.perustussolmu) circle.classList.add('opinto-kartta-perustussolmu');
     const otsikko = document.createElementNS('http://www.w3.org/2000/svg', 'title');
-    otsikko.textContent = piste.aihe.name;
+    otsikko.textContent = piste.aihe._kurssiNimi ? piste.aihe._kurssiNimi + ' — ' + piste.aihe.name : piste.aihe.name;
     circle.appendChild(otsikko);
     svg.appendChild(circle);
   });
@@ -2488,17 +2491,15 @@ function piirraOpintoKarttaSolmuverkko(aiheet) {
   return svg;
 }
 
-// Kurssitason taustasävy (VAIHE 4) — kurssin solmujen KESKIMÄÄRÄINEN syvyys
-// kevyenä sävynä kortin taustalla, sitoo yksittäiset solmut yhdeksi
-// kokonaiskuvaksi samalla väriasteikolla. Tarkoituksella hillitty (max 12%
-// läpinäkymätön syvanne) ettei peitä solmuverkkoa alleen.
-function opintoKurssinTaustasavy(aiheet) {
-  if (!aiheet || aiheet.length === 0) return 'transparent';
-  const keskiarvo = aiheet.reduce(function(s, a) { return s + opintoSolmunSyvyys(a); }, 0) / aiheet.length;
-  const alpha = (keskiarvo * 0.12).toFixed(3);
-  return 'rgba(63, 95, 83, ' + alpha + ')'; // --syvanne RGB-arvoina
-}
-
+// YKSI yhtenäinen verkko koko Kartalle (2026-08-30, Katrin korjaus: "no
+// separate courses visible, all of their solmus can be but arranged so
+// that things related to each other are closeby") — EI enää erillistä
+// korttia/taustaa per kurssi. Kaikki kurssien solmut peräkkäin YHDESSÄ
+// ruudukossa, kurssin sisäinen sort_order-järjestys säilyy niin että
+// saman kurssin solmut pysyvät vierekkäin/lähekkäin (= "closeby") ilman
+// mitään laatikkoa niiden ympärillä. Kurssin nimi näkyy silti jokaisen
+// solmun title-vihjeessä (ks. piirraOpintoKarttaSolmuverkko), ei omana
+// otsikkorivinään.
 async function lataaOpintoKartta() {
   const { data: kurssit, error: kurssiError } = await db.from('opinto_kurssit').select().order('sort_order');
   if (kurssiError) {
@@ -2516,41 +2517,23 @@ async function lataaOpintoKartta() {
     return;
   }
 
-  for (const kurssi of kurssit) {
-    const [{ data: aiheet }, { data: kurssiDeadlinet }, { data: aiheDeadlinet }] = await Promise.all([
-      db.from('opinto_aiheet').select('name, sort_order, pero_vaihe, retrieval_kierrokset, retrieval_tavoite, perustussolmu').eq('kurssi_id', kurssi.id).order('sort_order'),
-      db.from('opinto_deadlinet').select('pvm').eq('kurssi_id', kurssi.id).gte('pvm', paivamaaraISO(new Date())).order('pvm').limit(1),
-      db.from('opinto_deadlinet').select('pvm, aihe_id, opinto_aiheet!inner(kurssi_id)').eq('opinto_aiheet.kurssi_id', kurssi.id).gte('pvm', paivamaaraISO(new Date())).order('pvm').limit(1),
-    ]);
+  const aiheryhmat = await Promise.all(kurssit.map(function(kurssi) {
+    return db.from('opinto_aiheet').select('name, sort_order, pero_vaihe, retrieval_kierrokset, retrieval_tavoite, perustussolmu').eq('kurssi_id', kurssi.id).order('sort_order')
+      .then(function(res) {
+        return (res.data || []).map(function(aihe) { aihe._kurssiNimi = kurssi.name; return aihe; });
+      });
+  }));
+  const kaikkiAiheet = [].concat.apply([], aiheryhmat);
 
-    const kortti = document.createElement('div');
-    kortti.className = 'opinto-kartta-kurssi';
-    kortti.style.background = opintoKurssinTaustasavy(aiheet);
-
-    const nimi = document.createElement('div');
-    nimi.className = 'opinto-kartta-kurssi-nimi';
-    nimi.textContent = kurssi.name;
-    kortti.appendChild(nimi);
-
-    if (aiheet && aiheet.length > 0) {
-      kortti.appendChild(piirraOpintoKarttaSolmuverkko(aiheet));
-    }
-
-    // Lähin tuleva deadline joko kurssi- tai aihetasolta — yksinkertainen
-    // Math.min kahdesta jo valmiiksi lajitellusta/rajatusta hakutuloksesta.
-    const lahimmat = []
-      .concat(kurssiDeadlinet || [])
-      .concat(aiheDeadlinet || [])
-      .sort(function(a, b) { return a.pvm < b.pvm ? -1 : 1; });
-    if (lahimmat.length > 0) {
-      const deadlineEl = document.createElement('div');
-      deadlineEl.className = 'opinto-kartta-deadline';
-      deadlineEl.textContent = '📅 Lähin: ' + muotoileOpintoPvm(lahimmat[0].pvm);
-      kortti.appendChild(deadlineEl);
-    }
-
-    sisalto.appendChild(kortti);
+  if (kaikkiAiheet.length === 0) {
+    const tyhja = document.createElement('p');
+    tyhja.className = 'section-empty';
+    tyhja.textContent = 'Ei vielä solmuja.';
+    sisalto.appendChild(tyhja);
+    return;
   }
+
+  sisalto.appendChild(piirraOpintoKarttaSolmuverkko(kaikkiAiheet));
 }
 
 // === OPINTOPOLKU VAIHE 2: KOLMEN VOIMAN MOOTTORI (2026-07-21, ks.

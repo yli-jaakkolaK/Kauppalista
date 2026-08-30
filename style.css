@@ -3794,27 +3794,17 @@ h1 {
 #opinto-aihe-lista li { flex-wrap: wrap; }
 #opinto-aihe-lista li span:first-child { flex-basis: 100%; }
 
-.opinto-kartta-kurssi {
-  border: 1px solid var(--border-dash);
-  border-radius: 6px;
-  padding: 10px 12px;
-  margin-bottom: 10px;
-}
-
-.opinto-kartta-kurssi-nimi {
-  font-size: 15px;
-  color: var(--text);
-  margin-bottom: 6px;
-}
-
-/* Solmutason gradienttiverkko (2026-08-30, SATAMA_SPEKSI.md §6.1) — korvaa
-   entisen kolmiväripalkin. Sävy tulee JS:stä per-solmu (fill-attribuutti,
-   ks. opintoSolmunVari script.js:ssä), tässä vain viiva + koko/asettelu. */
+/* Solmutason gradienttiverkko (2026-08-30, SATAMA_SPEKSI.md §6.1 +
+   satama-design-kuvaus.md) — korvaa entisen kolmiväripalkin JA entisen
+   kurssikohtaisen kortin (Katrin korjaus: "no separate courses visible,
+   arranged so that things related to each other are closeby" — kaikkien
+   kurssien solmut yhdessä verkossa, ei enää omaa laatikkoa per kurssi).
+   Sävy tulee JS:stä per-solmu (fill-attribuutti, ks. opintoSolmunVari
+   script.js:ssä), tässä vain viiva + koko/asettelu. */
 .opinto-kartta-verkko {
   display: block;
   width: 100%;
   height: auto;
-  max-height: 160px;
   margin-top: 6px;
 }
 .opinto-kartta-verkko circle {
@@ -3835,12 +3825,6 @@ h1 {
 .opinto-kartta-perustussolmu {
   stroke: var(--sinappi);
   stroke-width: 2;
-}
-
-.opinto-kartta-deadline {
-  font-size: 12px;
-  color: var(--muted);
-  margin-top: 6px;
 }
 
 /* Kurssikortti Reitti-välilehdellä, PÄIVITETTY luettavasta painettavaan
