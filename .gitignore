@@ -2,6 +2,15 @@
 .claude/
 node_modules/
 
+# Ennaltaehkäisevä (2026-08-30, tietoturvakierros) — mikään salaisuus ei ole
+# vielä koskaan päätynyt tänne (ANTHROPIC_API_KEY/SUPABASE_SERVICE_KEY yms.
+# asuvat vain Vercelin ympäristömuuttujissa), mutta jos joku loisi paikallisen
+# .env-tiedoston testausta varten, tämä estää sen päätymisen vahingossa
+# committiin (esim. huolimaton git add -A).
+.env
+.env.local
+.env*.local
+
 # Varmuuskopiot sisältävät oikeaa perheen dataa - ei koskaan versionhallintaan.
 # Oletuspaikka on kotikansiossa (~/Documents/Satama-varmuuskopiot tai iCloud),
 # tämä on vain varmuuden vuoksi jos joku ajaisi skriptin repon sisältä.

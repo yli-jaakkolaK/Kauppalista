@@ -449,8 +449,17 @@ module.exports = async function handler(req, res) {
   if (!process.env.VAPID_PUBLIC_KEY || !process.env.VAPID_PRIVATE_KEY || !process.env.VAPID_SUBJECT) {
     return res.status(500).json({ error: 'VAPID-ympäristömuuttujat puuttuvat' });
   }
+  // KORJAUS (2026-08-30, tietoturvakierros): "if (salaisuus && avain !==
+  // salaisuus)" petti AUKI jos MUISTUTUKSET_CRON_SECRET puuttuisi koskaan
+  // Vercelistä (esim. vahinko ympäristömuuttujien siivouksessa) - silloin
+  // tämä reitti (oikeita push-ilmoituksia!) olisi ollut täysin avoin kenelle
+  // tahansa netissä ilman mitään salaisuutta. caldav-sync.js:n
+  // onkoValtuutettu() oppi tämän jo aiemmassa auditoinnissa (ks. sen oma
+  // kommentti) mutta korjaus ei koskaan levinnyt tänne. Nyt sama sääntö
+  // kuin api/add.js:ssä: puuttuva salaisuus = hylkää KAIKKI, ei koskaan
+  // vahingossa auki.
   const salaisuus = process.env.MUISTUTUKSET_CRON_SECRET;
-  if (salaisuus && (req.query || {}).avain !== salaisuus) {
+  if (!salaisuus || (req.query || {}).avain !== salaisuus) {
     return res.status(401).json({ error: 'Virheellinen tai puuttuva avain' });
   }
 

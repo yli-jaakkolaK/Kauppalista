@@ -349,8 +349,13 @@ module.exports = async function handler(req, res) {
   if (!ANTHROPIC_API_KEY) {
     return res.status(500).json({ error: 'ANTHROPIC_API_KEY puuttuu Vercelistä' });
   }
+  // KORJAUS (2026-08-30, tietoturvakierros) — sama fail-open-bugi kuin
+  // muistutukset-laheta.js:ssä oli: puuttuva salaisuus jätti reitin täysin
+  // auki sen sijaan että hylkäisi. Tämä reitti käsittelee ja luokittelee
+  // perheen yksityisiä Laituri-muistiinpanoja tekoälyllä joka yöajolla -
+  // fail-open olisi merkittävästi pahempi tässä kuin push-ilmoituksissa.
   const secret = process.env.MUISTUTUKSET_CRON_SECRET;
-  if (secret && (req.query || {}).key !== secret) {
+  if (!secret || (req.query || {}).key !== secret) {
     return res.status(401).json({ error: 'Virheellinen tai puuttuva avain' });
   }
 
