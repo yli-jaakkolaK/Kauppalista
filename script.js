@@ -2403,26 +2403,22 @@ function opintoSolmunVari(aihe) {
   return sekoitaHexVari(OPINTO_KARTTA_PAPERI_HEX, OPINTO_KARTTA_SYVANNE_HEX, opintoSolmunSyvyys(aihe));
 }
 
-// Ruudukkolayout sort_order-järjestyksessä — EI speksin käsin aseteltu
-// käsitekartta (ei sijainti-/yhteysdataa skeemassa vielä), vaan tietoinen
-// yksinkertaistus: riittää gradientin ja solmutason erottelun näyttämiseen.
-// Jos Katri haluaa oikeat käsin piirretyt yhteydet myöhemmin, se vaatii
-// uuden taulun (ks. muistin project_kartta_speksi_v2).
-//
-// VERKKO (2026-08-30, korjattu Katrin huomiosta luettuaan mockupin sijaan
-// omaa kuvaustaan uudelleen — satama-design-kuvaus.md: "verkko KIRISTYY ja
-// meri syvenee/tummenee siellä missä yhteyksiä ja vahvuutta on paljon" —
-// EI pelkkä väri, vaan KAKSI merkkiä samasta asiasta). Ensimmäinen versio
-// piirsi vain yhden suoran polun solmujen välille — ei mitään "kiristystä".
-// Nyt: OIKEA verkko/silmukkakuvio (jokainen solmu yhdistyy naapuriinsa
-// SEKÄ oikealla että alapuolella, ei vain edelliseen), ja jokainen lanka
-// piirretään kaarena joka VETÄYTYY SUORAKSI kun molemmat päät ovat vahvoja
-// (syvyys lähellä 1) ja LOISKAHTAA/PULLISTUU kun jompikumpi on heikko
-// (syvyys lähellä 0) — sama visuaalinen efekti kuin oikeassa löysässä vs.
-// kireässä kalaverkon langassa.
-const OPINTO_KARTTA_SADE = 10;
-const OPINTO_KARTTA_SADE_PERUS = 14;
-const OPINTO_KARTTA_MAX_LOYSYYS = 7; // px, kuinka paljon heikoin lanka pullistuu
+// SANAPILVI + VERKKO (2026-08-30, kolmas korjaus samana päivänä). Katrin
+// kaksi peräkkäistä täsmennystä yhdistettynä:
+//  1) "no course names at all.. word cloud style.. words like coding or
+//     mathematics and then maybe functions or matrices in between" — solmun
+//     NIMI itse on sana pilvessä, ei ympyrä; koko+väri kertoo syvyyden.
+//  2) "word cloud but still keep net/mesh/tightening where skills are
+//     stronger" — EI siis jompikumpi vaan MOLEMMAT: sanat ripustettuina
+//     samaan ristikkoverkkoon kuin aiemmassa ympyräversiossa, langat
+//     kiristyvät/löystyvät ihan kuten ennenkin (ks. piirraOpintoVerkkoLanka),
+//     nyt vain solmun "koru" on teksti eikä ympyrä.
+// Ei kurssin nimeä missään — kaikki solmut samassa virtaavassa verkossa,
+// saman kurssin solmut peräkkäin listassa (lataaOpintoKartta) niin että ne
+// asettuvat lähelle toisiaan ruudukossa, ilman mitään ryhmittelyrajaa.
+const OPINTO_KARTTA_FONTTI_MIN = 11;
+const OPINTO_KARTTA_FONTTI_MAX = 21;
+const OPINTO_KARTTA_MAX_LOYSYYS = 6; // px, kuinka paljon heikoin lanka pullistuu
 
 function piirraOpintoVerkkoLanka(svg, pisteA, pisteB) {
   const dx = pisteB.cx - pisteA.cx;
@@ -2438,35 +2434,60 @@ function piirraOpintoVerkkoLanka(svg, pisteA, pisteB) {
   const keskiY = (pisteA.cy + pisteB.cy) / 2 + ny * loysyys;
   const lanka = document.createElementNS('http://www.w3.org/2000/svg', 'path');
   lanka.setAttribute('d', 'M ' + pisteA.cx + ' ' + pisteA.cy + ' Q ' + keskiX + ' ' + keskiY + ' ' + pisteB.cx + ' ' + pisteB.cy);
-  // Kireä lanka piirtyy vahvempana/tummempana kuin löysä — sama "kaksi
-  // merkkiä samasta asiasta" -periaate kuin solmuväreillä.
-  lanka.style.opacity = String(0.25 + kireys * 0.55);
+  // Kireä lanka piirtyy vahvempana kuin löysä — sama "kaksi merkkiä
+  // samasta asiasta" -periaate kuin sanan koolla/värillä.
+  lanka.style.opacity = String(0.2 + kireys * 0.5);
   svg.appendChild(lanka);
 }
 
-// Perustussolmun säde isompi — sama merkitys kuin paivitaOpintoTehtava-
-// PerustussolmuNapin käyttötarkoitus: "1-3 solmua joiden päälle tulevat
-// kurssit rakentuvat, näille saa antaa enemmän aikaa" (ks. script.js:n oma
-// kommentti kohdassa A3 perustussolmu).
-function piirraOpintoKarttaSolmuverkko(aiheet) {
-  // COLS isompi kuin per-kurssi-versiossa (oli 6) — nyt YKSI verkko kattaa
-  // kaikkien kurssien solmut, tarvitsee leveämmän ruudukon ettei näytä
-  // yhdeltä pitkältä pylväältä.
-  const COLS = Math.min(10, Math.max(1, aiheet.length));
-  const CELL = 36;
+function piirraOpintoKarttaSanapilvi(aiheet) {
+  const COLS = Math.min(5, Math.max(1, aiheet.length));
+  const CELL_W = 84;
+  const CELL_H = 34;
   const rows = Math.ceil(aiheet.length / COLS);
   const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-  svg.setAttribute('viewBox', '0 0 ' + (COLS * CELL) + ' ' + (rows * CELL));
+  svg.setAttribute('viewBox', '0 0 ' + (COLS * CELL_W) + ' ' + (rows * CELL_H));
   svg.classList.add('opinto-kartta-verkko');
 
   const pisteet = aiheet.map(function(aihe, i) {
     const col = i % COLS;
     const row = Math.floor(i / COLS);
-    return { aihe: aihe, col: col, row: row, cx: col * CELL + CELL / 2, cy: row * CELL + CELL / 2 };
+    return { aihe: aihe, col: col, row: row, cx: col * CELL_W + CELL_W / 2, cy: row * CELL_H + CELL_H / 2 };
   });
-  // col+row -> piste, jotta naapurit löytyvät nopeasti ilman sisäkkäistä silmukkaa.
   const ruudukko = new Map();
   pisteet.forEach(function(p) { ruudukko.set(p.row + ',' + p.col, p); });
+
+  // "Meri syvenee siellä missä vahvuutta on paljon" (satama-design-kuvaus.md)
+  // — sumennettu syvanne-täplä jokaisen solmun alla, opasiteetti syvyyden
+  // mukaan. Päällekkäin osuvat täplät sulautuvat yhteen sumennuksen kautta
+  // niin että vahvojen solmujen ALUE näyttää yhtenäisesti tummemmalta, ei
+  // vain yksittäinen sana. Piirretään ENSIN (alimmaksi kerrokseksi), langat
+  // ja sanat tulevat päälle.
+  const defs = document.createElementNS('http://www.w3.org/2000/svg', 'defs');
+  const suodin = document.createElementNS('http://www.w3.org/2000/svg', 'filter');
+  suodin.setAttribute('id', 'opinto-kartta-meri-sumennus');
+  suodin.setAttribute('x', '-50%'); suodin.setAttribute('y', '-50%');
+  suodin.setAttribute('width', '200%'); suodin.setAttribute('height', '200%');
+  const sumennus = document.createElementNS('http://www.w3.org/2000/svg', 'feGaussianBlur');
+  sumennus.setAttribute('stdDeviation', String(CELL_H * 0.5));
+  suodin.appendChild(sumennus);
+  defs.appendChild(suodin);
+  svg.appendChild(defs);
+
+  const meri = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+  meri.setAttribute('filter', 'url(#opinto-kartta-meri-sumennus)');
+  pisteet.forEach(function(piste) {
+    const syvyys = opintoSolmunSyvyys(piste.aihe);
+    if (syvyys <= 0) return;
+    const tappi = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+    tappi.setAttribute('cx', String(piste.cx));
+    tappi.setAttribute('cy', String(piste.cy));
+    tappi.setAttribute('r', String(CELL_H * 0.7));
+    tappi.setAttribute('fill', OPINTO_KARTTA_SYVANNE_HEX);
+    tappi.style.opacity = String(syvyys * 0.4);
+    meri.appendChild(tappi);
+  });
+  svg.appendChild(meri);
 
   pisteet.forEach(function(piste) {
     const oikea = ruudukko.get(piste.row + ',' + (piste.col + 1));
@@ -2476,30 +2497,27 @@ function piirraOpintoKarttaSolmuverkko(aiheet) {
   });
 
   pisteet.forEach(function(piste) {
-    const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
-    circle.setAttribute('cx', String(piste.cx));
-    circle.setAttribute('cy', String(piste.cy));
-    circle.setAttribute('r', String(piste.aihe.perustussolmu ? OPINTO_KARTTA_SADE_PERUS : OPINTO_KARTTA_SADE));
-    circle.setAttribute('fill', opintoSolmunVari(piste.aihe));
-    if (piste.aihe.perustussolmu) circle.classList.add('opinto-kartta-perustussolmu');
-    const otsikko = document.createElementNS('http://www.w3.org/2000/svg', 'title');
-    otsikko.textContent = piste.aihe._kurssiNimi ? piste.aihe._kurssiNimi + ' — ' + piste.aihe.name : piste.aihe.name;
-    circle.appendChild(otsikko);
-    svg.appendChild(circle);
+    const syvyys = opintoSolmunSyvyys(piste.aihe);
+    const teksti = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+    teksti.setAttribute('x', String(piste.cx));
+    teksti.setAttribute('y', String(piste.cy));
+    teksti.setAttribute('text-anchor', 'middle');
+    teksti.setAttribute('dominant-baseline', 'middle');
+    teksti.setAttribute('font-size', (OPINTO_KARTTA_FONTTI_MIN + syvyys * (OPINTO_KARTTA_FONTTI_MAX - OPINTO_KARTTA_FONTTI_MIN)).toFixed(1));
+    teksti.setAttribute('fill', opintoSolmunVari(piste.aihe));
+    if (piste.aihe.perustussolmu) teksti.classList.add('opinto-kartta-perustussolmu');
+    teksti.textContent = piste.aihe.name;
+    svg.appendChild(teksti);
   });
 
   return svg;
 }
 
-// YKSI yhtenäinen verkko koko Kartalle (2026-08-30, Katrin korjaus: "no
-// separate courses visible, all of their solmus can be but arranged so
-// that things related to each other are closeby") — EI enää erillistä
-// korttia/taustaa per kurssi. Kaikki kurssien solmut peräkkäin YHDESSÄ
-// ruudukossa, kurssin sisäinen sort_order-järjestys säilyy niin että
-// saman kurssin solmut pysyvät vierekkäin/lähekkäin (= "closeby") ilman
-// mitään laatikkoa niiden ympärillä. Kurssin nimi näkyy silti jokaisen
-// solmun title-vihjeessä (ks. piirraOpintoKarttaSolmuverkko), ei omana
-// otsikkorivinään.
+// YKSI yhtenäinen sanapilvi koko Kartalle — EI erillistä korttia/taustaa
+// eikä nimeä per kurssi. Kaikki kurssien solmut peräkkäin, kurssin
+// sisäinen sort_order-järjestys säilyy niin että saman kurssin solmut
+// pysyvät vierekkäin/lähekkäin (= "closeby") ilman mitään laatikkoa tai
+// otsikkoa niiden ympärillä.
 async function lataaOpintoKartta() {
   const { data: kurssit, error: kurssiError } = await db.from('opinto_kurssit').select().order('sort_order');
   if (kurssiError) {
@@ -2519,9 +2537,7 @@ async function lataaOpintoKartta() {
 
   const aiheryhmat = await Promise.all(kurssit.map(function(kurssi) {
     return db.from('opinto_aiheet').select('name, sort_order, pero_vaihe, retrieval_kierrokset, retrieval_tavoite, perustussolmu').eq('kurssi_id', kurssi.id).order('sort_order')
-      .then(function(res) {
-        return (res.data || []).map(function(aihe) { aihe._kurssiNimi = kurssi.name; return aihe; });
-      });
+      .then(function(res) { return res.data || []; });
   }));
   const kaikkiAiheet = [].concat.apply([], aiheryhmat);
 

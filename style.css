@@ -3794,37 +3794,38 @@ h1 {
 #opinto-aihe-lista li { flex-wrap: wrap; }
 #opinto-aihe-lista li span:first-child { flex-basis: 100%; }
 
-/* Solmutason gradienttiverkko (2026-08-30, SATAMA_SPEKSI.md §6.1 +
-   satama-design-kuvaus.md) — korvaa entisen kolmiväripalkin JA entisen
-   kurssikohtaisen kortin (Katrin korjaus: "no separate courses visible,
-   arranged so that things related to each other are closeby" — kaikkien
-   kurssien solmut yhdessä verkossa, ei enää omaa laatikkoa per kurssi).
-   Sävy tulee JS:stä per-solmu (fill-attribuutti, ks. opintoSolmunVari
-   script.js:ssä), tässä vain viiva + koko/asettelu. */
+/* Sanapilvi + verkko (2026-08-30, SATAMA_SPEKSI.md §6.1 + satama-design-
+   kuvaus.md, kolmesti täsmennetty Katrin suorista korjauksista samana
+   päivänä — ks. script.js:n piirraOpintoKarttaSanapilvi-kommentti täydestä
+   historiasta). Korvaa entisen kolmiväripalkin JA kurssikohtaisen kortin:
+   kaikkien kurssien solmut yhdessä sanapilvessä, ei omaa laatikkoa/nimeä
+   per kurssi. Solmun nimi ON sen "kuvake" — koko+väri tulevat JS:stä
+   inline (font-size/fill), tässä vain fontti + langan/pisteen perustyyli. */
 .opinto-kartta-verkko {
   display: block;
   width: 100%;
   height: auto;
   margin-top: 6px;
 }
-.opinto-kartta-verkko circle {
-  stroke: var(--hius-vahva);
-  stroke-width: 1;
+.opinto-kartta-verkko text {
+  font-family: var(--fontti-loki);
+  font-weight: 600;
 }
-/* Verkon langat ovat <path>-kaaria (ks. piirraOpintoVerkkoLanka), eivät
-   suoria <line>-elementtejä — kaari "pullistuu" heikommalla solmuparilla,
-   suoristuu vahvemmalla. Opacity tulee inline-tyylistä per lanka. */
+/* Verkon langat ovat <path>-kaaria (ks. piirraOpintoVerkkoLanka) — kaari
+   "pullistuu" heikommalla solmuparilla, suoristuu/kiristyy vahvemmalla.
+   Opacity tulee inline-tyylistä per lanka. */
 .opinto-kartta-verkko path {
   fill: none;
   stroke: var(--syvanne);
   stroke-width: 1.5;
 }
-/* Perustussolmu (VAIHE 4) — isompi säde jo hoitaa suurimman osan
-   erottumisesta (ks. script.js:n OPINTO_KARTTA_SADE_PERUS), tässä vain
-   vahvempi reunaviiva täydentämään. */
+/* Perustussolmu — sama merkitys kuin ennenkin ("1-3 solmua joiden päälle
+   kurssit rakentuvat"), nyt lihavoituna erottuu tekstinä ympyrän sijaan. */
 .opinto-kartta-perustussolmu {
-  stroke: var(--sinappi);
-  stroke-width: 2;
+  font-weight: 800;
+  text-decoration: underline;
+  text-decoration-color: var(--sinappi);
+  text-decoration-thickness: 2px;
 }
 
 /* Kurssikortti Reitti-välilehdellä, PÄIVITETTY luettavasta painettavaan
