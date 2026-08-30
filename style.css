@@ -3807,17 +3807,20 @@ h1 {
   margin-bottom: 6px;
 }
 
-.opinto-kartta-palkki {
-  display: flex;
-  height: 10px;
-  border-radius: 5px;
-  overflow: hidden;
-  background: var(--border);
+/* Solmutason gradienttiverkko (2026-08-30, SATAMA_SPEKSI.md §6.1) — korvaa
+   entisen kolmiväripalkin. Sävy tulee JS:stä per-solmu (fill-attribuutti,
+   ks. opintoSolmunVari script.js:ssä), tässä vain viiva + koko/asettelu. */
+.opinto-kartta-verkko {
+  display: block;
+  width: 100%;
+  height: auto;
+  max-height: 160px;
+  margin-top: 6px;
 }
-
-.opinto-kartta-lohko--hallussa { background: var(--sinappi); }
-.opinto-kartta-lohko--tyon-alla { background: var(--huomio); }
-.opinto-kartta-lohko--edessa { background: var(--border-dash); }
+.opinto-kartta-verkko circle {
+  stroke: var(--hius-vahva);
+  stroke-width: 1;
+}
 
 .opinto-kartta-deadline {
   font-size: 12px;

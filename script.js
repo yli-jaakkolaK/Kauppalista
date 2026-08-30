@@ -2401,6 +2401,85 @@ document.getElementById('opinto-kurssi-deadline-lisaa-btn').addEventListener('cl
 // summa, deadline = lähin tuleva (kurssi- TAI aihetasolta). Oli oma
 // showOpintoKarttaView()-näkymä, nyt kolmas Hytti-välilehti (§1b) —
 // vaihdaHyttiValilehti('kartta') hoitaa näyttämisen ja lataamisen.
+// === HYTTI KARTTA — VAIHE 4 §6.1 "OPISKELU"-NÄKYMÄ (2026-08-30, ks.
+// SATAMA_SPEKSI.md §6.1) — KORVAA vanhan palkkipohjaisen näkymän. Speksi:
+// "Ei palkkeja. Ei prosentteja. Ei pistemääriä. Ei tehtävämääriä." —
+// solmutasoinen liukuvärjäys (--syvanne tumma → --paperi vaalea) sen sijaan.
+// Rakennetaan vaiheittain (ks. muistin project_scriptjs_split_plan-viereinen
+// kartta-suunnitelma):
+//   1-2 (TÄSSÄ): syvyyspisteytys + gradienttisolmut, EI vielä verkkoa.
+//   3: verkko-ylläpinta (yhdistävät viivat sort_order-järjestyksessä).
+//   4: perustussolmu-korostus + kurssitason taustasävy.
+// --syvanne/--paperi ovat KIINTEITÄ (eivät seuraa laitteen tummaa tilaa,
+// ks. style.css:n oma kommentti niiden kohdalla) — siksi hex-arvot voi
+// lukea suoraan tähän ilman getComputedStyleä.
+const OPINTO_KARTTA_PAPERI_HEX = '#EAE6DC';
+const OPINTO_KARTTA_SYVANNE_HEX = '#3F5F53';
+
+// Solmun "syvyys" 0..1 — EI tuntemus-kentästä (se on priming-vaiheen
+// KERTALUONTEINEN alkuarvio, ei jatkuva harjoittelumittari, ks.
+// paivitaOpintoTehtavaTuntemus) vaan pero_vaihe-etenemisestä + retrieval-
+// kierrosten suhteellisesta edistymisestä siellä missä sellainen on
+// mielekäs (itse retrieval-vaiheen sisällä).
+const OPINTO_KARTTA_SYVYYS_VAIHEELLE = {
+  priming: 0.05,
+  encoding: 0.35,
+  reference: 0.75,
+  yllapito: 1,
+  overlearning: 1,
+};
+function opintoSolmunSyvyys(aihe) {
+  if (aihe.pero_vaihe === 'retrieval') {
+    const tavoite = aihe.retrieval_tavoite || 1;
+    const kierrokset = Math.min(aihe.retrieval_kierrokset || 0, tavoite);
+    return 0.55 + (kierrokset / tavoite) * 0.35;
+  }
+  const perus = OPINTO_KARTTA_SYVYYS_VAIHEELLE[aihe.pero_vaihe];
+  return perus != null ? perus : 0;
+}
+
+function sekoitaHexVari(hexA, hexB, t) {
+  const parsi = function(hex) {
+    const puhdas = hex.replace('#', '');
+    return [0, 2, 4].map(function(i) { return parseInt(puhdas.substr(i, 2), 16); });
+  };
+  const a = parsi(hexA), b = parsi(hexB);
+  const rgb = a.map(function(av, i) { return Math.round(av + (b[i] - av) * t); });
+  return 'rgb(' + rgb.join(',') + ')';
+}
+
+function opintoSolmunVari(aihe) {
+  return sekoitaHexVari(OPINTO_KARTTA_PAPERI_HEX, OPINTO_KARTTA_SYVANNE_HEX, opintoSolmunSyvyys(aihe));
+}
+
+// Yksinkertainen ruudukkolayout sort_order-järjestyksessä — EI speksin
+// käsin aseteltu käsitekartta (ei sijainti-/yhteysdataa skeemassa vielä),
+// vaan tietoinen vaihe 1-2 -yksinkertaistus: riittää gradientin ja
+// solmutason erottelun näyttämiseen. Verkko/yhteydet tulevat vaiheessa 3.
+function piirraOpintoKarttaSolmuverkko(aiheet) {
+  const COLS = Math.min(6, Math.max(1, aiheet.length));
+  const CELL = 40;
+  const R = 12;
+  const rows = Math.ceil(aiheet.length / COLS);
+  const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+  svg.setAttribute('viewBox', '0 0 ' + (COLS * CELL) + ' ' + (rows * CELL));
+  svg.classList.add('opinto-kartta-verkko');
+  aiheet.forEach(function(aihe, i) {
+    const col = i % COLS;
+    const row = Math.floor(i / COLS);
+    const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+    circle.setAttribute('cx', String(col * CELL + CELL / 2));
+    circle.setAttribute('cy', String(row * CELL + CELL / 2));
+    circle.setAttribute('r', String(R));
+    circle.setAttribute('fill', opintoSolmunVari(aihe));
+    const otsikko = document.createElementNS('http://www.w3.org/2000/svg', 'title');
+    otsikko.textContent = aihe.name;
+    circle.appendChild(otsikko);
+    svg.appendChild(circle);
+  });
+  return svg;
+}
+
 async function lataaOpintoKartta() {
   const { data: kurssit, error: kurssiError } = await db.from('opinto_kurssit').select().order('sort_order');
   if (kurssiError) {
@@ -2420,7 +2499,7 @@ async function lataaOpintoKartta() {
 
   for (const kurssi of kurssit) {
     const [{ data: aiheet }, { data: kurssiDeadlinet }, { data: aiheDeadlinet }] = await Promise.all([
-      db.from('opinto_aiheet').select('pero_vaihe, kertausjonossa').eq('kurssi_id', kurssi.id),
+      db.from('opinto_aiheet').select('name, sort_order, pero_vaihe, retrieval_kierrokset, retrieval_tavoite').eq('kurssi_id', kurssi.id).order('sort_order'),
       db.from('opinto_deadlinet').select('pvm').eq('kurssi_id', kurssi.id).gte('pvm', paivamaaraISO(new Date())).order('pvm').limit(1),
       db.from('opinto_deadlinet').select('pvm, aihe_id, opinto_aiheet!inner(kurssi_id)').eq('opinto_aiheet.kurssi_id', kurssi.id).gte('pvm', paivamaaraISO(new Date())).order('pvm').limit(1),
     ]);
@@ -2433,25 +2512,9 @@ async function lataaOpintoKartta() {
     nimi.textContent = kurssi.name;
     kortti.appendChild(nimi);
 
-    const palkki = document.createElement('div');
-    palkki.className = 'opinto-kartta-palkki';
-    const maara = (aiheet || []).length;
-    if (maara === 0) {
-      const lohko = document.createElement('div');
-      lohko.className = 'opinto-kartta-lohko--edessa';
-      lohko.style.flex = '1';
-      palkki.appendChild(lohko);
-    } else {
-      ['hallussa', 'tyon-alla', 'edessa'].forEach(function(ryhma) {
-        const osuus = aiheet.filter(function(a) { return opintoVaiheRyhma(a.pero_vaihe, a.kertausjonossa) === ryhma; }).length;
-        if (osuus === 0) return;
-        const lohko = document.createElement('div');
-        lohko.className = 'opinto-kartta-lohko--' + ryhma;
-        lohko.style.flex = String(osuus);
-        palkki.appendChild(lohko);
-      });
+    if (aiheet && aiheet.length > 0) {
+      kortti.appendChild(piirraOpintoKarttaSolmuverkko(aiheet));
     }
-    kortti.appendChild(palkki);
 
     // Lähin tuleva deadline joko kurssi- tai aihetasolta — yksinkertainen
     // Math.min kahdesta jo valmiiksi lajitellusta/rajatusta hakutuloksesta.
