@@ -3794,6 +3794,32 @@ h1 {
 #opinto-aihe-lista li { flex-wrap: wrap; }
 #opinto-aihe-lista li span:first-child { flex-basis: 100%; }
 
+/* Kartta — näkymänvaihdin (Opiskelu / Työelämätaidot, 2026-08-30, mockupin
+   .vaihdin/.saadin sovitettuna Sataman omiin tokeneihin — sama aktiivinen-
+   tila-kaava kuin .opinto-tuntemus-btn.active:lla). */
+.opinto-kartta-vaihdin {
+  display: flex;
+  gap: 7px;
+  margin: 10px 0 4px;
+}
+.opinto-kartta-saadin {
+  font-family: var(--fontti-loki);
+  font-size: 11.5px;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  padding: 7px 13px;
+  border-radius: var(--r-kosketettava, 13px);
+  border: 1px solid var(--hius-vahva);
+  background: transparent;
+  color: var(--muted, var(--vaimea));
+  cursor: pointer;
+}
+.opinto-kartta-saadin[aria-pressed="true"] {
+  border-color: var(--messinki);
+  color: var(--messinki);
+  font-weight: 700;
+}
+
 /* Kartta — Opiskelu-näkymä (2026-08-30, portattu Katrin omasta HTML-
    mockupista, ks. script.js:n piirraOpintoKarttaSanapilvi-kommentti
    täydestä historiasta/perusteluista). Kaikkien kurssien solmut yhdessä
@@ -3830,6 +3856,19 @@ h1 {
   letter-spacing: .18em;
   fill: var(--muste);
   opacity: .38;
+}
+/* Osataito → taito -nuolet (Työelämätaidot-näkymä). */
+.opinto-kartta-kaari {
+  stroke: var(--messinki);
+  stroke-width: .9;
+  stroke-opacity: .6;
+  stroke-dasharray: 2.5 3;
+}
+.opinto-kartta-nuolenkarki-polku {
+  fill: none;
+  stroke: var(--messinki);
+  stroke-width: 1.2;
+  stroke-linecap: round;
 }
 /* Perustussolmu — sama merkitys kuin ennenkin ("1-3 solmua joiden päälle
    kurssit rakentuvat"), lihavoituna + alleviivattuna erottuu muista sanoista. */

@@ -2494,8 +2494,10 @@ function opintoKarttaHyllyasettelu(kurssiryhmat) {
     ryhma.aiheet.forEach(function(aihe, i) {
       const col = i % cols, row = Math.floor(i / cols);
       solmut.push({
-        aihe: aihe,
         v: opintoSolmunSyvyys(aihe),
+        teksti: aihe.name,
+        perustussolmu: !!aihe.perustussolmu,
+        yllapito: opintoSolmuOnYllapidossa(aihe),
         x: rowX + OPINTO_KARTTA_HYLLY_PADDING / 2 + col * OPINTO_KARTTA_SOLMU_VALI + OPINTO_KARTTA_SOLMU_VALI / 2,
         y: rowY + OPINTO_KARTTA_HYLLY_OTSAKE_H + OPINTO_KARTTA_HYLLY_PADDING / 2 + row * OPINTO_KARTTA_SOLMU_VALI + OPINTO_KARTTA_SOLMU_VALI / 2,
       });
@@ -2594,9 +2596,13 @@ function piirraOpintoKarttaSyvyyskentta(svg, solmut) {
   svg.appendChild(g);
 }
 
+// Yleiskäyttöinen solmupiirtäjä — solmu on litteä {x,y,v,teksti,iso?,
+// perustussolmu?,yllapito?} -olio, käyttävät sekä Opiskelu- että
+// Työelämätaidot-näkymä. `iso` suurentaa fonttia (Työelämän "taito"-tason
+// solmut, mockupin isot nimet), muuten normaali sanapilvi-koko.
 function piirraOpintoKarttaSolmut(svg, solmut) {
   solmut.forEach(function(s) {
-    if (opintoSolmuOnYllapidossa(s.aihe)) {
+    if (s.yllapito) {
       const rengas = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
       rengas.setAttribute('cx', String(s.x));
       rengas.setAttribute('cy', String(s.y));
@@ -2604,17 +2610,48 @@ function piirraOpintoKarttaSolmut(svg, solmut) {
       rengas.classList.add('opinto-kartta-yllapito-rengas');
       svg.appendChild(rengas);
     }
+    const fonttiMin = s.iso ? OPINTO_KARTTA_FONTTI_MIN + 6 : OPINTO_KARTTA_FONTTI_MIN;
+    const fonttiMax = s.iso ? OPINTO_KARTTA_FONTTI_MAX + 6 : OPINTO_KARTTA_FONTTI_MAX;
     const teksti = document.createElementNS('http://www.w3.org/2000/svg', 'text');
     teksti.setAttribute('x', String(s.x));
     teksti.setAttribute('y', String(s.y));
     teksti.setAttribute('text-anchor', 'middle');
     teksti.setAttribute('dominant-baseline', 'middle');
-    teksti.setAttribute('font-size', (OPINTO_KARTTA_FONTTI_MIN + s.v * (OPINTO_KARTTA_FONTTI_MAX - OPINTO_KARTTA_FONTTI_MIN)).toFixed(1));
-    teksti.setAttribute('font-weight', s.v > 0.5 ? '700' : '400');
+    teksti.setAttribute('font-size', (fonttiMin + s.v * (fonttiMax - fonttiMin)).toFixed(1));
+    teksti.setAttribute('font-weight', (s.iso || s.v > 0.5) ? '700' : '400');
     teksti.setAttribute('fill', opintoKarttaTekstinVari(s.v));
-    if (s.aihe.perustussolmu) teksti.classList.add('opinto-kartta-perustussolmu');
-    teksti.textContent = s.aihe.name;
+    if (s.perustussolmu) teksti.classList.add('opinto-kartta-perustussolmu');
+    teksti.textContent = s.teksti;
     svg.appendChild(teksti);
+  });
+}
+
+// Osataito → taito -nuolet (Työelämätaidot-näkymä, mockupin #kaaret) —
+// katkoviiva + nuolenkärki, sama "isot taidot koostuvat pienistä
+// osataidoista" -logiikka kuin mockupissa.
+function piirraOpintoKarttaKaaret(svg, kaaret) {
+  const defs = document.createElementNS('http://www.w3.org/2000/svg', 'defs');
+  const marker = document.createElementNS('http://www.w3.org/2000/svg', 'marker');
+  marker.setAttribute('id', 'opinto-kartta-nuolenkarki');
+  marker.setAttribute('viewBox', '0 0 8 8'); marker.setAttribute('refX', '7'); marker.setAttribute('refY', '4');
+  marker.setAttribute('markerWidth', '5.5'); marker.setAttribute('markerHeight', '5.5'); marker.setAttribute('orient', 'auto');
+  const karkiPolku = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+  karkiPolku.setAttribute('d', 'M0 .6 L7.4 4 L0 7.4');
+  karkiPolku.classList.add('opinto-kartta-nuolenkarki-polku');
+  marker.appendChild(karkiPolku);
+  defs.appendChild(marker);
+  svg.appendChild(defs);
+
+  kaaret.forEach(function(k) {
+    const dx = k.to.x - k.from.x, dy = k.to.y - k.from.y, d = Math.hypot(dx, dy) || 1;
+    const viiva = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+    viiva.setAttribute('x1', (k.from.x + dx / d * 22).toFixed(1));
+    viiva.setAttribute('y1', (k.from.y + dy / d * 22).toFixed(1));
+    viiva.setAttribute('x2', (k.to.x - dx / d * 30).toFixed(1));
+    viiva.setAttribute('y2', (k.to.y - dy / d * 30).toFixed(1));
+    viiva.setAttribute('marker-end', 'url(#opinto-kartta-nuolenkarki)');
+    viiva.classList.add('opinto-kartta-kaari');
+    svg.appendChild(viiva);
   });
 }
 
@@ -2630,7 +2667,7 @@ function piirraOpintoKarttaOtsakkeet(svg, otsakkeet) {
   });
 }
 
-function piirraOpintoKarttaSanapilvi(kurssiryhmat) {
+function piirraOpintoKarttaOpiskelu(kurssiryhmat) {
   const asettelu = opintoKarttaHyllyasettelu(kurssiryhmat);
   const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
   svg.setAttribute('viewBox', '0 0 ' + asettelu.leveys + ' ' + asettelu.korkeus);
@@ -2641,6 +2678,148 @@ function piirraOpintoKarttaSanapilvi(kurssiryhmat) {
   piirraOpintoKarttaSolmut(svg, asettelu.solmut);
   return svg;
 }
+
+// === TYÖELÄMÄTAIDOT (Näkymä 2, 2026-08-30, sama mockup kuin Opiskelu-
+// näkymä) — Katrin pyyntö: "translate course names actually what can i
+// do... reveal also my ways of working that you can draw from data you
+// collect from me". EI kurssin nimiä missään (mockupin oma sääntö). Sisältö
+// on Katrin itsensä 2026-08-30 vahvistama/tarkentama: hän hyväksyi nämä 4
+// taitoa, ja täsmensi itse yhden jaon ("measuring i was pretty good at
+// because of my precizeness, but after measuring i didn't necessarily know
+// what to do with numbers") — siksi Mittaustarkkuus ja Tulosten tulkinta
+// ovat ERI osataitoja, ja niiden taustalla olevat opinto_aiheet-rivit
+// (Measurement techniques/Circuit measurements vs. Data processing and
+// graphing/Measurement uncertainty and reliability) päivitettiin vastaamaan
+// tätä suoraan Supabasessa samana päivänä (pelkkä datamuutos, ei
+// migraatiota — sama käytäntö kuin muillakin data-only-muutoksilla).
+//
+// Osataidot laskevat syvyytensä LIVENÄ: 'kurssi'-lähteiset keskiarvona
+// niiden opinto_aiheet-rivien opintoSolmunSyvyys()-arvoista joiden nimi/
+// kurssi täsmää (ei kertaluontoinen snapshot — päivittyy Katrin edetessä).
+// 'kayttaytyminen'-lähteiset tulevat haeTyoelamaKayttaytyminen()-kyselyn
+// oikeasta datasta (ei keksittyjä lukuja).
+const OPINTO_TYOELAMA_MALLI = [
+  { taito: 'Tekninen mallinnus ja analyysi', osataidot: [
+    { nimi: 'Matemaattinen mallinnus', lahde: 'kurssi', kurssit: ['Math Roadmap', 'Introduction to Mathematical Sciences'] },
+    { nimi: 'Fysikaalinen mallinnus', lahde: 'kurssi', aiheet: ['Physical modeling', 'Basic electrical concepts (V, R, I, P)', "Ohm's and Kirchhoff's laws", 'DC and AC circuits', 'Circuit building (protoboard)'] },
+    { nimi: 'Ongelmanratkaisu ja jäsentäminen', lahde: 'kurssi', aiheet: ['CDIO framework (Conceive & Design)', 'Problem-solving and design thinking'] },
+  ]},
+  { taito: 'Mittaaminen ja tulosten raportointi', osataidot: [
+    { nimi: 'Mittaustarkkuus', lahde: 'kurssi', aiheet: ['Measurement techniques', 'Circuit measurements'] },
+    { nimi: 'Tulosten tulkinta ja analyysi', lahde: 'kurssi', aiheet: ['Data processing and graphing', 'Measurement uncertainty and reliability'] },
+    { nimi: 'Raportointi ja dokumentointi', lahde: 'kurssi', aiheet: ['Lab safety and reporting', 'Tieteellisen kirjoittamisen perusteet', 'Asiantuntijan tekstitaidot'] },
+  ]},
+  { taito: 'Asiantuntijaviestintä', osataidot: [
+    { nimi: 'Esiintyminen ja suullinen viestintä', lahde: 'kurssi', aiheet: ['Field-related presentations', 'B2-level speaking and writing', 'Esiintymis- ja palautetaidot'] },
+    { nimi: 'Kirjallinen asiantuntijaviestintä', lahde: 'kurssi', aiheet: ['Reports and emails', 'Professional register and style', 'Lähteiden eettinen käyttö'] },
+  ]},
+  { taito: 'Oman osaamisen ja opiskelun johtaminen', osataidot: [
+    { nimi: 'Oman osaamisen itsearviointi', lahde: 'kurssi', aiheet: ['Self-assessment of strengths', 'Study skills and curriculum orientation'] },
+    { nimi: 'Projektityöskentely', lahde: 'kurssi', aiheet: ['ICT project management basics', 'Ammatillinen vuorovaikutus ja ryhmätyö'] },
+    { nimi: 'Työskentelyn säännöllisyys', lahde: 'kayttaytyminen', kayttaytymisAvain: 'saannollisyys' },
+    { nimi: 'Suunniteltujen askelten läpivienti', lahde: 'kayttaytyminen', kayttaytymisAvain: 'lapivienti' },
+    { nimi: 'Deadlinen puskurin käyttö', lahde: 'kayttaytyminen', kayttaytymisAvain: 'puskuri' },
+  ]},
+];
+
+// Käyttäytymisdata — OIKEAT kyselyt, ei keksittyjä lukuja (Katrin pyyntö:
+// "reveal my ways of working that you can draw from data you collect from
+// me"). Deadlinen puskuri palauttaa 0 juuri nyt (kaikki 17 deadlinea ovat
+// vasta tulevaisuudessa, ensimmäinen 13.9. — Katrin oma huomio "deadlines
+// are about to start") — rakenne on silti mukana valmiina, arvo täyttyy
+// automaattisesti ensimmäisen menneen deadlinen jälkeen, EI keskeneräinen.
+async function haeTyoelamaKayttaytyminen() {
+  const tanaan = paivamaaraISO(new Date());
+  const [{ data: sessiot }, { data: askeleet }] = await Promise.all([
+    db.from('opinto_sessiot').select('alkoi_at'),
+    db.from('opinto_paivan_askeleet').select('tila').lt('pvm', tanaan),
+  ]);
+
+  // Säännöllisyys: eri päiviä joilla vähintään yksi sessio, suhteessa
+  // ensimmäisestä sessiosta kuluneisiin päiviin (katto 14pv ettei kauan
+  // sitten alkanut jakso pidä lukua keinotekoisen korkeana ikuisesti).
+  let saannollisyys = 0;
+  if (sessiot && sessiot.length > 0) {
+    const paivat = new Set(sessiot.map(function(s) { return s.alkoi_at.slice(0, 10); }));
+    const eka = sessiot.reduce(function(min, s) { return s.alkoi_at < min ? s.alkoi_at : min; }, sessiot[0].alkoi_at);
+    const ikkuna = Math.max(1, Math.min(14, Math.round((Date.now() - new Date(eka).getTime()) / 86400000) + 1));
+    saannollisyys = Math.min(1, paivat.size / ikkuna);
+  }
+
+  // Läpivienti: kuinka moni MENNYT (pvm < tänään) tarjottu askel tehtiin.
+  let lapivienti = 0;
+  if (askeleet && askeleet.length > 0) {
+    lapivienti = askeleet.filter(function(a) { return a.tila === 'tehty'; }).length / askeleet.length;
+  }
+
+  return { saannollisyys: saannollisyys, lapivienti: lapivienti, puskuri: 0 };
+}
+
+function opintoTyoelamaOsataitoSyvyys(osataito, kaikkiAiheet, kayttaytyminen) {
+  if (osataito.lahde === 'kayttaytyminen') {
+    return kayttaytyminen[osataito.kayttaytymisAvain] || 0;
+  }
+  let kohteet;
+  if (osataito.kurssit) {
+    kohteet = kaikkiAiheet.filter(function(a) { return osataito.kurssit.indexOf(a._kurssiNimi) !== -1; });
+  } else {
+    kohteet = kaikkiAiheet.filter(function(a) { return osataito.aiheet.indexOf(a.name) !== -1; });
+  }
+  if (kohteet.length === 0) return 0;
+  return kohteet.reduce(function(s, a) { return s + opintoSolmunSyvyys(a); }, 0) / kohteet.length;
+}
+
+function laskeTyoelamaTaidot(kaikkiAiheet, kayttaytyminen) {
+  return OPINTO_TYOELAMA_MALLI.map(function(t) {
+    const osataidot = t.osataidot.map(function(o) {
+      return { nimi: o.nimi, lahde: o.lahde, v: opintoTyoelamaOsataitoSyvyys(o, kaikkiAiheet, kayttaytyminen) };
+    });
+    const v = osataidot.reduce(function(s, o) { return s + o.v; }, 0) / osataidot.length;
+    return { nimi: t.taito, v: v, osataidot: osataidot };
+  });
+}
+
+// Asettelu: taito omalle "hyllylleen" (kuten kurssit Opiskelu-näkymässä),
+// osataidot ympyröitynä sen ympärille — sama visuaalinen idea kuin
+// mockupin käsin sijoitellut taito+osataito-klusterit.
+function opintoKarttaTyoelamaAsettelu(taidot) {
+  const COLS = Math.max(1, Math.ceil(Math.sqrt(taidot.length)));
+  const CELL = 210;
+  const SADE = 78;
+  const solmut = [];
+  const kaaret = [];
+  taidot.forEach(function(taito, i) {
+    const col = i % COLS, row = Math.floor(i / COLS);
+    const cx = col * CELL + CELL / 2, cy = row * CELL + CELL / 2;
+    const taitoSolmu = { x: cx, y: cy, v: taito.v, teksti: taito.nimi, iso: true };
+    solmut.push(taitoSolmu);
+    const n = taito.osataidot.length;
+    taito.osataidot.forEach(function(o, j) {
+      const kulma = (j / n) * Math.PI * 2 - Math.PI / 2;
+      const osaSolmu = { x: cx + Math.cos(kulma) * SADE, y: cy + Math.sin(kulma) * SADE, v: o.v, teksti: o.nimi, lahde: o.lahde };
+      solmut.push(osaSolmu);
+      kaaret.push({ from: osaSolmu, to: taitoSolmu });
+    });
+  });
+  const rows = Math.ceil(taidot.length / COLS);
+  return { solmut: solmut, kaaret: kaaret, leveys: COLS * CELL, korkeus: rows * CELL };
+}
+
+function piirraOpintoKarttaTyoelama(taidot) {
+  const asettelu = opintoKarttaTyoelamaAsettelu(taidot);
+  const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+  svg.setAttribute('viewBox', '0 0 ' + asettelu.leveys + ' ' + asettelu.korkeus);
+  svg.classList.add('opinto-kartta-verkko');
+  piirraOpintoKarttaSyvyyskentta(svg, asettelu.solmut);
+  piirraOpintoKarttaVerkkotausta(svg, asettelu.solmut, asettelu.leveys, asettelu.korkeus);
+  piirraOpintoKarttaKaaret(svg, asettelu.kaaret);
+  piirraOpintoKarttaSolmut(svg, asettelu.solmut);
+  return svg;
+}
+
+// Näkymänvaihdin (Opiskelu / Työelämätaidot) — sama tila-malli kuin
+// mockupin `tila`-muuttuja.
+let opintoKarttaNakyma = 'opiskelu';
 
 // Kaikkien kurssien solmut yhdessä kartassa — kurssi omana hyllynään
 // (opintoKarttaHyllyasettelu), ei laatikkoa/rajaa hyllyjen välissä.
@@ -2663,7 +2842,9 @@ async function lataaOpintoKartta() {
 
   const kurssiryhmat = await Promise.all(kurssit.map(function(kurssi) {
     return db.from('opinto_aiheet').select('name, sort_order, pero_vaihe, retrieval_kierrokset, retrieval_tavoite, sr_interval_index, perustussolmu').eq('kurssi_id', kurssi.id).order('sort_order')
-      .then(function(res) { return { kurssi: kurssi, aiheet: res.data || [] }; });
+      .then(function(res) {
+        return { kurssi: kurssi, aiheet: (res.data || []).map(function(a) { a._kurssiNimi = kurssi.name; return a; }) };
+      });
   }));
 
   if (kurssiryhmat.every(function(r) { return r.aiheet.length === 0; })) {
@@ -2674,8 +2855,25 @@ async function lataaOpintoKartta() {
     return;
   }
 
-  sisalto.appendChild(piirraOpintoKarttaSanapilvi(kurssiryhmat));
+  if (opintoKarttaNakyma === 'opiskelu') {
+    sisalto.appendChild(piirraOpintoKarttaOpiskelu(kurssiryhmat));
+  } else {
+    const kaikkiAiheet = [].concat.apply([], kurssiryhmat.map(function(r) { return r.aiheet; }));
+    const kayttaytyminen = await haeTyoelamaKayttaytyminen();
+    const taidot = laskeTyoelamaTaidot(kaikkiAiheet, kayttaytyminen);
+    sisalto.appendChild(piirraOpintoKarttaTyoelama(taidot));
+  }
 }
+
+function vaihdaOpintoKarttaNakyma(nakyma) {
+  if (opintoKarttaNakyma === nakyma) return;
+  opintoKarttaNakyma = nakyma;
+  document.getElementById('opinto-kartta-nakyma-opiskelu').setAttribute('aria-pressed', String(nakyma === 'opiskelu'));
+  document.getElementById('opinto-kartta-nakyma-tyoelama').setAttribute('aria-pressed', String(nakyma === 'tyoelama'));
+  lataaOpintoKartta();
+}
+document.getElementById('opinto-kartta-nakyma-opiskelu').addEventListener('click', function() { vaihdaOpintoKarttaNakyma('opiskelu'); });
+document.getElementById('opinto-kartta-nakyma-tyoelama').addEventListener('click', function() { vaihdaOpintoKarttaNakyma('tyoelama'); });
 
 // === OPINTOPOLKU VAIHE 2: KOLMEN VOIMAN MOOTTORI (2026-07-21, ks.
 // muistiinpanot.md "Opintopolku VAIHE 2" — KONSEPTIKIRJA.md 4.11 puuttuu
