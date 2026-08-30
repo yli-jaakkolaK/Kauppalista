@@ -2464,10 +2464,16 @@ function opintoSolmunVari(aihe) {
 // koska skeemassa ei ole erillistä yhteys-/edge-taulua. Ks. muistin
 // project_kartta_speksi_v2: jos Katri haluaa oikeat käsin piirretyt
 // yhteydet myöhemmin, se vaatii uuden taulun eikä ole tässä vaiheessa.
+// Perustussolmun säde isompi (VAIHE 4, 2026-08-30) — sama merkitys kuin
+// paivitaOpintoTehtavaPerustussolmuNappi:n käyttötarkoitus: "1-3 solmua
+// joiden päälle tulevat kurssit rakentuvat, näille saa antaa enemmän aikaa"
+// (ks. script.js:n oma kommentti kohdassa A3 perustussolmu).
+const OPINTO_KARTTA_SADE = 12;
+const OPINTO_KARTTA_SADE_PERUS = 16;
+
 function piirraOpintoKarttaSolmuverkko(aiheet) {
   const COLS = Math.min(6, Math.max(1, aiheet.length));
   const CELL = 40;
-  const R = 12;
   const rows = Math.ceil(aiheet.length / COLS);
   const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
   svg.setAttribute('viewBox', '0 0 ' + (COLS * CELL) + ' ' + (rows * CELL));
@@ -2494,8 +2500,9 @@ function piirraOpintoKarttaSolmuverkko(aiheet) {
     const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
     circle.setAttribute('cx', String(piste.cx));
     circle.setAttribute('cy', String(piste.cy));
-    circle.setAttribute('r', String(R));
+    circle.setAttribute('r', String(piste.aihe.perustussolmu ? OPINTO_KARTTA_SADE_PERUS : OPINTO_KARTTA_SADE));
     circle.setAttribute('fill', opintoSolmunVari(piste.aihe));
+    if (piste.aihe.perustussolmu) circle.classList.add('opinto-kartta-perustussolmu');
     const otsikko = document.createElementNS('http://www.w3.org/2000/svg', 'title');
     otsikko.textContent = piste.aihe.name;
     circle.appendChild(otsikko);
@@ -2503,6 +2510,17 @@ function piirraOpintoKarttaSolmuverkko(aiheet) {
   });
 
   return svg;
+}
+
+// Kurssitason taustasävy (VAIHE 4) — kurssin solmujen KESKIMÄÄRÄINEN syvyys
+// kevyenä sävynä kortin taustalla, sitoo yksittäiset solmut yhdeksi
+// kokonaiskuvaksi samalla väriasteikolla. Tarkoituksella hillitty (max 12%
+// läpinäkymätön syvanne) ettei peitä solmuverkkoa alleen.
+function opintoKurssinTaustasavy(aiheet) {
+  if (!aiheet || aiheet.length === 0) return 'transparent';
+  const keskiarvo = aiheet.reduce(function(s, a) { return s + opintoSolmunSyvyys(a); }, 0) / aiheet.length;
+  const alpha = (keskiarvo * 0.12).toFixed(3);
+  return 'rgba(63, 95, 83, ' + alpha + ')'; // --syvanne RGB-arvoina
 }
 
 async function lataaOpintoKartta() {
@@ -2524,13 +2542,14 @@ async function lataaOpintoKartta() {
 
   for (const kurssi of kurssit) {
     const [{ data: aiheet }, { data: kurssiDeadlinet }, { data: aiheDeadlinet }] = await Promise.all([
-      db.from('opinto_aiheet').select('name, sort_order, pero_vaihe, retrieval_kierrokset, retrieval_tavoite').eq('kurssi_id', kurssi.id).order('sort_order'),
+      db.from('opinto_aiheet').select('name, sort_order, pero_vaihe, retrieval_kierrokset, retrieval_tavoite, perustussolmu').eq('kurssi_id', kurssi.id).order('sort_order'),
       db.from('opinto_deadlinet').select('pvm').eq('kurssi_id', kurssi.id).gte('pvm', paivamaaraISO(new Date())).order('pvm').limit(1),
       db.from('opinto_deadlinet').select('pvm, aihe_id, opinto_aiheet!inner(kurssi_id)').eq('opinto_aiheet.kurssi_id', kurssi.id).gte('pvm', paivamaaraISO(new Date())).order('pvm').limit(1),
     ]);
 
     const kortti = document.createElement('div');
     kortti.className = 'opinto-kartta-kurssi';
+    kortti.style.background = opintoKurssinTaustasavy(aiheet);
 
     const nimi = document.createElement('div');
     nimi.className = 'opinto-kartta-kurssi-nimi';

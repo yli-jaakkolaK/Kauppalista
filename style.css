@@ -3825,6 +3825,13 @@ h1 {
   stroke: var(--hius-vahva);
   stroke-width: 1;
 }
+/* Perustussolmu (VAIHE 4) — isompi säde jo hoitaa suurimman osan
+   erottumisesta (ks. script.js:n OPINTO_KARTTA_SADE_PERUS), tässä vain
+   vahvempi reunaviiva täydentämään. */
+.opinto-kartta-perustussolmu {
+  stroke: var(--sinappi);
+  stroke-width: 2;
+}
 
 .opinto-kartta-deadline {
   font-size: 12px;
