@@ -178,7 +178,10 @@ const ALAPALKKI_IKONIT = {
   // ulkopuolella — siksi se lisätään erikseen luoAlapalkkiNappi():ssa.
   kalenteri: '<span class="alapalkki-kal-ikoni"><span class="alapalkki-kal-kk" data-role="alapalkki-kal-kk"></span><span class="alapalkki-kal-pv" data-role="alapalkki-kal-pv"></span></span>',
   hytti: '<span class="alapalkki-emoji">🚪</span>',
-  muistilaput: '<span class="alapalkki-emoji">🗒️</span>',
+  // Vaihdettu spiraalimuistilehtiöstä (🗒️) leikepöytään (2026-08-30, Katrin
+  // pyyntö: "näyttäis enemmän todo listalta") - useimmat alustat piirtävät
+  // 📋:n rivi-/täppäysmerkeillä, näyttää selvemmin tehtävälistalta.
+  muistilaput: '<span class="alapalkki-emoji">📋</span>',
   varasto: '<span class="alapalkki-emoji">📦</span>',
   asetukset: '<span class="alapalkki-emoji">⚙️</span>',
   lisaa: '<svg viewBox="0 0 28 28" fill="none"><circle cx="8" cy="14" r="2" fill="var(--vaimea)"/><circle cx="14" cy="14" r="2" fill="var(--vaimea)"/><circle cx="20" cy="14" r="2" fill="var(--vaimea)"/></svg>',
@@ -11353,7 +11356,7 @@ async function haeKotiKohteet() {
 async function avaaKohdeValikko(rivi, li) {
   openRowMenu(li, [
     { label: '📦 Varasto', onClick: function() { avaaKohdeAlivalikko(rivi, li, 'varasto'); } },
-    { label: '🗒️ Muistilaput', onClick: function() { avaaKohdeAlivalikko(rivi, li, 'muistilaput'); } },
+    { label: '📋 Muistilaput', onClick: function() { avaaKohdeAlivalikko(rivi, li, 'muistilaput'); } },
     { label: '🗄 Arkistoi', onClick: function() { arkistoiLaituriRivi(rivi); } },
   ]);
 }
