@@ -3850,13 +3850,6 @@ h1 {
   stroke-dasharray: 3 4;
   stroke-opacity: .8;
 }
-/* Kurssin nimi hyllyn yläreunassa — vaimea "vesileima", ei otsikko/laatikko. */
-.opinto-kartta-kurssiotsake {
-  font-size: 8.5px;
-  letter-spacing: .18em;
-  fill: var(--muste);
-  opacity: .38;
-}
 /* Osataito → taito -nuolet (Työelämätaidot-näkymä). */
 .opinto-kartta-kaari {
   stroke: var(--messinki);

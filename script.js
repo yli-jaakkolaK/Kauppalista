@@ -2440,7 +2440,6 @@ const OPINTO_KARTTA_FONTTI_MIN = 11;
 const OPINTO_KARTTA_FONTTI_MAX = 20;
 const OPINTO_KARTTA_SOLMU_VALI = 70; // px, minigridin solmuväli hyllyn sisällä (riittää rivitetylle, ~110px leveälle nimelle ilman että naapuri koskettaa)
 const OPINTO_KARTTA_HYLLY_PADDING = 22;
-const OPINTO_KARTTA_HYLLY_OTSAKE_H = 18;
 const OPINTO_KARTTA_LEVEYS = 760; // leveämpi kuin korkea sisältö hyötyy — viewBox skaalautuu joka tapauksessa kapealle näytölle
 const OPINTO_KARTTA_MESH_VALI = 30; // px, taustaverkon ruutukoko (mockupin SX/SY)
 const OPINTO_KARTTA_VETO_SADE = 58; // px, kuinka kaukaa solmu vääntää verkkoa (mockupin 58)
@@ -2498,7 +2497,6 @@ function opintoKarttaTekstinVari(syvyys) {
 function opintoKarttaHyllyasettelu(kurssiryhmat) {
   let rowX = 0, rowY = 0, rowMaxH = 0;
   const solmut = [];
-  const otsakkeet = [];
   kurssiryhmat.forEach(function(ryhma) {
     const n = ryhma.aiheet.length;
     if (n === 0) return;
@@ -2533,14 +2531,13 @@ function opintoKarttaHyllyasettelu(kurssiryhmat) {
     const shelfSisaltoKorkeus = rivikorkeudet.reduce(function(s, h) { return s + h; }, 0);
 
     const cellW = cols * OPINTO_KARTTA_SOLMU_VALI + OPINTO_KARTTA_HYLLY_PADDING;
-    const cellH = shelfSisaltoKorkeus + OPINTO_KARTTA_HYLLY_PADDING + OPINTO_KARTTA_HYLLY_OTSAKE_H;
+    const cellH = shelfSisaltoKorkeus + OPINTO_KARTTA_HYLLY_PADDING;
     if (rowX > 0 && rowX + cellW > OPINTO_KARTTA_LEVEYS) {
       rowX = 0; rowY += rowMaxH; rowMaxH = 0;
     }
-    otsakkeet.push({ teksti: ryhma.kurssi.name, x: rowX + cellW / 2, y: rowY + 11 });
 
     const rivienAlkuY = [];
-    let kum = rowY + OPINTO_KARTTA_HYLLY_OTSAKE_H + OPINTO_KARTTA_HYLLY_PADDING / 2;
+    let kum = rowY + OPINTO_KARTTA_HYLLY_PADDING / 2;
     for (let r = 0; r < rows; r++) {
       rivienAlkuY.push(kum);
       kum += rivikorkeudet[r];
@@ -2568,8 +2565,7 @@ function opintoKarttaHyllyasettelu(kurssiryhmat) {
   // kasvatetaan kangas sen mukaan.
   const M = OPINTO_KARTTA_REUNA_MARGINAALI + 20;
   solmut.forEach(function(s) { s.x += M; s.y += M; });
-  otsakkeet.forEach(function(o) { o.x += M; o.y += M; });
-  return { solmut: solmut, otsakkeet: otsakkeet, leveys: OPINTO_KARTTA_LEVEYS + 2 * M, korkeus: rowY + rowMaxH + 2 * M };
+  return { solmut: solmut, leveys: OPINTO_KARTTA_LEVEYS + 2 * M, korkeus: rowY + rowMaxH + 2 * M };
 }
 
 // Paikallinen vahvuuskenttä pisteessä (px,py) — Gaussin-summa kaikista
@@ -2761,18 +2757,6 @@ function piirraOpintoKarttaKaaret(svg, kaaret) {
   });
 }
 
-function piirraOpintoKarttaOtsakkeet(svg, otsakkeet) {
-  otsakkeet.forEach(function(o) {
-    const teksti = document.createElementNS('http://www.w3.org/2000/svg', 'text');
-    teksti.setAttribute('x', String(o.x));
-    teksti.setAttribute('y', String(o.y));
-    teksti.setAttribute('text-anchor', 'middle');
-    teksti.classList.add('opinto-kartta-kurssiotsake');
-    teksti.textContent = o.teksti.toUpperCase();
-    svg.appendChild(teksti);
-  });
-}
-
 function piirraOpintoKarttaOpiskelu(kurssiryhmat) {
   const asettelu = opintoKarttaHyllyasettelu(kurssiryhmat);
   const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
@@ -2780,7 +2764,6 @@ function piirraOpintoKarttaOpiskelu(kurssiryhmat) {
   svg.classList.add('opinto-kartta-verkko');
   piirraOpintoKarttaSyvyyskentta(svg, asettelu.solmut);
   piirraOpintoKarttaVerkkotausta(svg, asettelu.solmut, asettelu.leveys, asettelu.korkeus);
-  piirraOpintoKarttaOtsakkeet(svg, asettelu.otsakkeet);
   piirraOpintoKarttaSolmut(svg, asettelu.solmut, asettelu.leveys, asettelu.korkeus);
   return svg;
 }
@@ -2981,7 +2964,24 @@ async function lataaOpintoKartta() {
   }
 
   if (opintoKarttaNakyma === 'opiskelu') {
-    sisalto.appendChild(piirraOpintoKarttaOpiskelu(kurssiryhmat));
+    // Katrin pyyntö 2026-08-30: "i'd rather read 3 things i can read that
+    // messy 35" — koskematon (pero_vaihe==='priming', ei perustussolmu)
+    // aihe ei kerro vielä mitään (syvyys ~0.05, tuskin näkyvä joka
+    // tapauksessa) mutta täyttää tilaa ja tekee kartasta sotkuisen — piiloon
+    // sama periaate kuin feedback_hide_empty_sections_not_empty_text.md:ssä
+    // (piilota koko rivi, älä näytä tyhjää/merkityksetöntä). EI vaikuta
+    // Työelämätaidot-laskentaan (haetaan alkuperäisestä kurssiryhmat:sta).
+    const nakyvatKurssiryhmat = kurssiryhmat.map(function(r) {
+      return { kurssi: r.kurssi, aiheet: r.aiheet.filter(function(a) { return a.pero_vaihe !== 'priming' || a.perustussolmu; }) };
+    });
+    if (nakyvatKurssiryhmat.every(function(r) { return r.aiheet.length === 0; })) {
+      const tyhja = document.createElement('p');
+      tyhja.className = 'section-empty';
+      tyhja.textContent = 'Ei vielä aloitettuja aiheita.';
+      sisalto.appendChild(tyhja);
+      return;
+    }
+    sisalto.appendChild(piirraOpintoKarttaOpiskelu(nakyvatKurssiryhmat));
   } else {
     const kaikkiAiheet = [].concat.apply([], kurssiryhmat.map(function(r) { return r.aiheet; }));
     const kayttaytyminen = await haeTyoelamaKayttaytyminen();
