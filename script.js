@@ -7955,10 +7955,24 @@ function piirraViikkoKokopaivaRivi(paivanKaikki, iso) {
 
 // Ryhmittää päivän ajalliset tapahtumat ketjutetusti päällekkäisiin
 // klustereihin (samaan tapaan kuin laskeViikonLinjat, mutta kellonajan
-// eikä päivämäärän mukaan) ja jakaa klusterin oman aika-alueen tasan sen
-// tapahtumien kesken — "korkeussuunnassa alekkain, 50%/50% korkeudesta"
-// kahden päällekkäisen tapauksessa (Kalenteri UI -speksi), yleistettynä
-// N:lle tapahtumalle.
+// eikä päivämäärän mukaan) ja jakaa klusterin PALSTATILAN (leveyden) tasan
+// sen tapahtumien kesken — EI enää aika-aluetta.
+//
+// KORJAUS (2026-08-30, Katrin löytö): alkuperäinen versio ("korkeussuunnassa
+// alekkain, 50%/50% korkeudesta", Kalenteri UI -speksin oma teksti) jakoi
+// klusterin YHTEISEN aika-alueen tasan tapahtumien kesken ja asetteli ne
+// PERÄKKÄIN ajassa — kahden todellisuudessa PÄÄLLEKKÄISEN tapahtuman (esim.
+// oma tunti klo 10-12 ja miehen tapahtuma samaan aikaan) todelliset kestot
+// hävisivät kokonaan: 2h+2h -klusteri näytti kahdelta 1h peräkkäiseltä
+// palkilta niiden oikeiden, päällekkäisten aikojen sijaan ("looks like i
+// have classes from 10-11 and 12-14 but for real it is 10-12 and 12-14").
+// Sama bugi vaikutti sekä perhekalenteriin että Hyttiin, koska molemmat
+// käyttävät tätä samaa funktiota.
+//
+// Nyt: top/height tulee AINA suoraan tapahtuman OMASTA todellisesta
+// alku/loppuajasta (ei koskaan jaeta/keskiarvoisteta) — vain left/width
+// jaetaan klusterin sisällä, jolloin päällekkäiset tapahtumat piirtyvät
+// vierekkäin OIKEALLA korkeudellaan/kestollaan, eivät peräkkäin väärällä.
 function assignWeekOverlapSlots(paivanAjalliset) {
   const klusterit = [];
   paivanAjalliset
@@ -7979,13 +7993,16 @@ function assignWeekOverlapSlots(paivanAjalliset) {
   const tulos = [];
   klusterit.forEach(function(k) {
     const n = k.tapahtumat.length;
-    const alkuMinimit = k.tapahtumat.map(function(t) { return aikaMinuutteina(t.event_time); });
-    const loppuMinimit = k.tapahtumat.map(function(t) { return t.event_end_time ? aikaMinuutteina(t.event_end_time) : aikaMinuutteina(t.event_time) + 30; });
-    const topPct = minutesToPercent(Math.min.apply(null, alkuMinimit));
-    const loppuPct = minutesToPercent(Math.max.apply(null, loppuMinimit));
-    const korkeusPct = Math.max(loppuPct - topPct, 0);
     k.tapahtumat.forEach(function(t, i) {
-      tulos.push({ tapahtuma: t, topPct: topPct + (i / n) * korkeusPct, heightPct: korkeusPct / n });
+      const alku = aikaMinuutteina(t.event_time);
+      const loppu = t.event_end_time ? aikaMinuutteina(t.event_end_time) : alku + 30;
+      tulos.push({
+        tapahtuma: t,
+        topPct: minutesToPercent(alku),
+        heightPct: Math.max(minutesToPercent(loppu) - minutesToPercent(alku), 0),
+        leftPct: (i / n) * 100,
+        widthPct: 100 / n,
+      });
     });
   });
   return tulos;
@@ -8054,6 +8071,12 @@ function piirraViikkoTuntialue(paivanAjalliset, henkselitLista, iso, paivanSessi
     palkki.className = 'kalenteri-viikko-palkki';
     palkki.style.top = kohde.topPct + '%';
     palkki.style.height = kohde.heightPct + '%';
+    // left/width korvaa CSS:n kiinteän left:2px/right:2px (2026-08-30,
+    // ks. assignWeekOverlapSlots-kommentti) — calc()-muoto säilyttää saman
+    // 2px-marginaalin kuin ennen kun n=1 (leftPct=0, widthPct=100).
+    palkki.style.left = 'calc(' + kohde.leftPct + '% + 2px)';
+    palkki.style.width = 'calc(' + kohde.widthPct + '% - 4px)';
+    palkki.style.right = 'auto';
     const vari = resolveEventOwnerColor(t);
     palkki.style.borderLeftColor = vari;
     palkki.style.backgroundColor = vari + '26'; // ~15% peittävyys (hex-alpha)

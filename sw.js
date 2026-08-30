@@ -1,4 +1,4 @@
-const CACHE = 'kauppalista-v226';
+const CACHE = 'kauppalista-v227';
 const APP_FILES = ['/', '/index.html', '/style.css', '/script.js', '/harjoittele.js', '/manifest.json', '/icon.png'];
 
 // Sama julkinen avain kuin script.js:ssä (VAPID_PUBLIC_KEY) — kaksi kopiota
