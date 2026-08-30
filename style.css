@@ -3794,13 +3794,12 @@ h1 {
 #opinto-aihe-lista li { flex-wrap: wrap; }
 #opinto-aihe-lista li span:first-child { flex-basis: 100%; }
 
-/* Sanapilvi + verkko (2026-08-30, SATAMA_SPEKSI.md §6.1 + satama-design-
-   kuvaus.md, kolmesti täsmennetty Katrin suorista korjauksista samana
-   päivänä — ks. script.js:n piirraOpintoKarttaSanapilvi-kommentti täydestä
-   historiasta). Korvaa entisen kolmiväripalkin JA kurssikohtaisen kortin:
-   kaikkien kurssien solmut yhdessä sanapilvessä, ei omaa laatikkoa/nimeä
-   per kurssi. Solmun nimi ON sen "kuvake" — koko+väri tulevat JS:stä
-   inline (font-size/fill), tässä vain fontti + langan/pisteen perustyyli. */
+/* Kartta — Opiskelu-näkymä (2026-08-30, portattu Katrin omasta HTML-
+   mockupista, ks. script.js:n piirraOpintoKarttaSanapilvi-kommentti
+   täydestä historiasta/perusteluista). Kaikkien kurssien solmut yhdessä
+   kartassa, kurssi omana "hyllynään" ilman laatikkoa/rajaa hyllyjen
+   välissä. Solmun nimi ON sen kuvake — koko tulee JS:stä inline
+   (font-size), tässä fontti + verkon/kentän/otsakkeiden perustyyli. */
 .opinto-kartta-verkko {
   display: block;
   width: 100%;
@@ -3809,20 +3808,32 @@ h1 {
 }
 .opinto-kartta-verkko text {
   font-family: var(--fontti-loki);
-  font-weight: 600;
 }
-/* Verkon langat ovat <path>-kaaria (ks. piirraOpintoVerkkoLanka) — kaari
-   "pullistuu" heikommalla solmuparilla, suoristuu/kiristyy vahvemmalla.
-   Opacity tulee inline-tyylistä per lanka. */
-.opinto-kartta-verkko path {
-  fill: none;
+/* Taustaverkko (opintoKarttaPiste/-Tiheys) — lomittunut ruudukko joka
+   vääntyy/tummenee lähellä vahvoja solmuja. Opacity/paksuus per viiva
+   tulevat inline-tyylistä (script.js). */
+.opinto-kartta-mesh line {
   stroke: var(--syvanne);
-  stroke-width: 1.5;
+}
+/* Ylläpidossa-rengas (opintoSolmuOnYllapidossa) — katkoviivarengas solmun
+   ympärillä, sama merkitys kuin mockupin "katkoviivarengas = ylläpidossa". */
+.opinto-kartta-yllapito-rengas {
+  fill: none;
+  stroke: var(--messinki);
+  stroke-width: 1.1;
+  stroke-dasharray: 3 4;
+  stroke-opacity: .8;
+}
+/* Kurssin nimi hyllyn yläreunassa — vaimea "vesileima", ei otsikko/laatikko. */
+.opinto-kartta-kurssiotsake {
+  font-size: 8.5px;
+  letter-spacing: .18em;
+  fill: var(--muste);
+  opacity: .38;
 }
 /* Perustussolmu — sama merkitys kuin ennenkin ("1-3 solmua joiden päälle
-   kurssit rakentuvat"), nyt lihavoituna erottuu tekstinä ympyrän sijaan. */
+   kurssit rakentuvat"), lihavoituna + alleviivattuna erottuu muista sanoista. */
 .opinto-kartta-perustussolmu {
-  font-weight: 800;
   text-decoration: underline;
   text-decoration-color: var(--sinappi);
   text-decoration-thickness: 2px;
