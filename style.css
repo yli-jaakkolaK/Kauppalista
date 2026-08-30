@@ -3821,9 +3821,13 @@ h1 {
   stroke: var(--hius-vahva);
   stroke-width: 1;
 }
-.opinto-kartta-verkko line {
-  stroke: var(--hius-vahva);
-  stroke-width: 1;
+/* Verkon langat ovat <path>-kaaria (ks. piirraOpintoVerkkoLanka), eivät
+   suoria <line>-elementtejä — kaari "pullistuu" heikommalla solmuparilla,
+   suoristuu vahvemmalla. Opacity tulee inline-tyylistä per lanka. */
+.opinto-kartta-verkko path {
+  fill: none;
+  stroke: var(--syvanne);
+  stroke-width: 1.5;
 }
 /* Perustussolmu (VAIHE 4) — isompi säde jo hoitaa suurimman osan
    erottumisesta (ks. script.js:n OPINTO_KARTTA_SADE_PERUS), tässä vain

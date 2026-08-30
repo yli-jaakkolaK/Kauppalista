@@ -2403,25 +2403,51 @@ function opintoSolmunVari(aihe) {
   return sekoitaHexVari(OPINTO_KARTTA_PAPERI_HEX, OPINTO_KARTTA_SYVANNE_HEX, opintoSolmunSyvyys(aihe));
 }
 
-// Yksinkertainen ruudukkolayout sort_order-järjestyksessä — EI speksin
-// käsin aseteltu käsitekartta (ei sijainti-/yhteysdataa skeemassa vielä),
-// vaan tietoinen vaihe 1-2 -yksinkertaistus: riittää gradientin ja
-// solmutason erottelun näyttämiseen.
+// Ruudukkolayout sort_order-järjestyksessä — EI speksin käsin aseteltu
+// käsitekartta (ei sijainti-/yhteysdataa skeemassa vielä), vaan tietoinen
+// yksinkertaistus: riittää gradientin ja solmutason erottelun näyttämiseen.
+// Jos Katri haluaa oikeat käsin piirretyt yhteydet myöhemmin, se vaatii
+// uuden taulun (ks. muistin project_kartta_speksi_v2).
 //
-// VAIHE 3 (2026-08-30): yhdistävät viivat solmujen välillä, sort_order-
-// järjestyksessä (aiheet-taulukko on jo tässä järjestyksessä, ks.
-// lataaOpintoKartta:n .order('sort_order')). EI oikea käsin muokattava
-// käsitekartta — approksimoi speksin "verkkoa" yhdellä polulla per kurssi,
-// koska skeemassa ei ole erillistä yhteys-/edge-taulua. Ks. muistin
-// project_kartta_speksi_v2: jos Katri haluaa oikeat käsin piirretyt
-// yhteydet myöhemmin, se vaatii uuden taulun eikä ole tässä vaiheessa.
-// Perustussolmun säde isompi (VAIHE 4, 2026-08-30) — sama merkitys kuin
-// paivitaOpintoTehtavaPerustussolmuNappi:n käyttötarkoitus: "1-3 solmua
-// joiden päälle tulevat kurssit rakentuvat, näille saa antaa enemmän aikaa"
-// (ks. script.js:n oma kommentti kohdassa A3 perustussolmu).
-const OPINTO_KARTTA_SADE = 12;
-const OPINTO_KARTTA_SADE_PERUS = 16;
+// VERKKO (2026-08-30, korjattu Katrin huomiosta luettuaan mockupin sijaan
+// omaa kuvaustaan uudelleen — satama-design-kuvaus.md: "verkko KIRISTYY ja
+// meri syvenee/tummenee siellä missä yhteyksiä ja vahvuutta on paljon" —
+// EI pelkkä väri, vaan KAKSI merkkiä samasta asiasta). Ensimmäinen versio
+// piirsi vain yhden suoran polun solmujen välille — ei mitään "kiristystä".
+// Nyt: OIKEA verkko/silmukkakuvio (jokainen solmu yhdistyy naapuriinsa
+// SEKÄ oikealla että alapuolella, ei vain edelliseen), ja jokainen lanka
+// piirretään kaarena joka VETÄYTYY SUORAKSI kun molemmat päät ovat vahvoja
+// (syvyys lähellä 1) ja LOISKAHTAA/PULLISTUU kun jompikumpi on heikko
+// (syvyys lähellä 0) — sama visuaalinen efekti kuin oikeassa löysässä vs.
+// kireässä kalaverkon langassa.
+const OPINTO_KARTTA_SADE = 10;
+const OPINTO_KARTTA_SADE_PERUS = 14;
+const OPINTO_KARTTA_MAX_LOYSYYS = 7; // px, kuinka paljon heikoin lanka pullistuu
 
+function piirraOpintoVerkkoLanka(svg, pisteA, pisteB) {
+  const dx = pisteB.cx - pisteA.cx;
+  const dy = pisteB.cy - pisteA.cy;
+  const pituus = Math.sqrt(dx * dx + dy * dy) || 1;
+  // Kohtisuora yksikkövektori langan suuntaan nähden — pullistuma tähän
+  // suuntaan, ei pitkin lankaa.
+  const nx = -dy / pituus;
+  const ny = dx / pituus;
+  const kireys = (opintoSolmunSyvyys(pisteA.aihe) + opintoSolmunSyvyys(pisteB.aihe)) / 2;
+  const loysyys = OPINTO_KARTTA_MAX_LOYSYYS * (1 - kireys);
+  const keskiX = (pisteA.cx + pisteB.cx) / 2 + nx * loysyys;
+  const keskiY = (pisteA.cy + pisteB.cy) / 2 + ny * loysyys;
+  const lanka = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+  lanka.setAttribute('d', 'M ' + pisteA.cx + ' ' + pisteA.cy + ' Q ' + keskiX + ' ' + keskiY + ' ' + pisteB.cx + ' ' + pisteB.cy);
+  // Kireä lanka piirtyy vahvempana/tummempana kuin löysä — sama "kaksi
+  // merkkiä samasta asiasta" -periaate kuin solmuväreillä.
+  lanka.style.opacity = String(0.25 + kireys * 0.55);
+  svg.appendChild(lanka);
+}
+
+// Perustussolmun säde isompi — sama merkitys kuin paivitaOpintoTehtava-
+// PerustussolmuNapin käyttötarkoitus: "1-3 solmua joiden päälle tulevat
+// kurssit rakentuvat, näille saa antaa enemmän aikaa" (ks. script.js:n oma
+// kommentti kohdassa A3 perustussolmu).
 function piirraOpintoKarttaSolmuverkko(aiheet) {
   const COLS = Math.min(6, Math.max(1, aiheet.length));
   const CELL = 40;
@@ -2433,19 +2459,18 @@ function piirraOpintoKarttaSolmuverkko(aiheet) {
   const pisteet = aiheet.map(function(aihe, i) {
     const col = i % COLS;
     const row = Math.floor(i / COLS);
-    return { aihe: aihe, cx: col * CELL + CELL / 2, cy: row * CELL + CELL / 2 };
+    return { aihe: aihe, col: col, row: row, cx: col * CELL + CELL / 2, cy: row * CELL + CELL / 2 };
   });
+  // col+row -> piste, jotta naapurit löytyvät nopeasti ilman sisäkkäistä silmukkaa.
+  const ruudukko = new Map();
+  pisteet.forEach(function(p) { ruudukko.set(p.row + ',' + p.col, p); });
 
-  for (let i = 1; i < pisteet.length; i++) {
-    const edellinen = pisteet[i - 1];
-    const nykyinen = pisteet[i];
-    const viiva = document.createElementNS('http://www.w3.org/2000/svg', 'line');
-    viiva.setAttribute('x1', String(edellinen.cx));
-    viiva.setAttribute('y1', String(edellinen.cy));
-    viiva.setAttribute('x2', String(nykyinen.cx));
-    viiva.setAttribute('y2', String(nykyinen.cy));
-    svg.appendChild(viiva);
-  }
+  pisteet.forEach(function(piste) {
+    const oikea = ruudukko.get(piste.row + ',' + (piste.col + 1));
+    if (oikea) piirraOpintoVerkkoLanka(svg, piste, oikea);
+    const alla = ruudukko.get((piste.row + 1) + ',' + piste.col);
+    if (alla) piirraOpintoVerkkoLanka(svg, piste, alla);
+  });
 
   pisteet.forEach(function(piste) {
     const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
