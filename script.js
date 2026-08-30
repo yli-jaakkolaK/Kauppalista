@@ -2444,6 +2444,25 @@ const OPINTO_KARTTA_HYLLY_OTSAKE_H = 18;
 const OPINTO_KARTTA_LEVEYS = 760; // leveämpi kuin korkea sisältö hyötyy — viewBox skaalautuu joka tapauksessa kapealle näytölle
 const OPINTO_KARTTA_MESH_VALI = 30; // px, taustaverkon ruutukoko (mockupin SX/SY)
 const OPINTO_KARTTA_VETO_SADE = 58; // px, kuinka kaukaa solmu vääntää verkkoa (mockupin 58)
+const OPINTO_KARTTA_SANA_LEVEYS = 110; // px, rivityksen tavoiteleveys normaalille solmulle
+const OPINTO_KARTTA_SANA_LEVEYS_ISO = 150; // px, rivityksen tavoiteleveys "iso"-solmulle (Työelämän taito-taso)
+const OPINTO_KARTTA_RIVIKORKEUS_KERROIN = 1.15;
+
+// Fontti+rivitys YHDESSÄ paikassa, jotta asettelu (rivikorkeuden mitoitus)
+// ja piirto (tspanit) käyttävät AINA samaa laskentaa — erillinen logiikka
+// kahdessa paikassa oli juuri se mikä aiheutti Katrin löytämän "hot mess"
+// -bugin (rivikorkeus mitoitettiin kiinteänä vaikka pitkä nimi saattoi
+// rivittyä 3-5 riville, jolloin naapuririvit menivät päällekkäin).
+function opintoKarttaSolmunFontti(v, iso) {
+  const fonttiMin = iso ? OPINTO_KARTTA_FONTTI_MIN + 6 : OPINTO_KARTTA_FONTTI_MIN;
+  const fonttiMax = iso ? OPINTO_KARTTA_FONTTI_MAX + 6 : OPINTO_KARTTA_FONTTI_MAX;
+  return fonttiMin + v * (fonttiMax - fonttiMin);
+}
+function opintoKarttaSolmunRivit(teksti, v, iso) {
+  const koko = opintoKarttaSolmunFontti(v, iso);
+  const tavoiteleveys = iso ? OPINTO_KARTTA_SANA_LEVEYS_ISO : OPINTO_KARTTA_SANA_LEVEYS;
+  return { koko: koko, rivit: opintoKarttaRivita(teksti, tavoiteleveys, koko) };
+}
 
 // Solmu on "ylläpidossa" kun retrieval-kierto on käyty läpi kokonaan ja
 // sr_interval_index on kasvanut alkukertaustaulukon (OPINTO_SR_VALIT_PV)
@@ -2488,21 +2507,54 @@ function opintoKarttaHyllyasettelu(kurssiryhmat) {
     // paljon korkeampi kuin kapea puhelinnäyttö hyötyy.
     const cols = Math.max(1, Math.ceil(Math.sqrt(n) * 1.5));
     const rows = Math.ceil(n / cols);
+
+    // Esilasketaan jokaisen aiheen fontti+rivimäärä ENNEN sijoittelua —
+    // Katrin löytämä "hot mess": rivikorkeus oli aiemmin KIINTEÄ vaikka
+    // pitkä nimi saattoi rivittyä 3-5 riville, jolloin naapuririvit
+    // menivät päällekkäin. Nyt jokainen minigridin RIVI (ei koko hylly)
+    // saa oman korkeutensa sen mukaan mikä sillä rivillä on korkein.
+    const tiedot = ryhma.aiheet.map(function(aihe) {
+      const v = opintoSolmunSyvyys(aihe);
+      const info = opintoKarttaSolmunRivit(aihe.name, v, false);
+      return { aihe: aihe, v: v, koko: info.koko, rivit: info.rivit };
+    });
+    const rivikorkeudet = [];
+    for (let r = 0; r < rows; r++) {
+      let korkein = OPINTO_KARTTA_SOLMU_VALI;
+      for (let c = 0; c < cols; c++) {
+        const idx = r * cols + c;
+        if (idx >= n) continue;
+        const t = tiedot[idx];
+        const tarvittu = t.rivit.length * t.koko * OPINTO_KARTTA_RIVIKORKEUS_KERROIN + 14;
+        if (tarvittu > korkein) korkein = tarvittu;
+      }
+      rivikorkeudet.push(korkein);
+    }
+    const shelfSisaltoKorkeus = rivikorkeudet.reduce(function(s, h) { return s + h; }, 0);
+
     const cellW = cols * OPINTO_KARTTA_SOLMU_VALI + OPINTO_KARTTA_HYLLY_PADDING;
-    const cellH = rows * OPINTO_KARTTA_SOLMU_VALI + OPINTO_KARTTA_HYLLY_PADDING + OPINTO_KARTTA_HYLLY_OTSAKE_H;
+    const cellH = shelfSisaltoKorkeus + OPINTO_KARTTA_HYLLY_PADDING + OPINTO_KARTTA_HYLLY_OTSAKE_H;
     if (rowX > 0 && rowX + cellW > OPINTO_KARTTA_LEVEYS) {
       rowX = 0; rowY += rowMaxH; rowMaxH = 0;
     }
     otsakkeet.push({ teksti: ryhma.kurssi.name, x: rowX + cellW / 2, y: rowY + 11 });
-    ryhma.aiheet.forEach(function(aihe, i) {
+
+    const rivienAlkuY = [];
+    let kum = rowY + OPINTO_KARTTA_HYLLY_OTSAKE_H + OPINTO_KARTTA_HYLLY_PADDING / 2;
+    for (let r = 0; r < rows; r++) {
+      rivienAlkuY.push(kum);
+      kum += rivikorkeudet[r];
+    }
+
+    tiedot.forEach(function(t, i) {
       const col = i % cols, row = Math.floor(i / cols);
       solmut.push({
-        v: opintoSolmunSyvyys(aihe),
-        teksti: aihe.name,
-        perustussolmu: !!aihe.perustussolmu,
-        yllapito: opintoSolmuOnYllapidossa(aihe),
+        v: t.v,
+        teksti: t.aihe.name,
+        perustussolmu: !!t.aihe.perustussolmu,
+        yllapito: opintoSolmuOnYllapidossa(t.aihe),
         x: rowX + OPINTO_KARTTA_HYLLY_PADDING / 2 + col * OPINTO_KARTTA_SOLMU_VALI + OPINTO_KARTTA_SOLMU_VALI / 2,
-        y: rowY + OPINTO_KARTTA_HYLLY_OTSAKE_H + OPINTO_KARTTA_HYLLY_PADDING / 2 + row * OPINTO_KARTTA_SOLMU_VALI + OPINTO_KARTTA_SOLMU_VALI / 2,
+        y: rivienAlkuY[row] + rivikorkeudet[row] / 2,
       });
     });
     rowX += cellW;
@@ -2657,11 +2709,9 @@ function piirraOpintoKarttaSolmut(svg, solmut, leveys, korkeus) {
       rengas.classList.add('opinto-kartta-yllapito-rengas');
       svg.appendChild(rengas);
     }
-    const fonttiMin = s.iso ? OPINTO_KARTTA_FONTTI_MIN + 6 : OPINTO_KARTTA_FONTTI_MIN;
-    const fonttiMax = s.iso ? OPINTO_KARTTA_FONTTI_MAX + 6 : OPINTO_KARTTA_FONTTI_MAX;
-    const koko = fonttiMin + s.v * (fonttiMax - fonttiMin);
-    const rivit = opintoKarttaRivita(s.teksti, s.iso ? 150 : 110, koko);
-    const rivikorkeus = koko * 1.15;
+    const info = opintoKarttaSolmunRivit(s.teksti, s.v, !!s.iso);
+    const koko = info.koko, rivit = info.rivit;
+    const rivikorkeus = koko * OPINTO_KARTTA_RIVIKORKEUS_KERROIN;
     const alkuY = s.y - ((rivit.length - 1) / 2) * rivikorkeus;
 
     const teksti = document.createElementNS('http://www.w3.org/2000/svg', 'text');
