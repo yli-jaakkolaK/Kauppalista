@@ -2440,6 +2440,12 @@ const OPINTO_KARTTA_FONTTI_MIN = 11;
 const OPINTO_KARTTA_FONTTI_MAX = 20;
 const OPINTO_KARTTA_SOLMU_VALI = 70; // px, minigridin solmuväli hyllyn sisällä (riittää rivitetylle, ~110px leveälle nimelle ilman että naapuri koskettaa)
 const OPINTO_KARTTA_HYLLY_PADDING = 22;
+// Kurssien VÄLINEN tyhjä tila (2026-08-30, Katrin pyyntö: "opiskelu could
+// bollow little bit od its clarity" [työelämätaidosta]) — ilman kurssin
+// nimiä ainoa keino erottaa kurssit toisistaan silmämääräisesti on selkeä
+// väli niiden hyllyjen välissä, sama periaate kuin Työelämätaidon selkeästi
+// erillään olevat taito-klusterit.
+const OPINTO_KARTTA_HYLLY_VALI = 46;
 const OPINTO_KARTTA_LEVEYS = 760; // leveämpi kuin korkea sisältö hyötyy — viewBox skaalautuu joka tapauksessa kapealle näytölle
 const OPINTO_KARTTA_MESH_VALI = 30; // px, taustaverkon ruutukoko (mockupin SX/SY)
 const OPINTO_KARTTA_VETO_SADE = 58; // px, kuinka kaukaa solmu vääntää verkkoa (mockupin 58)
@@ -2513,7 +2519,12 @@ function opintoKarttaHyllyasettelu(kurssiryhmat) {
     // saa oman korkeutensa sen mukaan mikä sillä rivillä on korkein.
     const tiedot = ryhma.aiheet.map(function(aihe) {
       const v = opintoSolmunSyvyys(aihe);
-      const info = opintoKarttaSolmunRivit(aihe.name, v, false);
+      // Perustussolmu isompana (samat "iso"-mitat kuin Työelämätaidon
+      // taito-tason solmuilla) — lainaa Työelämätaidon kokohierarkiaa
+      // Katrin pyynnöstä ("opiskelu could bollow little bit od its
+      // clarity"), ainoa jäljellä oleva keino korostaa tärkeitä solmuja
+      // kun kurssin nimiä ei enää näytetä.
+      const info = opintoKarttaSolmunRivit(aihe.name, v, !!aihe.perustussolmu);
       return { aihe: aihe, v: v, koko: info.koko, rivit: info.rivit };
     });
     const rivikorkeudet = [];
@@ -2530,8 +2541,8 @@ function opintoKarttaHyllyasettelu(kurssiryhmat) {
     }
     const shelfSisaltoKorkeus = rivikorkeudet.reduce(function(s, h) { return s + h; }, 0);
 
-    const cellW = cols * OPINTO_KARTTA_SOLMU_VALI + OPINTO_KARTTA_HYLLY_PADDING;
-    const cellH = shelfSisaltoKorkeus + OPINTO_KARTTA_HYLLY_PADDING;
+    const cellW = cols * OPINTO_KARTTA_SOLMU_VALI + OPINTO_KARTTA_HYLLY_PADDING + OPINTO_KARTTA_HYLLY_VALI;
+    const cellH = shelfSisaltoKorkeus + OPINTO_KARTTA_HYLLY_PADDING + OPINTO_KARTTA_HYLLY_VALI;
     if (rowX > 0 && rowX + cellW > OPINTO_KARTTA_LEVEYS) {
       rowX = 0; rowY += rowMaxH; rowMaxH = 0;
     }
@@ -2549,6 +2560,7 @@ function opintoKarttaHyllyasettelu(kurssiryhmat) {
         v: t.v,
         teksti: t.aihe.name,
         perustussolmu: !!t.aihe.perustussolmu,
+        iso: !!t.aihe.perustussolmu,
         yllapito: opintoSolmuOnYllapidossa(t.aihe),
         x: rowX + OPINTO_KARTTA_HYLLY_PADDING / 2 + col * OPINTO_KARTTA_SOLMU_VALI + OPINTO_KARTTA_SOLMU_VALI / 2,
         y: rivienAlkuY[row] + rivikorkeudet[row] / 2,
