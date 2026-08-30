@@ -2438,10 +2438,10 @@ function opintoSolmunVari(aihe) {
 const OPINTO_KARTTA_MUSTE_HEX = '#221F1A';
 const OPINTO_KARTTA_FONTTI_MIN = 11;
 const OPINTO_KARTTA_FONTTI_MAX = 20;
-const OPINTO_KARTTA_SOLMU_VALI = 38; // px, minigridin solmuväli hyllyn sisällä
+const OPINTO_KARTTA_SOLMU_VALI = 70; // px, minigridin solmuväli hyllyn sisällä (riittää rivitetylle, ~110px leveälle nimelle ilman että naapuri koskettaa)
 const OPINTO_KARTTA_HYLLY_PADDING = 22;
 const OPINTO_KARTTA_HYLLY_OTSAKE_H = 18;
-const OPINTO_KARTTA_LEVEYS = 520;
+const OPINTO_KARTTA_LEVEYS = 760; // leveämpi kuin korkea sisältö hyötyy — viewBox skaalautuu joka tapauksessa kapealle näytölle
 const OPINTO_KARTTA_MESH_VALI = 30; // px, taustaverkon ruutukoko (mockupin SX/SY)
 const OPINTO_KARTTA_VETO_SADE = 58; // px, kuinka kaukaa solmu vääntää verkkoa (mockupin 58)
 
@@ -2483,7 +2483,10 @@ function opintoKarttaHyllyasettelu(kurssiryhmat) {
   kurssiryhmat.forEach(function(ryhma) {
     const n = ryhma.aiheet.length;
     if (n === 0) return;
-    const cols = Math.ceil(Math.sqrt(n));
+    // *1.5 leventää minigridiä (vähemmän rivejä, enemmän sarakkeita) —
+    // muuten esim. 32 aiheen kurssi pakkautuisi 6x6-neliöksi joka olisi
+    // paljon korkeampi kuin kapea puhelinnäyttö hyötyy.
+    const cols = Math.max(1, Math.ceil(Math.sqrt(n) * 1.5));
     const rows = Math.ceil(n / cols);
     const cellW = cols * OPINTO_KARTTA_SOLMU_VALI + OPINTO_KARTTA_HYLLY_PADDING;
     const cellH = rows * OPINTO_KARTTA_SOLMU_VALI + OPINTO_KARTTA_HYLLY_PADDING + OPINTO_KARTTA_HYLLY_OTSAKE_H;
@@ -2505,7 +2508,16 @@ function opintoKarttaHyllyasettelu(kurssiryhmat) {
     rowX += cellW;
     rowMaxH = Math.max(rowMaxH, cellH);
   });
-  return { solmut: solmut, otsakkeet: otsakkeet, leveys: OPINTO_KARTTA_LEVEYS, korkeus: rowY + rowMaxH };
+  // Marginaali kaikilla reunoilla (2026-08-30, Katrin löytämä toinen bugi:
+  // "iso osa sanoista joko näkyy huonosti tai katkeaa kesken" — juurisyy:
+  // <svg>-juurielementin OLETUS on overflow:hidden, joten reunaan asti
+  // ulottuva teksti leikkautuu pois ilman että mikään CSS-sääntö edes
+  // pyytää sitä). Siirretään koko sisältö marginaalin verran sisemmäs ja
+  // kasvatetaan kangas sen mukaan.
+  const M = OPINTO_KARTTA_REUNA_MARGINAALI + 20;
+  solmut.forEach(function(s) { s.x += M; s.y += M; });
+  otsakkeet.forEach(function(o) { o.x += M; o.y += M; });
+  return { solmut: solmut, otsakkeet: otsakkeet, leveys: OPINTO_KARTTA_LEVEYS + 2 * M, korkeus: rowY + rowMaxH + 2 * M };
 }
 
 // Paikallinen vahvuuskenttä pisteessä (px,py) — Gaussin-summa kaikista
@@ -2596,11 +2608,46 @@ function piirraOpintoKarttaSyvyyskentta(svg, solmut) {
   svg.appendChild(g);
 }
 
+// Rivittää pitkän sanan/nimen useammalle riville — SVG <text> EI rivitä
+// itse, ja oikeat kurssi-/taito-/osataitonimet ovat moninkertaisesti
+// pidempiä kuin mockupin lyhyet esimerkit ("Silmukat", "Vektorit") — ilman
+// tätä pitkä nimi piirtyi yhtenä leveänä rivinä naapureiden päälle (Katrin
+// löytämä oikea bugi: "words should not be on top of each other"). Fontti
+// on kiinteäleveä (Courier Prime, ks. --fontti-loki), joten merkkimäärä
+// per rivi lasketaan suoraan tavoiteleveydestä ilman mittausta DOMista.
+function opintoKarttaRivita(sana, tavoiteleveysPx, fonttiKoko) {
+  const maxMerkkia = Math.max(6, Math.round(tavoiteleveysPx / (fonttiKoko * 0.62)));
+  const sanat = sana.split(' ');
+  const rivit = [];
+  let nykyinen = '';
+  sanat.forEach(function(osa) {
+    const ehdokas = nykyinen ? nykyinen + ' ' + osa : osa;
+    if (ehdokas.length > maxMerkkia && nykyinen) {
+      rivit.push(nykyinen);
+      nykyinen = osa;
+    } else {
+      nykyinen = ehdokas;
+    }
+  });
+  if (nykyinen) rivit.push(nykyinen);
+  return rivit;
+}
+
+// Reunahäivytys (2026-08-30, Katrin pyyntö: "fade away towards edges") —
+// pehmeä opasiteetin lasku kankaan reunoja kohti sen sijaan että sanat
+// loppuisivat jyrkästi kesken. Etäisyys lähimpään reunaan, täysi näkyvyys
+// yli MARGINAALIn päässä.
+const OPINTO_KARTTA_REUNA_MARGINAALI = 42;
+function opintoKarttaReunaOpasiteetti(x, y, leveys, korkeus) {
+  const lahin = Math.min(x, leveys - x, y, korkeus - y);
+  return Math.max(0.18, Math.min(1, lahin / OPINTO_KARTTA_REUNA_MARGINAALI));
+}
+
 // Yleiskäyttöinen solmupiirtäjä — solmu on litteä {x,y,v,teksti,iso?,
 // perustussolmu?,yllapito?} -olio, käyttävät sekä Opiskelu- että
 // Työelämätaidot-näkymä. `iso` suurentaa fonttia (Työelämän "taito"-tason
 // solmut, mockupin isot nimet), muuten normaali sanapilvi-koko.
-function piirraOpintoKarttaSolmut(svg, solmut) {
+function piirraOpintoKarttaSolmut(svg, solmut, leveys, korkeus) {
   solmut.forEach(function(s) {
     if (s.yllapito) {
       const rengas = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
@@ -2612,16 +2659,25 @@ function piirraOpintoKarttaSolmut(svg, solmut) {
     }
     const fonttiMin = s.iso ? OPINTO_KARTTA_FONTTI_MIN + 6 : OPINTO_KARTTA_FONTTI_MIN;
     const fonttiMax = s.iso ? OPINTO_KARTTA_FONTTI_MAX + 6 : OPINTO_KARTTA_FONTTI_MAX;
+    const koko = fonttiMin + s.v * (fonttiMax - fonttiMin);
+    const rivit = opintoKarttaRivita(s.teksti, s.iso ? 150 : 110, koko);
+    const rivikorkeus = koko * 1.15;
+    const alkuY = s.y - ((rivit.length - 1) / 2) * rivikorkeus;
+
     const teksti = document.createElementNS('http://www.w3.org/2000/svg', 'text');
-    teksti.setAttribute('x', String(s.x));
-    teksti.setAttribute('y', String(s.y));
     teksti.setAttribute('text-anchor', 'middle');
-    teksti.setAttribute('dominant-baseline', 'middle');
-    teksti.setAttribute('font-size', (fonttiMin + s.v * (fonttiMax - fonttiMin)).toFixed(1));
+    teksti.setAttribute('font-size', koko.toFixed(1));
     teksti.setAttribute('font-weight', (s.iso || s.v > 0.5) ? '700' : '400');
     teksti.setAttribute('fill', opintoKarttaTekstinVari(s.v));
+    teksti.style.opacity = opintoKarttaReunaOpasiteetti(s.x, s.y, leveys, korkeus).toFixed(2);
     if (s.perustussolmu) teksti.classList.add('opinto-kartta-perustussolmu');
-    teksti.textContent = s.teksti;
+    rivit.forEach(function(rivi, i) {
+      const tspan = document.createElementNS('http://www.w3.org/2000/svg', 'tspan');
+      tspan.setAttribute('x', String(s.x));
+      tspan.setAttribute('y', (alkuY + i * rivikorkeus).toFixed(1));
+      tspan.textContent = rivi;
+      teksti.appendChild(tspan);
+    });
     svg.appendChild(teksti);
   });
 }
@@ -2675,7 +2731,7 @@ function piirraOpintoKarttaOpiskelu(kurssiryhmat) {
   piirraOpintoKarttaSyvyyskentta(svg, asettelu.solmut);
   piirraOpintoKarttaVerkkotausta(svg, asettelu.solmut, asettelu.leveys, asettelu.korkeus);
   piirraOpintoKarttaOtsakkeet(svg, asettelu.otsakkeet);
-  piirraOpintoKarttaSolmut(svg, asettelu.solmut);
+  piirraOpintoKarttaSolmut(svg, asettelu.solmut, asettelu.leveys, asettelu.korkeus);
   return svg;
 }
 
@@ -2707,11 +2763,23 @@ const OPINTO_TYOELAMA_MALLI = [
   { taito: 'Mittaaminen ja tulosten raportointi', osataidot: [
     { nimi: 'Mittaustarkkuus', lahde: 'kurssi', aiheet: ['Measurement techniques', 'Circuit measurements'] },
     { nimi: 'Tulosten tulkinta ja analyysi', lahde: 'kurssi', aiheet: ['Data processing and graphing', 'Measurement uncertainty and reliability'] },
+    // Katrin oma korjaus 2026-08-30: "dokumentointi on selvästi myös
+    // vahvuus, en laita raportteihin pelkkää vastausta vaan nimenomaan
+    // miten ajattelen" — Lab safety and reporting (id 170) nostettu
+    // 'reference'-tasolle Supabasessa vastaamaan tätä.
     { nimi: 'Raportointi ja dokumentointi', lahde: 'kurssi', aiheet: ['Lab safety and reporting', 'Tieteellisen kirjoittamisen perusteet', 'Asiantuntijan tekstitaidot'] },
   ]},
   { taito: 'Asiantuntijaviestintä', osataidot: [
     { nimi: 'Esiintyminen ja suullinen viestintä', lahde: 'kurssi', aiheet: ['Field-related presentations', 'B2-level speaking and writing', 'Esiintymis- ja palautetaidot'] },
     { nimi: 'Kirjallinen asiantuntijaviestintä', lahde: 'kurssi', aiheet: ['Reports and emails', 'Professional register and style', 'Lähteiden eettinen käyttö'] },
+    // 'palaute'-lähde (2026-08-30) — EI opinto_aiheet-dataa, vaan Katrin
+    // oma kertomus: parin kuukauden harjoittelu, jossa hän haastatteli
+    // yrityksiä näiden tekemistä projekteista. Ohjaajan/tekoälyn palaute
+    // nosti esiin nimenomaan kehityskaaren pinnallisten "mitä tehtiin"
+    // -faktojen keräämisestä oikeiden oivallusten kirjaamiseen — kiinteä
+    // arvo koska tämä on kertaluontoinen, jo tapahtunut näyttö, ei jatkuvasti
+    // päivittyvä kurssiedistymä.
+    { nimi: 'Havaintojen syventäminen oivalluksiksi', lahde: 'palaute', kiinteaArvo: 0.82 },
   ]},
   { taito: 'Oman osaamisen ja opiskelun johtaminen', osataidot: [
     { nimi: 'Oman osaamisen itsearviointi', lahde: 'kurssi', aiheet: ['Self-assessment of strengths', 'Study skills and curriculum orientation'] },
@@ -2759,6 +2827,9 @@ function opintoTyoelamaOsataitoSyvyys(osataito, kaikkiAiheet, kayttaytyminen) {
   if (osataito.lahde === 'kayttaytyminen') {
     return kayttaytyminen[osataito.kayttaytymisAvain] || 0;
   }
+  if (osataito.kiinteaArvo != null) {
+    return osataito.kiinteaArvo;
+  }
   let kohteet;
   if (osataito.kurssit) {
     kohteet = kaikkiAiheet.filter(function(a) { return osataito.kurssit.indexOf(a._kurssiNimi) !== -1; });
@@ -2784,8 +2855,8 @@ function laskeTyoelamaTaidot(kaikkiAiheet, kayttaytyminen) {
 // mockupin käsin sijoitellut taito+osataito-klusterit.
 function opintoKarttaTyoelamaAsettelu(taidot) {
   const COLS = Math.max(1, Math.ceil(Math.sqrt(taidot.length)));
-  const CELL = 210;
-  const SADE = 78;
+  const CELL = 300;
+  const SADE = 110;
   const solmut = [];
   const kaaret = [];
   taidot.forEach(function(taito, i) {
@@ -2802,7 +2873,11 @@ function opintoKarttaTyoelamaAsettelu(taidot) {
     });
   });
   const rows = Math.ceil(taidot.length / COLS);
-  return { solmut: solmut, kaaret: kaaret, leveys: COLS * CELL, korkeus: rows * CELL };
+  // Sama reunamarginaali kuin Opiskelu-hyllyasettelussa — <svg>-juuren
+  // oletus overflow:hidden leikkaisi reunaan asti ulottuvat sanat muuten.
+  const M = OPINTO_KARTTA_REUNA_MARGINAALI + 20;
+  solmut.forEach(function(s) { s.x += M; s.y += M; });
+  return { solmut: solmut, kaaret: kaaret, leveys: COLS * CELL + 2 * M, korkeus: rows * CELL + 2 * M };
 }
 
 function piirraOpintoKarttaTyoelama(taidot) {
@@ -2813,7 +2888,7 @@ function piirraOpintoKarttaTyoelama(taidot) {
   piirraOpintoKarttaSyvyyskentta(svg, asettelu.solmut);
   piirraOpintoKarttaVerkkotausta(svg, asettelu.solmut, asettelu.leveys, asettelu.korkeus);
   piirraOpintoKarttaKaaret(svg, asettelu.kaaret);
-  piirraOpintoKarttaSolmut(svg, asettelu.solmut);
+  piirraOpintoKarttaSolmut(svg, asettelu.solmut, asettelu.leveys, asettelu.korkeus);
   return svg;
 }
 
