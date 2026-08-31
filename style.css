@@ -923,6 +923,14 @@ h1 {
   color: var(--muste);
   white-space: normal;
   overflow-wrap: break-word;
+  /* KORJATTU 2026-08-31 (Katrin löytö: "sulkapallo vuotaa ruutunsa
+     ulkopuolelle") — flex-lapsen OLETUS min-width on "auto", joka
+     laskee minimileveyden pisimmän KATKEAMATTOMAN sanan mukaan ja
+     ohittaa overflow-wrap:break-wordin täysin yhden pitkän sanan
+     kohdalla (tunnettu flexbox-kompastuskivi). min-width:0 pakottaa
+     selaimen kunnioittamaan palkin oikeaa leveyttä ja katkaisemaan
+     sanan tarvittaessa rivin sisään sen sijaan että se vuotaisi ulos. */
+  min-width: 0;
 }
 
 /* Toteutunut opiskelu — ohut reunamerkki (2026-08-17), EI täysleveä palkki
@@ -937,16 +945,28 @@ h1 {
   border-radius: 0 2px 2px 0;
 }
 
-/* FÖLI-siirtymämerkki viikkonäkymässä (2026-08-31) — oikeassa reunassa
-   (opiskelu-merkki on vasemmassa), pelkkä kuvake koska sarake on kapea,
-   tarkka tieto title-vihjeessä. */
+/* FÖLI-siirtymäpalkki viikkonäkymässä (2026-08-31, uudistettu kuvakkeesta
+   palkiksi Katrin pyynnöstä: "it should not be sign but instead block
+   some time right before"). Oikeassa reunassa (opiskelu-merkki on
+   vasemmassa). Raidoitettu täyttö TARKOITUKSELLA eri kuin oikeiden
+   tapahtumien tasainen väri (Katrin pyyntö: "colored travel time block
+   should be visually easily separated from actual live events") — raidat
+   viestivät heti "laskettu ehdotus", ei "varattu tapahtuma". Tarkka tieto
+   title-vihjeessä. */
 .kalenteri-viikko-foli-merkki {
   position: absolute;
   right: 0;
-  transform: translateY(-50%);
-  font-size: 10px;
-  line-height: 1;
-  opacity: .75;
+  width: 5px;
+  min-height: 3px;
+  border-radius: 2px 0 0 2px;
+  opacity: .8;
+  background: repeating-linear-gradient(
+    45deg,
+    var(--syvanne) 0,
+    var(--syvanne) 2px,
+    transparent 2px,
+    transparent 4px
+  );
 }
 
 /* Suunniteltu (Taso 1 -tavoiteikkuna, 2026-08-18) — TIETOISESTI eri

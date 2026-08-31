@@ -285,6 +285,41 @@ function etsiTunnettuFoliMatka(tapahtuma) {
   return FOLI_TUNNETUT_KOHTEET.find(function(k) { return teksti.indexOf(k.tunnistin) !== -1; }) || null;
 }
 
+// Peräkkäisten SAMAAN kohteeseen menevien tapahtumien ryhmittely
+// (2026-08-31, Katrin löytö: kaksi peräkkäistä samaan luokkaan menevää
+// luentoa — esim. 10-12 ja 12-14 — tuottivat 4 FÖLI-merkkiä kun piti olla
+// 2, koska molemmat laskivat oman meno+paluu-parinsa vaikka hän ei
+// koskaan poistunut paikalta niiden välissä). Ryhmä muodostuu peräkkäisistä
+// (seuraava alkaa viimeistään edellisen loppuessa, ei aukkoa välissä)
+// tapahtumista joilla SAMA FÖLI-kohde — koko ryhmälle lasketaan yksi meno
+// ENNEN ensimmäistä ja yksi paluu VIIMEISEN jälkeen, ei per-tapahtuma.
+function foliKohdeAvain(tapahtuma) {
+  const tunnettu = etsiTunnettuFoliMatka(tapahtuma);
+  return tunnettu ? tunnettu.tunnistin : (tapahtumanSijaintiteksti(tapahtuma) || '').toLowerCase();
+}
+
+function ryhmitaPerakkaisetFoliTapahtumat(tapahtumat) {
+  const jarjestetyt = tapahtumat.slice().sort(function(a, b) {
+    return aikaMinuutteina(a.event_time.slice(0, 5)) - aikaMinuutteina(b.event_time.slice(0, 5));
+  });
+  const ryhmat = [];
+  jarjestetyt.forEach(function(t) {
+    const kohde = foliKohdeAvain(t);
+    if (!kohde) return; // ei sijaintia lainkaan — haeFoliSiirtymatTapahtumalle palauttaisi silti [], ei kannata ryhmitellä eri sijaintittomia yhteen
+    const alku = aikaMinuutteina(t.event_time.slice(0, 5));
+    const loppu = t.event_end_time ? aikaMinuutteina(t.event_end_time.slice(0, 5)) : alku + 60;
+    const edellinen = ryhmat[ryhmat.length - 1];
+    if (edellinen && edellinen.kohde === kohde && alku <= edellinen.loppu) {
+      edellinen.loppu = Math.max(edellinen.loppu, loppu);
+    } else {
+      ryhmat.push({ kohde: kohde, ensimmainen: t, loppu: loppu });
+    }
+  });
+  return ryhmat.map(function(r) {
+    return Object.assign({}, r.ensimmainen, { event_end_time: minutesToHHMM(r.loppu) + ':00' });
+  });
+}
+
 // SIRI-viivekerros (2026-08-31, Katrin pyyntö: "SIRI layer could be added
 // so that I can show if bus is early or late") — EI KOSKAAN perusaikataulun
 // lähde (se pysyy Digitransit-reititetystä kestosta, ks.
@@ -385,21 +420,38 @@ async function haeFoliSiirtymatTapahtumalle(tapahtuma, paivanIso, varattu) {
       ])
     : [null, null];
 
+  // alku/loppu kattavat nyt OIKEAN matka-ajan (ei enää pelkkä piste),
+  // kun kesto tiedetään — 2026-08-31, Katrin pyyntö: "it should not be
+  // sign but instead block some time right before... so that I get to
+  // class on time". Ilman kestoa (ei Digitransit-avainta) pysyy pisteenä,
+  // koska todellista kestoa ei silloin tunneta.
   const rivit = [{
-    tyyppi: 'siirtyma-uusi', suunta: 'meno', alku: menoAlku, loppu: menoAlku,
+    tyyppi: 'siirtyma-uusi', suunta: 'meno', alku: menoAlku, loppu: kesto ? (alkuMin - saavuEnnenMin) : menoAlku,
     pysakkiNimi: p.stop_name, etaisyysM: etaisyysM, mapsUrl: mapsUrl,
     kestoMin: kesto ? kesto.kestoMin : null, linja: kesto ? kesto.linja : null, viiveMin: menoViiveMin,
   }];
 
   // Paluu: heti tapahtuman päätyttyä (ei erillistä saapumistarvetta paluulle).
   if (loppuMin <= 1439) {
+    const paluuLoppu = kesto ? Math.min(1439, loppuMin + kesto.kestoMin) : loppuMin;
     rivit.push({
-      tyyppi: 'siirtyma-uusi', suunta: 'paluu', alku: loppuMin, loppu: loppuMin,
+      tyyppi: 'siirtyma-uusi', suunta: 'paluu', alku: loppuMin, loppu: paluuLoppu,
       pysakkiNimi: p.stop_name, etaisyysM: etaisyysM, mapsUrl: mapsUrl,
       kestoMin: kesto ? kesto.kestoMin : null, linja: kesto ? kesto.linja : null, viiveMin: paluuViiveMin,
     });
-    if (kesto) { for (let m = loppuMin; m < Math.min(1439, loppuMin + kesto.kestoMin); m++) varattu[m] = true; }
+    if (kesto) { for (let m = loppuMin; m < paluuLoppu; m++) varattu[m] = true; }
   }
 
   return rivit;
+}
+
+// Koko päivän FÖLI-siirtymät kerralla: ryhmittelee peräkkäiset saman-
+// kohteiset tapahtumat ENSIN (ks. ryhmitaPerakkaisetFoliTapahtumat), laskee
+// sitten meno/paluu per RYHMÄ, ei per raaka kalenteririvi. YKSI yhteinen
+// paikka jota kaikki kolme kutsupaikkaa (Nyt-loki, päivänäkymä,
+// viikkonäkymä) käyttävät, ettei ryhmittely voi unohtua yhdestä.
+async function haeFoliSiirtymatPaivalle(tapahtumat, paivanIso, varattu) {
+  const ryhmat = ryhmitaPerakkaisetFoliTapahtumat((tapahtumat || []).filter(function(t) { return t.event_time; }));
+  const listat = await Promise.all(ryhmat.map(function(t) { return haeFoliSiirtymatTapahtumalle(t, paivanIso, varattu); }));
+  return [].concat.apply([], listat);
 }

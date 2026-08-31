@@ -4451,11 +4451,7 @@ async function piirraNytLoki(askeleet) {
   // kalenteritapahtumaksi") — vain tapahtumille joilla on TUNNETTU matka
   // (etsiTunnettuFoliMatka), esim. sijaintiton "meillä"-tapahtuma ei koskaan
   // laukaise tätä. Varaa ruudukosta todellisen SIRI-lähdön mukaisen ajan.
-  const siirtymat = [];
-  const siirtymaLuettelot = await Promise.all(
-    omatTapahtumat.map(function(t) { return haeFoliSiirtymatTapahtumalle(t, tanaan, varattu); })
-  );
-  siirtymaLuettelot.forEach(function(lista) { lista.forEach(function(r) { siirtymat.push(r); }); });
+  const siirtymat = await haeFoliSiirtymatPaivalle(omatTapahtumat, tanaan, varattu);
 
   // Pieni tauko kotiin paluun jälkeen (2026-08-18, Katrin pyyntö: "when i
   // come home small break and then studying" — ei ryntäistä opiskeluun heti
@@ -7765,25 +7761,23 @@ async function lataaKalenteri() {
     // "varattu" (1440 min) on tässä pelkkä kertakäyttöinen sivuvaikutuslista,
     // ei tarvita muualla kuin haeFoliSiirtymatTapahtumalle():n sisällä.
     const foliVarattu = new Array(1440).fill(false);
-    const foliListat = await Promise.all(
-      rivit.filter(function(r) { return r._tyyppi === 'tapahtuma' && r.event_time; })
-        .map(function(t) { return haeFoliSiirtymatTapahtumalle(t, tanaanIso, foliVarattu); })
+    const foliListat = await haeFoliSiirtymatPaivalle(
+      rivit.filter(function(r) { return r._tyyppi === 'tapahtuma' && r.event_time; }),
+      tanaanIso, foliVarattu
     );
-    foliListat.forEach(function(lista) {
-      lista.forEach(function(s) {
-        const alkuAika = minutesToHHMM(Math.max(0, s.alku));
-        // Yhtenäinen FÖLI-rivi (2026-08-31 uudistus, ks. foli.js:n
-        // haeFoliSiirtymatTapahtumalle) — pelkkä teksti tässä (kalenterin
-        // rivi on textContent, ei innerHTML, ei siis Maps-linkkiä kuten
-        // Nyt-lokissa). s.kestoMin on oikea kesto JOS Digitransit-avain on
-        // asetettu, muuten null (näytetään silti lähin pysäkki, ei kaadu).
-        const suuntaEtu = s.suunta === 'paluu' ? '(paluu) ' : '';
-        const viiveTeksti = typeof s.viiveMin === 'number' ? (' (' + (s.viiveMin >= 0 ? '+' : '') + s.viiveMin + ' min)') : '';
-        const title = s.kestoMin
-          ? '🚏 ' + suuntaEtu + s.pysakkiNimi + ' — n. ' + s.kestoMin + ' min' + (s.linja ? ' (linja ' + s.linja + ')' : '') + viiveTeksti
-          : '🚏 ' + suuntaEtu + s.pysakkiNimi + ' (n. ' + s.etaisyysM + ' m)';
-        rivit.push({ _tyyppi: 'foli-siirtyma', title: title, event_time: alkuAika + ':00' });
-      });
+    foliListat.forEach(function(s) {
+      const alkuAika = minutesToHHMM(Math.max(0, s.alku));
+      // Yhtenäinen FÖLI-rivi (2026-08-31 uudistus, ks. foli.js:n
+      // haeFoliSiirtymatTapahtumalle) — pelkkä teksti tässä (kalenterin
+      // rivi on textContent, ei innerHTML, ei siis Maps-linkkiä kuten
+      // Nyt-lokissa). s.kestoMin on oikea kesto JOS Digitransit-avain on
+      // asetettu, muuten null (näytetään silti lähin pysäkki, ei kaadu).
+      const suuntaEtu = s.suunta === 'paluu' ? '(paluu) ' : '';
+      const viiveTeksti = typeof s.viiveMin === 'number' ? (' (' + (s.viiveMin >= 0 ? '+' : '') + s.viiveMin + ' min)') : '';
+      const title = s.kestoMin
+        ? '🚏 ' + suuntaEtu + s.pysakkiNimi + ' — n. ' + s.kestoMin + ' min' + (s.linja ? ' (linja ' + s.linja + ')' : '') + viiveTeksti
+        : '🚏 ' + suuntaEtu + s.pysakkiNimi + ' (n. ' + s.etaisyysM + ' m)';
+      rivit.push({ _tyyppi: 'foli-siirtyma', title: title, event_time: alkuAika + ':00' });
     });
 
     piirraHenkselitBanneri(sisalto, paivanHenkselit, tanaanIso);
@@ -8298,17 +8292,25 @@ function piirraViikkoOpiskeluMerkit(paivanSessiot) {
 // kuin piirraViikkoOpiskeluMerkit — kapea sarake ei mahduta täyttä riviä,
 // joten pelkkä 🚏-kuvake + title-vihje tarkalla tiedolla. Ei osallistu
 // assignWeekOverlapSlots-pinoamiseen (nämä eivät ole oikeita tapahtumia).
+// Uudistettu pisteestä palkiksi (2026-08-31, Katrin pyyntö: "it should not
+// be sign but instead block some time right before/ so that I get to class
+// on time") — top/height kattaa nyt s.alku->s.loppu (oikea matka-aika-
+// ikkuna, ks. foli.js:n haeFoliSiirtymatTapahtumalle), ei enää pelkkä
+// piste-ikoni väärässä kohdassa. Jos kestoa ei tunneta (ei Digitransit-
+// avainta), alku===loppu ja CSS:n min-height pitää palkin silti näkyvänä
+// ohuena viivana.
 function piirraViikkoFoliMerkit(paivanFoliLegit) {
   return (paivanFoliLegit || []).map(function(s) {
     const merkki = document.createElement('div');
     merkki.className = 'kalenteri-viikko-foli-merkki';
-    merkki.style.top = minutesToPercent(s.alku) + '%';
+    const topPct = minutesToPercent(s.alku);
+    merkki.style.top = topPct + '%';
+    merkki.style.height = Math.max(0, minutesToPercent(s.loppu) - topPct) + '%';
     const viiveTeksti = typeof s.viiveMin === 'number' ? (' (' + (s.viiveMin >= 0 ? '+' : '') + s.viiveMin + ' min)') : '';
     const kestoTeksti = s.kestoMin
       ? (s.kestoMin + ' min' + (s.linja ? ' (linja ' + s.linja + ')' : '') + viiveTeksti)
       : ('n. ' + s.etaisyysM + ' m');
     merkki.title = (s.suunta === 'paluu' ? 'Paluu — ' : 'Meno — ') + s.pysakkiNimi + ' — ' + kestoTeksti;
-    merkki.textContent = '🚏';
     return merkki;
   });
 }
@@ -8325,8 +8327,7 @@ async function haeViikonFoliLegit(data, viikonIsot) {
   await Promise.all(viikonIsot.map(async function(iso) {
     const paivanTapahtumat = data.filter(function(t) { return t.event_time && !onkoMonipaivainen(t) && tapahtumaKattaaPaivan(t, iso); });
     const dummyVarattu = new Array(1440).fill(false); // viikkonäkymä ei tarvitse kuormavarausta, vain sijoittelu
-    const listat = await Promise.all(paivanTapahtumat.map(function(t) { return haeFoliSiirtymatTapahtumalle(t, iso, dummyVarattu); }));
-    kartta.set(iso, [].concat.apply([], listat));
+    kartta.set(iso, await haeFoliSiirtymatPaivalle(paivanTapahtumat, iso, dummyVarattu));
   }));
   return kartta;
 }
