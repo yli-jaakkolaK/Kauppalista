@@ -4759,6 +4759,7 @@ h1 {
 .ruori .saa-yla { display: flex; align-items: flex-start; gap: 12px; }
 .ruori .saa-lampo { font-size: 52px; font-weight: 700; line-height: 1; letter-spacing: -.02em; color: var(--muste); flex: none; }
 .ruori .saa-tagit { display: flex; flex-wrap: wrap; gap: 6px 5px; padding-top: 6px; }
+.ruori .saa-vanha { display: block; font-size: 11px; color: var(--vaimea); margin-top: 6px; }
 /* "Leima"-tagit (§2.4) — epätasainen ink-stamp-reuna feTurbulence/feDisplacementMap-
    suodattimella (ks. <defs> body:n alussa), kevyt jos suodatin lagaa iOS Safarilla (§7). */
 .ruori .saa-tagi {

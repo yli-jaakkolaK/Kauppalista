@@ -67,14 +67,18 @@
 
     <!-- SÄÄ (2026-08-11, Ruori-speksi §2) — Open-Meteo api/saa.js:n kautta,
          30 min välimuisti. Piilossa kokonaan jos haku epäonnistuu eikä
-         välimuistia ole: "vanhan datan näyttäminen tuoreena on pahempi
-         virhe kuin sään puuttuminen" (§2.2). -->
+         MITÄÄN aiempaa dataa ole edes välimuistissa. Jos aiempi onnistunut
+         haku on, näytetään SE viimeisimpänä tunnettuna ("saa-vanha"-leima
+         kertoo iän) piilottamisen sijaan (2026-08-31, Katrin palaute: "it's
+         better to show weather an hour ago than hide it complitely" —
+         korvaa aiemman "piilota aina virheessä" -periaatteen §2.2:sta). -->
     <a class="segmentti saa" id="ruori-saa-segmentti" href="https://open-meteo.com/" target="_blank" rel="noopener" style="display:none">
       <div class="saa-yla">
         <span class="saa-lampo" id="ruori-saa-lampo"></span>
         <div class="saa-tagit" id="ruori-saa-tagit"></div>
       </div>
       <div class="saa-tunnit" id="ruori-saa-tunnit"></div>
+      <span class="saa-vanha" id="ruori-saa-vanha" style="display:none"></span>
     </a>
 
     <!-- KALENTERI -->

@@ -63,10 +63,25 @@ async function haeFoliPysakit() {
     const hakemisto = await fetch('https://data.foli.fi/gtfs/stops');
     if (!hakemisto.ok) { console.warn('Föli-pysäkkihakemisto vastasi', hakemisto.status); return null; }
     const meta = await hakemisto.json();
-    if (!meta.go) { console.warn('Föli-pysäkkihakemistolla ei go-kenttää:', JSON.stringify(meta)); return null; }
-    const vastaus = await fetch('https:' + meta.go);
-    if (!vastaus.ok) { console.warn('Föli-pysäkkilista vastasi', vastaus.status); return null; }
-    const pysakit = await vastaus.json();
+
+    // Katrin selaimessa 2026-08-31 tama ensimmainen kutsu palautti jo
+    // OIKEAN taydellisen pysakkilistan suoraan (ei pientä {datasets,
+    // latest, go} -ohjausoliota) - jonkin selaimen/valikerroksen takia,
+    // syyta ei selvitetty tarkemmin. Ei enaa oleteta kumpaakaan muotoa:
+    // jos go-kenttaa ei ole mutta olio nayttaa jo pysakkidatalta (jokin
+    // avain jolla stop_lat), kaytetaan sita suoraan sen sijaan etta
+    // heitettaisiin pois oikea data pelkan muotoerheen takia.
+    let pysakit;
+    if (meta.go) {
+      const vastaus = await fetch('https:' + meta.go);
+      if (!vastaus.ok) { console.warn('Föli-pysäkkilista vastasi', vastaus.status); return null; }
+      pysakit = await vastaus.json();
+    } else if (Object.keys(meta).some(function(id) { return meta[id] && typeof meta[id].stop_lat === 'number'; })) {
+      pysakit = meta;
+    } else {
+      console.warn('Föli-pysäkkihakemistolla ei go-kenttää eikä tunnistettavaa pysäkkidataa:', JSON.stringify(meta).slice(0, 300));
+      return null;
+    }
     try {
       localStorage.setItem(FOLI_PYSAKIT_KEY, JSON.stringify({ haettu: Date.now(), pysakit: pysakit }));
     } catch (e) { /* localStorage täynnä tms — jatketaan silti muistivaraisena */ }

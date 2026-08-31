@@ -102,18 +102,101 @@ function pyoristaKymmeneen(n) { return Math.round(n / 10) * 10; }
 
 // SATAMA_SPEKSI.md §16.5c kohta 4 (2026-08-16): "näytä viimeisin tunnettu
 // arvo yhteyskatkolla, piilota vain jos ei koskaan ollut arvoa TAI
-// edellisenkin hakeminen epäonnistui" — sietää YHDEN ohimenevän
-// verkkokatkon näyttämällä vanhaa dataa tuoreena hetken, mutta kaksi
-// peräkkäistä epäonnistumista piilottaa (data on silloin liian vanhaa
-// luotettavaksi). Ei ristiriidassa Ruori-speksin (§15.2) alkuperäisen
-// "vanhan datan näyttäminen tuoreena on pahempi kuin sään puuttuminen"
-// -periaatteen kanssa, koska KAHDEN peräkkäisen epäonnistumisen jälkeen
-// piilotus tapahtuu edelleen — vain YHDEN katkon sieto on uutta.
-let saaOnKoskaanOnnistunut = false;
-let saaEdellinenOnnistui = true;
+// edellisenkin hakeminen epäonnistui" — UUDISTETTU 2026-08-31, Katrin
+// palaute: "it's better to show weather an hour ago than hide it
+// complitely when there is error in network". Vanha versio sieti vain
+// YHDEN ohimenevän katkon puhtaasti muistivaraisilla lipuilla (nollautuivat
+// joka sivulatauksella, eivät siis auttaneet jos ITSE lataus epäonnistui
+// ensimmäisenä yrityksenä). Nyt viimeisin ONNISTUNUT haku tallennetaan
+// localStorageen aikaleimalla — epäonnistuessa näytetään SE (leimattuna
+// "N min/h sitten", ei koskaan tuoreena esitettynä — säilyttää Ruori-
+// speksin §15.2 alkuperäisen periaatteen "ei valehdella tuoreudesta"),
+// piilotus vain jos ei ole MITÄÄN talletettua dataa lainkaan.
+const SAA_VIIMEISIN_KEY = 'kauppalista_saa_viimeisin';
+
+// Piirtää sään annetusta datasta (tuore TAI välimuistista) — palauttaa
+// true jos jotain näytettävää löytyi (tälle päivälle osuvia tunteja),
+// false jos data ei kelpaa (esim. välimuistissa eri päivän tunnit).
+function piirraRuoriSaaSisalto(saa) {
+  const tunnit = saa.hourly.time;
+
+  // Koko päivä klo 1-23 (2026-08-11, Katrin pyyntö), ei enää vain
+  // seuraavat muutama tunti. Merkkijonovertailu, ei new Date(t) — Open-
+  // Meteon paikallisaikaleimat ("2026-08-11T14:00") eivät sisällä
+  // aikavyöhykettä, ja new Date() tulkitsisi ne selaimen omalla
+  // paikallisajalla, mikä on hauras jos se joskus poikkeaa Suomen ajasta.
+  const tanaanIso = paivamaaraISO(new Date());
+  const nytTunti = new Date().getHours();
+  const nakyvat = [];
+  let nykyIdx = -1;
+  tunnit.forEach(function(t, i) {
+    if (t.slice(0, 10) !== tanaanIso) return;
+    const tunti = parseInt(t.slice(11, 13), 10);
+    if (tunti < 1 || tunti > 23) return;
+    if (tunti === nytTunti) nykyIdx = nakyvat.length;
+    nakyvat.push(i);
+  });
+  if (nakyvat.length === 0) return false;
+  const nykyAnkkuri = Math.max(nykyIdx, 0);
+
+  const nykyinenLampo = saa.current && typeof saa.current.apparent_temperature === 'number'
+    ? saa.current.apparent_temperature
+    : saa.hourly.apparent_temperature[nakyvat[nykyAnkkuri]];
+  document.getElementById('ruori-saa-lampo').textContent = Math.round(nykyinenLampo) + '°';
+
+  const maxSadeTod = nakyvat.slice(nykyAnkkuri, nykyAnkkuri + 4).reduce(function(max, i) {
+    return Math.max(max, saa.hourly.precipitation_probability[i] || 0);
+  }, 0);
+  const tagit = [];
+  if (maxSadeTod >= 40) tagit.push('Sateenvarjo');
+  if (nykyinenLampo <= 0) tagit.push('Hattu');
+  if (nykyinenLampo >= 25) tagit.push('Aurinkolasit');
+  // Tuuli EI ole tässä leimana eikä numerona (Katrin pyyntö) — ks.
+  // saaTuuliIkoni() tuntirivin renderöinnissä alempana, kuvake sään
+  // vierellä sinä tuntina jona tuulee.
+  const tagitEl = document.getElementById('ruori-saa-tagit');
+  tagitEl.innerHTML = '';
+  tagit.forEach(function(teksti, i) {
+    const span = document.createElement('span');
+    span.className = 'saa-tagi';
+    span.textContent = teksti;
+    span.style.transform = 'rotate(' + (-4 + i * 3.5) + 'deg)';
+    tagitEl.appendChild(span);
+  });
+
+  const tunnitEl = document.getElementById('ruori-saa-tunnit');
+  tunnitEl.innerHTML = nakyvat.map(function(i, idx) {
+    const sade = saa.hourly.precipitation_probability[i];
+    const tuuli = saa.hourly.wind_speed_10m ? saa.hourly.wind_speed_10m[i] : undefined;
+    // Tuntukohtainen "tuntuu kuin" -lukema (2026-08-18, Katrin pyyntö) —
+    // sama apparent_temperature-sarja jota jo käytetään yläosan isolle
+    // lukemalle, nyt myös jokaisella tunnilla erikseen, ei vain nyt-hetkellä.
+    const tuntuu = saa.hourly.apparent_temperature ? saa.hourly.apparent_temperature[i] : undefined;
+    return '<div class="saa-tunti' + (idx === nykyIdx ? ' saa-tunti-nyt' : '') + '">'
+      + '<span class="saa-tunti-aika">' + tunnit[i].slice(11, 13) + '</span>'
+      + '<span class="saa-tunti-ikoni">' + saaIkoniHtml(saa.hourly.weather_code[i], sade) + saaTuuliIkoni(tuuli) + '</span>'
+      + '<span class="saa-tunti-lampo">' + (typeof tuntuu === 'number' ? Math.round(tuntuu) + '°' : '') + '</span>'
+      + '<span class="saa-tunti-sade">' + (sade >= SAA_SADE_KYNNYS ? pyoristaKymmeneen(sade) + '%' : '') + '</span>'
+      + '</div>';
+  }).join('');
+  if (nykyIdx >= 0) {
+    const nykySolu = tunnitEl.children[nykyIdx];
+    if (nykySolu) nykySolu.scrollIntoView({ inline: 'center', block: 'nearest' });
+  }
+  return true;
+}
+
+function saaIanTeksti(haettuMs) {
+  const minuuttia = Math.round((Date.now() - haettuMs) / 60000);
+  if (minuuttia < 1) return 'juuri nyt';
+  if (minuuttia < 60) return minuuttia + ' min sitten';
+  return Math.round(minuuttia / 60) + ' h sitten';
+}
 
 async function lataaRuoriSaa() {
   const segmentti = document.getElementById('ruori-saa-segmentti');
+  const vanhaEl = document.getElementById('ruori-saa-vanha');
+
   try {
     const { data: sessioData } = await db.auth.getSession();
     const token = sessioData.session ? sessioData.session.access_token : null;
@@ -121,83 +204,19 @@ async function lataaRuoriSaa() {
     const vastaus = await fetch('/api/saa', { headers: { Authorization: 'Bearer ' + token } });
     const paketti = await vastaus.json();
     if (!vastaus.ok || !paketti.data) throw new Error(paketti.error || 'Säädatan haku epäonnistui');
+    if (!piirraRuoriSaaSisalto(paketti.data)) throw new Error('Ei tunteja näytettäväksi');
 
-    const saa = paketti.data;
-    const tunnit = saa.hourly.time;
-
-    // Koko päivä klo 1-23 (2026-08-11, Katrin pyyntö), ei enää vain
-    // seuraavat muutama tunti. Merkkijonovertailu, ei new Date(t) — Open-
-    // Meteon paikallisaikaleimat ("2026-08-11T14:00") eivät sisällä
-    // aikavyöhykettä, ja new Date() tulkitsisi ne selaimen omalla
-    // paikallisajalla, mikä on hauras jos se joskus poikkeaa Suomen ajasta.
-    const tanaanIso = paivamaaraISO(new Date());
-    const nytTunti = new Date().getHours();
-    const nakyvat = [];
-    let nykyIdx = -1;
-    tunnit.forEach(function(t, i) {
-      if (t.slice(0, 10) !== tanaanIso) return;
-      const tunti = parseInt(t.slice(11, 13), 10);
-      if (tunti < 1 || tunti > 23) return;
-      if (tunti === nytTunti) nykyIdx = nakyvat.length;
-      nakyvat.push(i);
-    });
-    if (nakyvat.length === 0) throw new Error('Ei tunteja näytettäväksi');
-    const nykyAnkkuri = Math.max(nykyIdx, 0);
-
-    const nykyinenLampo = saa.current && typeof saa.current.apparent_temperature === 'number'
-      ? saa.current.apparent_temperature
-      : saa.hourly.apparent_temperature[nakyvat[nykyAnkkuri]];
-    document.getElementById('ruori-saa-lampo').textContent = Math.round(nykyinenLampo) + '°';
-
-    const maxSadeTod = nakyvat.slice(nykyAnkkuri, nykyAnkkuri + 4).reduce(function(max, i) {
-      return Math.max(max, saa.hourly.precipitation_probability[i] || 0);
-    }, 0);
-    const tagit = [];
-    if (maxSadeTod >= 40) tagit.push('Sateenvarjo');
-    if (nykyinenLampo <= 0) tagit.push('Hattu');
-    if (nykyinenLampo >= 25) tagit.push('Aurinkolasit');
-    // Tuuli EI ole tässä leimana eikä numerona (Katrin pyyntö) — ks.
-    // saaTuuliIkoni() tuntirivin renderöinnissä alempana, kuvake sään
-    // vierellä sinä tuntina jona tuulee.
-    const tagitEl = document.getElementById('ruori-saa-tagit');
-    tagitEl.innerHTML = '';
-    tagit.forEach(function(teksti, i) {
-      const span = document.createElement('span');
-      span.className = 'saa-tagi';
-      span.textContent = teksti;
-      span.style.transform = 'rotate(' + (-4 + i * 3.5) + 'deg)';
-      tagitEl.appendChild(span);
-    });
-
-    const tunnitEl = document.getElementById('ruori-saa-tunnit');
-    tunnitEl.innerHTML = nakyvat.map(function(i, idx) {
-      const sade = saa.hourly.precipitation_probability[i];
-      const tuuli = saa.hourly.wind_speed_10m ? saa.hourly.wind_speed_10m[i] : undefined;
-      // Tuntukohtainen "tuntuu kuin" -lukema (2026-08-18, Katrin pyyntö) —
-      // sama apparent_temperature-sarja jota jo käytetään yläosan isolle
-      // lukemalle, nyt myös jokaisella tunnilla erikseen, ei vain nyt-hetkellä.
-      const tuntuu = saa.hourly.apparent_temperature ? saa.hourly.apparent_temperature[i] : undefined;
-      return '<div class="saa-tunti' + (idx === nykyIdx ? ' saa-tunti-nyt' : '') + '">'
-        + '<span class="saa-tunti-aika">' + tunnit[i].slice(11, 13) + '</span>'
-        + '<span class="saa-tunti-ikoni">' + saaIkoniHtml(saa.hourly.weather_code[i], sade) + saaTuuliIkoni(tuuli) + '</span>'
-        + '<span class="saa-tunti-lampo">' + (typeof tuntuu === 'number' ? Math.round(tuntuu) + '°' : '') + '</span>'
-        + '<span class="saa-tunti-sade">' + (sade >= SAA_SADE_KYNNYS ? pyoristaKymmeneen(sade) + '%' : '') + '</span>'
-        + '</div>';
-    }).join('');
-    if (nykyIdx >= 0) {
-      const nykySolu = tunnitEl.children[nykyIdx];
-      if (nykySolu) nykySolu.scrollIntoView({ inline: 'center', block: 'nearest' });
-    }
-
+    try { localStorage.setItem(SAA_VIIMEISIN_KEY, JSON.stringify({ haettu: Date.now(), saa: paketti.data })); } catch (e) { /* täynnä tms, jatketaan silti */ }
+    vanhaEl.style.display = 'none';
     segmentti.style.display = 'block';
-    saaOnKoskaanOnnistunut = true;
-    saaEdellinenOnnistui = true;
   } catch (e) {
     console.error('Ruorin säädatan haku epäonnistui:', e.message);
-    if (saaOnKoskaanOnnistunut && saaEdellinenOnnistui) {
-      // Ensimmäinen ohimenevä katko onnistuneen datan jälkeen — jätetään
-      // vanha, jo näytössä oleva data näkyviin sellaisenaan, ei piilotusta.
-      saaEdellinenOnnistui = false;
+    let vanhin = null;
+    try { vanhin = JSON.parse(localStorage.getItem(SAA_VIIMEISIN_KEY) || 'null'); } catch (e2) { /* korruptoitunut, ei näytettävää */ }
+    if (vanhin && piirraRuoriSaaSisalto(vanhin.saa)) {
+      vanhaEl.textContent = 'Päivitetty ' + saaIanTeksti(vanhin.haettu);
+      vanhaEl.style.display = 'block';
+      segmentti.style.display = 'block';
     } else {
       segmentti.style.display = 'none';
     }
