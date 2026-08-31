@@ -4602,13 +4602,17 @@ function piirraNytLokiRivi(rivi) {
       '<span class="pieni">tarkentuu lähempänä lähtöä</span></div>';
   } else if (rivi.tyyppi === 'siirtyma-uusi') {
     // Uusi/tuntematon osoite (2026-08-31, ks. foli.js:n haeFoliUusiOsoiteRivi)
-    // — vain lähin pysäkki + Maps-linkki, EI kestoa (SIRI ei tee reititystä
-    // mielivaltaiselle pysäkkiparille).
+    // — lähin pysäkki + Maps-linkki aina, PLUS oikea kesto (rivi.kestoMin)
+    // JOS Digitransit-avain on asetettu (ks. api/geocode.js:n haeReitti) —
+    // ennen avainta kestoMin on null ja rivi näyttää pelkän pysäkin, ei kaadu.
     el.className = 'nyt-loki-rivi live siirtyma siirtyma-arvio';
+    const kestoTeksti = rivi.kestoMin
+      ? ('n. ' + rivi.kestoMin + ' min' + (rivi.linja ? ' (linja ' + rivi.linja + ')' : '') + ' — ')
+      : ('lähin pysäkki, n. ' + rivi.etaisyysM + ' m — ');
     el.innerHTML =
       '<div class="nyt-loki-aika">' + kelloMinuuteista(rivi.alku) + '</div>' +
       '<div class="nyt-loki-teksti"><b>🚏 ' + rivi.pysakkiNimi + '</b>' +
-      '<span class="pieni">lähin pysäkki, n. ' + rivi.etaisyysM + ' m — ' +
+      '<span class="pieni">' + kestoTeksti +
       '<a href="' + rivi.mapsUrl + '" target="_blank" rel="noopener">reitti Mapsissa ↗</a></span></div>';
   } else {
     const kohde = rivi.kohde;
@@ -7771,9 +7775,12 @@ async function lataaKalenteri() {
         } else if (s.tyyppi === 'siirtyma-uusi') {
           // Uusi/tuntematon osoite (ks. foli.js:n haeFoliUusiOsoiteRivi) —
           // pelkkä teksti tässä (kalenterin rivi on textContent, ei innerHTML,
-          // ei siis Maps-linkkiä kuten Nyt-lokissa) — lähin pysäkki riittää
-          // kalenterin vilkaisuun, tarkempi reitti löytyy Hytin Nyt-lokista.
-          title = '🚏 ' + s.pysakkiNimi + ' (n. ' + s.etaisyysM + ' m)';
+          // ei siis Maps-linkkiä kuten Nyt-lokissa). s.kestoMin on oikea kesto
+          // JOS Digitransit-avain on asetettu, muuten null (näytetään silti
+          // lähin pysäkki, ei kaadu).
+          title = s.kestoMin
+            ? '🚏 ' + s.pysakkiNimi + ' — n. ' + s.kestoMin + ' min' + (s.linja ? ' (linja ' + s.linja + ')' : '')
+            : '🚏 ' + s.pysakkiNimi + ' (n. ' + s.etaisyysM + ' m)';
         } else {
           title = '🚌 Bussi — tarkentuu lähempänä lähtöä';
         }

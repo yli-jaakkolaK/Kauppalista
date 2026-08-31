@@ -194,9 +194,34 @@ async function geokoodaaOsoite(osoiteTeksti) {
   }
 }
 
-// Lähin pysäkki tapahtuman osoitteelle + Maps-linkki — EI aikataulua/kestoa
-// (ks. yläkommentti). Palauttaa yhden rivin tai [] jos osoitetta ei ole,
-// geokoodaus epäonnistuu, tai pysäkkilistaa ei saada.
+// VAIHE 2 (2026-08-31, Katrin pyyntö: "start building what you can without
+// key") — oikea kesto Digitransitin kautta (ks. api/geocode.js:n haeReitti).
+// Palauttaa null HILJAA jos DIGITRANSIT_KEY ei ole vielä asetettu Verceliin
+// (503) TAI mikä tahansa muu virhe — kutsuja (haeFoliUusiOsoiteRivi) näyttää
+// silloin vaiheen 1 "lähin pysäkki" -tiedot ilman kestoa, ei kaadu. Kun
+// avain joskus lisätään, tämä alkaa palauttaa oikean keston ilman uutta
+// pushia — pelkkä ympäristömuuttuja aktivoi sen.
+async function haeDigitransitKesto(fromLat, fromLon, toLat, toLon) {
+  try {
+    const { data: sessioData } = await db.auth.getSession();
+    const token = sessioData.session ? sessioData.session.access_token : null;
+    if (!token) return null;
+    const url = '/api/geocode?reitti=1&fromLat=' + fromLat + '&fromLon=' + fromLon + '&toLat=' + toLat + '&toLon=' + toLon;
+    const vastaus = await fetch(url, { headers: { Authorization: 'Bearer ' + token } });
+    if (!vastaus.ok) return null; // 503 = ei vielä avainta, muu virhe = ei reittiä juuri nyt
+    const tulos = await vastaus.json();
+    if (!tulos.kestoS) return null;
+    const linja = (tulos.legit || []).find(function(l) { return l.mode === 'BUS'; });
+    return { kestoMin: Math.round(tulos.kestoS / 60), linja: linja && linja.route ? linja.route.shortName : null };
+  } catch (e) {
+    return null;
+  }
+}
+
+// Lähin pysäkki tapahtuman osoitteelle + Maps-linkki, PLUS oikea kesto jos
+// Digitransit-avain on jo asetettu (ks. haeDigitransitKesto). Palauttaa
+// yhden rivin tai [] jos osoitetta ei ole, geokoodaus epäonnistuu, tai
+// pysäkkilistaa ei saada.
 async function haeFoliUusiOsoiteRivi(tapahtuma) {
   const osoiteTeksti = tapahtumanSijaintiteksti(tapahtuma);
   if (!osoiteTeksti || !tapahtuma.event_time) return [];
@@ -205,13 +230,23 @@ async function haeFoliUusiOsoiteRivi(tapahtuma) {
   const pysakkiId = lahinFoliPysakki(pysakit, sijainti.lat, sijainti.lon);
   if (!pysakkiId) return [];
   const p = pysakit[pysakkiId];
+  const kotiPysakki = pysakit[FOLI_OLETUSPYSAKKI];
   const etaisyysM = Math.round(haversineMetria(sijainti.lat, sijainti.lon, p.stop_lat, p.stop_lon));
   const alku = aikaMinuutteina(tapahtuma.event_time.slice(0, 5));
   const mapsUrl = 'https://www.google.com/maps/dir/?api=1'
     + '&origin=' + encodeURIComponent(FOLI_KOTIOSOITE)
     + '&destination=' + encodeURIComponent(osoiteTeksti)
     + '&travelmode=transit';
-  return [{ tyyppi: 'siirtyma-uusi', alku: alku, loppu: alku, pysakkiNimi: p.stop_name, etaisyysM: etaisyysM, mapsUrl: mapsUrl }];
+
+  const kesto = kotiPysakki
+    ? await haeDigitransitKesto(kotiPysakki.stop_lat, kotiPysakki.stop_lon, sijainti.lat, sijainti.lon)
+    : null;
+
+  return [{
+    tyyppi: 'siirtyma-uusi', alku: alku, loppu: alku,
+    pysakkiNimi: p.stop_name, etaisyysM: etaisyysM, mapsUrl: mapsUrl,
+    kestoMin: kesto ? kesto.kestoMin : null, linja: kesto ? kesto.linja : null,
+  }];
 }
 
 // === TUNNETUT MATKAT (2026-08-18, Katrin täsmennykset) === EI geokoodausta
