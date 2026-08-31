@@ -247,8 +247,21 @@ const FOLI_TUNNETUT_KOHTEET = [
 // Sama nimi kuin ennen (script.js:n opintoPaivanKuorma käyttää tätä
 // pelkkänä totuusarvona, "onko tälle jotain FÖLI-käsittelyä ylipäätään" —
 // ei riipu palautetun olion muodosta, joten uudistus ei riko sitä kutsua).
+// Syötteen oletusosoite (kalenteri_syotteet.osoite) LUETAAN SUORAAN
+// liitetystä olioista jos t._osoite ei ole erikseen esikäsitelty (2026-08-31,
+// löytö: Reitin viikkokalenterin oma kysely ei koskaan hakenut osoite-
+// kenttää eikä siis _osoite-esikäsittelyä ollut edes mahdollista tehdä —
+// sama "Joukahaisenkatu ei täsmää huonekoodiin" -bugiluokka kuin 30.8.
+// korjattiin Nyt-lokille, nyt eri näkymässä). Keskitetty TÄHÄN yhteen
+// paikkaan (EI enää erillistä _osoite-esikäsittelyaskelta jokaisessa
+// kutsujassa muistettavaksi) — jos SELECT joskus unohtaa osoite-kentän
+// kokonaan, palautuu vain hiljaa null:iin, ei kaadu.
+function haeTapahtumanOsoiteTeksti(tapahtuma) {
+  return tapahtuma._osoite || (tapahtuma.kalenteri_syotteet ? tapahtuma.kalenteri_syotteet.osoite : null) || '';
+}
+
 function etsiTunnettuFoliMatka(tapahtuma) {
-  const teksti = ((tapahtuma.location || '') + ' ' + (tapahtuma._osoite || '')).toLowerCase();
+  const teksti = ((tapahtuma.location || '') + ' ' + haeTapahtumanOsoiteTeksti(tapahtuma)).toLowerCase();
   if (!teksti.trim()) return null; // ei sijaintia lainkaan = ei matkaa (esim. "meillä")
   return FOLI_TUNNETUT_KOHTEET.find(function(k) { return teksti.indexOf(k.tunnistin) !== -1; }) || null;
 }

@@ -3221,7 +3221,7 @@ async function lataaReittiViikko() {
 
   const tanaanIso = opintoTanaanPvm();
   const [{ data: haetut, error }, henkselitLista, { data: sessiot }, { data: suunnitellut }] = await Promise.all([
-    db.from('kalenteri_tapahtumat').select('*, kalenteri_syotteet(vari, henkilo, scope)')
+    db.from('kalenteri_tapahtumat').select('*, kalenteri_syotteet(vari, henkilo, scope, osoite)')
       .gte('event_date', alkuIso).lte('event_date', loppuIso)
       .order('event_date').order('event_time', { nullsFirst: false }),
     fetchVisibleHenkselit(alkuIso, loppuIso),
@@ -3253,8 +3253,9 @@ async function lataaReittiViikko() {
   });
 
   const signaalit = await computeVisibleDaySignals(data, isoPaivat);
+  const viikonFoliLegit = await haeViikonFoliLegit(data, isoPaivat);
   sisalto.innerHTML = '';
-  piirraViikkoAikajana(sisalto, data, alku, signaalit.kuormaTasot, henkselitLista, sessiot || [], suunnitellutAiheet);
+  piirraViikkoAikajana(sisalto, data, alku, signaalit.kuormaTasot, henkselitLista, sessiot || [], suunnitellutAiheet, viikonFoliLegit);
 }
 
 // === LÄHESTYVÄT MÄÄRÄAJAT (§5.1 kohta 2: "3 seuraavaa palautusta") ===
@@ -7785,7 +7786,8 @@ async function lataaKalenteri() {
     }
     const signaalit = await computeVisibleDaySignals(data, viikonIsot);
     const viikonHenkselit = await fetchVisibleHenkselit(viikonIsot[0], viikonIsot[6]);
-    piirraViikkoAikajana(sisalto, data, alku, signaalit.kuormaTasot, viikonHenkselit);
+    const viikonFoliLegit = await haeViikonFoliLegit(data, viikonIsot);
+    piirraViikkoAikajana(sisalto, data, alku, signaalit.kuormaTasot, viikonHenkselit, null, null, viikonFoliLegit);
     return;
   }
 
@@ -8276,20 +8278,59 @@ function piirraViikkoOpiskeluMerkit(paivanSessiot) {
   });
 }
 
+// FÖLI-siirtymämerkit viikkonäkymässä (2026-08-31, Katrin pyyntö: "travel
+// blocks should show also in weeks far in the future as week is showing" —
+// EI koskaan kuukausinäkymässä, Katrin oma rajaus). Sama kevyt merkki-kaava
+// kuin piirraViikkoOpiskeluMerkit — kapea sarake ei mahduta täyttä riviä,
+// joten pelkkä 🚏-kuvake + title-vihje tarkalla tiedolla. Ei osallistu
+// assignWeekOverlapSlots-pinoamiseen (nämä eivät ole oikeita tapahtumia).
+function piirraViikkoFoliMerkit(paivanFoliLegit) {
+  return (paivanFoliLegit || []).map(function(s) {
+    const merkki = document.createElement('div');
+    merkki.className = 'kalenteri-viikko-foli-merkki';
+    merkki.style.top = minutesToPercent(s.alku) + '%';
+    const kestoTeksti = s.kestoMin
+      ? (s.kestoMin + ' min' + (s.linja ? ' (linja ' + s.linja + ')' : ''))
+      : ('n. ' + s.etaisyysM + ' m');
+    merkki.title = (s.suunta === 'paluu' ? 'Paluu — ' : 'Meno — ') + s.pysakkiNimi + ' — ' + kestoTeksti;
+    merkki.textContent = '🚏';
+    return merkki;
+  });
+}
+
+// Koko viikon FÖLI-siirtymät kerralla (2026-08-31) — laskettu ETUKÄTEEN
+// ennen piirraViikkoAikajanaa (ei sen sisällä, joka on synkroninen), samaan
+// tapaan kuin sessiot/suunnitellutAiheet jo valmiiksi lasketaan. Katrin
+// pyyntö: "data could be available 3 months advance or even more" — tämä
+// EI ole rajattu lähitulevaisuuteen millään tavalla, sama aritmeettinen
+// laskenta toimii miten kauas tahansa (ei riipu SIRI:n reaaliaikaisesta
+// lähtötaulusta, ks. foli.js:n haeFoliSiirtymatTapahtumalle-kommentti).
+async function haeViikonFoliLegit(data, viikonIsot) {
+  const kartta = new Map();
+  await Promise.all(viikonIsot.map(async function(iso) {
+    const paivanTapahtumat = data.filter(function(t) { return t.event_time && !onkoMonipaivainen(t) && tapahtumaKattaaPaivan(t, iso); });
+    const dummyVarattu = new Array(1440).fill(false); // viikkonäkymä ei tarvitse kuormavarausta, vain sijoittelu
+    const listat = await Promise.all(paivanTapahtumat.map(function(t) { return haeFoliSiirtymatTapahtumalle(t, iso, dummyVarattu); }));
+    kartta.set(iso, [].concat.apply([], listat));
+  }));
+  return kartta;
+}
+
 // Sijaintiteksti kalenteririvin/-palkin toiselle riville (viikko- JA
 // päivänäkymä): tapahtuman oma location, tai jos sitä ei ole, syötteen
 // oletusosoite (kalenteri_syotteet.osoite, sql/138) — esim. Lukkarikone-
 // luennoille kiinteä "Joukahaisenkatu 3-5, Turku" ilman erillistä
 // geokoodausta (Katrin 24.8.2026 ohje: "no need to fetch it from anywhere").
 function tapahtumanSijaintiteksti(t) {
-  return t.location || t._osoite || null;
+  return t.location || haeTapahtumanOsoiteTeksti(t) || null;
 }
 
-function piirraViikkoTuntialue(paivanAjalliset, henkselitLista, iso, paivanSessiot) {
+function piirraViikkoTuntialue(paivanAjalliset, henkselitLista, iso, paivanSessiot, paivanFoliLegit) {
   const alue = document.createElement('div');
   alue.className = 'kalenteri-viikko-tuntialue';
   piirraViikkoHenkselitTausta(henkselitLista, iso).forEach(function(tausta) { alue.appendChild(tausta); });
   piirraViikkoOpiskeluMerkit(paivanSessiot || []).forEach(function(merkki) { alue.appendChild(merkki); });
+  piirraViikkoFoliMerkit(paivanFoliLegit).forEach(function(merkki) { alue.appendChild(merkki); });
   assignWeekOverlapSlots(paivanAjalliset).forEach(function(kohde) {
     const t = kohde.tapahtuma;
     const palkki = document.createElement('div');
@@ -8344,7 +8385,7 @@ function piirraViikkoSuunniteltuRivi(paivanSuunnitellut) {
   return rivi;
 }
 
-function piirraViikkoAikajana(sisalto, data, viikonAlkuPvm, kuormaTasot, henkselitLista, sessiot, suunnitellutAiheet) {
+function piirraViikkoAikajana(sisalto, data, viikonAlkuPvm, kuormaTasot, henkselitLista, sessiot, suunnitellutAiheet, viikonFoliLegit) {
   const aikajana = document.createElement('div');
   aikajana.className = 'kalenteri-viikko-aikajana';
 
@@ -8407,7 +8448,8 @@ function piirraViikkoAikajana(sisalto, data, viikonAlkuPvm, kuormaTasot, henksel
     sarake.appendChild(piirraViikkoSuunniteltuRivi(paivanSuunnitellut));
 
     sarake.appendChild(piirraViikkoKokopaivaRivi(paivanKaikki, iso));
-    sarake.appendChild(piirraViikkoTuntialue(paivanAjalliset, henkselitLista, iso, paivanSessiot));
+    const paivanFoliLegit = viikonFoliLegit ? viikonFoliLegit.get(iso) : null;
+    sarake.appendChild(piirraViikkoTuntialue(paivanAjalliset, henkselitLista, iso, paivanSessiot, paivanFoliLegit));
 
     aikajana.appendChild(sarake);
   }
