@@ -9520,10 +9520,12 @@ document.getElementById('kuormanappi').addEventListener('click', function() {
 const SILTA_IKONI_SVG = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 9h20"/><path d="M5 9v11M12 9v11M19 9v11"/><path d="M2 20h20"/></svg>';
 document.querySelectorAll('.silta-ikoni').forEach(function(el) { el.innerHTML = SILTA_IKONI_SVG; });
 
-// Säänäyttö (lataaRuoriSaa ym.) siirretty omaan tiedostoonsa (saa-widget.js,
+// Säänäyttö (lataaRuoriSaa ym.) siirretty omaan tiedostoonsa (ruori-saa.js,
 // 2026-08-30, script.js:n pilkkomisen askel 2, ks. muistin
-// project_scriptjs_split_plan) — kutsutaan alempana avaaKotinakyma-tyyppisen
-// alustuksen yhteydessä, muokkaa saa-widget.js:ää jos tarve.
+// project_scriptjs_split_plan; nimetty uudelleen saa-widget.js:sta 2026-08-31,
+// "widget" tiedostonimessa esti latauksen mainosestolistoilla) — kutsutaan
+// alempana avaaKotinakyma-tyyppisen alustuksen yhteydessä, muokkaa
+// ruori-saa.js:ää jos tarve.
 
 // === RUORI: KALENTERI-SEGMENTTI (2026-08-08) === tämän päivän ensimmäinen
 // tapahtuma + ristiriita/huolilippu-tila, ks. satama-ruori.html. Käyttää

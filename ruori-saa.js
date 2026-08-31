@@ -22,8 +22,13 @@
 //
 // SIIRRETTY OMAKSI TIEDOSTOKSEEN (2026-08-30, script.js:n pilkkomisen askel
 // 2, ks. muistin project_scriptjs_split_plan) — pelkkä fyysinen siirto, ei
-// sisällöllistä muutosta. Ei-api/saa.js — nimetty saa-widget.js:ksi ettei
-// sekoitu palvelinpuolen api/saa.js:ään.
+// sisällöllistä muutosta. Nimettiin ensin saa-widget.js:ksi (ettei sekoitu
+// palvelinpuolen api/saa.js:ään), UUDELLEENNIMETTY ruori-saa.js:ksi
+// 2026-08-31: Katrin loyto, "widget" tiedostonimessa on tunnettu
+// mainosestolistojen (EasyList ym.) sokea suodatuspätterni — tiedosto
+// jai lataamatta hanen selaimessaan JOKA kerta riippumatta cache/SW-
+// tilasta (sailyi jopa taydellisen "clear site data" -tyhjennyksen yli),
+// mika nakyi konsolissa "lataaRuoriSaa is not defined" -virheena.
 const SAA_VARI_AURINKO = 'var(--sinappi)';
 const SAA_VARI_PILVI = 'var(--vaimea)';
 const SAA_VARI_SADE = 'var(--syvanne)';

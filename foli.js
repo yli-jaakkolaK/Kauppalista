@@ -63,7 +63,7 @@ async function haeFoliPysakit() {
     const hakemisto = await fetch('https://data.foli.fi/gtfs/stops');
     if (!hakemisto.ok) { console.warn('Föli-pysäkkihakemisto vastasi', hakemisto.status); return null; }
     const meta = await hakemisto.json();
-    if (!meta.go) { console.warn('Föli-pysäkkihakemistolla ei go-kenttää', meta); return null; }
+    if (!meta.go) { console.warn('Föli-pysäkkihakemistolla ei go-kenttää:', JSON.stringify(meta)); return null; }
     const vastaus = await fetch('https:' + meta.go);
     if (!vastaus.ok) { console.warn('Föli-pysäkkilista vastasi', vastaus.status); return null; }
     const pysakit = await vastaus.json();
