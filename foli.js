@@ -56,12 +56,16 @@ async function haeFoliPysakit() {
     // tarkistettu suoraan livenä API:sta. Oikea data on go-kentän
     // osoittamassa versioidussa polussa. Koko Föli-ominaisuus oli tämän
     // takia hiljaa rikki siitä asti kun se rakennettiin (17.8.).
+    // Nama kolme paluuta EIVAT heittaneet poikkeusta ennen (2026-08-31,
+    // Katrin loyto: koko FOLI-putki pysahtyi tahan ilman YHTAAN konsoli-
+    // virhetta) - nyt nakyvia jotta ei-2xx-tila/puuttuva go-kentta erottuu
+    // verkkovirheesta eika jaa hiljaiseksi.
     const hakemisto = await fetch('https://data.foli.fi/gtfs/stops');
-    if (!hakemisto.ok) return null;
+    if (!hakemisto.ok) { console.warn('Föli-pysäkkihakemisto vastasi', hakemisto.status); return null; }
     const meta = await hakemisto.json();
-    if (!meta.go) return null;
+    if (!meta.go) { console.warn('Föli-pysäkkihakemistolla ei go-kenttää', meta); return null; }
     const vastaus = await fetch('https:' + meta.go);
-    if (!vastaus.ok) return null;
+    if (!vastaus.ok) { console.warn('Föli-pysäkkilista vastasi', vastaus.status); return null; }
     const pysakit = await vastaus.json();
     try {
       localStorage.setItem(FOLI_PYSAKIT_KEY, JSON.stringify({ haettu: Date.now(), pysakit: pysakit }));
