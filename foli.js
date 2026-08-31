@@ -383,6 +383,12 @@ async function haeFoliSiirtymatTapahtumalle(tapahtuma, paivanIso, varattu) {
   if (!sijainti || !pysakit) return [];
   const pysakkiId = lahinFoliPysakki(pysakit, sijainti.lat, sijainti.lon);
   if (!pysakkiId) return [];
+  // Kohde on käytännössä koti itse (2026-08-31, Katrin löytö: "Jamielin
+  // kaverisynttärit" jonka location-kenttä ON kotiosoite — synttärit
+  // pidettiin kotona, mutta koodi laski silti "matkan" kotoa kotiin).
+  // Lähin pysäkki sama kuin kotipysäkki on riittävän luotettava merkki
+  // ettei mitään oikeaa matkaa tarvita — ei väärää FÖLI-riviä.
+  if (pysakkiId === FOLI_OLETUSPYSAKKI) return [];
   const p = pysakit[pysakkiId];
   const kotiPysakki = pysakit[FOLI_OLETUSPYSAKKI];
   const etaisyysM = Math.round(haversineMetria(sijainti.lat, sijainti.lon, p.stop_lat, p.stop_lon));
