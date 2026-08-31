@@ -362,107 +362,111 @@ async function haeFoliViiveMin(pysakkiId, linja, kohdeAikaMin, paivaMs) {
   return typeof paras.delay === 'number' ? Math.round(paras.delay / 60) : null;
 }
 
-// Menon + paluun siirtymäpalikat yhdelle kalenteritapahtumalle — YKSI
-// yleiskäyttöinen putki sekä tunnetuille kohteille (Joukahaisenkatu) että
-// täysin uusille osoitteille (esim. Kiesikatu 4): tunnistetaan kohdeosoite
-// (kiinteä tunnettu TAI tapahtuman oma location/osoite), geokoodataan,
-// lasketaan kesto+linja Digitransitista (ei koskaan SIRI:n raakaa
-// pysäkkihakua — ei suunnan sekaannusta). Ajoitus lasketaan AINA
-// aritmeettisesti (tapahtuman kellonaika ± kesto ± puskuri), EI reaaliaikaisen
-// SIRI-lähtötaulun mukaan — siksi rivi on käytettävissä HETI kun päivä
-// piirretään, ei vasta kun oikea bussi sattuu näkymään reaaliaikalistassa
-// (Katrin pyyntö: "travel time blocks should be there little earlier...
-// travel blocks should be there by then" kun Hytti luo päiväsuunnitelman).
-async function haeFoliSiirtymatTapahtumalle(tapahtuma, paivanIso, varattu) {
-  if (!tapahtuma.event_time) return [];
+// Yhden kohteen sijainti+pysäkki+ajoitustiedot valmiiksi (käytetään
+// ketjutuksessa alla) — palauttaa null jos sijaintia ei saada tai kohde
+// on käytännössä koti itse (2026-08-31, Katrin löytö: "Jamielin
+// kaverisynttärit" jonka location ON kotiosoite — synttärit pidettiin
+// kotona, mutta vanha koodi laski silti "matkan" kotoa kotiin. Lähin
+// pysäkki sama kuin kotipysäkki on riittävän luotettava merkki ettei
+// mitään oikeaa matkaa tarvita).
+async function haeFoliKohdeTiedot(tapahtuma, pysakit) {
+  if (!tapahtuma.event_time) return null;
   const tunnettu = etsiTunnettuFoliMatka(tapahtuma);
   const osoiteTeksti = tunnettu ? tunnettu.osoite : tapahtumanSijaintiteksti(tapahtuma);
-  if (!osoiteTeksti) return [];
-
-  const [sijainti, pysakit] = await Promise.all([geokoodaaOsoite(osoiteTeksti), haeFoliPysakit()]);
-  if (!sijainti || !pysakit) return [];
+  if (!osoiteTeksti) return null;
+  const sijainti = await geokoodaaOsoite(osoiteTeksti);
+  if (!sijainti) return null;
   const pysakkiId = lahinFoliPysakki(pysakit, sijainti.lat, sijainti.lon);
-  if (!pysakkiId) return [];
-  // Kohde on käytännössä koti itse (2026-08-31, Katrin löytö: "Jamielin
-  // kaverisynttärit" jonka location-kenttä ON kotiosoite — synttärit
-  // pidettiin kotona, mutta koodi laski silti "matkan" kotoa kotiin).
-  // Lähin pysäkki sama kuin kotipysäkki on riittävän luotettava merkki
-  // ettei mitään oikeaa matkaa tarvita — ei väärää FÖLI-riviä.
-  if (pysakkiId === FOLI_OLETUSPYSAKKI) return [];
-  const p = pysakit[pysakkiId];
-  const kotiPysakki = pysakit[FOLI_OLETUSPYSAKKI];
-  const etaisyysM = Math.round(haversineMetria(sijainti.lat, sijainti.lon, p.stop_lat, p.stop_lon));
-  const mapsUrl = 'https://www.google.com/maps/dir/?api=1'
-    + '&origin=' + encodeURIComponent(FOLI_KOTIOSOITE)
-    + '&destination=' + encodeURIComponent(osoiteTeksti)
-    + '&travelmode=transit';
-
-  const kesto = kotiPysakki
-    ? await haeDigitransitKesto(kotiPysakki.stop_lat, kotiPysakki.stop_lon, sijainti.lat, sijainti.lon)
-    : null;
-
+  if (!pysakkiId || pysakkiId === FOLI_OLETUSPYSAKKI) return null;
   const alkuMin = aikaMinuutteina(tapahtuma.event_time.slice(0, 5));
   const loppuMin = tapahtuma.event_end_time ? aikaMinuutteina(tapahtuma.event_end_time.slice(0, 5)) : alkuMin + 60;
-  const saavuEnnenMin = tunnettu ? (tunnettu.saavuEnnenTapahtumaaMin || 0) : 0;
-
-  // Meno: jos kesto tiedetään (Digitransit-avain asetettu), lasketaan
-  // suositeltu "lähde nyt" -hetki taaksepäin. Jos ei tiedetä, EI keksitä
-  // kestoa — sijoitetaan rivi "tarvitset olla paikalla" -hetkeen niin että
-  // se silti näkyy oikeassa kohdassa päivää, teksti kertoo vain etäisyyden.
-  const menoAlku = kesto
-    ? Math.max(0, alkuMin - saavuEnnenMin - kesto.kestoMin)
-    : Math.max(0, alkuMin - saavuEnnenMin);
-  if (kesto) { for (let m = menoAlku; m < alkuMin - saavuEnnenMin; m++) varattu[m] = true; }
-
-  // SIRI-viive vain TÄNÄÄN (Katrin pyyntö: "SIRI layer... show if bus is
-  // early or late" — real-time-tieto on merkityksetön kauas tulevaisuuteen,
-  // SIRI ei muutenkaan näytä sitä silloin, ks. haeFoliViiveMin). Kotipysäkki
-  // menolle, kohteen lähin pysäkki paluulle — kummallakin oma suunta.
-  const onkoTanaan = paivanIso === opintoTanaanPvm();
-  const [menoViiveMin, paluuViiveMin] = onkoTanaan && kesto && kotiPysakki
-    ? await Promise.all([
-        haeFoliViiveMin(FOLI_OLETUSPYSAKKI, kesto.linja, menoAlku, new Date(paivanIso + 'T00:00:00').getTime()),
-        haeFoliViiveMin(pysakkiId, kesto.linja, loppuMin, new Date(paivanIso + 'T00:00:00').getTime()),
-      ])
-    : [null, null];
-
-  // alku/loppu kattavat nyt OIKEAN matka-ajan (ei enää pelkkä piste),
-  // kun kesto tiedetään — 2026-08-31, Katrin pyyntö: "it should not be
-  // sign but instead block some time right before... so that I get to
-  // class on time". Ilman kestoa (ei Digitransit-avainta) pysyy pisteenä,
-  // koska todellista kestoa ei silloin tunneta. Väri samasta
-  // omistaja-paletista kuin oikeat tapahtumapalkit (resolveEventOwnerColor,
-  // script.js) — Katrin pyyntö: "use satama colour schema reddish for me
-  // bluish for husband" — sama tapahtuma jolle matka lasketaan kertoo
-  // kenen matka se on.
-  const vari = resolveEventOwnerColor(tapahtuma);
-  const rivit = [{
-    tyyppi: 'siirtyma-uusi', suunta: 'meno', alku: menoAlku, loppu: kesto ? (alkuMin - saavuEnnenMin) : menoAlku,
-    pysakkiNimi: p.stop_name, etaisyysM: etaisyysM, mapsUrl: mapsUrl, vari: vari,
-    kestoMin: kesto ? kesto.kestoMin : null, linja: kesto ? kesto.linja : null, viiveMin: menoViiveMin,
-  }];
-
-  // Paluu: heti tapahtuman päätyttyä (ei erillistä saapumistarvetta paluulle).
-  if (loppuMin <= 1439) {
-    const paluuLoppu = kesto ? Math.min(1439, loppuMin + kesto.kestoMin) : loppuMin;
-    rivit.push({
-      tyyppi: 'siirtyma-uusi', suunta: 'paluu', alku: loppuMin, loppu: paluuLoppu,
-      pysakkiNimi: p.stop_name, etaisyysM: etaisyysM, mapsUrl: mapsUrl, vari: vari,
-      kestoMin: kesto ? kesto.kestoMin : null, linja: kesto ? kesto.linja : null, viiveMin: paluuViiveMin,
-    });
-    if (kesto) { for (let m = loppuMin; m < paluuLoppu; m++) varattu[m] = true; }
-  }
-
-  return rivit;
+  return {
+    tapahtuma: tapahtuma, osoiteTeksti: osoiteTeksti,
+    pysakkiId: pysakkiId, p: pysakit[pysakkiId],
+    etaisyysM: Math.round(haversineMetria(sijainti.lat, sijainti.lon, pysakit[pysakkiId].stop_lat, pysakit[pysakkiId].stop_lon)),
+    alkuMin: alkuMin, loppuMin: loppuMin,
+    saavuEnnenMin: tunnettu ? (tunnettu.saavuEnnenTapahtumaaMin || 0) : 0,
+  };
 }
 
-// Koko päivän FÖLI-siirtymät kerralla: ryhmittelee peräkkäiset saman-
-// kohteiset tapahtumat ENSIN (ks. ryhmitaPerakkaisetFoliTapahtumat), laskee
-// sitten meno/paluu per RYHMÄ, ei per raaka kalenteririvi. YKSI yhteinen
-// paikka jota kaikki kolme kutsupaikkaa (Nyt-loki, päivänäkymä,
-// viikkonäkymä) käyttävät, ettei ryhmittely voi unohtua yhdestä.
+// Koko päivän FÖLI-siirtymät KETJUTETTUNA (2026-08-31, VAIHE 3, Katrin
+// pyyntö: "not really home address false but instead am I in the same
+// place as the next event about to happen"). Korvaa aiemman "aina
+// koti->tapahtuma->koti per rivi" -oletuksen: päivän kohteet ryhmitellään
+// (peräkkäiset saman paikan tapahtumat, ks. ryhmitaPerakkaisetFoliTapahtumat)
+// ja aikajärjestetään, sitten lasketaan yksi matka per SIIRTYMÄ solmusta
+// toiseen — koti -> kohde1 -> kohde2 -> ... -> koti. Jos peräkkäiset
+// solmut osuvat samaan pysäkkiin (esim. kaksi käyntiä samalla alueella),
+// väliin ei lasketa MITÄÄN riviä — ei "ei matkaa tarvita" -tekstiä, Katrin
+// oma periaate: "no need to tell no travel needed" (sama linja kuin
+// sovelluksen "piilota tyhjä osio, älä tyhjä teksti" -sääntö).
 async function haeFoliSiirtymatPaivalle(tapahtumat, paivanIso, varattu) {
   const ryhmat = ryhmitaPerakkaisetFoliTapahtumat((tapahtumat || []).filter(function(t) { return t.event_time; }));
-  const listat = await Promise.all(ryhmat.map(function(t) { return haeFoliSiirtymatTapahtumalle(t, paivanIso, varattu); }));
-  return [].concat.apply([], listat);
+  if (ryhmat.length === 0) return [];
+
+  const pysakit = await haeFoliPysakit();
+  if (!pysakit) return [];
+  const kotiPysakki = pysakit[FOLI_OLETUSPYSAKKI];
+  if (!kotiPysakki) return [];
+
+  const kohteet = (await Promise.all(ryhmat.map(function(t) { return haeFoliKohdeTiedot(t, pysakit); }))).filter(Boolean);
+  if (kohteet.length === 0) return [];
+
+  // Ketjun solmut: koti (ei kiinteää aikaa) + kohteet aikajärjestyksessä +
+  // koti lopuksi. p/pysakkiId yhtenäisessä muodossa koti- ja kohde-
+  // solmuille, jotta silmukka alla ei tarvitse erikoistapauksia niiden
+  // välillä paitsi "onko tämä koti" -tarkistuksissa.
+  const koti = { koti: true, pysakkiId: FOLI_OLETUSPYSAKKI, p: kotiPysakki, osoiteTeksti: FOLI_KOTIOSOITE };
+  const solmut = [koti].concat(kohteet).concat([koti]);
+
+  const onkoTanaan = paivanIso === opintoTanaanPvm();
+  const paivaMs = new Date(paivanIso + 'T00:00:00').getTime();
+  const rivit = [];
+
+  for (let i = 0; i < solmut.length - 1; i++) {
+    const lahto = solmut[i], saapumis = solmut[i + 1];
+    if (lahto.pysakkiId === saapumis.pysakkiId) continue; // sama paikka — ei riviä, ei viestiä
+
+    const onSaapumisKoti = !!saapumis.koti;
+    const onLahtoKoti = !!lahto.koti;
+    // Saapumisen tarve: seuraavan kohteen alkuun (miinus sen oma puskuri),
+    // TAI viimeisellä etapilla (kohde -> koti) heti edellisen kohteen
+    // loputtua — paluulle ei ole erillistä saapumistarvetta.
+    const tarveAika = onSaapumisKoti ? lahto.loppuMin : (saapumis.alkuMin - saapumis.saavuEnnenMin);
+
+    const kesto = await haeDigitransitKesto(lahto.p.stop_lat, lahto.p.stop_lon, saapumis.p.stop_lat, saapumis.p.stop_lon);
+    let alku = kesto ? Math.max(0, tarveAika - kesto.kestoMin) : Math.max(0, tarveAika);
+    // Välietappi (kohde -> kohde) ei voi lähteä ennen kuin edellinen
+    // tapahtuma on päättynyt, vaikka laskennallinen "lähde nyt" -hetki
+    // osuisi sitä aiemmaksi.
+    if (!onLahtoKoti) alku = Math.max(alku, lahto.loppuMin);
+    const loppu = kesto ? Math.min(1439, alku + kesto.kestoMin) : alku;
+    if (kesto && loppu > alku) { for (let m = alku; m < loppu; m++) varattu[m] = true; }
+
+    // Väri: sen tapahtuman omistajalta jolle matka tehdään (kohde-pää,
+    // ei koti-pää) — Katrin pyyntö: "use satama colour schema reddish
+    // for me bluish for husband".
+    const omistajaTapahtuma = onLahtoKoti ? saapumis.tapahtuma : lahto.tapahtuma;
+    const kohdeEtaisyys = onSaapumisKoti ? lahto.etaisyysM : saapumis.etaisyysM;
+    const kohdePysakkiNimi = onSaapumisKoti ? lahto.p.stop_name : saapumis.p.stop_name;
+    const mapsUrl = 'https://www.google.com/maps/dir/?api=1&travelmode=transit'
+      + '&origin=' + encodeURIComponent(lahto.osoiteTeksti)
+      + '&destination=' + encodeURIComponent(saapumis.osoiteTeksti);
+
+    // SIRI-viive vain TÄNÄÄN (SIRI ei näytä mitään hyödyllistä kauas
+    // tulevaisuuteen, ks. haeFoliViiveMin).
+    const viiveMin = onkoTanaan && kesto
+      ? await haeFoliViiveMin(lahto.pysakkiId, kesto.linja, alku, paivaMs)
+      : null;
+
+    rivit.push({
+      tyyppi: 'siirtyma-uusi',
+      suunta: onLahtoKoti ? 'meno' : (onSaapumisKoti ? 'paluu' : 'valietappi'),
+      alku: alku, loppu: loppu,
+      pysakkiNimi: kohdePysakkiNimi, etaisyysM: kohdeEtaisyys, mapsUrl: mapsUrl,
+      vari: resolveEventOwnerColor(omistajaTapahtuma),
+      kestoMin: kesto ? kesto.kestoMin : null, linja: kesto ? kesto.linja : null, viiveMin: viiveMin,
+    });
+  }
+  return rivit;
 }

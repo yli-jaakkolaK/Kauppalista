@@ -4599,7 +4599,7 @@ function piirraNytLokiRivi(rivi) {
     // (rivi.kestoMin/linja) JOS Digitransit-avain on asetettu — ennen
     // avainta kestoMin on null ja rivi näyttää pelkän pysäkin, ei kaadu.
     el.className = 'nyt-loki-rivi live siirtyma siirtyma-arvio';
-    const suuntaTeksti = rivi.suunta === 'paluu' ? 'paluumatka — ' : 'menomatka — ';
+    const suuntaTeksti = rivi.suunta === 'paluu' ? 'paluumatka — ' : (rivi.suunta === 'valietappi' ? 'siirtymä — ' : 'menomatka — ');
     const kestoTeksti = rivi.kestoMin
       ? ('n. ' + rivi.kestoMin + ' min' + (rivi.linja ? ' (linja ' + rivi.linja + ')' : '') + ' — ')
       : ('lähin pysäkki, n. ' + rivi.etaisyysM + ' m — ');
@@ -7772,7 +7772,7 @@ async function lataaKalenteri() {
       // rivi on textContent, ei innerHTML, ei siis Maps-linkkiä kuten
       // Nyt-lokissa). s.kestoMin on oikea kesto JOS Digitransit-avain on
       // asetettu, muuten null (näytetään silti lähin pysäkki, ei kaadu).
-      const suuntaEtu = s.suunta === 'paluu' ? '(paluu) ' : '';
+      const suuntaEtu = s.suunta === 'paluu' ? '(paluu) ' : (s.suunta === 'valietappi' ? '(siirtymä) ' : '');
       const viiveTeksti = typeof s.viiveMin === 'number' ? (' (' + (s.viiveMin >= 0 ? '+' : '') + s.viiveMin + ' min)') : '';
       const title = s.kestoMin
         ? '🚏 ' + suuntaEtu + s.pysakkiNimi + ' — n. ' + s.kestoMin + ' min' + (s.linja ? ' (linja ' + s.linja + ')' : '') + viiveTeksti
@@ -8321,7 +8321,8 @@ function piirraViikkoFoliMerkit(paivanFoliLegit) {
     const kestoTeksti = s.kestoMin
       ? (s.kestoMin + ' min' + (s.linja ? ' (linja ' + s.linja + ')' : '') + viiveTeksti)
       : ('n. ' + s.etaisyysM + ' m');
-    merkki.title = (s.suunta === 'paluu' ? 'Paluu — ' : 'Meno — ') + s.pysakkiNimi + ' — ' + kestoTeksti;
+    const suuntaNimi = s.suunta === 'paluu' ? 'Paluu — ' : (s.suunta === 'valietappi' ? 'Siirtymä — ' : 'Meno — ');
+    merkki.title = suuntaNimi + s.pysakkiNimi + ' — ' + kestoTeksti;
     return merkki;
   });
 }
