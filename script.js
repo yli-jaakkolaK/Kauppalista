@@ -1980,14 +1980,18 @@ async function paivitaOpintoTehtavaOhje() {
 // (opinto-miro.js, 2026-08-30, script.js:n pilkkomisen askel 4, ks.
 // muistin project_scriptjs_split_plan).
 
-// Priming-vaiheessa kirjoitetaan kysymykset; encoding-vaiheesta eteenpäin
-// ne näytetään luku-tilassa (sung-metodi.md §6: "nousevat esiin kun
-// encoding alkaa").
+// Vanha kirjoitettava priming-kysymykset-tekstikenttä (+ encoding-vaiheen
+// luku-tila-näyttönsä) POISTETTU 2026-08-31 — Katrin huomio: "eikö ne
+// pitäny poistaa kaikista ja laittaa niin, että priming vaiheessa jo miro
+// avautuu siihen". Opiskelutaulu (Taulu 1) korvasi tämän jo 2026-08-29
+// (ks. paivitaOpintoTehtavaMiroKoukku: "Kaikki priming+encoding
+// (+overlearning)-muokkaukset" siirtyivät Miroon), mutta vanha tekstikenttä
+// jäi vahingossa näkyviin sen RINNALLE eikä koskaan poistunut — kahden
+// päällekkäisen työkalun sekaannus, ei tarkoituksellinen kaksoiskappale.
+// Vanhaa dataa (opinto_aiheet.priming_kysymykset) ei poisteta, sarake jää
+// koskemattomaksi historiaksi, vain UI poistuu.
 function paivitaOpintoTehtavaPriming() {
   const aihe = currentOpintoAihe;
-  const kirjoitusOsio = document.getElementById('opinto-tehtava-priming-kysymykset-osio');
-  const naytto = document.getElementById('opinto-tehtava-priming-kysymykset-nayto');
-
   const miroOhjeEl = document.getElementById('opinto-tehtava-miro-priming-ohje');
   if (aihe.pero_vaihe === 'priming' && aihe.miro_priming_ohje) {
     miroOhjeEl.textContent = '🧭 ' + aihe.miro_priming_ohje;
@@ -1995,29 +1999,7 @@ function paivitaOpintoTehtavaPriming() {
   } else {
     miroOhjeEl.style.display = 'none';
   }
-
-  if (aihe.pero_vaihe === 'priming') {
-    kirjoitusOsio.style.display = 'block';
-    naytto.style.display = 'none';
-    document.getElementById('opinto-tehtava-priming-kysymykset').value = aihe.priming_kysymykset || '';
-  } else if (aihe.priming_kysymykset) {
-    kirjoitusOsio.style.display = 'none';
-    naytto.style.display = 'block';
-    naytto.textContent = '💭 Priming-kysymykset: ' + aihe.priming_kysymykset;
-  } else {
-    kirjoitusOsio.style.display = 'none';
-    naytto.style.display = 'none';
-  }
 }
-
-document.getElementById('opinto-tehtava-priming-kysymykset').addEventListener('blur', async function(e) {
-  if (!currentOpintoAihe || currentOpintoAihe.pero_vaihe !== 'priming') return;
-  const uusi = e.target.value.trim() || null;
-  if (uusi === currentOpintoAihe.priming_kysymykset) return;
-  const { error } = await db.from('opinto_aiheet').update({ priming_kysymykset: uusi }).eq('id', currentOpintoAihe.id);
-  if (ilmoitaKirjoitusvirheesta(error, 'Priming-kysymysten tallennus')) return;
-  currentOpintoAihe.priming_kysymykset = uusi;
-});
 
 // A3 tuntemus-säädin — "priming-vaiheen askel 0" (rakennusjärjestys-
 // dokumentti), näytetään siis vain priming-vaiheessa, ei muissa.
