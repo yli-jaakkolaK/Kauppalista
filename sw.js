@@ -1,5 +1,5 @@
-const CACHE = 'kauppalista-v251';
-const APP_FILES = ['/', '/index.html', '/style.css', '/script.js', '/harjoittele.js', '/saa-widget.js', '/foli.js', '/opinto-miro.js', '/opinto-ai-prompti.js', '/manifest.json', '/icon.png'];
+const CACHE = 'kauppalista-v252';
+const APP_FILES = ['/', '/index.html', '/style.css', '/script.js', '/harjoittele.js', '/saa-widget.js', '/foli.js', '/opinto-miro.js', '/opinto-ai-prompti.js', '/tauko.js', '/manifest.json', '/icon.png'];
 
 // Sama julkinen avain kuin script.js:ssä (VAPID_PUBLIC_KEY) — kaksi kopiota
 // koska service worker ei voi importata script.js:ää. Julkinen avain saa

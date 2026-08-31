@@ -316,6 +316,13 @@
 
     <hr class="divider">
 
+    <!-- Taukolista (sql/152, 2026-08-31) — Katrin muistelema Sung/PACER-
+         keskustelu "Hytti V5": "the best next thing isn't a study session
+         but e.g. a 15 min walk outside". Aina näkyvissä, ei riipu
+         moottorin päivän tarjouksesta — tauko on validi vaihtoehto milloin
+         vain. -->
+    <button class="link-btn" id="tauko-avaa-btn">☕ Tauko</button>
+
     <!-- Nyt-välilehti (SATAMA_SPEKSI.md §4, uudistettu 17.8.2026) — päivän
          loki ylimpänä (kalenteri Katrin omilta tapahtumilta + suojatut
          ikkunat + moottorin valitsemat opiskelupätkät samassa aikajärjes-
@@ -1534,6 +1541,25 @@
     </div>
   </div>
 
+  <!-- Taukolista (sql/152, 2026-08-31) — yksi ehdotus kerrallaan, kaksi
+       tointoa: "Tein tämän" kirjaa tauon (tauko_kirjaukset, pelkkä täppäys
+       ei kestoa, ks. script.js:n kommentti) ja sulkee; "Toinen ehdotus"
+       arpoo uuden ilman kirjausta. -->
+  <div class="dialog-overlay" id="tauko-overlay" style="display:none">
+    <div class="dialog-box">
+      <p class="dialog-title">☕ Tauko</p>
+      <p class="dialog-body" id="tauko-ehdotus-teksti"></p>
+      <p class="selite" id="tauko-tyhja-selite" style="display:none">Ei vielä taukoehdotuksia.</p>
+      <div class="dialog-buttons">
+        <button class="dialog-btn dialog-btn-cancel" id="tauko-toinen-btn">🔄 Toinen ehdotus</button>
+        <button class="dialog-btn dialog-btn-cancel" id="tauko-tein-btn">✅ Tein tämän</button>
+      </div>
+      <div class="dialog-buttons">
+        <button class="dialog-btn dialog-btn-cancel" id="tauko-sulje-btn">Sulje</button>
+      </div>
+    </div>
+  </div>
+
   <div class="dialog-overlay" id="ristiriita-overlay" style="display:none">
     <div class="dialog-box">
       <p class="dialog-title">Päällekkäin tänä päivänä</p>
@@ -1856,5 +1882,10 @@
   <!-- opinto-ai-prompti.js (2026-08-30) - script.js:n pilkkomisen askel 5,
        ks. muistin project_scriptjs_split_plan. -->
   <script src="opinto-ai-prompti.js"></script>
+  <!-- tauko.js (2026-08-31) - uusi, itsenäinen ominaisuus (Taukolista, ks.
+       sql/152), rakennettu suoraan omaan tiedostoonsa script.js:n
+       kasvattamisen sijaan (samaa linjaa kuin script.js:n pilkkomisen
+       askeleet 1-5, ks. muistin project_scriptjs_split_plan). -->
+  <script src="tauko.js"></script>
 </body>
 </html>
