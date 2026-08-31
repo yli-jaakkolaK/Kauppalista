@@ -1270,15 +1270,39 @@ function kurssinPeroVaihe(aiheet) {
 // messingillä versaalina, jäljellä-palkki. EI prosentteja/pistemääriä —
 // palkki näyttää PALJONKO ON JÄLJELLÄ (ei-hallussa-olevien aiheiden osuus),
 // ei osaamistasoa, siksi neutraali muste eikä Kartan värikoodattu 3-palkki.
+// Arkistoidut kurssit piilossa oletuksena (2026-08-31 asti listasi AINA
+// kaikki kurssit statuksesta riippumatta — Katrin havainto omista
+// arkistoiduista kursseistaan sekaisin 3 aktiivisen joukossa: "mitä nää
+// on"). Sama nayta/piilota-kaava kuin Hytin oma arkisto-linkki
+// (hytti-arkisto-linkki), mutta kevyempi: ei erillistä dialogia, pelkkä
+// napautus paljastaa arkistoidut saman listan loppuun.
+let naytaOpintoArkistoidutKurssit = false;
+
 async function lataaOpintoKurssit() {
   const { data, error } = await db.from('opinto_kurssit').select().order('sort_order');
   if (error) {
     console.error('Opintopolun kurssien haku epäonnistui:', error);
     return;
   }
-  const kurssit = data || [];
+  const kaikki = data || [];
+  const arkistoidut = kaikki.filter(function(k) { return k.status === 'arkistoitu'; });
+  const kurssit = naytaOpintoArkistoidutKurssit ? kaikki : kaikki.filter(function(k) { return k.status !== 'arkistoitu'; });
   const listEl = document.getElementById('opinto-kurssi-lista');
   listEl.innerHTML = '';
+
+  const arkistoLinkki = document.getElementById('opinto-kurssi-arkisto-linkki');
+  if (arkistoidut.length === 0) {
+    arkistoLinkki.style.display = 'none';
+  } else {
+    arkistoLinkki.style.display = 'block';
+    arkistoLinkki.textContent = naytaOpintoArkistoidutKurssit
+      ? 'Piilota arkistoidut'
+      : 'Näytä arkistoidut (' + arkistoidut.length + ')';
+    arkistoLinkki.onclick = function() {
+      naytaOpintoArkistoidutKurssit = !naytaOpintoArkistoidutKurssit;
+      lataaOpintoKurssit();
+    };
+  }
 
   for (const kurssi of kurssit) {
     const { data: aiheet, error: aiheError } = await db.from('opinto_aiheet').select('pero_vaihe, kertausjonossa').eq('kurssi_id', kurssi.id);
