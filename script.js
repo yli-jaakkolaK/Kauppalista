@@ -8299,6 +8299,14 @@ function piirraViikkoOpiskeluMerkit(paivanSessiot) {
 // piste-ikoni väärässä kohdassa. Jos kestoa ei tunneta (ei Digitransit-
 // avainta), alku===loppu ja CSS:n min-height pitää palkin silti näkyvänä
 // ohuena viivana.
+// Väri per rivi (2026-08-31, Katrin pyyntö: "use satama colour schema
+// reddish for me bluish for husband") — s.vari tulee jo foli.js:n
+// resolveEventOwnerColor-kutsusta, käytetään inline-tyylinä koska paletti
+// on dynaaminen (ei kiinteä yksi CSS-muuttuja enää). Raidat KÄÄNNETTYYN
+// suuntaan (135deg, oli 45deg — Katrin pyyntö "other way round") ja
+// leveämpi/tummempi kuin ensimmäinen versio, jotta lukee "varattu tila"
+// eikä pelkkä ohut reunavihje (Katrin pyyntö: "like actually blocking
+// events from that time slot").
 function piirraViikkoFoliMerkit(paivanFoliLegit) {
   return (paivanFoliLegit || []).map(function(s) {
     const merkki = document.createElement('div');
@@ -8306,6 +8314,9 @@ function piirraViikkoFoliMerkit(paivanFoliLegit) {
     const topPct = minutesToPercent(s.alku);
     merkki.style.top = topPct + '%';
     merkki.style.height = Math.max(0, minutesToPercent(s.loppu) - topPct) + '%';
+    const vari = s.vari || 'var(--syvanne)';
+    merkki.style.background = 'repeating-linear-gradient(135deg, '
+      + vari + ' 0, ' + vari + ' 3px, ' + vari + '55 3px, ' + vari + '55 6px)';
     const viiveTeksti = typeof s.viiveMin === 'number' ? (' (' + (s.viiveMin >= 0 ? '+' : '') + s.viiveMin + ' min)') : '';
     const kestoTeksti = s.kestoMin
       ? (s.kestoMin + ' min' + (s.linja ? ' (linja ' + s.linja + ')' : '') + viiveTeksti)

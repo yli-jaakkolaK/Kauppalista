@@ -424,10 +424,15 @@ async function haeFoliSiirtymatTapahtumalle(tapahtuma, paivanIso, varattu) {
   // kun kesto tiedetään — 2026-08-31, Katrin pyyntö: "it should not be
   // sign but instead block some time right before... so that I get to
   // class on time". Ilman kestoa (ei Digitransit-avainta) pysyy pisteenä,
-  // koska todellista kestoa ei silloin tunneta.
+  // koska todellista kestoa ei silloin tunneta. Väri samasta
+  // omistaja-paletista kuin oikeat tapahtumapalkit (resolveEventOwnerColor,
+  // script.js) — Katrin pyyntö: "use satama colour schema reddish for me
+  // bluish for husband" — sama tapahtuma jolle matka lasketaan kertoo
+  // kenen matka se on.
+  const vari = resolveEventOwnerColor(tapahtuma);
   const rivit = [{
     tyyppi: 'siirtyma-uusi', suunta: 'meno', alku: menoAlku, loppu: kesto ? (alkuMin - saavuEnnenMin) : menoAlku,
-    pysakkiNimi: p.stop_name, etaisyysM: etaisyysM, mapsUrl: mapsUrl,
+    pysakkiNimi: p.stop_name, etaisyysM: etaisyysM, mapsUrl: mapsUrl, vari: vari,
     kestoMin: kesto ? kesto.kestoMin : null, linja: kesto ? kesto.linja : null, viiveMin: menoViiveMin,
   }];
 
@@ -436,7 +441,7 @@ async function haeFoliSiirtymatTapahtumalle(tapahtuma, paivanIso, varattu) {
     const paluuLoppu = kesto ? Math.min(1439, loppuMin + kesto.kestoMin) : loppuMin;
     rivit.push({
       tyyppi: 'siirtyma-uusi', suunta: 'paluu', alku: loppuMin, loppu: paluuLoppu,
-      pysakkiNimi: p.stop_name, etaisyysM: etaisyysM, mapsUrl: mapsUrl,
+      pysakkiNimi: p.stop_name, etaisyysM: etaisyysM, mapsUrl: mapsUrl, vari: vari,
       kestoMin: kesto ? kesto.kestoMin : null, linja: kesto ? kesto.linja : null, viiveMin: paluuViiveMin,
     });
     if (kesto) { for (let m = loppuMin; m < paluuLoppu; m++) varattu[m] = true; }

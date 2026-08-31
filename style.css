@@ -947,26 +947,19 @@ h1 {
 
 /* FÖLI-siirtymäpalkki viikkonäkymässä (2026-08-31, uudistettu kuvakkeesta
    palkiksi Katrin pyynnöstä: "it should not be sign but instead block
-   some time right before"). Oikeassa reunassa (opiskelu-merkki on
-   vasemmassa). Raidoitettu täyttö TARKOITUKSELLA eri kuin oikeiden
-   tapahtumien tasainen väri (Katrin pyyntö: "colored travel time block
-   should be visually easily separated from actual live events") — raidat
-   viestivät heti "laskettu ehdotus", ei "varattu tapahtuma". Tarkka tieto
-   title-vihjeessä. */
+   some time right before... like actually blocking events from that
+   time slot"). Oikeassa reunassa (opiskelu-merkki on vasemmassa),
+   leveämpi kuin ensimmäinen versio jotta lukee varattuna tilana eikä
+   ohuena reunavihjeenä. Väri (omistajan mukaan, punainen/sininen ym.) JA
+   raidoitus asetetaan JS:stä inline-tyylinä (ks. piirraViikkoFoliMerkit)
+   koska paletti on dynaaminen — tässä vain mitat. */
 .kalenteri-viikko-foli-merkki {
   position: absolute;
   right: 0;
-  width: 5px;
-  min-height: 3px;
+  width: 7px;
+  min-height: 4px;
   border-radius: 2px 0 0 2px;
-  opacity: .8;
-  background: repeating-linear-gradient(
-    45deg,
-    var(--syvanne) 0,
-    var(--syvanne) 2px,
-    transparent 2px,
-    transparent 4px
-  );
+  opacity: .85;
 }
 
 /* Suunniteltu (Taso 1 -tavoiteikkuna, 2026-08-18) — TIETOISESTI eri
