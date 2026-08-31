@@ -1,4 +1,4 @@
-const CACHE = 'kauppalista-v257';
+const CACHE = 'kauppalista-v258';
 const APP_FILES = ['/', '/index.html', '/style.css', '/script.js', '/harjoittele.js', '/saa-widget.js', '/foli.js', '/opinto-miro.js', '/opinto-ai-prompti.js', '/tauko.js', '/manifest.json', '/icon.png'];
 
 // Sama julkinen avain kuin script.js:ssä (VAPID_PUBLIC_KEY) — kaksi kopiota
@@ -39,8 +39,18 @@ self.addEventListener('fetch', event => {
   event.respondWith(
     caches.match(event.request).then(cached => {
       return cached || fetch(event.request).then(response => {
+        // KORJATTU 2026-08-31: clone() PITÄÄ kutsua SYNKRONISESTI heti kun
+        // response saadaan, ei myöhemmin caches.open().then()-lohkon sisällä
+        // (kuten ennen) — jos clone() viivästyy, sivu (esim. <script>-tagin
+        // lataus) ehtii jo alkaa lukea vastauksen bodya ennen clonea, jolloin
+        // clone() heittää "Response body is already used" ja SW:n oma
+        // fetch-käsittely voi jäädä kesken sen tiedoston kohdalla — Katrin
+        // löytämä bugi: satunnainen tiedosto (esim. saa-widget.js, foli.js)
+        // jäi tämän takia joskus lataamatta kokonaan, näkyi mm. "lataaRuoriSaa
+        // is not defined" -virheenä ja FÖLI-siirtymien puuttumisena.
         if (response.ok) {
-          caches.open(CACHE).then(cache => cache.put(event.request, response.clone()));
+          const cachettava = response.clone();
+          caches.open(CACHE).then(cache => cache.put(event.request, cachettava));
         }
         return response;
       });
