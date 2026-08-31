@@ -152,6 +152,68 @@ async function haeFoliLahdot(pysakkiId) {
   }
 }
 
+// === UUDET OSOITTEET (2026-08-31, ks. muistin project_foli_itinerary_idea)
+// === Katrin pyyntö: "if she has an appointment at a brand-new address...
+// it should compute travel time" — TÄMÄ on vain ensimmäinen, tietoisesti
+// rajattu pala siitä. Ei ristiriidassa yllä olevan 18.8. päätöksen kanssa
+// (EI geokoodausta tunnettuihin matkoihin) — tämä koskee VAIN osoitteita
+// joita FOLI_TUNNETUT_MATKAT ei tunnista, eikä sekään laske kestoa: SIRI ei
+// tee reititystä mielivaltaiselle pysäkkiparille (sama rajoitus kuin
+// tunnetuissa matkoissa, ei mitenkään kierretty). Näytetään VAIN lähin
+// pysäkki + Google Maps -linkki todellista reittiä/kestoa varten — Katrin
+// oma päätös 31.8.: "build first what you recommended but then in next
+// build add some system so that you can check from google maps or such for
+// how long actual travel time is" — tämä linkki ei ole se järjestelmä,
+// vain väliaikainen manuaalinen silta siihen asti.
+const FOLI_GEOKOODI_KEY = 'kauppalista_foli_geokoodi';
+
+// Osoitteet eivät liiku — välimuisti EI vanhene (toisin kuin pysäkkilista
+// yllä, joka voi teoriassa muuttua).
+async function geokoodaaOsoite(osoiteTeksti) {
+  let valimuisti = {};
+  try { valimuisti = JSON.parse(localStorage.getItem(FOLI_GEOKOODI_KEY) || '{}'); } catch (e) { /* korruptoitunut, jatketaan tyhjällä */ }
+  const avain = osoiteTeksti.trim().toLowerCase();
+  if (valimuisti[avain]) return valimuisti[avain];
+
+  try {
+    const { data: sessioData } = await db.auth.getSession();
+    const token = sessioData.session ? sessioData.session.access_token : null;
+    if (!token) return null;
+    const vastaus = await fetch('/api/geocode?osoite=' + encodeURIComponent(osoiteTeksti), {
+      headers: { Authorization: 'Bearer ' + token },
+    });
+    if (!vastaus.ok) return null;
+    const tulos = await vastaus.json();
+    const sijainti = { lat: tulos.lat, lon: tulos.lon };
+    valimuisti[avain] = sijainti;
+    try { localStorage.setItem(FOLI_GEOKOODI_KEY, JSON.stringify(valimuisti)); } catch (e) { /* täynnä tms, jatketaan silti */ }
+    return sijainti;
+  } catch (e) {
+    console.error('Geokoodaus epäonnistui:', e.message);
+    return null;
+  }
+}
+
+// Lähin pysäkki tapahtuman osoitteelle + Maps-linkki — EI aikataulua/kestoa
+// (ks. yläkommentti). Palauttaa yhden rivin tai [] jos osoitetta ei ole,
+// geokoodaus epäonnistuu, tai pysäkkilistaa ei saada.
+async function haeFoliUusiOsoiteRivi(tapahtuma) {
+  const osoiteTeksti = tapahtumanSijaintiteksti(tapahtuma);
+  if (!osoiteTeksti || !tapahtuma.event_time) return [];
+  const [sijainti, pysakit] = await Promise.all([geokoodaaOsoite(osoiteTeksti), haeFoliPysakit()]);
+  if (!sijainti || !pysakit) return [];
+  const pysakkiId = lahinFoliPysakki(pysakit, sijainti.lat, sijainti.lon);
+  if (!pysakkiId) return [];
+  const p = pysakit[pysakkiId];
+  const etaisyysM = Math.round(haversineMetria(sijainti.lat, sijainti.lon, p.stop_lat, p.stop_lon));
+  const alku = aikaMinuutteina(tapahtuma.event_time.slice(0, 5));
+  const mapsUrl = 'https://www.google.com/maps/dir/?api=1'
+    + '&origin=' + encodeURIComponent(FOLI_KOTIOSOITE)
+    + '&destination=' + encodeURIComponent(osoiteTeksti)
+    + '&travelmode=transit';
+  return [{ tyyppi: 'siirtyma-uusi', alku: alku, loppu: alku, pysakkiNimi: p.stop_name, etaisyysM: etaisyysM, mapsUrl: mapsUrl }];
+}
+
 // === TUNNETUT MATKAT (2026-08-18, Katrin täsmennykset) === EI geokoodausta
 // eikä pysäkin arvausta osoitetekstistä — tarkistettu suoraan livenä 18.8.
 // ettei Marsukatu-Kupittaa-välillä ole suoraa (vaihdotonta) ajovuoroa, joten
@@ -234,7 +296,8 @@ async function haeFoliPaluuTapahtumanJalkeen(tapahtumaLoppuMs, matka) {
 // mitään (ei keksitä kestoa) — näytetään vain karkea arvio ajankohdasta.
 async function haeFoliSiirtymatTapahtumalle(tapahtuma, paivanIso, varattu) {
   const matka = etsiTunnettuFoliMatka(tapahtuma);
-  if (!matka || !tapahtuma.event_time) return [];
+  if (!tapahtuma.event_time) return [];
+  if (!matka) return haeFoliUusiOsoiteRivi(tapahtuma);
   const paivaMs = new Date(paivanIso + 'T00:00:00').getTime();
   const alkuMs = paivaMs + aikaMinuutteina(tapahtuma.event_time.slice(0, 5)) * 60000;
   const loppuMs = tapahtuma.event_end_time ? paivaMs + aikaMinuutteina(tapahtuma.event_end_time.slice(0, 5)) * 60000 : alkuMs + 3600000;

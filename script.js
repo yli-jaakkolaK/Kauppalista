@@ -4600,6 +4600,16 @@ function piirraNytLokiRivi(rivi) {
       '<div class="nyt-loki-aika">n. ' + kelloMinuuteista(rivi.alku) + '</div>' +
       '<div class="nyt-loki-teksti"><b>🚌 Bussi</b>' +
       '<span class="pieni">tarkentuu lähempänä lähtöä</span></div>';
+  } else if (rivi.tyyppi === 'siirtyma-uusi') {
+    // Uusi/tuntematon osoite (2026-08-31, ks. foli.js:n haeFoliUusiOsoiteRivi)
+    // — vain lähin pysäkki + Maps-linkki, EI kestoa (SIRI ei tee reititystä
+    // mielivaltaiselle pysäkkiparille).
+    el.className = 'nyt-loki-rivi live siirtyma siirtyma-arvio';
+    el.innerHTML =
+      '<div class="nyt-loki-aika">' + kelloMinuuteista(rivi.alku) + '</div>' +
+      '<div class="nyt-loki-teksti"><b>🚏 ' + rivi.pysakkiNimi + '</b>' +
+      '<span class="pieni">lähin pysäkki, n. ' + rivi.etaisyysM + ' m — ' +
+      '<a href="' + rivi.mapsUrl + '" target="_blank" rel="noopener">reitti Mapsissa ↗</a></span></div>';
   } else {
     const kohde = rivi.kohde;
     const kurssi = rivi.askel.opinto_aiheet ? (kohde.opinto_kurssit ? kohde.opinto_kurssit.name : '') : (kohde.lahde || '');
@@ -7758,6 +7768,12 @@ async function lataaKalenteri() {
           title = s.suunta === 'paluu'
             ? '🚌 ' + s.linja + ' → Kotiin (' + FOLI_KOTIOSOITE + ')'
             : '🚌 ' + s.linja + ' → ' + s.kohde;
+        } else if (s.tyyppi === 'siirtyma-uusi') {
+          // Uusi/tuntematon osoite (ks. foli.js:n haeFoliUusiOsoiteRivi) —
+          // pelkkä teksti tässä (kalenterin rivi on textContent, ei innerHTML,
+          // ei siis Maps-linkkiä kuten Nyt-lokissa) — lähin pysäkki riittää
+          // kalenterin vilkaisuun, tarkempi reitti löytyy Hytin Nyt-lokista.
+          title = '🚏 ' + s.pysakkiNimi + ' (n. ' + s.etaisyysM + ' m)';
         } else {
           title = '🚌 Bussi — tarkentuu lähempänä lähtöä';
         }
