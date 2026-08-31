@@ -4588,31 +4588,22 @@ function piirraNytLokiRivi(rivi) {
       '<div class="nyt-loki-aika">' + kelloMinuuteista(rivi.alku) + '</div>' +
       '<div class="nyt-loki-teksti"><b>' + rivi.title + '</b>' +
       '<span class="nyt-live-merkki"><span class="nyt-live-piste"></span>live — ei siirry</span></div>';
-  } else if (rivi.tyyppi === 'siirtyma') {
-    el.className = 'nyt-loki-rivi live siirtyma';
-    el.innerHTML =
-      '<div class="nyt-loki-aika">' + kelloMinuuteista(rivi.alku) + '</div>' +
-      '<div class="nyt-loki-teksti"><b>🚌 ' + rivi.linja + ' → ' + rivi.kohde + '</b>' +
-      '<span class="nyt-live-merkki"><span class="nyt-live-piste"></span>' + (rivi.suunta === 'paluu' ? 'paluumatka' : 'menomatka') + '</span></div>';
-  } else if (rivi.tyyppi === 'siirtyma-tuntematon') {
-    el.className = 'nyt-loki-rivi live siirtyma siirtyma-arvio';
-    el.innerHTML =
-      '<div class="nyt-loki-aika">n. ' + kelloMinuuteista(rivi.alku) + '</div>' +
-      '<div class="nyt-loki-teksti"><b>🚌 Bussi</b>' +
-      '<span class="pieni">tarkentuu lähempänä lähtöä</span></div>';
   } else if (rivi.tyyppi === 'siirtyma-uusi') {
-    // Uusi/tuntematon osoite (2026-08-31, ks. foli.js:n haeFoliUusiOsoiteRivi)
-    // — lähin pysäkki + Maps-linkki aina, PLUS oikea kesto (rivi.kestoMin)
-    // JOS Digitransit-avain on asetettu (ks. api/geocode.js:n haeReitti) —
-    // ennen avainta kestoMin on null ja rivi näyttää pelkän pysäkin, ei kaadu.
+    // Yhtenäinen FÖLI-siirtymärivi (2026-08-31 uudistus, ks. foli.js:n
+    // haeFoliSiirtymatTapahtumalle) — sekä tunnetuille kohteille
+    // (Joukahaisenkatu) että täysin uusille osoitteille, sama rakenne
+    // molemmille. Lähin pysäkki + Maps-linkki aina, PLUS oikea kesto+linja
+    // (rivi.kestoMin/linja) JOS Digitransit-avain on asetettu — ennen
+    // avainta kestoMin on null ja rivi näyttää pelkän pysäkin, ei kaadu.
     el.className = 'nyt-loki-rivi live siirtyma siirtyma-arvio';
+    const suuntaTeksti = rivi.suunta === 'paluu' ? 'paluumatka — ' : 'menomatka — ';
     const kestoTeksti = rivi.kestoMin
       ? ('n. ' + rivi.kestoMin + ' min' + (rivi.linja ? ' (linja ' + rivi.linja + ')' : '') + ' — ')
       : ('lähin pysäkki, n. ' + rivi.etaisyysM + ' m — ');
     el.innerHTML =
       '<div class="nyt-loki-aika">' + kelloMinuuteista(rivi.alku) + '</div>' +
       '<div class="nyt-loki-teksti"><b>🚏 ' + rivi.pysakkiNimi + '</b>' +
-      '<span class="pieni">' + kestoTeksti +
+      '<span class="pieni">' + suuntaTeksti + kestoTeksti +
       '<a href="' + rivi.mapsUrl + '" target="_blank" rel="noopener">reitti Mapsissa ↗</a></span></div>';
   } else {
     const kohde = rivi.kohde;
@@ -7767,23 +7758,15 @@ async function lataaKalenteri() {
     foliListat.forEach(function(lista) {
       lista.forEach(function(s) {
         const alkuAika = minutesToHHMM(Math.max(0, s.alku));
-        let title;
-        if (s.tyyppi === 'siirtyma') {
-          title = s.suunta === 'paluu'
-            ? '🚌 ' + s.linja + ' → Kotiin (' + FOLI_KOTIOSOITE + ')'
-            : '🚌 ' + s.linja + ' → ' + s.kohde;
-        } else if (s.tyyppi === 'siirtyma-uusi') {
-          // Uusi/tuntematon osoite (ks. foli.js:n haeFoliUusiOsoiteRivi) —
-          // pelkkä teksti tässä (kalenterin rivi on textContent, ei innerHTML,
-          // ei siis Maps-linkkiä kuten Nyt-lokissa). s.kestoMin on oikea kesto
-          // JOS Digitransit-avain on asetettu, muuten null (näytetään silti
-          // lähin pysäkki, ei kaadu).
-          title = s.kestoMin
-            ? '🚏 ' + s.pysakkiNimi + ' — n. ' + s.kestoMin + ' min' + (s.linja ? ' (linja ' + s.linja + ')' : '')
-            : '🚏 ' + s.pysakkiNimi + ' (n. ' + s.etaisyysM + ' m)';
-        } else {
-          title = '🚌 Bussi — tarkentuu lähempänä lähtöä';
-        }
+        // Yhtenäinen FÖLI-rivi (2026-08-31 uudistus, ks. foli.js:n
+        // haeFoliSiirtymatTapahtumalle) — pelkkä teksti tässä (kalenterin
+        // rivi on textContent, ei innerHTML, ei siis Maps-linkkiä kuten
+        // Nyt-lokissa). s.kestoMin on oikea kesto JOS Digitransit-avain on
+        // asetettu, muuten null (näytetään silti lähin pysäkki, ei kaadu).
+        const suuntaEtu = s.suunta === 'paluu' ? '(paluu) ' : '';
+        const title = s.kestoMin
+          ? '🚏 ' + suuntaEtu + s.pysakkiNimi + ' — n. ' + s.kestoMin + ' min' + (s.linja ? ' (linja ' + s.linja + ')' : '')
+          : '🚏 ' + suuntaEtu + s.pysakkiNimi + ' (n. ' + s.etaisyysM + ' m)';
         rivit.push({ _tyyppi: 'foli-siirtyma', title: title, event_time: alkuAika + ':00' });
       });
     });

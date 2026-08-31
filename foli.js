@@ -135,36 +135,7 @@ async function haeFoliLahtoPysakki() {
   return lahinFoliPysakki(pysakit, sijainti.lat, sijainti.lon) || FOLI_OLETUSPYSAKKI;
 }
 
-// SIRI Stop Monitoring -haku yhdelle pysäkille — reaaliaikaiset ennustetut
-// lähtöajat (expecteddeparturetime, unix-aikaleima). EI välimuistiteta (§8.1
-// sanoo "älä pollaa tiheästi", mutta data ITSESSÄÄN on reaaliaikaista —
-// data.foli.fi:n oma palvelin jo välimuistittaa 15-30s, ks. sen dokumentaatio).
-async function haeFoliLahdot(pysakkiId) {
-  try {
-    const vastaus = await fetch('https://data.foli.fi/siri/sm/' + pysakkiId);
-    if (!vastaus.ok) return [];
-    const data = await vastaus.json();
-    if (data.status !== 'OK') return [];
-    return Array.isArray(data.result) ? data.result : [];
-  } catch (e) {
-    console.error('Föli-lähtöjen haku epäonnistui (pysäkki ' + pysakkiId + '):', e.message);
-    return [];
-  }
-}
-
-// === UUDET OSOITTEET (2026-08-31, ks. muistin project_foli_itinerary_idea)
-// === Katrin pyyntö: "if she has an appointment at a brand-new address...
-// it should compute travel time" — TÄMÄ on vain ensimmäinen, tietoisesti
-// rajattu pala siitä. Ei ristiriidassa yllä olevan 18.8. päätöksen kanssa
-// (EI geokoodausta tunnettuihin matkoihin) — tämä koskee VAIN osoitteita
-// joita FOLI_TUNNETUT_MATKAT ei tunnista, eikä sekään laske kestoa: SIRI ei
-// tee reititystä mielivaltaiselle pysäkkiparille (sama rajoitus kuin
-// tunnetuissa matkoissa, ei mitenkään kierretty). Näytetään VAIN lähin
-// pysäkki + Google Maps -linkki todellista reittiä/kestoa varten — Katrin
-// oma päätös 31.8.: "build first what you recommended but then in next
-// build add some system so that you can check from google maps or such for
-// how long actual travel time is" — tämä linkki ei ole se järjestelmä,
-// vain väliaikainen manuaalinen silta siihen asti.
+// === GEOKOODAUS + REITITYS (2026-08-31, ks. muistin project_foli_itinerary_idea)
 const FOLI_GEOKOODI_KEY = 'kauppalista_foli_geokoodi';
 
 // Osoitteet eivät liiku — välimuisti EI vanhene (toisin kuin pysäkkilista
@@ -197,34 +168,108 @@ async function geokoodaaOsoite(osoiteTeksti) {
 // VAIHE 2 (2026-08-31, Katrin pyyntö: "start building what you can without
 // key") — oikea kesto Digitransitin kautta (ks. api/geocode.js:n haeReitti).
 // Palauttaa null HILJAA jos DIGITRANSIT_KEY ei ole vielä asetettu Verceliin
-// (503) TAI mikä tahansa muu virhe — kutsuja (haeFoliUusiOsoiteRivi) näyttää
-// silloin vaiheen 1 "lähin pysäkki" -tiedot ilman kestoa, ei kaadu. Kun
-// avain joskus lisätään, tämä alkaa palauttaa oikean keston ilman uutta
-// pushia — pelkkä ympäristömuuttuja aktivoi sen.
+// (503) TAI mikä tahansa muu virhe — kutsuja näyttää silloin lähimmän
+// pysäkin ilman kestoa, ei kaadu. Kun avain joskus lisätään, tämä alkaa
+// palauttaa oikean keston ilman uutta pushia — pelkkä ympäristömuuttuja
+// aktivoi sen.
+//
+// Välimuistitettu (2026-08-31, Katrin pyyntö: "how to build it so that it
+// uses as little as possible API credits") — sama reitti (esim. koti ->
+// Joukahaisenkatu) kysyttäisiin muuten UUDESTAAN joka ikinen kerta kun
+// Hytti/kalenteri piirretään, käytännössä joka päivä sama kysely. Koordinaatit
+// pyöristetään ~100m tarkkuuteen avaimessa (4 desimaalia) jotta pienet
+// GPS/geokoodaus-eroavaisuudet samalle osoitteelle osuvat samaan
+// välimuistimerkintään. 24h TTL — sama periaate kuin pysäkkilistan
+// välimuistilla (FOLI_PYSAKIT_MAX_IKA_MS): reitin kesto ei muutu tunneittain.
+const FOLI_REITTI_KEY = 'kauppalista_foli_reitti';
+const FOLI_REITTI_MAX_IKA_MS = 24 * 3600000;
+
 async function haeDigitransitKesto(fromLat, fromLon, toLat, toLon) {
+  const avain = fromLat.toFixed(4) + ',' + fromLon.toFixed(4) + '->' + toLat.toFixed(4) + ',' + toLon.toFixed(4);
+  let valimuisti = {};
+  try { valimuisti = JSON.parse(localStorage.getItem(FOLI_REITTI_KEY) || '{}'); } catch (e) { /* korruptoitunut, jatketaan tyhjällä */ }
+  const tallennettu = valimuisti[avain];
+  if (tallennettu && Date.now() - tallennettu.haettu < FOLI_REITTI_MAX_IKA_MS) {
+    return tallennettu.kesto;
+  }
+
   try {
     const { data: sessioData } = await db.auth.getSession();
     const token = sessioData.session ? sessioData.session.access_token : null;
     if (!token) return null;
     const url = '/api/geocode?reitti=1&fromLat=' + fromLat + '&fromLon=' + fromLon + '&toLat=' + toLat + '&toLon=' + toLon;
     const vastaus = await fetch(url, { headers: { Authorization: 'Bearer ' + token } });
-    if (!vastaus.ok) return null; // 503 = ei vielä avainta, muu virhe = ei reittiä juuri nyt
+    if (!vastaus.ok) return null; // 503 = ei vielä avainta, muu virhe = ei reittiä juuri nyt — EI välimuistiteta virhettä, yritetään uudelleen ensi kerralla
     const tulos = await vastaus.json();
     if (!tulos.kestoS) return null;
     const linja = (tulos.legit || []).find(function(l) { return l.mode === 'BUS'; });
-    return { kestoMin: Math.round(tulos.kestoS / 60), linja: linja && linja.route ? linja.route.shortName : null };
+    const kesto = { kestoMin: Math.round(tulos.kestoS / 60), linja: linja && linja.route ? linja.route.shortName : null };
+    valimuisti[avain] = { haettu: Date.now(), kesto: kesto };
+    try { localStorage.setItem(FOLI_REITTI_KEY, JSON.stringify(valimuisti)); } catch (e) { /* täynnä tms, jatketaan silti */ }
+    return kesto;
   } catch (e) {
     return null;
   }
 }
 
-// Lähin pysäkki tapahtuman osoitteelle + Maps-linkki, PLUS oikea kesto jos
-// Digitransit-avain on jo asetettu (ks. haeDigitransitKesto). Palauttaa
-// yhden rivin tai [] jos osoitetta ei ole, geokoodaus epäonnistuu, tai
-// pysäkkilistaa ei saada.
-async function haeFoliUusiOsoiteRivi(tapahtuma) {
-  const osoiteTeksti = tapahtumanSijaintiteksti(tapahtuma);
-  if (!osoiteTeksti || !tapahtuma.event_time) return [];
+// === TUNNETUT KOHTEET (uudistettu 2026-08-31, korvaa vanhan
+// FOLI_TUNNETUT_MATKAT-mallin — Katrin oma löytö ja pyyntö samana päivänä:
+// "it's showing 00.00 6A Kaarina before lectures" + "I don't want to build
+// this so that these are too hardcoded, but flexibly system should know if
+// I'm somewhere else". Vanha malli kysyi raakaa SIRI-pysäkkihakua
+// (haeFoliLahdot) joka EI tiennyt suuntaa — pysäkki 6011 palvelee busseja
+// MOLEMPIIN suuntiin (Kupittaalle JA Kaarinaan), ja koodi hyväksyi minkä
+// tahansa suunnan kunhan ajoitus sopi. Digitransit sen sijaan REITITTÄÄ
+// oikeasti pisteestä toiseen (ks. haeDigitransitKesto) — ei voi koskaan
+// ehdottaa väärään suuntaan menevää bussia, koska se laskee oikean reitin,
+// ei vain lue pysäkin koko lähtötaulua.
+//
+// "Joukahaisenkatu" on edelleen tunnistettava AVAINSANA, koska Lukkarikoneen
+// oma location-kenttä on huonekoodi (esim. "ICT_B1033 - Oppimistila -
+// ICT-City"), ei geokoodattava katuosoite — tarvitaan siis kiinteä tunnettu
+// osoite tälle. Mutta KESTO/LINJA ei ole enää käsin ylläpidetty (vrt. vanha
+// kestoMin: 45, hosumisPuskuriMin: 10) — ne lasketaan nyt AINA tuoreena
+// Digitransitista, samalla yleiskäyttöisellä putkella kuin täysin uudetkin
+// osoitteet (esim. Kiesikatu 4). Yksi järjestelmä kahden sijaan.
+const FOLI_TUNNETUT_KOHTEET = [
+  {
+    tunnistin: 'joukahaisenkatu', // tapahtuman location-/osoite-tekstin osamerkkijono (pieninä kirjaimina)
+    osoite: 'Joukahaisenkatu 3-5, Turku',
+    // Katrin täsmennys 18.8.: kalenterin alkuaika (esim. luennon 12:00) EI ole
+    // todellinen tarve olla paikalla — koululounas ennen tuntia ei ole omana
+    // kalenterimerkintänään. "I need to be at school at 11" — todellinen
+    // saapumistarve on 60min ENNEN kalenterin alkuaikaa. Uusille/muille
+    // tunnetuille kohteille tämä on 0 (oletus: saavu tasan tapahtuman alkuun).
+    saavuEnnenTapahtumaaMin: 60,
+  },
+];
+
+// Sama nimi kuin ennen (script.js:n opintoPaivanKuorma käyttää tätä
+// pelkkänä totuusarvona, "onko tälle jotain FÖLI-käsittelyä ylipäätään" —
+// ei riipu palautetun olion muodosta, joten uudistus ei riko sitä kutsua).
+function etsiTunnettuFoliMatka(tapahtuma) {
+  const teksti = ((tapahtuma.location || '') + ' ' + (tapahtuma._osoite || '')).toLowerCase();
+  if (!teksti.trim()) return null; // ei sijaintia lainkaan = ei matkaa (esim. "meillä")
+  return FOLI_TUNNETUT_KOHTEET.find(function(k) { return teksti.indexOf(k.tunnistin) !== -1; }) || null;
+}
+
+// Menon + paluun siirtymäpalikat yhdelle kalenteritapahtumalle — YKSI
+// yleiskäyttöinen putki sekä tunnetuille kohteille (Joukahaisenkatu) että
+// täysin uusille osoitteille (esim. Kiesikatu 4): tunnistetaan kohdeosoite
+// (kiinteä tunnettu TAI tapahtuman oma location/osoite), geokoodataan,
+// lasketaan kesto+linja Digitransitista (ei koskaan SIRI:n raakaa
+// pysäkkihakua — ei suunnan sekaannusta). Ajoitus lasketaan AINA
+// aritmeettisesti (tapahtuman kellonaika ± kesto ± puskuri), EI reaaliaikaisen
+// SIRI-lähtötaulun mukaan — siksi rivi on käytettävissä HETI kun päivä
+// piirretään, ei vasta kun oikea bussi sattuu näkymään reaaliaikalistassa
+// (Katrin pyyntö: "travel time blocks should be there little earlier...
+// travel blocks should be there by then" kun Hytti luo päiväsuunnitelman).
+async function haeFoliSiirtymatTapahtumalle(tapahtuma, paivanIso, varattu) {
+  if (!tapahtuma.event_time) return [];
+  const tunnettu = etsiTunnettuFoliMatka(tapahtuma);
+  const osoiteTeksti = tunnettu ? tunnettu.osoite : tapahtumanSijaintiteksti(tapahtuma);
+  if (!osoiteTeksti) return [];
+
   const [sijainti, pysakit] = await Promise.all([geokoodaaOsoite(osoiteTeksti), haeFoliPysakit()]);
   if (!sijainti || !pysakit) return [];
   const pysakkiId = lahinFoliPysakki(pysakit, sijainti.lat, sijainti.lon);
@@ -232,7 +277,6 @@ async function haeFoliUusiOsoiteRivi(tapahtuma) {
   const p = pysakit[pysakkiId];
   const kotiPysakki = pysakit[FOLI_OLETUSPYSAKKI];
   const etaisyysM = Math.round(haversineMetria(sijainti.lat, sijainti.lon, p.stop_lat, p.stop_lon));
-  const alku = aikaMinuutteina(tapahtuma.event_time.slice(0, 5));
   const mapsUrl = 'https://www.google.com/maps/dir/?api=1'
     + '&origin=' + encodeURIComponent(FOLI_KOTIOSOITE)
     + '&destination=' + encodeURIComponent(osoiteTeksti)
@@ -242,121 +286,34 @@ async function haeFoliUusiOsoiteRivi(tapahtuma) {
     ? await haeDigitransitKesto(kotiPysakki.stop_lat, kotiPysakki.stop_lon, sijainti.lat, sijainti.lon)
     : null;
 
-  return [{
-    tyyppi: 'siirtyma-uusi', alku: alku, loppu: alku,
+  const alkuMin = aikaMinuutteina(tapahtuma.event_time.slice(0, 5));
+  const loppuMin = tapahtuma.event_end_time ? aikaMinuutteina(tapahtuma.event_end_time.slice(0, 5)) : alkuMin + 60;
+  const saavuEnnenMin = tunnettu ? (tunnettu.saavuEnnenTapahtumaaMin || 0) : 0;
+
+  // Meno: jos kesto tiedetään (Digitransit-avain asetettu), lasketaan
+  // suositeltu "lähde nyt" -hetki taaksepäin. Jos ei tiedetä, EI keksitä
+  // kestoa — sijoitetaan rivi "tarvitset olla paikalla" -hetkeen niin että
+  // se silti näkyy oikeassa kohdassa päivää, teksti kertoo vain etäisyyden.
+  const menoAlku = kesto
+    ? Math.max(0, alkuMin - saavuEnnenMin - kesto.kestoMin)
+    : Math.max(0, alkuMin - saavuEnnenMin);
+  if (kesto) { for (let m = menoAlku; m < alkuMin - saavuEnnenMin; m++) varattu[m] = true; }
+
+  const rivit = [{
+    tyyppi: 'siirtyma-uusi', suunta: 'meno', alku: menoAlku, loppu: menoAlku,
     pysakkiNimi: p.stop_name, etaisyysM: etaisyysM, mapsUrl: mapsUrl,
     kestoMin: kesto ? kesto.kestoMin : null, linja: kesto ? kesto.linja : null,
   }];
-}
 
-// === TUNNETUT MATKAT (2026-08-18, Katrin täsmennykset) === EI geokoodausta
-// eikä pysäkin arvausta osoitetekstistä — tarkistettu suoraan livenä 18.8.
-// ettei Marsukatu-Kupittaa-välillä ole suoraa (vaihdotonta) ajovuoroa, joten
-// SIRI:stä ei voi laskea luotettavaa kokonaiskestoa vaihdolliselle matkalle
-// (§8.1:n oma rajaus: "ei ovelta ovelle -reititystä"). Sen sijaan Katrin oma
-// kokemusperäinen kesto pysäkkiparille + hänen pyytämänsä hosumispuskuri.
-// EI tekoälyä tässä — pelkkää suoraa API-dataa ja laskentaa (Katrin pyyntö).
-// Uusi tunnettu matka lisätään tähän listaan sitä mukaa kun niitä tulee.
-const FOLI_TUNNETUT_MATKAT = [
-  {
-    tunnistin: 'joukahaisenkatu', // tapahtuman location-tekstin osamerkkijono (pieninä kirjaimina)
-    kotiPysakki: '6011', // Marsukatu
-    kohdePysakit: ['499', '130', '134', '162', '1685'], // Kupittaan jäähalli / Uudenmaantulli
-    kestoMin: 45,
-    hosumisPuskuriMin: 10,
-    // Katrin täsmennys 18.8.: kalenterin alkuaika (12:00) EI ole todellinen
-    // tarve olla paikalla — koululounas ennen tapaamista ("lunch at school")
-    // ei ole omana kalenterimerkintänään, samaan tapaan kuin päiväkotivienti
-    // ei näy kalenterissa. "I need to be at school at 11" — todellinen
-    // saapumistarve on 60min ENNEN kalenterin alkuaikaa.
-    saavuEnnenTapahtumaaMin: 60,
-  },
-];
-
-// KORJAUS (2026-08-30, Katrin löytö: "no travel time is showing") — käytti
-// aiemmin VAIN tapahtuma.location:ia. Lukkarikone-luennoilla ON oma
-// location (huoneen tunnus, esim. "ICT_B1033 - Oppimistila - ICT-City"),
-// joten se EI ollut tyhjä eikä siis "location || _osoite" -korjaus (aiempi
-// yritys) auttanut — huonetunnus ei vain koskaan sisällä sanaa
-// "joukahaisenkatu". Todellinen katuosoite on syötteen OMASSA osoite-
-// kentässä (t._osoite, "Joukahaisenkatu 3-5, Turku" Lukkarikoneelle).
-// Katrin vahvistus: "everything from Lukkarikone should be potential one"
-// — siis TARKISTETAAN MOLEMMAT (huone JA syötteen osoite) yhdessä, ei
-// jompikumpi varalla, koska tunnistin voi osua kumpaan tahansa.
-function etsiTunnettuFoliMatka(tapahtuma) {
-  const teksti = ((tapahtuma.location || '') + ' ' + (tapahtuma._osoite || '')).toLowerCase();
-  if (!teksti.trim()) return null; // ei sijaintia lainkaan = ei matkaa (esim. "meillä")
-  return FOLI_TUNNETUT_MATKAT.find(function(m) { return teksti.indexOf(m.tunnistin) !== -1; }) || null;
-}
-
-// Viimeinen TODELLINEN (SIRI-reaaliaikainen) lähtö kotipysäkiltä joka vielä
-// ehtii perille ennen tapahtuman alkua (kesto + hosumispuskuri huomioiden).
-// Palauttaa null jos SIRI ei (vielä) näytä yhtään riittävän aikaista lähtöä
-// — se ei tarkoita ettei bussia olisi, vain ettei se ole vielä reaaliaika-
-// listassa (kaukaisempi lähtö tarkentuu lähempänä).
-async function haeFoliLahtoEnnenTapahtumaa(tapahtumaAlkuMs, matka) {
-  const lahdot = await haeFoliLahdot(matka.kotiPysakki);
-  const tarveOllaPaikallaMs = tapahtumaAlkuMs - (matka.saavuEnnenTapahtumaaMin || 0) * 60000;
-  const viimeinenSallittu = tarveOllaPaikallaMs - (matka.kestoMin + matka.hosumisPuskuriMin) * 60000;
-  let paras = null;
-  lahdot.forEach(function(l) {
-    const lahtoMs = l.expecteddeparturetime * 1000;
-    if (lahtoMs <= viimeinenSallittu && (!paras || lahtoMs > paras.lahtoMs)) {
-      paras = { lahtoMs: lahtoMs, linja: l.lineref, kohde: l.destinationdisplay };
-    }
-  });
-  if (!paras) return null;
-  return { lahtoMs: paras.lahtoMs, saapumisMs: paras.lahtoMs + matka.kestoMin * 60000, linja: paras.linja, kohde: paras.kohde };
-}
-
-// Ensimmäinen todellinen lähtö jommaltakummalta kohdepysäkiltä tapahtuman
-// päättymisen jälkeen — paluumatka.
-async function haeFoliPaluuTapahtumanJalkeen(tapahtumaLoppuMs, matka) {
-  const kaikki = await Promise.all(matka.kohdePysakit.map(haeFoliLahdot));
-  const lahdot = [].concat.apply([], kaikki);
-  let paras = null;
-  lahdot.forEach(function(l) {
-    const lahtoMs = l.expecteddeparturetime * 1000;
-    if (lahtoMs >= tapahtumaLoppuMs && (!paras || lahtoMs < paras.lahtoMs)) {
-      paras = { lahtoMs: lahtoMs, linja: l.lineref, kohde: l.destinationdisplay };
-    }
-  });
-  if (!paras) return null;
-  return { lahtoMs: paras.lahtoMs, saapumisMs: paras.lahtoMs + matka.kestoMin * 60000, linja: paras.linja, kohde: paras.kohde };
-}
-
-// Menon + paluun siirtymäpalikat yhdelle kalenteritapahtumalle, minuutti-
-// ruudukkoon merkittynä (varattu, sivuvaikutuksena) ja rivilistana
-// palautettuna. "Ei vielä tiedossa" -tapauksessa EI varata ruudukosta
-// mitään (ei keksitä kestoa) — näytetään vain karkea arvio ajankohdasta.
-async function haeFoliSiirtymatTapahtumalle(tapahtuma, paivanIso, varattu) {
-  const matka = etsiTunnettuFoliMatka(tapahtuma);
-  if (!tapahtuma.event_time) return [];
-  if (!matka) return haeFoliUusiOsoiteRivi(tapahtuma);
-  const paivaMs = new Date(paivanIso + 'T00:00:00').getTime();
-  const alkuMs = paivaMs + aikaMinuutteina(tapahtuma.event_time.slice(0, 5)) * 60000;
-  const loppuMs = tapahtuma.event_end_time ? paivaMs + aikaMinuutteina(tapahtuma.event_end_time.slice(0, 5)) * 60000 : alkuMs + 3600000;
-
-  const [meno, paluu] = await Promise.all([
-    haeFoliLahtoEnnenTapahtumaa(alkuMs, matka),
-    haeFoliPaluuTapahtumanJalkeen(loppuMs, matka),
-  ]);
-
-  const rivit = [];
-  if (meno) {
-    const a = Math.max(0, Math.round((meno.lahtoMs - paivaMs) / 60000));
-    const b = Math.min(1439, Math.round((meno.saapumisMs - paivaMs) / 60000));
-    for (let m = a; m < b; m++) varattu[m] = true;
-    rivit.push({ tyyppi: 'siirtyma', alku: a, loppu: b, linja: meno.linja, kohde: meno.kohde, suunta: 'meno' });
-  } else {
-    const arvioAlku = aikaMinuutteina(tapahtuma.event_time.slice(0, 5)) - (matka.saavuEnnenTapahtumaaMin || 0) - matka.kestoMin - matka.hosumisPuskuriMin;
-    rivit.push({ tyyppi: 'siirtyma-tuntematon', alku: arvioAlku, loppu: arvioAlku, suunta: 'meno' });
+  // Paluu: heti tapahtuman päätyttyä (ei erillistä saapumistarvetta paluulle).
+  if (loppuMin <= 1439) {
+    rivit.push({
+      tyyppi: 'siirtyma-uusi', suunta: 'paluu', alku: loppuMin, loppu: loppuMin,
+      pysakkiNimi: p.stop_name, etaisyysM: etaisyysM, mapsUrl: mapsUrl,
+      kestoMin: kesto ? kesto.kestoMin : null, linja: kesto ? kesto.linja : null,
+    });
+    if (kesto) { for (let m = loppuMin; m < Math.min(1439, loppuMin + kesto.kestoMin); m++) varattu[m] = true; }
   }
-  if (paluu) {
-    const a = Math.max(0, Math.round((paluu.lahtoMs - paivaMs) / 60000));
-    const b = Math.min(1439, Math.round((paluu.saapumisMs - paivaMs) / 60000));
-    for (let m = a; m < b; m++) varattu[m] = true;
-    rivit.push({ tyyppi: 'siirtyma', alku: a, loppu: b, linja: paluu.linja, kohde: paluu.kohde, suunta: 'paluu' });
-  }
+
   return rivit;
 }
