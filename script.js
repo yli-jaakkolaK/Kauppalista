@@ -899,16 +899,27 @@ document.getElementById('teema-nakyvyys-btn').addEventListener('click', async fu
   naytaIlmoitus(uusi === 'shared' ? 'Näkyy nyt molemmille' : 'Näkyy nyt vain sinulle');
 });
 
+// KORJATTU 2026-08-31 (Katrin periaate, ks. Ruorin kalenteri-korjaus samana
+// päivänä: "in you have no info to convey do not say i have no info..
+// that should apply everywhere in satama") — näytti aiemmin "Ei vielä
+// sovittua linjaa" -placeholder-tekstin. Piilotetaan teksti+pvm kokonaan
+// kun mitään ei ole sovittu (sama "piilota tyhjä, älä näytä tyhjää tekstiä"
+// -sääntö), ja napin oma teksti kertoo tilan sen sijaan (➕ Aseta / ✎
+// Päivitä) — sama kaava kuin Miro-linkkikentillä (opinto-miro.js).
 function paivitaSovittuLinjaNaytto() {
   const teksti = document.getElementById('teema-sovittu-linja-teksti');
   const pvm = document.getElementById('teema-sovittu-linja-pvm');
+  const muokkaaBtn = document.getElementById('teema-sovittu-linja-muokkaa-btn');
   if (currentTeema.sovittu_linja) {
+    teksti.style.display = 'block';
     teksti.textContent = currentTeema.sovittu_linja;
     const d = new Date(currentTeema.sovittu_linja_pvm + 'T00:00:00');
     pvm.textContent = 'sovittu ' + d.getDate() + '.' + (d.getMonth() + 1) + '.' + d.getFullYear();
+    muokkaaBtn.textContent = '✎ Päivitä';
   } else {
-    teksti.textContent = 'Ei vielä sovittua linjaa';
+    teksti.style.display = 'none';
     pvm.textContent = '';
+    muokkaaBtn.textContent = '➕ Aseta linja';
   }
 }
 
@@ -947,7 +958,11 @@ document.getElementById('teema-sovittu-linja-muokkaa-btn').addEventListener('cli
     input.removeEventListener('blur', tallenna);
     input.style.display = 'none';
     napit.style.display = 'flex';
-    document.getElementById('teema-sovittu-linja-teksti').style.display = 'block';
+    // Ei enää kiinteää display:'block' tähän (2026-08-31) — paivitaSovittu-
+    // LinjaNaytto() päättää näkyykö teksti ollenkaan, ettei tyhjä arvo jää
+    // näkyviin tyhjänä rivinä jos käyttäjä avaa muokkauksen eikä kirjoita
+    // mitään (ks. sen oma "piilota tyhjä" -kommentti).
+    paivitaSovittuLinjaNaytto();
     if (!uusi || uusi === currentTeema.sovittu_linja) return;
 
     if (currentTeema.sovittu_linja) {
@@ -2958,13 +2973,11 @@ async function lataaOpintoKartta() {
 
   const sisalto = document.getElementById('opinto-kartta-sisalto');
   sisalto.innerHTML = '';
-  if (!kurssit || kurssit.length === 0) {
-    const tyhja = document.createElement('p');
-    tyhja.className = 'section-empty';
-    tyhja.textContent = 'Ei vielä kursseja.';
-    sisalto.appendChild(tyhja);
-    return;
-  }
+  // KORJATTU 2026-08-31 (Katrin periaate: "do not say i have no info..
+  // that should apply everywhere") — jätetään sisalto tyhjäksi ilman
+  // placeholder-tekstiä sen sijaan että näytettäisiin "Ei vielä X." (sama
+  // muutos kolmessa kohdassa alempana).
+  if (!kurssit || kurssit.length === 0) return;
 
   const kurssiryhmat = await Promise.all(kurssit.map(function(kurssi) {
     return db.from('opinto_aiheet').select('name, sort_order, pero_vaihe, retrieval_kierrokset, retrieval_tavoite, sr_interval_index, perustussolmu').eq('kurssi_id', kurssi.id).order('sort_order')
@@ -2973,13 +2986,7 @@ async function lataaOpintoKartta() {
       });
   }));
 
-  if (kurssiryhmat.every(function(r) { return r.aiheet.length === 0; })) {
-    const tyhja = document.createElement('p');
-    tyhja.className = 'section-empty';
-    tyhja.textContent = 'Ei vielä solmuja.';
-    sisalto.appendChild(tyhja);
-    return;
-  }
+  if (kurssiryhmat.every(function(r) { return r.aiheet.length === 0; })) return;
 
   if (opintoKarttaNakyma === 'opiskelu') {
     // Katrin pyyntö 2026-08-30: "i'd rather read 3 things i can read that
@@ -2992,13 +2999,7 @@ async function lataaOpintoKartta() {
     const nakyvatKurssiryhmat = kurssiryhmat.map(function(r) {
       return { kurssi: r.kurssi, aiheet: r.aiheet.filter(function(a) { return a.pero_vaihe !== 'priming' || a.perustussolmu; }) };
     });
-    if (nakyvatKurssiryhmat.every(function(r) { return r.aiheet.length === 0; })) {
-      const tyhja = document.createElement('p');
-      tyhja.className = 'section-empty';
-      tyhja.textContent = 'Ei vielä aloitettuja aiheita.';
-      sisalto.appendChild(tyhja);
-      return;
-    }
+    if (nakyvatKurssiryhmat.every(function(r) { return r.aiheet.length === 0; })) return;
     sisalto.appendChild(piirraOpintoKarttaOpiskelu(nakyvatKurssiryhmat));
   } else {
     const kaikkiAiheet = [].concat.apply([], kurssiryhmat.map(function(r) { return r.aiheet; }));
@@ -3521,12 +3522,15 @@ async function suoritaOpintoTavoitetahtiLaskenta() {
 function piirraOpintoTavoitetahtiTulos(tulos) {
   const kotelo = document.getElementById('opinto-tavoitetahti-tulos');
   kotelo.innerHTML = '';
-  kotelo.style.display = 'block';
 
+  // KORJATTU 2026-08-31 (Katrin periaate: "do not say i have no info..
+  // that should apply everywhere") — piilota koko kotelo tyhjänä tuloksena,
+  // älä näytä "Ei aktiivisia kursseja." -tekstiä.
   if (tulos.tulokset.length === 0) {
-    kotelo.textContent = 'Ei aktiivisia kursseja.';
+    kotelo.style.display = 'none';
     return;
   }
+  kotelo.style.display = 'block';
 
   const yhteenveto = document.createElement('p');
   yhteenveto.className = 'opinto-tavoitetahti-yhteenveto' + (tulos.ylitysTunteja > 0 ? ' ylittaa' : '');
@@ -7554,11 +7558,11 @@ function piirraKalenteriPaivaRyhma(container, rivit, otsikkoTeksti, kuormaraja, 
     ryhma.appendChild(otsikko);
   }
 
+  // KORJATTU 2026-08-31 (Katrin periaate: "do not say i have no info..
+  // that should apply everywhere") — ei enää "Ei tapahtumia." -tekstiä;
+  // otsikko (jos annettu) jää silti näkyviin, koska se on oikeaa
+  // rakenteellista tietoa (päivämäärä/kuorma), ei tyhjä placeholder.
   if (rivit.length === 0) {
-    const tyhja = document.createElement('p');
-    tyhja.className = 'kalenteri-tyhja';
-    tyhja.textContent = 'Ei tapahtumia.';
-    ryhma.appendChild(tyhja);
     container.appendChild(ryhma);
     return;
   }
@@ -9552,7 +9556,6 @@ async function lataaRuoriKalenteri() {
   puskuriAlku.setDate(puskuriAlku.getDate() - MONIPAIVAINEN_PUSKURI_PV);
 
   const segmentti = document.getElementById('ruori-kalenteri-segmentti');
-  const tyhja = document.getElementById('ruori-kalenteri-tyhja');
 
   const { data: haetut, error } = await db.from('kalenteri_tapahtumat')
     .select('*, kalenteri_syotteet(vari, henkilo, scope)')
@@ -9564,7 +9567,6 @@ async function lataaRuoriKalenteri() {
   if (error) {
     console.error('Ruorin kalenterikatsauksen haku epäonnistui:', error);
     segmentti.style.display = 'none';
-    tyhja.style.display = 'none';
     return;
   }
 
@@ -9577,9 +9579,15 @@ async function lataaRuoriKalenteri() {
     })
     .filter(function(t) { return tapahtumaKattaaPaivan(t, tanaanIso); });
 
+  // KORJATTU 2026-08-31 (Katrin havainto Ruorista: "do not say i have no
+  // info... should apply everywhere") — näytti aiemmin erillisen "Ei
+  // tapahtumia tänään." -tekstisegmentin (#ruori-kalenteri-tyhja) sen
+  // sijaan että olisi vain piilottanut koko segmentin, rikkoen jo 18.8.
+  // sovittua "piilota tyhjä osio, älä tyhjä teksti" -sääntöä. Sama
+  // piilotus kuin alempana (seuraavat.length === 0 -haara), joka jo teki
+  // tämän oikein — elementti poistettu HTML:stä kokonaan.
   if (rivit.length === 0) {
     segmentti.style.display = 'none';
-    tyhja.style.display = 'block';
     return;
   }
   const jarjestetyt = jarjestaAjanMukaan(rivit.slice());
@@ -9601,10 +9609,8 @@ async function lataaRuoriKalenteri() {
   });
   if (seuraavat.length === 0) {
     segmentti.style.display = 'none';
-    tyhja.style.display = 'none';
     return;
   }
-  tyhja.style.display = 'none';
   segmentti.style.display = 'block';
   segmentti.onclick = function() { avaaOsio({ route: 'kalenteri' }); };
 
@@ -15367,11 +15373,10 @@ async function paivitaMuistutusLista() {
   const listaEl = document.getElementById('muistutus-lista');
   listaEl.innerHTML = '';
 
+  // KORJATTU 2026-08-31 (Katrin periaate: "do not say i have no info..
+  // that should apply everywhere") — ei enää "Ei muistutuksia vielä."
+  // -tekstiä, lista jää vain tyhjäksi.
   if (!data || data.length === 0) {
-    const tyhja = document.createElement('p');
-    tyhja.className = 'section-empty';
-    tyhja.textContent = 'Ei muistutuksia vielä.';
-    listaEl.appendChild(tyhja);
     return;
   }
 

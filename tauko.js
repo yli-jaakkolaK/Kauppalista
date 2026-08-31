@@ -35,8 +35,12 @@ async function piirraTaukoEhdotus() {
   teksti.textContent = 'Haetaan ehdotusta...';
   taukoNykyinenEhdotus = await haeSeuraavaTaukoehdotus();
   if (!taukoNykyinenEhdotus) {
+    // KORJATTU 2026-08-31 (Katrin periaate: "in you have no info to
+    // convey do not say i have no info.. that should apply everywhere in
+    // satama") — näytti aiemmin "Ei vielä taukoehdotuksia." -tekstin,
+    // piilotetaan nyt kokonaan ilman placeholder-viestiä.
     teksti.style.display = 'none';
-    tyhjaSelite.style.display = 'block';
+    tyhjaSelite.style.display = 'none';
     toiminnot.forEach(function(b) { b.style.display = 'none'; });
     return;
   }
