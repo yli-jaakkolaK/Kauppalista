@@ -4601,8 +4601,15 @@ function piirraNytLokiRivi(rivi) {
     const kestoTeksti = rivi.kestoMin
       ? ('n. ' + rivi.kestoMin + ' min' + (rivi.linja ? ' (linja ' + rivi.linja + ')' : '') + ' — ')
       : ('lähin pysäkki, n. ' + rivi.etaisyysM + ' m — ');
+    // SIRI-viive (2026-08-31, Katrin pyyntö: "where timetable time is
+    // shown - or + and then number of minutes") — vain kun tänään JA
+    // löytyi (ks. foli.js:n haeFoliViiveMin), aikataulun VIEREEN, ei sen
+    // tilalle.
+    const aikaTeksti = kelloMinuuteista(rivi.alku) + (typeof rivi.viiveMin === 'number'
+      ? (' (' + (rivi.viiveMin >= 0 ? '+' : '') + rivi.viiveMin + ' min)' + (rivi.viiveMin > 0 ? ' myöhässä' : rivi.viiveMin < 0 ? ' ajoissa' : ''))
+      : '');
     el.innerHTML =
-      '<div class="nyt-loki-aika">' + kelloMinuuteista(rivi.alku) + '</div>' +
+      '<div class="nyt-loki-aika">' + aikaTeksti + '</div>' +
       '<div class="nyt-loki-teksti"><b>🚏 ' + rivi.pysakkiNimi + '</b>' +
       '<span class="pieni">' + suuntaTeksti + kestoTeksti +
       '<a href="' + rivi.mapsUrl + '" target="_blank" rel="noopener">reitti Mapsissa ↗</a></span></div>';
@@ -7765,8 +7772,9 @@ async function lataaKalenteri() {
         // Nyt-lokissa). s.kestoMin on oikea kesto JOS Digitransit-avain on
         // asetettu, muuten null (näytetään silti lähin pysäkki, ei kaadu).
         const suuntaEtu = s.suunta === 'paluu' ? '(paluu) ' : '';
+        const viiveTeksti = typeof s.viiveMin === 'number' ? (' (' + (s.viiveMin >= 0 ? '+' : '') + s.viiveMin + ' min)') : '';
         const title = s.kestoMin
-          ? '🚏 ' + suuntaEtu + s.pysakkiNimi + ' — n. ' + s.kestoMin + ' min' + (s.linja ? ' (linja ' + s.linja + ')' : '')
+          ? '🚏 ' + suuntaEtu + s.pysakkiNimi + ' — n. ' + s.kestoMin + ' min' + (s.linja ? ' (linja ' + s.linja + ')' : '') + viiveTeksti
           : '🚏 ' + suuntaEtu + s.pysakkiNimi + ' (n. ' + s.etaisyysM + ' m)';
         rivit.push({ _tyyppi: 'foli-siirtyma', title: title, event_time: alkuAika + ':00' });
       });
@@ -8289,8 +8297,9 @@ function piirraViikkoFoliMerkit(paivanFoliLegit) {
     const merkki = document.createElement('div');
     merkki.className = 'kalenteri-viikko-foli-merkki';
     merkki.style.top = minutesToPercent(s.alku) + '%';
+    const viiveTeksti = typeof s.viiveMin === 'number' ? (' (' + (s.viiveMin >= 0 ? '+' : '') + s.viiveMin + ' min)') : '';
     const kestoTeksti = s.kestoMin
-      ? (s.kestoMin + ' min' + (s.linja ? ' (linja ' + s.linja + ')' : ''))
+      ? (s.kestoMin + ' min' + (s.linja ? ' (linja ' + s.linja + ')' : '') + viiveTeksti)
       : ('n. ' + s.etaisyysM + ' m');
     merkki.title = (s.suunta === 'paluu' ? 'Paluu — ' : 'Meno — ') + s.pysakkiNimi + ' — ' + kestoTeksti;
     merkki.textContent = '🚏';

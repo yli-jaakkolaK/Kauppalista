@@ -266,6 +266,48 @@ function etsiTunnettuFoliMatka(tapahtuma) {
   return FOLI_TUNNETUT_KOHTEET.find(function(k) { return teksti.indexOf(k.tunnistin) !== -1; }) || null;
 }
 
+// SIRI-viivekerros (2026-08-31, Katrin pyyntö: "SIRI layer could be added
+// so that I can show if bus is early or late") — EI KOSKAAN perusaikataulun
+// lähde (se pysyy Digitransit-reititetystä kestosta, ks.
+// haeFoliSiirtymatTapahtumalle) — pelkkä LISÄTIETO päälle kun saatavilla.
+// Suodatetaan LINJAN mukaan (Digitransitin jo kertoma oikea linja), EI koko
+// pysäkin kaikkia lähtöjä kuten vanha bugillinen järjestelmä teki —
+// pienentää mutta ei täysin poista väärän suunnan riskiä jos sama
+// linjanumero ajaa molempiin suuntiin (Katrin oma esimerkki: 6A). Katrin
+// oma päätös 31.8.: hyväksytty riski yksinkertaisuuden vuoksi — tarkka
+// reitti-ID-täsmäys olisi luotettavampi mutta vaatisi vahvistamattoman
+// tutkimuksen ensin.
+async function haeFoliLahdot(pysakkiId) {
+  try {
+    const vastaus = await fetch('https://data.foli.fi/siri/sm/' + pysakkiId);
+    if (!vastaus.ok) return [];
+    const data = await vastaus.json();
+    if (data.status !== 'OK') return [];
+    return Array.isArray(data.result) ? data.result : [];
+  } catch (e) {
+    console.error('Föli-lähtöjen haku epäonnistui (pysäkki ' + pysakkiId + '):', e.message);
+    return [];
+  }
+}
+
+// Palauttaa viiveen minuutteina (positiivinen = myöhässä, negatiivinen =
+// ajoissa) LÄHIMMÄLLE samaa linjaa ajavalle SIRI-lähdölle annetun
+// kohdeajan ±30min sisällä, tai null jos mitään ei löydy riittävän
+// läheltä (ei tarkoita ettei bussia olisi — SIRI näyttää vain lähitulevaisuuden).
+async function haeFoliViiveMin(pysakkiId, linja, kohdeAikaMin, paivaMs) {
+  if (!linja) return null;
+  const lahdot = await haeFoliLahdot(pysakkiId);
+  const kohdeMs = paivaMs + kohdeAikaMin * 60000;
+  let paras = null, parasEro = Infinity;
+  lahdot.forEach(function(l) {
+    if (l.lineref !== linja) return;
+    const ero = Math.abs(l.expecteddeparturetime * 1000 - kohdeMs);
+    if (ero < parasEro) { parasEro = ero; paras = l; }
+  });
+  if (!paras || parasEro > 30 * 60000) return null;
+  return typeof paras.delay === 'number' ? Math.round(paras.delay / 60) : null;
+}
+
 // Menon + paluun siirtymäpalikat yhdelle kalenteritapahtumalle — YKSI
 // yleiskäyttöinen putki sekä tunnetuille kohteille (Joukahaisenkatu) että
 // täysin uusille osoitteille (esim. Kiesikatu 4): tunnistetaan kohdeosoite
@@ -312,10 +354,22 @@ async function haeFoliSiirtymatTapahtumalle(tapahtuma, paivanIso, varattu) {
     : Math.max(0, alkuMin - saavuEnnenMin);
   if (kesto) { for (let m = menoAlku; m < alkuMin - saavuEnnenMin; m++) varattu[m] = true; }
 
+  // SIRI-viive vain TÄNÄÄN (Katrin pyyntö: "SIRI layer... show if bus is
+  // early or late" — real-time-tieto on merkityksetön kauas tulevaisuuteen,
+  // SIRI ei muutenkaan näytä sitä silloin, ks. haeFoliViiveMin). Kotipysäkki
+  // menolle, kohteen lähin pysäkki paluulle — kummallakin oma suunta.
+  const onkoTanaan = paivanIso === opintoTanaanPvm();
+  const [menoViiveMin, paluuViiveMin] = onkoTanaan && kesto && kotiPysakki
+    ? await Promise.all([
+        haeFoliViiveMin(FOLI_OLETUSPYSAKKI, kesto.linja, menoAlku, new Date(paivanIso + 'T00:00:00').getTime()),
+        haeFoliViiveMin(pysakkiId, kesto.linja, loppuMin, new Date(paivanIso + 'T00:00:00').getTime()),
+      ])
+    : [null, null];
+
   const rivit = [{
     tyyppi: 'siirtyma-uusi', suunta: 'meno', alku: menoAlku, loppu: menoAlku,
     pysakkiNimi: p.stop_name, etaisyysM: etaisyysM, mapsUrl: mapsUrl,
-    kestoMin: kesto ? kesto.kestoMin : null, linja: kesto ? kesto.linja : null,
+    kestoMin: kesto ? kesto.kestoMin : null, linja: kesto ? kesto.linja : null, viiveMin: menoViiveMin,
   }];
 
   // Paluu: heti tapahtuman päätyttyä (ei erillistä saapumistarvetta paluulle).
@@ -323,7 +377,7 @@ async function haeFoliSiirtymatTapahtumalle(tapahtuma, paivanIso, varattu) {
     rivit.push({
       tyyppi: 'siirtyma-uusi', suunta: 'paluu', alku: loppuMin, loppu: loppuMin,
       pysakkiNimi: p.stop_name, etaisyysM: etaisyysM, mapsUrl: mapsUrl,
-      kestoMin: kesto ? kesto.kestoMin : null, linja: kesto ? kesto.linja : null,
+      kestoMin: kesto ? kesto.kestoMin : null, linja: kesto ? kesto.linja : null, viiveMin: paluuViiveMin,
     });
     if (kesto) { for (let m = loppuMin; m < Math.min(1439, loppuMin + kesto.kestoMin); m++) varattu[m] = true; }
   }
