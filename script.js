@@ -14980,21 +14980,40 @@ const laituriRealtimeChannel = db.channel('laituri-pallura')
   })
   .subscribe();
 
+// Debounssi (2026-09-01, Katri sai Supabasen "fair use" -kirjeen kohonneesta
+// egress-käytöstä): caldav-sync (5 min välein) kirjoittaa yhdellä ajolla
+// kymmeniä rivejä kalenteri_tapahtumat-tauluun, ja Supabase Realtime
+// lähettää YHDEN postgres_changes-tapahtuman JOKAISESTA rivistä erikseen —
+// ilman debounssia tämä kanava laukaisi paivitaKuittausTila/
+// paivitaRistiriitaPallura (kumpikin hakee ison osan tapahtumataulusta)
+// KYMMENIÄ kertoja PERÄKKÄIN saman synkan aikana. Mitattu suoraan Supabasen
+// logeista: ~19 000 turhaa hakua/vrk näihin kolmeen tauluun. Kokoaa
+// purskeen (esim. 60 rivimuutosta) yhdeksi päivitykseksi 2s hiljaisuuden
+// jälkeen sen sijaan että ajaisi jokaisen erikseen.
+function debounssi(fn, ms) {
+  let ajastin = null;
+  return function() {
+    clearTimeout(ajastin);
+    ajastin = setTimeout(fn, ms);
+  };
+}
+const debPaivitaKuittausJaRistiriita = debounssi(function() {
+  paivitaKuittausTila();
+  paivitaRistiriitaPallura();
+}, 2000);
+const debPaivitaKuittaus = debounssi(paivitaKuittausTila, 2000);
+const debPaivitaRistiriita = debounssi(function() {
+  paivitaRistiriitaPallura();
+  if (document.getElementById('kalenteri-view').style.display !== 'none') lataaKalenteri();
+}, 2000);
+
 const kalenteriPalluraChannel = db.channel('kalenteri-pallura')
-  .on('postgres_changes', { event: '*', schema: 'public', table: 'kalenteri_tapahtumat' }, () => {
-    paivitaKuittausTila();
-    paivitaRistiriitaPallura();
-  })
-  .on('postgres_changes', { event: '*', schema: 'public', table: 'kalenteri_kuittaukset' }, () => {
-    paivitaKuittausTila();
-  })
+  .on('postgres_changes', { event: '*', schema: 'public', table: 'kalenteri_tapahtumat' }, debPaivitaKuittausJaRistiriita)
+  .on('postgres_changes', { event: '*', schema: 'public', table: 'kalenteri_kuittaukset' }, debPaivitaKuittaus)
   // Ristiriitapaketti (2026-07-17): "Keskusteltu"-kuittaus näkyy molemmille
   // reaaliajassa, sama malli kuin kuittausjonolla — kumpi tahansa kuittaa,
   // toisen etusivun pallura/avoin Kalenteri-näkymä rauhoittuu heti.
-  .on('postgres_changes', { event: '*', schema: 'public', table: 'kalenteri_ristiriita_kuittaukset' }, () => {
-    paivitaRistiriitaPallura();
-    if (document.getElementById('kalenteri-view').style.display !== 'none') lataaKalenteri();
-  })
+  .on('postgres_changes', { event: '*', schema: 'public', table: 'kalenteri_ristiriita_kuittaukset' }, debPaivitaRistiriita)
   .subscribe();
 
 // Päivitetään lista ja Realtime-yhteys kun appi tulee taustalta etualalle
