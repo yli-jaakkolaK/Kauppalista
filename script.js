@@ -8574,11 +8574,26 @@ let kuittausjonoUudet = [];
 
 // Hakee kaikki synkatut tapahtumat, suodattaa "uudet minulle" -rivit ja
 // päivittää Kalenteri-näkymän yläosan linkin + etusivun Kalenteri-laatan merkin.
+// Aikaikkuna -14pv...+60pv (2026-09-01, Katrin päätös Supabase-egress-
+// varoituksen jälkeen: kysely haki aiemmin AINA koko historian, monen
+// vuoden Lukkarikone-datan asti — kallista jokaisella kutsulla debounssista
+// riippumatta). Sama +60pv-kaava kuin RISTIRIITA_PALLURA_PAIVIA_ETEENPAIN.
+// -14pv taaksepäin kattaa käytännön "unohdin kuitata" -viiveen; tätä
+// vanhempi kuittaamaton tapahtuma on joka tapauksessa liian vanha ollakseen
+// enää mielekkäästi "uusi".
+const KUITTAUSJONO_PAIVIA_TAAKSEPAIN = 14;
+const KUITTAUSJONO_PAIVIA_ETEENPAIN = 60;
 async function paivitaKuittausTila() {
   await paivitaKuitatutUidt();
+  const alku = new Date();
+  alku.setDate(alku.getDate() - KUITTAUSJONO_PAIVIA_TAAKSEPAIN);
+  const loppu = new Date();
+  loppu.setDate(loppu.getDate() + KUITTAUSJONO_PAIVIA_ETEENPAIN);
   const { data, error } = await db.from('kalenteri_tapahtumat')
     .select('*, kalenteri_syotteet(vari, name, scope)')
     .not('ical_uid', 'is', null)
+    .gte('event_date', paivamaaraISO(alku))
+    .lte('event_date', paivamaaraISO(loppu))
     .order('event_date');
   if (error) {
     console.error('Kuittausjonon haku epäonnistui:', error);
