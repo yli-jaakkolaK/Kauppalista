@@ -2333,6 +2333,26 @@ async function lataaOpintoKurssinDeadlinet() {
   listEl.innerHTML = '';
   (data || []).forEach(function(dl) {
     const li = document.createElement('li');
+    if (dl.palautettu) li.classList.add('opinto-deadline-palautettu');
+
+    // Valmiiksi merkintä (sql/153, 2026-09-01, Katrin kysymys: "miten
+    // hytissä voi laittaa jonkun tehtävän palautetuksi... there's no way
+    // or marking homework done") — vapaaehtoinen, EI poista riviä listasta
+    // (poisto pysyy erillisenä ×-toimintona), vain merkitsee sen tehdyksi
+    // yliviivauksella eikä laske sitä enää mihinkään kiireellisyys-
+    // laskuun (ks. muut opinto_deadlinet-kutsupaikat, kaikki suodattavat
+    // nyt .eq('palautettu', false)).
+    const check = document.createElement('input');
+    check.type = 'checkbox';
+    check.checked = !!dl.palautettu;
+    check.title = dl.tyyppi === 'koe' ? 'Suoritettu' : 'Palautettu';
+    check.addEventListener('change', async function() {
+      const { error: paivitysError } = await db.from('opinto_deadlinet').update({ palautettu: check.checked }).eq('id', dl.id);
+      if (ilmoitaKirjoitusvirheesta(paivitysError, 'Deadlinen tilan päivitys')) { check.checked = !check.checked; return; }
+      lataaOpintoKurssinDeadlinet();
+    });
+    li.appendChild(check);
+
     const teksti = document.createElement('span');
     // nimi on valinnainen (sql/141) — annettuna korvaa geneerisen "Koe"/
     // "Palautus"-sanan (tyyppi näkyy silti emojista), muuten ennallaan.
@@ -3288,8 +3308,8 @@ async function lataaReittiDeadlinet() {
   }
 
   const [{ data: kurssiDl }, { data: aiheDl }] = await Promise.all([
-    db.from('opinto_deadlinet').select('id, kurssi_id, pvm, tyyppi').in('kurssi_id', kurssiIdt).gte('pvm', tanaan),
-    db.from('opinto_deadlinet').select('id, pvm, tyyppi, opinto_aiheet!inner(name, kurssi_id)').in('opinto_aiheet.kurssi_id', kurssiIdt).gte('pvm', tanaan),
+    db.from('opinto_deadlinet').select('id, kurssi_id, pvm, tyyppi').in('kurssi_id', kurssiIdt).gte('pvm', tanaan).eq('palautettu', false),
+    db.from('opinto_deadlinet').select('id, pvm, tyyppi, opinto_aiheet!inner(name, kurssi_id)').in('opinto_aiheet.kurssi_id', kurssiIdt).gte('pvm', tanaan).eq('palautettu', false),
   ]);
 
   const kaikki = []
@@ -3452,8 +3472,8 @@ async function suoritaOpintoTavoitetahtiLaskenta() {
 
   const kurssiIdt = kurssit.map(function(k) { return k.id; });
   const [{ data: kurssiDl, error: kurssiDlError }, { data: aiheDl, error: aiheDlError }, { data: aiheet, error: aiheetError }, kapasiteettiTunteja] = await Promise.all([
-    db.from('opinto_deadlinet').select('kurssi_id, pvm').in('kurssi_id', kurssiIdt),
-    db.from('opinto_deadlinet').select('pvm, opinto_aiheet!inner(kurssi_id)').in('opinto_aiheet.kurssi_id', kurssiIdt),
+    db.from('opinto_deadlinet').select('kurssi_id, pvm').in('kurssi_id', kurssiIdt).eq('palautettu', false),
+    db.from('opinto_deadlinet').select('pvm, opinto_aiheet!inner(kurssi_id)').in('opinto_aiheet.kurssi_id', kurssiIdt).eq('palautettu', false),
     db.from('opinto_aiheet').select('id, kurssi_id, sort_order, perustussolmu, reference_tehty').in('kurssi_id', kurssiIdt),
     laskeViikonOpiskeluKapasiteettiTunteina(),
   ]);
@@ -3975,8 +3995,8 @@ async function laskeOpintoPaivanAskeleet(maxAskeliaYlikirjoitus, poissuljetutAih
 
   const eilen = paivaaEnnen(tanaan);
   const [{ data: kurssiDl }, { data: aiheDl }, { data: eilenAskeleet }, { data: eilenJumit }] = await Promise.all([
-    db.from('opinto_deadlinet').select('kurssi_id, pvm').in('kurssi_id', kurssiIdt.length ? kurssiIdt : [-1]),
-    db.from('opinto_deadlinet').select('aihe_id, pvm').in('aihe_id', aiheIdt.length ? aiheIdt : [-1]),
+    db.from('opinto_deadlinet').select('kurssi_id, pvm').in('kurssi_id', kurssiIdt.length ? kurssiIdt : [-1]).eq('palautettu', false),
+    db.from('opinto_deadlinet').select('aihe_id, pvm').in('aihe_id', aiheIdt.length ? aiheIdt : [-1]).eq('palautettu', false),
     db.from('opinto_paivan_askeleet').select('aihe_id, taitosolmu_id').eq('owner_id', currentUserId).eq('pvm', eilen).eq('tila', 'tehty'),
     db.from('opinto_jumi_merkinnat').select('aihe_id').eq('owner_id', currentUserId).gte('created_at', eilen + 'T00:00:00').lt('created_at', tanaan + 'T00:00:00'),
   ]);
@@ -4352,8 +4372,8 @@ async function piirraNytDeadlineRivi() {
   (kurssit || []).forEach(function(k) { kurssiKartta[k.id] = k.name; });
 
   const [{ data: kurssiDl }, { data: aiheDl }] = await Promise.all([
-    db.from('opinto_deadlinet').select('kurssi_id, pvm, tyyppi, nimi').in('kurssi_id', kurssiIdt),
-    db.from('opinto_deadlinet').select('pvm, tyyppi, nimi, opinto_aiheet!inner(name, kurssi_id)').in('opinto_aiheet.kurssi_id', kurssiIdt),
+    db.from('opinto_deadlinet').select('kurssi_id, pvm, tyyppi, nimi').in('kurssi_id', kurssiIdt).eq('palautettu', false),
+    db.from('opinto_deadlinet').select('pvm, tyyppi, nimi, opinto_aiheet!inner(name, kurssi_id)').in('opinto_aiheet.kurssi_id', kurssiIdt).eq('palautettu', false),
   ]);
   // nimi (sql/141, valinnainen) korvaa geneerisen "koe"/"palautus"-sanan
   // annettuna, muuten ennallaan.

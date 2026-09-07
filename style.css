@@ -3756,6 +3756,15 @@ h1 {
   margin: 10px 0;
 }
 
+/* "Palautettu/Suoritettu"-merkintä (sql/153, 2026-09-01) — yliviivaus +
+   himmennys, sama kaava kuin muualla sovelluksessa (esim.
+   .aly-log-rivi.aly-log-kumottu). Rivi PYSYY listassa (ei poistu),
+   erillinen × hoitaa varsinaisen poiston. */
+.opinto-deadline-palautettu span {
+  color: var(--vaimea);
+  text-decoration: line-through;
+}
+
 /* Ristiriitapaketti v2 (2026-08-06) — viikkopohjan päivälabel, sama rivi
    kuin .opinto-deadline-lisays mutta kiinteä kapea leveys ettei aikakentät
    hyppele rivistä toiseen eripituisten päivänimien takia. */
