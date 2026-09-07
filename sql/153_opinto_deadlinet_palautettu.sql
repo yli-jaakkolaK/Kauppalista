@@ -6,12 +6,9 @@
 -- pois kaikista kiireellisyys-/paine-laskuista (kolmiportainen kadenssi
 -- ym.) — valmis tehtävä ei saa enää painaa aikataulua.
 --
--- HUOM: tätä tiedostoa EI ole vielä ajettu — Supabase MCP -yhteys katkesi
--- kesken tämän istunnon, joten migraatiota ei voitu ajaa suoraan. Aja
--- tämä Supabasen SQL-editorista TAI pyydä ajamaan seuraavassa istunnossa
--- ennen kuin script.js:n uusi "✅ Palautettu / Suoritettu" -nappi toimii —
--- ilman saraketta kirjoitus epäonnistuu hiljaa (ilmoitaKirjoitusvirheesta
--- näyttää virheen, ei kaadu, mutta toiminto ei tallennu).
+-- Ajettu Katrin toimesta suoraan Supabasen SQL-editorista 2026-09-01
+-- (Supabase MCP -yhteys oli poikki kesken istunnon) — tämä tiedosto on
+-- historiakirjaus, ks. sql/151:n vastaava malli.
 
 begin;
 
