@@ -4786,3 +4786,18 @@ Katri sai Supabaselta suoran sähköpostin kohonneesta käytöstä ("breezed thr
 **TIETOISESTI JÄTETTY AUKI — Katrin oma päätös myöhemmäksi:** `paivitaKuittausTila()`:n oma kysely (`kalenteri_tapahtumat?select=*, ...`) ei ole päivämäärärajattu lainkaan — hakee JOKAISEN ikinä synkatun tapahtuman (koko monivuotinen Lukkarikone-historia, ks. FÖLI-löydös samalta päivältä) joka ikinen kerta kun se ajetaan, debounssista huolimatta. Tämän rajaaminen (esim. -14pv...+60pv, sama kaava kuin `RISTIRIITA_PALLURA_PAIVIA_ETEENPAIN`:llä) pienentäisi siirtomäärää lisää, MUTTA `onkoUusiMinulle()` ei ole lainkaan päivämäärätietoinen — vanha, ikinä-kuittaamaton tapahtuma vuodelta 2025 näkyisi yhä "uutena" ikuisesti nykyisellä logiikalla, joten rajaus muuttaisi ITSE TOIMINNALLISUUTTA (mitkä tapahtumat voivat koskaan näkyä "uusi minulle" -jonossa), ei vain suorituskykyä — jätetty siksi Katrin omaksi päätökseksi, ei tehty automaattisesti osana kustannuskorjausta.
 
 Jos "fair use" -varoitus tulee uudelleen lokakuun 2026 jälkeen tästä huolimatta: tarkista ensin `query_logs`-jakauma uudelleen (sama metodi kuin tässä) ennen kuin oletetaan mikä on syypää — egress voi silloin tulla jostain muualta.
+
+---
+
+## Itslearning-kalenterisynkka suljettu — 128 tuplatapahtuman todellinen juurisyy (2026-09-11)
+
+Edellinen samana päivänä tehty korjaus (`paallekkaisyysVakavuus`: hytti+hytti-pari ei koskaan 'full') oli oikea mutta vain OIRETTA hoitava — Katri palasi tarkalla, kirjoitetulla speksillä varsinaiseen syyhyn: **Itslearningin kalenterisynkka tuo Katrin koko lukujärjestyksen (luennot, tuutoroinnit, "Low-code..." istunnot) kalenteritapahtumina, VAIKKA sen pitäisi tuoda vain deadlinet/tehtävät** — Lukkarikone on jo ainoa oikea lähde live-luennoille. Tarkistettu suoraan datasta (60+ riviä syote_id=4:stä, syyskuu-marraskuu 2026): JOKAINEN rivi oli 60-120min "oikea" oppitunti, ei yhtään deadline-muotoista riviä — feed itse on siis lukujärjestysvienti, ei tehtävävienti.
+
+**Tehty (pelkkä data/konfiguraatiomuutos, EI koodimuutosta, EI deployta tarvittu):**
+- `kalenteri_syotteet.enabled = false` rivillä id=4 (Itslearning, Katri) — `caldav-sync.js` hakee jo valmiiksi vain `enabled=eq.true`-rivejä (rivi 693/732), joten tämä yksin riittää pysäyttämään synkan ilman koodin koskemista.
+- Poistettu (DELETE, ei vain peruttu=true — vältti false "🚫 Peruttu: ..." -ilmoitukset perheelle, koska nämä eivät olleet oikeita peruutuksia vaan synkkavirheen tuottamia duplikaatteja) kaikki 101 olemassa ollutta `kalenteri_tapahtumat`-riviä joilla `syote_id=4`. Tarkistettu ensin ettei mikään viittaa niihin (siirtyi_tapahtuma_id: 0, paivan_huolet: 0, muistutukset ei viittaa kalenteririveihin lainkaan tässä skeemassa) — turvallinen poisto.
+- Vahvistettu: `opinto_deadlinet` (deadline-seuranta) on TÄYSIN ERILLINEN taulu/mekanismi (käsin lisätty tai äylyn materiaalinjäsennyksestä poimittu) — ei riipu mitenkään kalenterisynkasta, joten Itslearningin kalenterisynkan sulkeminen ei vaikuta deadline-näkyvyyteen mitenkään.
+
+**EI kosketettu (Katrin oma rajaus):** Lukkarikone-synkka ennallaan. `ITSLEARNING_ICS_KATRI`-env-muuttuja jätetty koskemattomaksi (ei poistettu) siltä varalta että Itslearningistä joskus rakennetaan ERILLINEN deadline/RSS-haku — eri, myöhempi aihe.
+
+**Katrin oma huomio, ei käsitelty nyt:** "only one class has separate RSS but i'm too tired to tackle it now" — yksi kurssi (nimeä ei tarkennettu) käyttää erillistä RSS-mekanismia, jätetty tarkoituksella koskematta tässä erässä.
