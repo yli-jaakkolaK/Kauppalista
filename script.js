@@ -6136,6 +6136,20 @@ function paallekkaisyysVakavuus(a, b, isoPvm) {
   const bVastuu = b.vastuu_henkilo || b._henkilo;
   if (aVastuu && bVastuu && aVastuu !== bVastuu) return 'none';
 
+  // Molemmat puolet hytti-scopea (2026-09-11, Katrin löytö: "128 events
+  // flagging... engineering physics was flagged as ristiriita since it
+  // was in hytti and our family calendar" — todellisuudessa MOLEMMAT
+  // puolet olivat hytti: "Engineering Physics" Itslearning-syötteestä JA
+  // "HW session, Engineering Physics" Lukkarikone-syötteestä, sama
+  // luento kahdesti kahdesta ERI lähdejärjestelmästä). "full" tarkoittaa
+  // "sama henkilö fyysisesti kahdessa paikassa" — kaksi Katrin OMAA
+  // opiskelukalenterin riviä eri syötteistä ei ole tätä, vaikka
+  // syote_id on eri: se on lähdedatan päällekkäisyys, ei oikea
+  // kaksoisvaraus. Ei koskaan 'full' kun molemmat ovat hytti — enintään
+  // 'attention' (rauhoitusikkunassa, entinen käytös), muuten 'none'.
+  const molemmatHyttia = a._scope === 'hytti' && b._scope === 'hytti';
+  if (molemmatHyttia) return onkoRauhoitusIkkunassa(isoPvm) ? 'attention' : 'none';
+
   const hyttiaMukana = a._scope === 'hytti' || b._scope === 'hytti';
   if (hyttiaMukana && onkoRauhoitusIkkunassa(isoPvm)) return 'attention';
 
