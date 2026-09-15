@@ -601,75 +601,95 @@ function paivaaSiirretty(pvmStr, n) {
 // kohdeHenkilot: syotteen henkilo-kenttä JOS asetettu (henkilökohtainen
 // syöte, esim. Lukkarikone) — MUUTEN null, jolloin ilmoitus menee KAIKILLE
 // (jaettu perhekalenteri, kuka tahansa voi olla se joka olisi mennyt paikalle).
+// RINNAKKAISTETTU 2026-09-15 (Katri: "fix that in the best way you think
+// it should be fixed", viitaten aiemmin tunnistettuun mutta tietoisesti
+// koskemattomaksi jätettyyn sarjalliseen silmukkaan). Oli aiemmin
+// puhtaasti sarjallinen for-silmukka jonka jokainen kierros teki 1-3
+// peräkkäistä Supabase-pyyntöä — N peruutusta tarkoitti N*jotain
+// pyyntöä TÄYSIN peräkkäin, pahin CPU/aikariski cronin 300s-katolle jos
+// yhdellä ajolla oli paljon peruutuksia kerralla. Jokainen peruutus `p`
+// on riippumaton toisista (eri tapahtuma-id, eri mahdollinen
+// siirtynyt-kohde) — käsitellään nyt rinnakkain Promise.all:lla. YKSI `p`:n
+// SISÄLLÄ säilyy järjestys (siirtynyt-haku ENNEN ilmoitussisällön
+// rakentamista, oikea riippuvuus), mutta ilmoitukset eri kohdeuser_id:eille
+// SAMASTA tapahtumasta ovat keskenään riippumattomia ja rinnakkaistettu
+// myös. Jokainen `p`:n käsittely on omassa try/catchissään (kuten ennenkin
+// vain siirtynyt-haulle) jottei yhden peruutuksen odottamaton virhe voi
+// hylätä koko Promise.all-erää — sama suojaperiaate kuin tiedoston omassa
+// per-syote Promise.allSettled-silmukassa.
 async function kasitteleUudetPeruutukset(peruutukset, syoteId, henkiloKartta, kohdeHenkilo) {
   const kohdeUserIdt = kohdeHenkilo
     ? (henkiloKartta[kohdeHenkilo] ? [henkiloKartta[kohdeHenkilo]] : [])
     : Object.keys(henkiloKartta).map(function(h) { return henkiloKartta[h]; });
 
-  for (const p of peruutukset) {
-    let siirtynyt = null;
+  await Promise.all(peruutukset.map(async function(p) {
     try {
-      const alku = paivaaSiirretty(p.event_date, -5);
-      const loppu = paivaaSiirretty(p.event_date, 5);
-      const ehdokasRes = await supabaseFetch(
-        'kalenteri_tapahtumat?select=id,event_date,event_time&syote_id=eq.' + syoteId +
-        '&peruttu=eq.false&title=eq.' + encodeURIComponent(p.title) +
-        '&event_date=gte.' + alku + '&event_date=lte.' + loppu +
-        '&order=event_date.asc&limit=1'
-      );
-      const ehdokkaat = ehdokasRes.ok ? await ehdokasRes.json() : [];
-      siirtynyt = Array.isArray(ehdokkaat) && ehdokkaat[0] ? ehdokkaat[0] : null;
-      if (siirtynyt) {
-        const paivitysRes = await supabaseFetch('kalenteri_tapahtumat?id=eq.' + p.id, {
-          method: 'PATCH', headers: { Prefer: 'return=minimal' },
-          body: JSON.stringify({ siirtyi_tapahtuma_id: siirtynyt.id }),
+      let siirtynyt = null;
+      try {
+        const alku = paivaaSiirretty(p.event_date, -5);
+        const loppu = paivaaSiirretty(p.event_date, 5);
+        const ehdokasRes = await supabaseFetch(
+          'kalenteri_tapahtumat?select=id,event_date,event_time&syote_id=eq.' + syoteId +
+          '&peruttu=eq.false&title=eq.' + encodeURIComponent(p.title) +
+          '&event_date=gte.' + alku + '&event_date=lte.' + loppu +
+          '&order=event_date.asc&limit=1'
+        );
+        const ehdokkaat = ehdokasRes.ok ? await ehdokasRes.json() : [];
+        siirtynyt = Array.isArray(ehdokkaat) && ehdokkaat[0] ? ehdokkaat[0] : null;
+        if (siirtynyt) {
+          const paivitysRes = await supabaseFetch('kalenteri_tapahtumat?id=eq.' + p.id, {
+            method: 'PATCH', headers: { Prefer: 'return=minimal' },
+            body: JSON.stringify({ siirtyi_tapahtuma_id: siirtynyt.id }),
+          });
+          if (!paivitysRes.ok) console.error('[caldav-sync] siirtyi_tapahtuma_id-merkintä epäonnistui (tapahtuma ' + p.id + '):', paivitysRes.status);
+        }
+      } catch (e) {
+        console.error('[caldav-sync] Siirtokohteen haku epäonnistui (tapahtuma ' + p.id + '):', e.message);
+      }
+
+      if (kohdeUserIdt.length === 0) return; // ei tiedetä kenelle ilmoittaa — peruttu=true jäi silti näkyviin kalenteriin
+
+      const aikaTeksti = p.event_time ? ' klo ' + p.event_time.slice(0, 5) : '';
+      const siirtoTeksti = siirtynyt
+        ? (' — siirtynyt (arvio) ' + muotoilePvm(siirtynyt.event_date) + (siirtynyt.event_time ? ' klo ' + siirtynyt.event_time.slice(0, 5) : ''))
+        : '';
+      const sisalto = '🚫 Peruttu: ' + p.title + ' (' + muotoilePvm(p.event_date) + aikaTeksti + ')' + siirtoTeksti;
+
+      // Kohdehetki + katto (ks. yllä oleva kommentti) — päivä/kk/vuosi
+      // event_date-merkkijonosta, kellonaika joko peruutetun tunnin oma
+      // alkuperäinen aika tai (koko päivän tapahtumalle) illalla klo 23:59.
+      const [vuosi, kk, pv] = p.event_date.split('-').map(function(s) { return parseInt(s, 10); });
+      const [tunti, minuutti] = (p.event_time || '23:59:00').split(':').map(function(s) { return parseInt(s, 10); });
+      const alkuperainenHetki = helsinkiWallClockToUtc(vuosi, kk, pv, tunti, minuutti);
+      const nytMs = Date.now();
+      const KATTO_MS = 24 * 3600000;
+      const remindAtMs = Math.max(nytMs + 60000, Math.min(alkuperainenHetki.getTime(), nytMs + KATTO_MS));
+      const windowMinutes = Math.round((remindAtMs - nytMs) / 60000);
+      const frequency = Math.max(1, Math.round(windowMinutes / 60));
+
+      await Promise.all(kohdeUserIdt.map(async function(userId) {
+        const muistutusRes = await supabaseFetch('muistutukset', {
+          method: 'POST',
+          headers: { Prefer: 'return=minimal' },
+          body: JSON.stringify({
+            user_id: userId,
+            source: 'kalenteri_peruutus',
+            source_ref: String(p.id),
+            content: sisalto,
+            remind_at: new Date(remindAtMs).toISOString(),
+            persistent: true,
+            window_minutes: windowMinutes,
+            frequency: frequency,
+          }),
         });
-        if (!paivitysRes.ok) console.error('[caldav-sync] siirtyi_tapahtuma_id-merkintä epäonnistui (tapahtuma ' + p.id + '):', paivitysRes.status);
-      }
+        if (!muistutusRes.ok) {
+          console.error('[caldav-sync] Peruutusilmoituksen luonti epäonnistui (tapahtuma ' + p.id + ', user ' + userId + '):', muistutusRes.status, await muistutusRes.text());
+        }
+      }));
     } catch (e) {
-      console.error('[caldav-sync] Siirtokohteen haku epäonnistui (tapahtuma ' + p.id + '):', e.message);
+      console.error('[caldav-sync] Peruutuksen käsittely epäonnistui odottamattomasti (tapahtuma ' + p.id + '):', e.message);
     }
-
-    if (kohdeUserIdt.length === 0) continue; // ei tiedetä kenelle ilmoittaa — peruttu=true jäi silti näkyviin kalenteriin
-
-    const aikaTeksti = p.event_time ? ' klo ' + p.event_time.slice(0, 5) : '';
-    const siirtoTeksti = siirtynyt
-      ? (' — siirtynyt (arvio) ' + muotoilePvm(siirtynyt.event_date) + (siirtynyt.event_time ? ' klo ' + siirtynyt.event_time.slice(0, 5) : ''))
-      : '';
-    const sisalto = '🚫 Peruttu: ' + p.title + ' (' + muotoilePvm(p.event_date) + aikaTeksti + ')' + siirtoTeksti;
-
-    // Kohdehetki + katto (ks. yllä oleva kommentti) — päivä/kk/vuosi
-    // event_date-merkkijonosta, kellonaika joko peruutetun tunnin oma
-    // alkuperäinen aika tai (koko päivän tapahtumalle) illalla klo 23:59.
-    const [vuosi, kk, pv] = p.event_date.split('-').map(function(s) { return parseInt(s, 10); });
-    const [tunti, minuutti] = (p.event_time || '23:59:00').split(':').map(function(s) { return parseInt(s, 10); });
-    const alkuperainenHetki = helsinkiWallClockToUtc(vuosi, kk, pv, tunti, minuutti);
-    const nytMs = Date.now();
-    const KATTO_MS = 24 * 3600000;
-    const remindAtMs = Math.max(nytMs + 60000, Math.min(alkuperainenHetki.getTime(), nytMs + KATTO_MS));
-    const windowMinutes = Math.round((remindAtMs - nytMs) / 60000);
-    const frequency = Math.max(1, Math.round(windowMinutes / 60));
-
-    for (const userId of kohdeUserIdt) {
-      const muistutusRes = await supabaseFetch('muistutukset', {
-        method: 'POST',
-        headers: { Prefer: 'return=minimal' },
-        body: JSON.stringify({
-          user_id: userId,
-          source: 'kalenteri_peruutus',
-          source_ref: String(p.id),
-          content: sisalto,
-          remind_at: new Date(remindAtMs).toISOString(),
-          persistent: true,
-          window_minutes: windowMinutes,
-          frequency: frequency,
-        }),
-      });
-      if (!muistutusRes.ok) {
-        console.error('[caldav-sync] Peruutusilmoituksen luonti epäonnistui (tapahtuma ' + p.id + ', user ' + userId + '):', muistutusRes.status, await muistutusRes.text());
-      }
-    }
-  }
+  }));
 }
 
 async function haeHenkiloKartta() {
@@ -902,10 +922,15 @@ module.exports = async function handler(req, res) {
   if (kaikkiPeruutuserat.length > 0) {
     try {
       const henkiloKartta = await haeHenkiloKartta();
-      for (const era of kaikkiPeruutuserat) {
-        await kasitteleUudetPeruutukset(era.rivit, era.syoteId, henkiloKartta, era.henkilo);
+      // Rinnakkain erien (syötteiden) yli myös — kukin era on riippumaton
+      // toisista (eri syote_id), sama rinnakkaistus kuin
+      // kasitteleUudetPeruutukset():n sisällä (2026-09-15).
+      await Promise.all(kaikkiPeruutuserat.map(function(era) {
+        return kasitteleUudetPeruutukset(era.rivit, era.syoteId, henkiloKartta, era.henkilo);
+      }));
+      kaikkiPeruutuserat.forEach(function(era) {
         peruutuksiaIlmoitettu += era.rivit.length;
-      }
+      });
     } catch (e) {
       console.error('[caldav-sync] Peruutusten jälkikäsittely epäonnistui:', e.message);
     }
