@@ -163,10 +163,18 @@ async function supabaseFetch(polku, valinnat) {
 async function sendPushToOwner(muistutus, bodyText) {
   const tilausVastaus = await supabaseFetch('push_tilaukset?select=*&user_id=eq.' + muistutus.user_id);
   const tilaukset = await tilausVastaus.json();
+  // Array.isArray-suoja (2026-09-15, ks. caldav-sync.js:n samana päivänä
+  // korjattu bugiluokka) — supabaseFetch ei tarkista response.ok:ta, ja
+  // virhevastaus on kelvollista JSONia muttei taulukko; "|| []" suojaa
+  // vain null/undefinedilta, ei väärää muotoa.
+  if (!tilausVastaus.ok || !Array.isArray(tilaukset)) {
+    console.error('[muistutukset-laheta] push_tilaukset-haku epaonnistui (' + tilausVastaus.status + '):', JSON.stringify(tilaukset));
+    return { joku: false, eiRetryttavaa: true };
+  }
   const payload = JSON.stringify({ title: 'Satama ⏰', body: bodyText });
 
   let joku = false;
-  await Promise.all((tilaukset || []).map(async function(tilaus) {
+  await Promise.all(tilaukset.map(async function(tilaus) {
     try {
       await webpush.sendNotification({
         endpoint: tilaus.endpoint,
