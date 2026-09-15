@@ -4801,3 +4801,19 @@ Edellinen samana päivänä tehty korjaus (`paallekkaisyysVakavuus`: hytti+hytti
 **EI kosketettu (Katrin oma rajaus):** Lukkarikone-synkka ennallaan. `ITSLEARNING_ICS_KATRI`-env-muuttuja jätetty koskemattomaksi (ei poistettu) siltä varalta että Itslearningistä joskus rakennetaan ERILLINEN deadline/RSS-haku — eri, myöhempi aihe.
 
 **Katrin oma huomio, ei käsitelty nyt:** "only one class has separate RSS but i'm too tired to tackle it now" — yksi kurssi (nimeä ei tarkennettu) käyttää erillistä RSS-mekanismia, jätetty tarkoituksella koskematta tässä erässä.
+
+---
+
+## Vercel Fluid CPU 75% -varoitus: kaksi todistettua juurisyytä caldav-syncissä (2026-09-15)
+
+Katri sai Vercelilta varoituksen (75% ilmaisen tason 4h Fluid CPU -kiintiöstä), toi mukanaan jo valmiiksi tehdyn diagnoosin (toisesta lähteestä/työkalusta) joka osoitti oikeaan suuntaan: `/api/cron` (caldav-tehtävä) 300s-timeouteja 5.-7.9., ja `TypeError: (rivit || []).forEach is not a function` -kaatuminen JOKA ajolla. Vercelin oma lokihistoria ei ollut enää tutkittavissa (ilmaisen tason "ExceedsBillingLimitError" esti yli 24h vanhojen lokien haun) — korjaus tehtiin siis suoraan koodista + Supabase-datasta lukemalla, ei lokeista.
+
+**Juurisyy 1 — taulukko-tyyppivirhe joka kaatoi KOKO synkan ennen kuin se edes alkoi:** `haeTekijaKartta()` ajetaan KERRAN per synkka, ENNEN per-syote-silmukkaa. `supabaseFetch()` ei tarkista `response.ok`:ta — jos Supabase palauttaa virheen, `.json()` palauttaa silti kelvollisen JSON-OLION (esim. `{"message":...}`), ei taulukkoa. `(rivit || [])`-suoja auttaa vain null/undefinedia vastaan, ei väärää MUOTOA — olio on totuusarvoltaan tosi, ohittaa suojan, `.forEach()` kaatuu. Koska tämä on ENNEN per-syote-silmukkaa eikä missään try/catchissä, kaatuminen tuhosi koko cron-ajon — selittää miksi KAIKKI syotteet näyttivät epäonnistuvan samalla virheellä samaan aikaan.
+
+Korjattu (commit `b6ccfd2`): `Array.isArray()`-tarkistus + selkeä `console.error`-loki tyhjän kartan palautuksen kanssa (kaatumisen sijaan) kolmeen paikkaan joilla oli sama haavoittuvuus: `haeTekijaKartta()`, `haeHenkiloKartta()`, `siivoaPoistetut()`:n `olemassaOlevat`-haku.
+
+**Juurisyy 2 — muistutukset_source_check-rajoite ei koskaan sallinut 'kalenteri_peruutus'-arvoa:** sql/139 (29.8.2026) rakensi peruutettujen tapahtumien ilmoituskoneiston — `kasitteleUudetPeruutukset()` (caldav-sync.js) kirjoittaa `muistutukset.source = 'kalenteri_peruutus'` (script.js:7524 lukee saman arvon kuittausta varten) — mutta CHECK-rajoitetta ei koskaan laajennettu hyväksymään sitä (salli vain `rivi/kalenteri/ankkuri/hytti_rivi/laituri`). JOKA peruutusilmoitus epäonnistui rajoitevirheeseen ~2.5 viikon ajan sql/139:n ajosta asti, ja koska cron yrittää samoja jo-peruutettuja rivejä uudelleen joka 5 min (idempotenssi ei estä UUDELLEENYRITYSTÄ, vain kaksinkertaista ILMOITUSTA), tämä kulutti CPU-aikaa jatkuvasti onnistumatta koskaan.
+
+Korjattu: sql/154 (ajettu suoraan Supabase MCP:n kautta) lisää `'kalenteri_peruutus'`:n sallittuihin arvoihin.
+
+**Tietoisesti EI tehty:** `kasitteleUudetPeruutukset()`:n sisäinen per-peruutus-per-käyttäjä `for`-silmukka (sarjallinen, ei rinnakkainen) jätettiin koskemattomaksi — se on jo try/catchin sisällä (ei voi enää kaataa koko ajoa), ja nyt kun POST:it oikeasti onnistuvat (juurisyy 2 korjattu) eivätkä enää toistu joka ajolla samoille riveille, sarjallisuuden aiheuttama hidastus pienenee luultavasti itsestään merkityksettömäksi. Ei optimoitu ennakkoon ilman näyttöä että se on vielä tarpeen.
