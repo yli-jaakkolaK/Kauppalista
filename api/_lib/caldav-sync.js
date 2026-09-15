@@ -737,6 +737,13 @@ module.exports = async function handler(req, res) {
     try {
       const syotteetVastaus = await supabaseFetch('kalenteri_syotteet?select=*&enabled=eq.true');
       const syotteet = await syotteetVastaus.json();
+      // Sama Array.isArray-suoja kuin muualla tiedostossa (2026-09-15) —
+      // tama haara palauttaa jo siistin virheen try/catchin kautta jos
+      // jokin kaatuu, mutta yhdenmukaisuuden vuoksi ei luoteta sokeasti
+      // etta virhevastaus on taulukko.
+      if (!syotteetVastaus.ok || !Array.isArray(syotteet)) {
+        return res.status(502).json({ error: 'kalenteri_syotteet-haku epaonnistui', status: syotteetVastaus.status, vastaus: syotteet });
+      }
       const alku = new Date();
       alku.setDate(alku.getDate() - PAIVIA_TAAKSEPAIN);
       const loppu = new Date();
@@ -744,7 +751,7 @@ module.exports = async function handler(req, res) {
       const alkuRaja = ICAL.Time.fromJSDate(alku, true);
       const loppuRaja = ICAL.Time.fromJSDate(loppu, true);
 
-      const tulokset = await Promise.all((syotteet || []).map(async function(syote) {
+      const tulokset = await Promise.all(syotteet.map(async function(syote) {
         const icsTekstit = await haeSyoteTekstit(syote, alku.toISOString(), loppu.toISOString());
         let tapahtumat = [];
         icsTekstit.forEach(function(teksti) { tapahtumat = tapahtumat.concat(jasennaTapahtumat(teksti, alkuRaja, loppuRaja)); });
