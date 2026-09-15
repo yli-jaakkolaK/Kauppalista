@@ -416,11 +416,28 @@ async function haeSyoteTekstit(syote, alkuISO, loppuISO) {
 // user_id) kerran per synkkauskerta. Jos jonkin tapahtuman organizeria ei
 // löydy tästä kartasta, sen user_id jää NULLiksi tietokannassa — silloin
 // tapahtuma näkyy "uutena" KAIKILLE käyttäjille (turvallinen oletus).
+// KORJATTU 2026-09-15 (Katrin loyto: Vercelin Fluid CPU -kaytto 75%,
+// "TypeError: (rivit || []).forEach is not a function" JOKA cron-ajolla,
+// jokaiselle syotteelle) — supabaseFetch() EI tarkista response.ok:ta, ja
+// PostgRESTin virhevastaus (esim. {"message":..., "hint":...}) ON kelvollista
+// JSONia mutta EI taulukko. "rivit || []" suojaa vain null/undefinedilta,
+// ei vaaraa MUOTOA - virheolio on totuusarvoltaan tosi, ohittaa suojan, ja
+// .forEach() kaatuu. Kaatuminen tapahtuu TASSA, ENNEN per-syote-silmukkaa
+// (haeTekijaKartta ajetaan kerran koko synkalle) - siksi KAIKKI syotteet
+// nayttivat epaonnistuvan samalla virheella: koko funktio kaatui tanne asti
+// paasemattakaan. Sama Array.isArray-tarkistus lisatty joka .json()-tulokseen
+// joka aiemmin luotti sokeasti muotoon (ks. myos siivoaPoistetut,
+// haeHenkiloKartta) - epaonnistunut haku loggaa selkean virheen ja jatkaa
+// TYHJALLA kartalla sen sijaan etta kaataisi koko cron-ajon.
 async function haeTekijaKartta() {
   const vastaus = await supabaseFetch('kalenteri_tekijat?select=*');
   const rivit = await vastaus.json();
   const kartta = {};
-  (rivit || []).forEach(function(r) { kartta[r.organizer_tunniste] = r.user_id; });
+  if (!vastaus.ok || !Array.isArray(rivit)) {
+    console.error('[caldav-sync] kalenteri_tekijat-haku epaonnistui (' + vastaus.status + '):', JSON.stringify(rivit));
+    return kartta;
+  }
+  rivit.forEach(function(r) { kartta[r.organizer_tunniste] = r.user_id; });
   return kartta;
 }
 
@@ -494,7 +511,11 @@ async function siivoaPoistetut(syoteId, alkuPvm, loppuPvm, nahdytUidit, syncStar
     '&created_at=lt.' + encodeURIComponent(syncStartedAt)
   );
   const olemassaOlevat = await vastaus.json();
-  const poistuneet = (olemassaOlevat || []).filter(function(r) { return !nahdytUidit.has(r.ical_uid); });
+  if (!vastaus.ok || !Array.isArray(olemassaOlevat)) {
+    console.error('[caldav-sync] Olemassa olevien tapahtumien haku epaonnistui siivousta varten (syote ' + syoteId + ', ' + vastaus.status + '):', JSON.stringify(olemassaOlevat));
+    return { poistettu: 0, peruttu: [] };
+  }
+  const poistuneet = olemassaOlevat.filter(function(r) { return !nahdytUidit.has(r.ical_uid); });
   if (poistuneet.length === 0) return { poistettu: 0, peruttu: [] };
 
   const tulevat = poistuneet.filter(function(r) { return r.event_date >= tanaanPvm; });
@@ -655,7 +676,11 @@ async function haeHenkiloKartta() {
   const vastaus = await supabaseFetch('hytti_omistajat?select=henkilo,user_id');
   const rivit = await vastaus.json();
   const kartta = {};
-  (rivit || []).forEach(function(r) { kartta[r.henkilo] = r.user_id; });
+  if (!vastaus.ok || !Array.isArray(rivit)) {
+    console.error('[caldav-sync] hytti_omistajat-haku epaonnistui (' + vastaus.status + '):', JSON.stringify(rivit));
+    return kartta;
+  }
+  rivit.forEach(function(r) { kartta[r.henkilo] = r.user_id; });
   return kartta;
 }
 
