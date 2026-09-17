@@ -227,7 +227,18 @@ async function tarkistaVahdittuLepo() {
     for (const rivi of rivit) {
       const olemassaRes = await supabaseFetch('ankkurit?select=id&source=eq.vahdittu&source_ref=eq.' + rivi.id);
       const olemassa = await olemassaRes.json();
-      if (Array.isArray(olemassa) && olemassa.length > 0) continue;
+      // Array.isArray-suoja (2026-09-17, sama bugiluokka kuin sendPushToOwner
+      // yllä ja caldav-sync.js 2026-09-15: epäonnistunut haku palautti aiemmin
+      // kelvollisen mutta väärämuotoisen JSON-olion, joka läpäisi tarkistuksen
+      // ja loi kaksoiskappaleen ankkuriehdokkaan samasta vahdittu-rivistä
+      // viikkoja myöhemmin — Katrin löydös, kaksi paria duplikaatteja).
+      // Epäselvässä tilanteessa EI luoda, jotta virhe ei koskaan johda
+      // kaksoiskappaleeseen — vain onnistunut tyhjä tulos sallii jatkon.
+      if (!olemassaRes.ok || !Array.isArray(olemassa)) {
+        console.error('[muistutukset-laheta] Vahdittu-kaksoiskappaletarkistus epäonnistui rivi=' + rivi.id + ':', olemassaRes.status, JSON.stringify(olemassa));
+        continue;
+      }
+      if (olemassa.length > 0) continue;
 
       for (const userId of userIds) {
         const luontiRes = await supabaseFetch('ankkurit', {
@@ -278,7 +289,14 @@ async function isTomorrowCalm() {
 async function tarkistaKevyenPaivanEhdotus() {
   const pendingRes = await supabaseFetch('ankkurit?select=id&source=eq.kevyt_paiva&is_candidate=eq.true&done=eq.false');
   const pending = await pendingRes.json();
-  if (Array.isArray(pending) && pending.length > 0) return { ehdotettu: false, syy: 'jo_pending' };
+  // Array.isArray-suoja (2026-09-17, ks. tarkistaVahdittuLepo yllä samasta
+  // bugiluokasta) — epäselvässä tilanteessa EI ehdoteta, jottei epäonnistunut
+  // tarkistus koskaan johda kaksoiskappaleeseen.
+  if (!pendingRes.ok || !Array.isArray(pending)) {
+    console.error('[muistutukset-laheta] Kevyen päivän pending-tarkistus epäonnistui:', pendingRes.status, JSON.stringify(pending));
+    return { ehdotettu: false, syy: 'tarkistus_epaonnistui' };
+  }
+  if (pending.length > 0) return { ehdotettu: false, syy: 'jo_pending' };
 
   const kevyt = await isTomorrowCalm();
   if (!kevyt) return { ehdotettu: false, syy: 'ei_kevyt' };
@@ -351,7 +369,14 @@ async function checkCoupleTimeProposal() {
 
   const pendingRes = await supabaseFetch('ankkurit?select=id&source=eq.parisuhdeaika&is_candidate=eq.true&done=eq.false');
   const pending = await pendingRes.json();
-  if (Array.isArray(pending) && pending.length > 0) return { proposed: false, reason: 'already_pending' };
+  // Array.isArray guard (2026-09-17, same bug class as tarkistaVahdittuLepo
+  // above) — on an ambiguous result, do NOT propose, so a failed check never
+  // produces a duplicate.
+  if (!pendingRes.ok || !Array.isArray(pending)) {
+    console.error('[muistutukset-laheta] Couple time pending-check failed:', pendingRes.status, JSON.stringify(pending));
+    return { proposed: false, reason: 'check_failed' };
+  }
+  if (pending.length > 0) return { proposed: false, reason: 'already_pending' };
 
   const usersRes = await supabaseFetch('push_tilaukset?select=user_id');
   const userRows = await usersRes.json();

@@ -4829,3 +4829,15 @@ Katri: kalenterin/kotinäytön PWA-kuvakkeen punainen numero näytti pysyvän 13
 **Korjattu (script.js, `paallekkaisyysVakavuus`):** rivin 6125 sääntöön lisätty sama `molemmatHyttia`-poikkeus joka jo oli rivillä 6150 — sama syote_id EI enää ole automaattisesti 'full' jos molemmat tapahtumat ovat hytti-scopea, pudottaa nämä samaan `onkoRauhoitusIkkunassa()`-käsittelyyn (attention/none) kuin eri-syote_id-tapaus jo sai. Vahvistettu Nodella ajamalla korjattu sääntö samaa 60 päivän dataa vasten: 6 → 0 väärää 'full'-päivää.
 
 sw.js-cache bumpattu v272 → v273 (script.js muuttui, tarvitsee näkyä käyttäjälle asti).
+
+---
+
+## Ankkuriehdokas-duplikaatit — Vahdittu-lepo/Kevyt-päivä/Parisuhdeaika samat "taulukko-tyyppivirhe"-suojaamattomat idempotenssitarkistukset (2026-09-17, sama istunto jatkuu)
+
+Katri: "it should not be possible to have more than 1 of the same thing as an anchor suggestion." Tarkistettu suoraan Supabasesta: Katrin 5 ankkuriehdokkaasta 4 oli kaksi tarkkaa duplikaattiparia, sama `content` ja `source_ref`, eri `created_at` viikkojen välein (id 120 ↔ 139, "Mitä esimerkkejä Jamielin arjesta?"; id 122 ↔ 136, "Jamielin lyömistä..." — molemmat `source='vahdittu'`, samasta Vahdittu-listan tuoterivistä 615/616).
+
+**Juurisyy:** `api/_lib/muistutukset-laheta.js`:n `tarkistaVahdittuLepo()` TARKISTAA idempotenssin ennen luontia (`ankkurit?source=eq.vahdittu&source_ref=eq.<rivi.id>`, kommentti sanoo eksplisiittisesti "idempotenssi... estää saman rivin nostamisen uudelleen") — mutta tarkistus itse kärsii TÄSMÄLLEEN samasta bugiluokasta joka löydettiin ja korjattiin caldav-sync.js:stä 2026-09-15 ja tämän saman tiedoston `sendPushToOwner()`:sta samana päivänä: `supabaseFetch()` ei tarkista `response.ok`:ta, joten epäonnistunut haku palauttaa kelvollisen mutta väärämuotoisen JSON-olion; `Array.isArray(olemassa) && olemassa.length > 0` on tällöin `false`, koodi EI tulkitse tätä "duplikaatti löytyi" -tilaksi vaan putoaa läpi luomaan uuden rivin siitä huolimatta että edellinen on yhä olemassa. Sama korjaamaton kaava oli myös `tarkistaKevyenPaivanEhdotus()`:ssa ja `checkCoupleTimeProposal()`:ssa (molemmat "max yksi pending kerrallaan" -tarkistuksia) — 09-15 korjaus kosketti vain `sendPushToOwner()`:ia samassa tiedostossa, ei näitä kolmea sisarfunktiota jotka käyttävät samaa mallia.
+
+**Korjattu:** kaikkiin kolmeen lisätty `!res.ok || !Array.isArray(...)` -suoja joka epäselvässä tilanteessa OLETTAA duplikaatin/pendingin olemassaolon (ei luo/ehdota) ja lokittaa virheen — turvallisempi epäonnistumissuunta kuin oletusarvo "ei duplikaattia".
+
+**Datasiivous:** poistettu kaksi jo syntynyttä duplikaattia (id 136, 139) suoraan Supabase MCP:n kautta — ei viittauksia muualta (`aly_log.anchor_id` tarkistettu tyhjäksi näille), turvallinen poisto. Katrin ankkuriehdokkaat 5 → 3.
