@@ -4817,3 +4817,15 @@ Korjattu (commit `b6ccfd2`): `Array.isArray()`-tarkistus + selkeä `console.erro
 Korjattu: sql/154 (ajettu suoraan Supabase MCP:n kautta) lisää `'kalenteri_peruutus'`:n sallittuihin arvoihin.
 
 **Tietoisesti EI tehty:** `kasitteleUudetPeruutukset()`:n sisäinen per-peruutus-per-käyttäjä `for`-silmukka (sarjallinen, ei rinnakkainen) jätettiin koskemattomaksi — se on jo try/catchin sisällä (ei voi enää kaataa koko ajoa), ja nyt kun POST:it oikeasti onnistuvat (juurisyy 2 korjattu) eivätkä enää toistu joka ajolla samoille riveille, sarjallisuuden aiheuttama hidastus pienenee luultavasti itsestään merkityksettömäksi. Ei optimoitu ennakkoon ilman näyttöä että se on vielä tarpeen.
+
+---
+
+## Kotinäytön appikuvakkeen punainen numero jumissa 13:ssa — sama hytti-hytti-bugi eri muodossa (2026-09-17)
+
+Katri: kalenterin/kotinäytön PWA-kuvakkeen punainen numero näytti pysyvän 13:ssa aina kun se avattiin ja "mitä uutta" kuitattiin — uudet tapahtumat nostivat lukua hetkeksi, mutta se palasi aina takaisin 13:een, ei koskaan alemmas. Ei arvattu — laskettu oikea kaava suoraan Supabasesta (`huomioPallurat`: kuittausjono + laituri + asetukset + ankkurit + kalenterin ristiriitapallura) ja ajettu `paallekkaisyysVakavuus`-logiikka Nodella oikeaa 60 päivän tapahtumadataa vasten: 2 (kuittausjono) + 0 (laituri) + 0 (asetukset) + 5 (ankkurit) + **6 (ristiriitapallura)** = täsmälleen 13.
+
+**Juurisyy:** kaikki 6 "ristiriitaa" olivat Katrin OMAN Lukkarikone-lukujärjestyksen sisäisiä päällekkäisyyksiä (esim. kaksi eri kurssia molemmat klo 10:00, koulun oman lukujärjestyksen mukaan) — siis täysin sama ilmiö kuin 2026-09-11 korjattu "128 tapahtumaa"-bugi, mutta EI sen kattama tapaus: 2026-09-11 korjaus lisäsi `molemmatHyttia`-tarkistuksen (rivi ~6150) joka estää 'full'-tason kahden hytti-tapahtuman väliltä — MUTTA `paallekkaisyysVakavuus`:n ihan ensimmäinen sääntö ("sama syote_id → aina 'full'", rivi 6125) suoritetaan ennen tätä tarkistusta eikä koskaan edes tavoita sitä. Kun kaksi hytti-tapahtumaa tulee SAMASTA feedistä (sama `syote_id`, esim. molemmat Lukkarikonesta) ja menevät päällekkäin, ne olivat yhä aina 'full' — täysin riippumatta 09-11 korjauksesta. Koska nämä ovat koulun virallisen lukujärjestyksen omia päällekkäisyyksiä, ne toistuvat joka viikko koko lukukauden — badge ei siis koskaan voinut laskea niiden alle, "Keskusteltu"-kuittauskaan ei toiminut koska se on suunniteltu oikeille tapahtumapareille, ei koskaan tälle sisäiselle tapaukselle.
+
+**Korjattu (script.js, `paallekkaisyysVakavuus`):** rivin 6125 sääntöön lisätty sama `molemmatHyttia`-poikkeus joka jo oli rivillä 6150 — sama syote_id EI enää ole automaattisesti 'full' jos molemmat tapahtumat ovat hytti-scopea, pudottaa nämä samaan `onkoRauhoitusIkkunassa()`-käsittelyyn (attention/none) kuin eri-syote_id-tapaus jo sai. Vahvistettu Nodella ajamalla korjattu sääntö samaa 60 päivän dataa vasten: 6 → 0 väärää 'full'-päivää.
+
+sw.js-cache bumpattu v272 → v273 (script.js muuttui, tarvitsee näkyä käyttäjälle asti).

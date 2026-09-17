@@ -6122,7 +6122,17 @@ function tarvitseeLapsiValvontaa(lapsi, isoPvm, paallekkaisAlku, paallekkaisLopp
 //                ole, tai kaikki tarvitsevat-valvontaa-lapset on katettu,
 //                tai kukaan lapsi ei ole hoivaikkunassa juuri silloin.
 function paallekkaisyysVakavuus(a, b, isoPvm) {
-  if (a.syote_id && b.syote_id && a.syote_id === b.syote_id) return 'full';
+  // Sama syote_id MUTTA molemmat hytti-scopea (esim. kaksi Lukkarikone-
+  // kurssia menee koulun omassa lukujärjestyksessä päällekkäin) EI ole
+  // 'full' — sama periaate kuin alempana olevassa molemmatHyttia-tarkistuk-
+  // sessa (2026-09-17, Katrin löytö: kuudesti viikoittain toistuva lukkari-
+  // päällekkäisyys piti kalenterin ristiriitapalluraa/kotinäytön appikuva-
+  // ketta jumissa numerossa 13, koska tämä ensimmäinen sääntö suoritettiin
+  // ENNEN alempaa molemmatHyttia-tarkistusta eikä koskaan tavoittanut sitä).
+  // "full" tarkoittaa fyysistä kaksoisvarausta — Katrin oma opiskeluaika-
+  // taulun sisäinen päällekkäisyys ei ole sitä, ks. molemmatHyttia-kommentti
+  // alempana samasta periaatteesta eri syote_id:n tapauksessa.
+  if (a.syote_id && b.syote_id && a.syote_id === b.syote_id && !(a._scope === 'hytti' && b._scope === 'hytti')) return 'full';
 
   // Eri vastuuhenkilö hoitaa (sql/135, Katrin pyyntö 2026-08-18: "is there a
   // way to mark in satama who is going where") — jos MOLEMMILLA puolilla on
