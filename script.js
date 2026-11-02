@@ -11132,8 +11132,9 @@ async function lataaLaituri(hakusana) {
     // Bucket on yksityinen, joten tarvitaan allekirjoitettu URL (haetaan
     // taustalla ettei listan piirto odota).
     const kuvaTiedosto = tiedostoKartta[rivi.id];
-    if (kuvaTiedosto && /^image\//.test(kuvaTiedosto.mime_tyyppi || '') && kuvaTiedosto.mime_tyyppi !== 'image/heic') {
+    if (kuvaTiedosto && /^image\//.test(kuvaTiedosto.mime_tyyppi || '') && !/hei[cf]$/.test(kuvaTiedosto.mime_tyyppi)) {
       const kuva = document.createElement('img');
+      kuva.addEventListener('error', function() { kuva.remove(); });
       kuva.className = 'laituri-kuva';
       kuva.alt = otsikkoTeksti;
       kuva.loading = 'lazy';
@@ -14336,7 +14337,7 @@ function tyhjennaEditoriLuonnos() {
 // jälkeen (ei odota editorin sulkemista) — sama materiaaliKohdeKurssi-
 // lippu koskee sitä kuin editorin omaa tekstiäkin, jos kurssikontekstissa.
 const TIEDOSTO_HYLATYT_PAATTEET = ['doc', 'docx', 'zip', 'rar', '7z', 'tar', 'gz', 'ipynb'];
-const TIEDOSTO_KUVA_PAATTEET = ['jpg', 'jpeg', 'png', 'heic'];
+const TIEDOSTO_KUVA_PAATTEET = ['jpg', 'jpeg', 'png', 'heic', 'heif'];
 const TIEDOSTO_PDF_KOKORAJA = 32 * 1024 * 1024;
 const TIEDOSTO_MUU_KOKORAJA = 20 * 1024 * 1024;
 
@@ -14419,8 +14420,32 @@ async function kasitteleEditoriTiedosto(file, tilaElId) {
     // pdf/kuva/pptx: ladataan Storageen SUORAAN selaimesta (ei tämän
     // palvelimen kautta — pyyntökoko olisi liian pieni isolle pdf:lle,
     // ks. api/laituri-tiedosto-poiminta.js:n oma kommentti).
-    const polku = currentUserId + '/' + Date.now() + '_' + file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
-    const { error: uploadError } = await db.storage.from('materiaali').upload(polku, file, { contentType: file.type || 'application/octet-stream' });
+    // HEIC (iPhonen oletuskuvamuoto) muunnetaan JPEG:ksi ennen tallennusta,
+    // koska useimmat selaimet eivät näytä HEIC:iä. Muunnos onnistuu laitteilla
+    // jotka osaavat purkaa HEIC:n (iPhone/Safari); muuten tallennetaan alkuperäinen.
+    let lahetettava = file;
+    let lahetettavaNimi = file.name;
+    const onHeic = tyyppi === 'kuva' && (/^image\/hei[cf]$/.test(file.type) || ['heic', 'heif'].indexOf(tiedostonPaate(file.name)) !== -1);
+    if (onHeic) {
+      try {
+        const bitmap = await createImageBitmap(file);
+        const canvas = document.createElement('canvas');
+        canvas.width = bitmap.width;
+        canvas.height = bitmap.height;
+        canvas.getContext('2d').drawImage(bitmap, 0, 0);
+        const jpegBlob = await new Promise(function(resolve) { canvas.toBlob(resolve, 'image/jpeg', 0.9); });
+        if (jpegBlob) {
+          lahetettava = jpegBlob;
+          lahetettavaNimi = file.name.replace(/\.[^.]+$/, '') + '.jpg';
+        }
+      } catch (muunnosVirhe) {
+        console.error('HEIC-muunnos epäonnistui, tallennetaan alkuperäinen:', muunnosVirhe.message);
+      }
+    }
+    const lahetettavaTyyppi = lahetettava === file ? (file.type || 'application/octet-stream') : 'image/jpeg';
+
+    const polku = currentUserId + '/' + Date.now() + '_' + lahetettavaNimi.replace(/[^a-zA-Z0-9._-]/g, '_');
+    const { error: uploadError } = await db.storage.from('materiaali').upload(polku, lahetettava, { contentType: lahetettavaTyyppi });
     if (uploadError) {
       console.error('Tiedoston tallennus Storageen epäonnistui:', uploadError);
       naytaEditoriTiedostoTila('Tallennus epäonnistui — yritä uudelleen.', true, tilaElId);
@@ -14467,8 +14492,8 @@ async function kasitteleEditoriTiedosto(file, tilaElId) {
       muru_id: uusiRivi.id,
       tiedostonimi: file.name,
       storage_polku: polku,
-      mime_tyyppi: file.type || 'application/octet-stream',
-      koko_tavua: file.size,
+      mime_tyyppi: lahetettavaTyyppi,
+      koko_tavua: lahetettava.size,
       poimittu_teksti: poimittuTeksti,
       poiminta_menetelma: poimintaMenetelma,
     });
