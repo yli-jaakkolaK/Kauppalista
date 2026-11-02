@@ -11135,6 +11135,11 @@ async function lataaLaituri(hakusana) {
     if (kuvaTiedosto && /^image\//.test(kuvaTiedosto.mime_tyyppi || '') && !/hei[cf]$/.test(kuvaTiedosto.mime_tyyppi)) {
       const kuva = document.createElement('img');
       kuva.addEventListener('error', function() { kuva.remove(); });
+      // Kuvan ollessa näkyvillä "📷 tiedostonimi" -teksti on turha; jos kuva
+      // ei lataudu, teksti jää näkyviin varalle.
+      if (otsikkoTeksti.indexOf('📷 ') === 0) {
+        kuva.addEventListener('load', function() { teksti.style.display = 'none'; });
+      }
       kuva.className = 'laituri-kuva';
       kuva.alt = otsikkoTeksti;
       kuva.loading = 'lazy';
