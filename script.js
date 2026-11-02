@@ -8422,7 +8422,7 @@ function avaaViikkoTapahtumaTiedot(t, iso) {
   otsikko.textContent = (t.peruttu ? '🚫 Peruttu: ' : '') + t.title;
   lehti.appendChild(otsikko);
 
-  const lisaaRivi = function(nimike, arvo) {
+  const lisaaRivi = function(nimike, arvo, monirivinen) {
     if (!arvo) return;
     const rivi = document.createElement('div');
     rivi.className = 'viikko-tiedot-rivi';
@@ -8431,6 +8431,7 @@ function avaaViikkoTapahtumaTiedot(t, iso) {
     n.textContent = nimike;
     const a = document.createElement('span');
     a.textContent = arvo;
+    if (monirivinen) a.style.whiteSpace = 'pre-line';
     rivi.appendChild(n);
     rivi.appendChild(a);
     lehti.appendChild(rivi);
@@ -8445,6 +8446,7 @@ function avaaViikkoTapahtumaTiedot(t, iso) {
   lisaaRivi('Paikka', tapahtumanSijaintiteksti(t));
   lisaaRivi('Kalenteri', t.kalenteri_syotteet ? t.kalenteri_syotteet.name : null);
   lisaaRivi('Kenen', t._henkilo ? henkiloNimi(t._henkilo) : null);
+  lisaaRivi('Kuvaus', t.description, true);
 
   const paivaNappi = document.createElement('button');
   paivaNappi.type = 'button';

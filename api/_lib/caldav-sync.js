@@ -277,6 +277,7 @@ function jasennaTapahtumat(icsTeksti, alkuRaja, loppuRaja) {
           // vain tallennus puuttui aiemmin. Vapaamuotoinen teksti, täsmäys
           // Föli-pysäkkeihin tehdään sovelluspuolella.
           location: event.location || null,
+          description: event.description || null,
           cancelled: !!(tila && String(tila).toUpperCase() === 'CANCELLED'),
         });
         return;
@@ -319,6 +320,7 @@ function jasennaTapahtumat(icsTeksti, alkuRaja, loppuRaja) {
             // kerta on voitu siirtää eri paikkaan (samalla periaatteella
             // kuin tila/otsikko-luku yllä).
             location: tiedot.item.component.getFirstPropertyValue('location') || null,
+            description: tiedot.item.component.getFirstPropertyValue('description') || null,
             cancelled: !!(tila && String(tila).toUpperCase() === 'CANCELLED'),
           });
         }
@@ -455,6 +457,9 @@ function taydeksiTapahtumaksi(t) {
     // periaate kuin nimi/osallistujat: vain_varattu-tilan tapahtuma ei saa
     // vuotaa mitään yksityiskohtaa (ks. varattuTapahtumaksi()-kommentti alla).
     location: t.location,
+    // Kuvaus (sql/155) — VAIN taysi-tilassa, esim. Lukkarikoneen opintoryhmä
+    // viikkonäkymän tietolehteen. Rajattu ettei pitkä kuvaus paisuta riviä.
+    description: t.description ? String(t.description).slice(0, 2000) : null,
     // ks. sql/139_kalenteri_peruutus.sql yläkommentti.
     peruttu: !!t.cancelled,
   };
