@@ -8363,8 +8363,11 @@ function piirraViikkoFoliMerkit(paivanFoliLegit) {
     merkki.style.top = topPct + '%';
     merkki.style.height = Math.max(0, minutesToPercent(s.loppu) - topPct) + '%';
     const vari = s.vari || 'var(--syvanne)';
+    // Matka-aika on TAUSTAVIHJE, ei kilpaile oikeiden tapahtumien kanssa:
+    // ohut, vaalea raidoitus (2026-11-02, "meeting/school blocks should be
+    // stronger than traveltime").
     merkki.style.background = 'repeating-linear-gradient(135deg, '
-      + vari + ' 0, ' + vari + ' 3px, ' + vari + '55 3px, ' + vari + '55 6px)';
+      + vari + '3D 0, ' + vari + '3D 2px, ' + vari + '14 2px, ' + vari + '14 6px)';
     const viiveTeksti = typeof s.viiveMin === 'number' ? (' (' + (s.viiveMin >= 0 ? '+' : '') + s.viiveMin + ' min)') : '';
     const kestoTeksti = s.kestoMin
       ? (s.kestoMin + ' min' + (s.linja ? ' (linja ' + s.linja + ')' : '') + viiveTeksti)
@@ -8489,7 +8492,7 @@ function piirraViikkoTuntialue(paivanAjalliset, henkselitLista, iso, paivanSessi
     palkki.style.right = 'auto';
     const vari = resolveEventOwnerColor(t);
     palkki.style.borderLeftColor = vari;
-    palkki.style.backgroundColor = vari + '26'; // ~15% peittävyys (hex-alpha)
+    palkki.style.backgroundColor = vari + '5C'; // ~36% peittävyys (hex-alpha), vahvempi kuin matka-aika
 
     // Nimi näkyy AINA (2026-08-18, kalenterin UI-uudistus, Katrin ohje:
     // "teksti ei saa koskaan katketa piiloon" — ei enää title-tooltip-

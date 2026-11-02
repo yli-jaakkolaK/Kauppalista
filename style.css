@@ -846,6 +846,7 @@ h1 {
 .kalenteri-viikko-paiva-otsikko {
   height: 18px;
   font-size: 11px;
+  letter-spacing: .06em;
   text-align: center;
   color: var(--muste);
   cursor: pointer;
@@ -882,15 +883,22 @@ h1 {
   position: relative;
   height: 544px;
   border-top: 1px solid var(--hius);
-  border-left: 1px solid var(--hius-vahva);
+  border-left: 1px solid var(--hius);
+  /* Tuntiviivat vain hiusviivoina — rauhallinen ruudukko, jotta tapahtumat
+     (ei ruudukko) kantavat visuaalisen painon. */
   background-image: repeating-linear-gradient(
     to bottom,
-    var(--hius-vahva) 0,
-    var(--hius-vahva) 1px,
+    var(--hius) 0,
+    var(--hius) 1px,
     transparent 1px,
     transparent calc(100% / 16)
   );
 }
+.kalenteri-viikko-paiva.tanaan .kalenteri-viikko-tuntialue {
+  background-color: rgba(156, 122, 67, .07);
+}
+/* Henkselit-tausta (vapaa-ajan merkki) viikolla taustakerrokseksi, ei huutavaksi */
+.kalenteri-viikko-tuntialue .henkselit-tausta:not(.henkselit-tausta--osittainen) { opacity: .5; }
 
 /* Palkki EI enää leikkaa sisältöään (overflow oli aiemmin hidden, ks.
    poistettu VIIKKO_BADGE_NIMI_RAJA_PX-kommentti script.js:ssä) — nimi ja
@@ -906,9 +914,9 @@ h1 {
   left: 2px;
   right: 2px;
   min-height: 16px;
-  border-left: 3px solid;
-  border-radius: 2px;
-  padding: 2px 4px;
+  border-left: 4px solid;
+  border-radius: var(--r-luettava);
+  padding: 2px 5px;
   display: flex;
   flex-direction: column;
   align-items: flex-start;
@@ -919,7 +927,8 @@ h1 {
 
 .kalenteri-viikko-nimi {
   font-size: 11px;
-  font-weight: 600;
+  font-weight: 700;
+  line-height: 1.25;
   color: var(--muste);
   white-space: normal;
   overflow-wrap: break-word;
@@ -959,14 +968,14 @@ h1 {
   right: 2px;
   min-height: 4px;
   border-radius: 3px;
-  opacity: .85;
+  opacity: 1;
   overflow: hidden;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 10px;
-  font-weight: 600;
-  color: var(--muste);
+  font-size: 9px;
+  font-weight: 400;
+  color: var(--vaimea);
   white-space: nowrap;
 }
 
