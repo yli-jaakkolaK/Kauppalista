@@ -4338,6 +4338,18 @@ function kelloMinuuteista(min) {
   return String(Math.floor(min / 60)).padStart(2, '0') + ':' + String(min % 60).padStart(2, '0');
 }
 
+// Oikean bussin odotettu lähtöaika pysäkiltä (SIRI, vain tälle päivälle, ks.
+// foli.js:n haeFoliLahtoBussi) tekstinä päivänäkymien FÖLI-riveille, tai ''
+// jos live-tietoa ei ole. Esim. " — bussi klo 08:42 (+3 min myöhässä)".
+function foliBussiTeksti(s) {
+  if (typeof s.bussiLahtoMin !== 'number') return '';
+  let teksti = ' — bussi klo ' + kelloMinuuteista(s.bussiLahtoMin);
+  if (typeof s.bussiViiveMin === 'number' && s.bussiViiveMin !== 0) {
+    teksti += ' (' + (s.bussiViiveMin > 0 ? '+' : '') + s.bussiViiveMin + ' min ' + (s.bussiViiveMin > 0 ? 'myöhässä' : 'etuajassa') + ')';
+  }
+  return teksti;
+}
+
 async function piirraOpintoTanaanOsio(kaikkiAskeleet) {
   const osio = document.getElementById('opinto-tanaan-osio');
   // Boost asuu nyt omassa, sivun alimmaisessa säiliössään (2026-08-18, ks.
@@ -4625,7 +4637,7 @@ function piirraNytLokiRivi(rivi) {
     el.className = 'nyt-loki-rivi live siirtyma siirtyma-arvio';
     const suuntaTeksti = rivi.suunta === 'paluu' ? 'paluumatka — ' : (rivi.suunta === 'valietappi' ? 'siirtymä — ' : 'menomatka — ');
     const kestoTeksti = rivi.kestoMin
-      ? ('n. ' + rivi.kestoMin + ' min' + (rivi.linja ? ' (linja ' + rivi.linja + ')' : '') + ' — ')
+      ? ('n. ' + rivi.kestoMin + ' min ovelta ovelle' + (rivi.linja ? ' (linja ' + rivi.linja + ')' : '') + foliBussiTeksti(rivi) + ' — ')
       : ('lähin pysäkki, n. ' + rivi.etaisyysM + ' m — ');
     // SIRI-viive (2026-08-31, Katrin pyyntö: "where timetable time is
     // shown - or + and then number of minutes") — vain kun tänään JA
@@ -7823,7 +7835,7 @@ async function lataaKalenteri() {
       const suuntaEtu = s.suunta === 'paluu' ? '(paluu) ' : (s.suunta === 'valietappi' ? '(siirtymä) ' : '');
       const viiveTeksti = typeof s.viiveMin === 'number' ? (' (' + (s.viiveMin >= 0 ? '+' : '') + s.viiveMin + ' min)') : '';
       const title = s.kestoMin
-        ? '🚏 ' + suuntaEtu + s.pysakkiNimi + ' — n. ' + s.kestoMin + ' min' + (s.linja ? ' (linja ' + s.linja + ')' : '') + viiveTeksti
+        ? '🚏 ' + suuntaEtu + s.pysakkiNimi + ' — n. ' + s.kestoMin + ' min ovelta ovelle' + (s.linja ? ' (linja ' + s.linja + ')' : '') + (typeof s.bussiLahtoMin === 'number' ? foliBussiTeksti(s) : viiveTeksti)
         : '🚏 ' + suuntaEtu + s.pysakkiNimi + ' (n. ' + s.etaisyysM + ' m)';
       rivit.push({ _tyyppi: 'foli-siirtyma', title: title, event_time: alkuAika + ':00' });
     });
