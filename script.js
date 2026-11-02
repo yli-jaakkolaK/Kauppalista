@@ -8365,7 +8365,7 @@ function tummennaVari(hex, osuus) {
   return '#' + osat.map(function(v) { return v.toString(16).padStart(2, '0'); }).join('');
 }
 
-function piirraViikkoFoliMerkit(paivanFoliLegit, slotKartta) {
+function piirraViikkoFoliMerkit(paivanFoliLegit, slotKartta, iso) {
   return (paivanFoliLegit || []).map(function(s) {
     const merkki = document.createElement('div');
     merkki.className = 'kalenteri-viikko-foli-merkki';
@@ -8402,7 +8402,37 @@ function piirraViikkoFoliMerkit(paivanFoliLegit, slotKartta) {
     // Palkki on nyt koko sarakkeen levyinen ja korkeus = matka-aika; teksti
     // vain jos palkki on tarpeeksi korkea sille (≥14 px), muuten pelkkä raita.
     const korkeusPx = (parseFloat(merkki.style.height) / 100) * VIIKKO_TUNTIALUE_KORKEUS_PX;
-    if (s.kestoMin && korkeusPx >= 14) merkki.textContent = '🚏 ' + s.kestoMin + ' min';
+    // Teksti: oikean bussin (SIRI, vain tälle päivälle) ODOTETTU lähtöaika
+    // pysäkiltä, +viive jos bussi on myöhässä/ajoissa; muuten matkan kesto.
+    const onBussi = typeof s.bussiLahtoMin === 'number';
+    if (korkeusPx >= 14 && (onBussi || s.kestoMin)) {
+      let teksti = onBussi ? '🚏 ' + kelloMinuuteista(s.bussiLahtoMin) : '🚏 ' + s.kestoMin + ' min';
+      if (onBussi && typeof s.bussiViiveMin === 'number' && s.bussiViiveMin !== 0) {
+        teksti += ' ' + (s.bussiViiveMin > 0 ? '+' : '') + s.bussiViiveMin;
+      }
+      merkki.textContent = teksti;
+    }
+    if (onBussi) {
+      merkki.title += ' — bussi lähtee klo ' + kelloMinuuteista(s.bussiLahtoMin);
+    }
+    merkki.style.cursor = 'pointer';
+    merkki.addEventListener('click', function(e) {
+      e.stopPropagation();
+      let viiveRivi = null;
+      if (onBussi && typeof s.bussiViiveMin === 'number') {
+        viiveRivi = s.bussiViiveMin === 0 ? 'Aikataulussa'
+          : (Math.abs(s.bussiViiveMin) + ' min ' + (s.bussiViiveMin > 0 ? 'myöhässä' : 'etuajassa'));
+      }
+      avaaViikkoTietolehti(suuntaNimi.replace(' — ', ''), [
+        ['Bussi', onBussi ? ((s.linja ? 'Linja ' + s.linja + ', ' : '') + 'lähtee klo ' + kelloMinuuteista(s.bussiLahtoMin)) : (s.linja ? 'Linja ' + s.linja : null)],
+        ['Viive', viiveRivi],
+        ['Pysäkki', s.lahtoPysakkiNimi],
+        ['Kohde', s.pysakkiNimi],
+        ['Matka', s.kestoMin ? (s.kestoMin + ' min') : ('n. ' + s.etaisyysM + ' m')],
+        ['Lähde viimeistään', kelloMinuuteista(s.alku)],
+        ['Tieto', onBussi ? 'Reaaliaikainen (Föli)' : 'Laskettu aikataulusta — reaaliaikainen näkyy vain tälle päivälle'],
+      ], iso);
+    });
     return merkki;
   });
 }
@@ -8438,6 +8468,23 @@ function tapahtumanSijaintiteksti(t) {
 // palvelee sekä Kalenteria että Hytti/Reitti-viikkoa, koska ne jakavat
 // piirraViikkoAikajana():n.
 function avaaViikkoTapahtumaTiedot(t, iso) {
+  const pvm = new Date(iso + 'T00:00:00');
+  let aikaTeksti = VIIKONPAIVA_LYHENTEET[(pvm.getDay() + 6) % 7] + ' ' + pvm.getDate() + '.' + (pvm.getMonth() + 1) + '.';
+  if (t.event_time) {
+    aikaTeksti += ' klo ' + t.event_time.slice(0, 5) + (t.event_end_time ? '–' + t.event_end_time.slice(0, 5) : '');
+  }
+  avaaViikkoTietolehti((t.peruttu ? '🚫 Peruttu: ' : '') + t.title, [
+    ['Aika', aikaTeksti],
+    ['Paikka', tapahtumanSijaintiteksti(t)],
+    ['Kalenteri', t.kalenteri_syotteet ? t.kalenteri_syotteet.name : null],
+    ['Kenen', t._henkilo ? henkiloNimi(t._henkilo) : null],
+    ['Kuvaus', t.description, true],
+  ], iso);
+}
+
+// Yleinen viikkonäkymän tietolehti: otsikko + [nimike, arvo, monirivinen] -rivit
+// + "Avaa päivänäkymä". Palvelee sekä tapahtumia että matka-aikapalkkeja.
+function avaaViikkoTietolehti(otsikkoTeksti, rivit, iso) {
   const vanha = document.getElementById('viikko-tiedot-tausta');
   if (vanha) vanha.remove();
 
@@ -8451,7 +8498,7 @@ function avaaViikkoTapahtumaTiedot(t, iso) {
 
   const otsikko = document.createElement('h3');
   otsikko.className = 'viikko-tiedot-otsikko';
-  otsikko.textContent = (t.peruttu ? '🚫 Peruttu: ' : '') + t.title;
+  otsikko.textContent = otsikkoTeksti;
   lehti.appendChild(otsikko);
 
   const lisaaRivi = function(nimike, arvo, monirivinen) {
@@ -8470,15 +8517,7 @@ function avaaViikkoTapahtumaTiedot(t, iso) {
   };
 
   const pvm = new Date(iso + 'T00:00:00');
-  let aikaTeksti = VIIKONPAIVA_LYHENTEET[(pvm.getDay() + 6) % 7] + ' ' + pvm.getDate() + '.' + (pvm.getMonth() + 1) + '.';
-  if (t.event_time) {
-    aikaTeksti += ' klo ' + t.event_time.slice(0, 5) + (t.event_end_time ? '–' + t.event_end_time.slice(0, 5) : '');
-  }
-  lisaaRivi('Aika', aikaTeksti);
-  lisaaRivi('Paikka', tapahtumanSijaintiteksti(t));
-  lisaaRivi('Kalenteri', t.kalenteri_syotteet ? t.kalenteri_syotteet.name : null);
-  lisaaRivi('Kenen', t._henkilo ? henkiloNimi(t._henkilo) : null);
-  lisaaRivi('Kuvaus', t.description, true);
+  rivit.forEach(function(r) { lisaaRivi(r[0], r[1], r[2]); });
 
   const paivaNappi = document.createElement('button');
   paivaNappi.type = 'button';
@@ -8505,7 +8544,7 @@ function piirraViikkoTuntialue(paivanAjalliset, henkselitLista, iso, paivanSessi
   const slotit = assignWeekOverlapSlots(paivanAjalliset);
   const slotKartta = new Map();
   slotit.forEach(function(k) { slotKartta.set(k.tapahtuma.id, k); });
-  piirraViikkoFoliMerkit(paivanFoliLegit, slotKartta).forEach(function(merkki) { alue.appendChild(merkki); });
+  piirraViikkoFoliMerkit(paivanFoliLegit, slotKartta, iso).forEach(function(merkki) { alue.appendChild(merkki); });
   slotit.forEach(function(kohde) {
     const t = kohde.tapahtuma;
     const palkki = document.createElement('div');

@@ -362,6 +362,32 @@ async function haeFoliViiveMin(pysakkiId, linja, kohdeAikaMin, paivaMs) {
   return typeof paras.delay === 'number' ? Math.round(paras.delay / 60) : null;
 }
 
+// Oikea bussi pysäkiltä SIRI:n reaaliaikaisesta lähtötaulusta: SAMAN linjan
+// (Digitransitin kertoma) viimeinen lähtö jonka ODOTETTU lähtöaika on
+// korkeintaan kohdeAikaMin (= viimeinen hetki jolloin matkalle pitää lähteä).
+// Odotettu aika (ei aikataulun mukainen) otetaan huomioon, joten myöhässä
+// oleva bussi joka ehtisi lähteä vasta liian myöhään ei kelpaa — silloin
+// näytetään sitä edellinen. Palauttaa { odotettuMin, viiveMin } (minuuttia
+// vuorokauden alusta) tai null jos SIRI:ssä ei ole sopivaa lähtöä (esim.
+// muu kuin tämä päivä, tai lähtö on liian kaukana tulevaisuudessa).
+async function haeFoliLahtoBussi(pysakkiId, linja, kohdeAikaMin, paivaMs) {
+  if (!linja) return null;
+  const lahdot = await haeFoliLahdot(pysakkiId);
+  const rajaMs = paivaMs + kohdeAikaMin * 60000;
+  let paras = null;
+  lahdot.forEach(function(l) {
+    if (l.lineref !== linja) return;
+    const odotettuMs = l.expecteddeparturetime * 1000;
+    if (odotettuMs > rajaMs) return;
+    if (!paras || odotettuMs > paras.expecteddeparturetime * 1000) paras = l;
+  });
+  if (!paras) return null;
+  return {
+    odotettuMin: Math.round((paras.expecteddeparturetime * 1000 - paivaMs) / 60000),
+    viiveMin: typeof paras.delay === 'number' ? Math.round(paras.delay / 60) : null,
+  };
+}
+
 // Yhden kohteen sijainti+pysäkki+ajoitustiedot valmiiksi (käytetään
 // ketjutuksessa alla) — palauttaa null jos sijaintia ei saada tai kohde
 // on käytännössä koti itse (2026-08-31, Katrin löytö: "Jamielin
@@ -459,7 +485,14 @@ async function haeFoliSiirtymatPaivalle(tapahtumat, paivanIso, varattu) {
       ? await haeFoliViiveMin(lahto.pysakkiId, kesto.linja, alku, paivaMs)
       : null;
 
+    const bussi = onkoTanaan && kesto
+      ? await haeFoliLahtoBussi(lahto.pysakkiId, kesto.linja, alku, paivaMs)
+      : null;
+
     rivit.push({
+      bussiLahtoMin: bussi ? bussi.odotettuMin : null,
+      bussiViiveMin: bussi ? bussi.viiveMin : null,
+      lahtoPysakkiNimi: lahto.p.stop_name,
       tyyppi: 'siirtyma-uusi',
       suunta: onLahtoKoti ? 'meno' : (onSaapumisKoti ? 'paluu' : 'valietappi'),
       alku: alku, loppu: loppu,
