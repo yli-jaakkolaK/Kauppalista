@@ -11128,6 +11128,27 @@ async function lataaLaituri(hakusana) {
     teksti.textContent = otsikkoTeksti;
     sisalto.appendChild(teksti);
 
+    // Kuvaliite näytetään kuvana, ei pelkkänä "📷 tiedostonimi" -tekstinä.
+    // Bucket on yksityinen, joten tarvitaan allekirjoitettu URL (haetaan
+    // taustalla ettei listan piirto odota).
+    const kuvaTiedosto = tiedostoKartta[rivi.id];
+    if (kuvaTiedosto && /^image\//.test(kuvaTiedosto.mime_tyyppi || '') && kuvaTiedosto.mime_tyyppi !== 'image/heic') {
+      const kuva = document.createElement('img');
+      kuva.className = 'laituri-kuva';
+      kuva.alt = otsikkoTeksti;
+      kuva.loading = 'lazy';
+      kuva.style.cssText = 'display:block;max-width:100%;max-height:240px;margin-top:6px;border-radius:8px;';
+      sisalto.appendChild(kuva);
+      db.storage.from('materiaali').createSignedUrl(kuvaTiedosto.storage_polku, 3600).then(function(res) {
+        if (res.error || !res.data) {
+          console.error('Kuvan URL:n haku epäonnistui:', res.error);
+          kuva.remove();
+          return;
+        }
+        kuva.src = res.data.signedUrl;
+      });
+    }
+
     // BUGIKORJAUS ("Laiturin ⚓-tilan näkyvyys"): sijoittamaton ja jo-
     // ankkurina-oleva muru näyttivät identtisiltä — ⚓-napin oma väri/opacity-
     // ero (ks. .anchor-btn.active) ei riittänyt vilkaisulle. Tieto tilasta
