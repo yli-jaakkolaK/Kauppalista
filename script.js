@@ -8355,6 +8355,16 @@ function piirraViikkoOpiskeluMerkit(paivanSessiot) {
 // leveämpi/tummempi kuin ensimmäinen versio, jotta lukee "varattu tila"
 // eikä pelkkä ohut reunavihje (Katrin pyyntö: "like actually blocking
 // events from that time slot").
+// Sekoittaa #RRGGBB-värin mustetta (#221F1A) osuuden verran — tummentaa
+// reunaviivan riittävän kontrastiseksi paperia (#EAE6DC) vasten.
+function tummennaVari(hex, osuus) {
+  const muste = [0x22, 0x1F, 0x1A];
+  const osat = [1, 3, 5].map(function(i, k) {
+    return Math.round(parseInt(hex.slice(i, i + 2), 16) * (1 - osuus) + muste[k] * osuus);
+  });
+  return '#' + osat.map(function(v) { return v.toString(16).padStart(2, '0'); }).join('');
+}
+
 function piirraViikkoFoliMerkit(paivanFoliLegit, slotKartta) {
   return (paivanFoliLegit || []).map(function(s) {
     const merkki = document.createElement('div');
@@ -8375,8 +8385,14 @@ function piirraViikkoFoliMerkit(paivanFoliLegit, slotKartta) {
     // Matka-aika on TAUSTAVIHJE, ei kilpaile oikeiden tapahtumien kanssa:
     // ohut, vaalea raidoitus (2026-11-02, "meeting/school blocks should be
     // stronger than traveltime").
-    merkki.style.background = 'repeating-linear-gradient(135deg, '
-      + vari + '3D 0, ' + vari + '3D 2px, ' + vari + '14 2px, ' + vari + '14 6px)';
+    // Yksivärinen (ei raitoja, rauhallisempi): vaalea tasainen täyttö + ohut
+    // tummennettu reunaviiva. WCAG 2.2: reuna ≥3:1 paperia vasten (1.4.11,
+    // mitattu kaikille omistajaväreille ≥3.9:1), teksti muste-värillä ≥7:1
+    // täyttöä vasten (1.4.3), eikä merkitys nojaa pelkkään väriin (1.4.1) —
+    // erotus tapahtumapalkista: ei paksua vasenta reunaa, vaaleampi täyttö,
+    // 🚏-teksti.
+    merkki.style.background = vari + '38';
+    merkki.style.border = '1px solid ' + tummennaVari(vari, 0.3);
     const viiveTeksti = typeof s.viiveMin === 'number' ? (' (' + (s.viiveMin >= 0 ? '+' : '') + s.viiveMin + ' min)') : '';
     const kestoTeksti = s.kestoMin
       ? (s.kestoMin + ' min' + (s.linja ? ' (linja ' + s.linja + ')' : '') + viiveTeksti)
