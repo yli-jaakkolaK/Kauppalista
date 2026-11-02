@@ -825,8 +825,12 @@ h1 {
   position: relative;
   flex: 0 0 20px;
   width: 20px;
-  height: 544px;
-  margin-top: 38px;
+  /* 543 = tuntialue 544 - sen 1px border-top. margin-top 58 = otsikko 18 +
+     suunniteltu-rivi 19 + kokopäivä-rivi 16+4 + tuntialueen border 1
+     (2026-11-02, tunnit olivat 20px liian ylhäällä ruudukkoon nähden —
+     aiemmin 38). Pidä summa samana jos jokin näistä korkeuksista muuttuu. */
+  height: 543px;
+  margin-top: 58px;
 }
 
 .kalenteri-viikko-tuntileima {
@@ -1001,7 +1005,11 @@ h1 {
    automaattisesti kun päivä on mennyt tai aihe merkitty tehdyksi. */
 .kalenteri-viikko-suunniteltu-rivi {
   display: flex;
-  flex-wrap: wrap;
+  /* Kiinteä korkeus, ei kasva: useampi chippi aiemmin rivittyi ja työnsi
+     juuri sen päivän ruudukon alemmas kuin muiden päivien. */
+  flex-wrap: nowrap;
+  height: 19px;
+  overflow: hidden;
   gap: 3px;
   padding: 2px 2px 0;
   /* Kiinteä min-height (2026-08-30, Katrin löytö: "one varying day per week
