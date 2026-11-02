@@ -8900,6 +8900,12 @@ async function synkkaaICloud() {
       return;
     }
     paivitaKuittausTila();
+    // Synkka valmis: piirretään näkymä uudelleen tuoreella datalla, jotta
+    // juuri siirretty/muutettu tapahtuma (ja siitä lasketut matka-ajat)
+    // näkyy heti eikä vasta seuraavalla avauksella (2026-11-02, Katrin:
+    // "should always check current calendar situation").
+    const kalenteriNakyvissa = document.getElementById('kalenteri-view') && document.getElementById('kalenteri-view').style.display === 'block';
+    if (kalenteriNakyvissa) lataaKalenteri();
   } catch (e) {
     console.error('Kalenterin taustasynkka epäonnistui:', e.message);
   }

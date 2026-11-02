@@ -434,7 +434,10 @@ async function haeFoliKohdeTiedot(tapahtuma, pysakit) {
 // oma periaate: "no need to tell no travel needed" (sama linja kuin
 // sovelluksen "piilota tyhjä osio, älä tyhjä teksti" -sääntö).
 async function haeFoliSiirtymatPaivalle(tapahtumat, paivanIso, varattu) {
-  const ryhmat = ryhmitaPerakkaisetFoliTapahtumat((tapahtumat || []).filter(function(t) { return t.event_time; }));
+  // Peruttu tapahtuma (myös siirretyn tapahtuman vanha aika, ks. sql/139) EI
+  // saa tuottaa matkaa — muuten matka lasketaan vanhaan, jo ohitettuun
+  // aikaan (2026-11-02: siirretty 9:00 -> 8:45, matka jäi vielä 9:00:aan).
+  const ryhmat = ryhmitaPerakkaisetFoliTapahtumat((tapahtumat || []).filter(function(t) { return t.event_time && !t.peruttu; }));
   if (ryhmat.length === 0) return [];
 
   const pysakit = await haeFoliPysakit();
