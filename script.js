@@ -8487,6 +8487,8 @@ function piirraViikkoFoliMerkit(paivanFoliLegit, slotKartta, iso) {
     // matka-aika kapenee samoin eikä peitä toisen tapahtuman tilaa.
     const slot = slotKartta ? slotKartta.get(s.tapahtumaId) : null;
     if (slot) {
+      // Puolikas (tai kapeampi) palkki: puristettu teksti, ks. CSS.
+      if (slot.widthPct < 100) merkki.classList.add('kalenteri-viikko-foli-merkki--kapea');
       merkki.style.left = 'calc(' + slot.leftPct + '% + 2px)';
       merkki.style.width = 'calc(' + slot.widthPct + '% - 4px)';
       merkki.style.right = 'auto';
