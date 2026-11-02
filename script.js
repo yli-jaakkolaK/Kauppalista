@@ -8493,9 +8493,26 @@ function piirraViikkoFoliMerkit(paivanFoliLegit, slotKartta, iso) {
       merkki.style.width = 'calc(' + slot.widthPct + '% - 4px)';
       merkki.style.right = 'auto';
     }
-    const topPct = minutesToPercent(s.alku);
+    // Turvasääntö: matka MENOON päättyy viimeistään vanhempansa alkuun — jos
+    // laskenta jostain syystä antaisi myöhemmän lopun, koko palkki siirretään
+    // aiemmaksi (kesto säilyy), ei koskaan päällekkäin vanhempansa kanssa.
+    // Paluu/välietappi alkavat vanhempansa LOPUSTA, ei aiemmin.
+    let alkuMin = s.alku, loppuMin = s.loppu;
+    const vanhempi = slot ? slot.vanhempi : null;
+    if (vanhempi && vanhempi.event_time) {
+      const vAlku = aikaMinuutteina(vanhempi.event_time);
+      const vLoppu = vanhempi.event_end_time ? aikaMinuutteina(vanhempi.event_end_time) : vAlku + 30;
+      if (s.suunta === 'meno' && loppuMin > vAlku) {
+        alkuMin -= loppuMin - vAlku;
+        loppuMin = vAlku;
+      } else if (s.suunta !== 'meno' && alkuMin < vLoppu) {
+        loppuMin += vLoppu - alkuMin;
+        alkuMin = vLoppu;
+      }
+    }
+    const topPct = minutesToPercent(alkuMin);
     merkki.style.top = topPct + '%';
-    merkki.style.height = Math.max(0, minutesToPercent(s.loppu) - topPct) + '%';
+    merkki.style.height = Math.max(0, minutesToPercent(loppuMin) - topPct) + '%';
     const vari = s.vari || 'var(--syvanne)';
     // Matka-aika on TAUSTAVIHJE, ei kilpaile oikeiden tapahtumien kanssa:
     // ohut, vaalea raidoitus (2026-11-02, "meeting/school blocks should be
@@ -8546,7 +8563,9 @@ function piirraViikkoFoliMerkit(paivanFoliLegit, slotKartta, iso) {
         ['Pysäkki', s.lahtoPysakkiNimi],
         ['Kohde', s.pysakkiNimi],
         ['Matka', s.kestoMin ? (s.kestoMin + ' min') : ('n. ' + s.etaisyysM + ' m')],
-        ['Lähde viimeistään', kelloMinuuteista(s.alku)],
+        ['Tapahtuma', vanhempi ? (vanhempi.title + (vanhempi.event_time ? ' klo ' + vanhempi.event_time.slice(0, 5) + (vanhempi.event_end_time ? '–' + vanhempi.event_end_time.slice(0, 5) : '') : '')) : null],
+        ['Matka-aika', kelloMinuuteista(alkuMin) + '–' + kelloMinuuteista(loppuMin)],
+        ['Lähde viimeistään', kelloMinuuteista(alkuMin)],
         ['Tieto', onBussi ? 'Reaaliaikainen (Föli)' : 'Laskettu aikataulusta — reaaliaikainen näkyy vain tälle päivälle'],
       ], iso);
     });
@@ -8694,18 +8713,16 @@ function piirraViikkoTuntialue(paivanAjalliset, henkselitLista, iso, paivanSessi
   piirraViikkoHenkselitTausta(henkselitLista, iso).forEach(function(tausta) { alue.appendChild(tausta); });
   piirraViikkoOpiskeluMerkit(paivanSessiot || []).forEach(function(merkki) { alue.appendChild(merkki); });
   const slotit = assignWeekOverlapSlots(paivanAjalliset);
-  // Tapahtumat ja matka-aikapalkit PAKATAAN yhdessä sarakkeisiin, jotta
-  // matka-aika ei koskaan piirry minkään toisen tapahtuman päälle. Matka-
-  // palkki jolla ei ole päällekkäisyyttä perii oman tapahtumansa leveyden
-  // ja paikan (sama leveys kuin "vanhempi"), muuten se jakaa tilan.
-  const legit = (paivanFoliLegit || []).filter(function(l) { return l.loppu > l.alku; });
-  const pakkaus = pakkaaViikkoSarakkeet(
-    slotit.map(function(k) {
-      const alku = aikaMinuutteina(k.tapahtuma.event_time);
-      const loppu = k.tapahtuma.event_end_time ? aikaMinuutteina(k.tapahtuma.event_end_time) : alku + 30;
-      return { ref: k, alku: alku, loppu: loppu };
-    }).concat(legit.map(function(l) { return { ref: l, alku: l.alku, loppu: l.loppu }; }))
-  );
+  // Tapahtumat pakataan sarakkeisiin (päällekkäiset rinnakkain). Matka-aika
+  // EI koskaan jaa tilaa tapahtuman kanssa: se kulkee AINA oman
+  // "vanhempansa" (tapahtuman jolle matka tehdään) sarakkeessa ja samalla
+  // leveydellä — jos sen edellä on jotain muuta, aikataulu on tiukka eikä
+  // matkaa siirretä minnekään (Katrin ohje 2026-11-02).
+  const pakkaus = pakkaaViikkoSarakkeet(slotit.map(function(k) {
+    const alku = aikaMinuutteina(k.tapahtuma.event_time);
+    const loppu = k.tapahtuma.event_end_time ? aikaMinuutteina(k.tapahtuma.event_end_time) : alku + 30;
+    return { ref: k, alku: alku, loppu: loppu };
+  }));
   slotit.forEach(function(k) {
     const p = pakkaus.get(k);
     if (p) { k.leftPct = p.leftPct; k.widthPct = p.widthPct; }
@@ -8714,8 +8731,8 @@ function piirraViikkoTuntialue(paivanAjalliset, henkselitLista, iso, paivanSessi
   slotit.forEach(function(k) { tapahtumaSlotit.set(k.tapahtuma.id, k); });
   const slotKartta = new Map();
   (paivanFoliLegit || []).forEach(function(l) {
-    const p = pakkaus.get(l);
-    slotKartta.set(l, (p && !p.yksin) ? p : (tapahtumaSlotit.get(l.tapahtumaId) || p || null));
+    const vanhempi = tapahtumaSlotit.get(l.tapahtumaId);
+    if (vanhempi) slotKartta.set(l, { leftPct: vanhempi.leftPct, widthPct: vanhempi.widthPct, vanhempi: vanhempi.tapahtuma });
   });
   piirraViikkoFoliMerkit(paivanFoliLegit, slotKartta, iso).forEach(function(merkki) { alue.appendChild(merkki); });
   slotit.forEach(function(kohde) {
