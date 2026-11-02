@@ -3248,7 +3248,7 @@ async function lataaReittiViikko() {
 
   const tanaanIso = opintoTanaanPvm();
   const [{ data: haetut, error }, henkselitLista, { data: sessiot }, { data: suunnitellut }] = await Promise.all([
-    db.from('kalenteri_tapahtumat').select('*, kalenteri_syotteet(vari, henkilo, scope, osoite)')
+    db.from('kalenteri_tapahtumat').select('*, kalenteri_syotteet(vari, henkilo, scope, osoite, name)')
       .gte('event_date', alkuIso).lte('event_date', loppuIso)
       .order('event_date').order('event_time', { nullsFirst: false }),
     fetchVisibleHenkselit(alkuIso, loppuIso),
@@ -7694,7 +7694,7 @@ async function lataaKalenteri() {
   // rinnakkain, pudottaa kuusi matkaa yhdeksi.
   const [{ data: haetut, error }] = await Promise.all([
     db.from('kalenteri_tapahtumat')
-      .select('*, kalenteri_syotteet(vari, henkilo, scope, osoite)')
+      .select('*, kalenteri_syotteet(vari, henkilo, scope, osoite, name)')
       .gte('event_date', paivamaaraISO(haunAlku))
       .lte('event_date', paivamaaraISO(haunLoppu))
       .order('event_date')
@@ -8401,6 +8401,68 @@ function tapahtumanSijaintiteksti(t) {
   return t.location || haeTapahtumanOsoiteTeksti(t) || null;
 }
 
+// Viikkopalkin napautuksesta avautuva tietolehti: kaikki mitä tapahtumasta
+// tiedetään (nimi, aika, paikka, mistä kalenterista, kenen). Sama lehti
+// palvelee sekä Kalenteria että Hytti/Reitti-viikkoa, koska ne jakavat
+// piirraViikkoAikajana():n.
+function avaaViikkoTapahtumaTiedot(t, iso) {
+  const vanha = document.getElementById('viikko-tiedot-tausta');
+  if (vanha) vanha.remove();
+
+  const tausta = document.createElement('div');
+  tausta.id = 'viikko-tiedot-tausta';
+  tausta.className = 'viikko-tiedot-tausta';
+  const lehti = document.createElement('div');
+  lehti.className = 'viikko-tiedot-lehti';
+  const sulje = function() { tausta.remove(); };
+  tausta.addEventListener('click', function(e) { if (e.target === tausta) sulje(); });
+
+  const otsikko = document.createElement('h3');
+  otsikko.className = 'viikko-tiedot-otsikko';
+  otsikko.textContent = (t.peruttu ? '🚫 Peruttu: ' : '') + t.title;
+  lehti.appendChild(otsikko);
+
+  const lisaaRivi = function(nimike, arvo) {
+    if (!arvo) return;
+    const rivi = document.createElement('div');
+    rivi.className = 'viikko-tiedot-rivi';
+    const n = document.createElement('span');
+    n.className = 'viikko-tiedot-nimike';
+    n.textContent = nimike;
+    const a = document.createElement('span');
+    a.textContent = arvo;
+    rivi.appendChild(n);
+    rivi.appendChild(a);
+    lehti.appendChild(rivi);
+  };
+
+  const pvm = new Date(iso + 'T00:00:00');
+  let aikaTeksti = VIIKONPAIVA_LYHENTEET[(pvm.getDay() + 6) % 7] + ' ' + pvm.getDate() + '.' + (pvm.getMonth() + 1) + '.';
+  if (t.event_time) {
+    aikaTeksti += ' klo ' + t.event_time.slice(0, 5) + (t.event_end_time ? '–' + t.event_end_time.slice(0, 5) : '');
+  }
+  lisaaRivi('Aika', aikaTeksti);
+  lisaaRivi('Paikka', tapahtumanSijaintiteksti(t));
+  lisaaRivi('Kalenteri', t.kalenteri_syotteet ? t.kalenteri_syotteet.name : null);
+  lisaaRivi('Kenen', t._henkilo ? henkiloNimi(t._henkilo) : null);
+
+  const paivaNappi = document.createElement('button');
+  paivaNappi.type = 'button';
+  paivaNappi.className = 'viikko-tiedot-nappi';
+  paivaNappi.textContent = 'Avaa päivänäkymä';
+  paivaNappi.addEventListener('click', function() {
+    sulje();
+    kalenteriPvm = new Date(pvm);
+    kalenteriTila = 'paiva';
+    document.querySelectorAll('.kalenteri-tila-btn').forEach(function(b) { b.classList.toggle('active', b.dataset.tila === 'paiva'); });
+    lataaKalenteri();
+  });
+  lehti.appendChild(paivaNappi);
+
+  tausta.appendChild(lehti);
+  document.body.appendChild(tausta);
+}
+
 function piirraViikkoTuntialue(paivanAjalliset, henkselitLista, iso, paivanSessiot, paivanFoliLegit) {
   const alue = document.createElement('div');
   alue.className = 'kalenteri-viikko-tuntialue';
@@ -8437,6 +8499,13 @@ function piirraViikkoTuntialue(paivanAjalliset, henkselitLista, iso, paivanSessi
     nimi.className = 'kalenteri-viikko-nimi';
     nimi.textContent = t.title;
     palkki.appendChild(nimi);
+
+    // Napautus avaa tapahtuman tiedot (kuten päivänäkymän rivin napautus avaa
+    // valikon) — viikkopalkissa ei ole tilaa nimeä enempää.
+    palkki.addEventListener('click', function(e) {
+      e.stopPropagation();
+      avaaViikkoTapahtumaTiedot(t, iso);
+    });
 
     alue.appendChild(palkki);
   });

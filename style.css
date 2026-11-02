@@ -5262,3 +5262,37 @@ h1 {
   gap: 8px;
   margin-top: 4px;
 }
+
+/* Viikkopalkin napautuksesta avautuva tietolehti (avaaViikkoTapahtumaTiedot) */
+.kalenteri-viikko-palkki { cursor: pointer; }
+.viikko-tiedot-tausta {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  background: rgba(0, 0, 0, 0.4);
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+}
+.viikko-tiedot-lehti {
+  width: 100%;
+  max-width: 480px;
+  background: var(--paperi, #fff);
+  color: var(--muste, #222);
+  border-radius: 16px 16px 0 0;
+  padding: 18px 16px 28px;
+  box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.2);
+}
+.viikko-tiedot-otsikko { margin: 0 0 12px; font-size: 18px; overflow-wrap: break-word; }
+.viikko-tiedot-rivi { display: flex; gap: 10px; padding: 6px 0; font-size: 15px; }
+.viikko-tiedot-nimike { flex: none; width: 80px; opacity: 0.6; }
+.viikko-tiedot-nappi {
+  margin-top: 14px;
+  width: 100%;
+  padding: 10px;
+  border: 1px solid currentColor;
+  border-radius: 10px;
+  background: none;
+  color: inherit;
+  font-size: 15px;
+}
