@@ -969,14 +969,20 @@ h1 {
   min-height: 4px;
   border-radius: 3px;
   opacity: 1;
-  overflow: hidden;
+  /* Teksti näkyy aina: ei leikkausta, rivittyy seuraavalle riville kun palkki
+     on kapea tai matala ("12 min" -> "12" / "min"). */
+  overflow: visible;
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: center;
+  text-align: center;
+  padding: 0 1px;
+  line-height: 1.1;
   font-size: 10px;
   font-weight: 600;
   color: var(--muste);
-  white-space: nowrap;
+  white-space: normal;
+  overflow-wrap: anywhere;
 }
 
 /* Suunniteltu (Taso 1 -tavoiteikkuna, 2026-08-18) — TIETOISESTI eri

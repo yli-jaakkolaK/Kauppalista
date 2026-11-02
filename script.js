@@ -8518,7 +8518,9 @@ function piirraViikkoFoliMerkit(paivanFoliLegit, slotKartta, iso) {
     // Teksti: oikean bussin (SIRI, vain tälle päivälle) ODOTETTU lähtöaika
     // pysäkiltä, +viive jos bussi on myöhässä/ajoissa; muuten matkan kesto.
     const onBussi = typeof s.bussiLahtoMin === 'number';
-    if (korkeusPx >= 14 && (onBussi || s.kestoMin)) {
+    // Teksti näkyy AINA (myös lyhyellä palkilla) ja rivittyy tarvittaessa
+    // seuraavalle riville (esim. "12" / "min") — ks. .kalenteri-viikko-foli-merkki.
+    if (onBussi || s.kestoMin) {
       let teksti = onBussi ? '🚏 ' + kelloMinuuteista(s.bussiLahtoMin) : '🚏 ' + s.kestoMin + ' min';
       if (onBussi && typeof s.bussiViiveMin === 'number' && s.bussiViiveMin !== 0) {
         teksti += ' ' + (s.bussiViiveMin > 0 ? '+' : '') + s.bussiViiveMin;
