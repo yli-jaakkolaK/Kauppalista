@@ -5079,6 +5079,11 @@ h1 {
    n. 29px), leveämmillä näytöillä enintään entinen 52px. */
 .alapalkki-emoji { font-size: min(52px, 7.4vw); line-height: 1; display: block; }
 .alapalkki-arkki-lista li .alapalkki-emoji { font-size: 22px; }
+/* Pitkä painallus + veto (alustaAlapalkkiTabiRaahaus): ei tekstin/kuvan
+   valintaa eikä iOS:n pitkän painalluksen kehotetta, vedettävä tabi nousee. */
+.alapalkki-tabi { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; touch-action: manipulation; }
+.alapalkki-tabi.dragging .alapalkki-tabi-pinta { transform: scale(1.12); box-shadow: 0 4px 14px rgba(34, 31, 26, .35); }
+.alapalkki-tabi.dragging { position: relative; z-index: 2; }
 .alapalkki-alleviiva { width: 16px; height: 2.5px; border-radius: 2px; background: transparent; }
 .alapalkki-tabi.aktiivinen .alapalkki-alleviiva { background: var(--muste); }
 

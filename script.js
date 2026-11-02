@@ -241,7 +241,101 @@ function luoAlapalkkiNappi(id) {
   const pallura = id === 'kalenteri' ? '<span class="alapalkki-tabi-badge" data-role="alapalkki-badge-kalenteri" style="display:none"></span>' : '';
   nappi.innerHTML = '<span class="alapalkki-tabi-pinta">' + (ALAPALKKI_IKONIT[id] || '') + pallura + '</span><span class="alapalkki-alleviiva"></span>';
   nappi.addEventListener('click', function() { alapalkkiSiirry(id); });
+  if (id !== 'ruori') alustaAlapalkkiTabiRaahaus(nappi);
   return nappi;
+}
+
+// Tabien järjestely suoraan palkissa (2026-11-02, Katrin pyyntö: "add long
+// press and drag") — ⋯-arkki ei ole enää puhelimella tavallisesti näkyvissä,
+// joten järjestys vaihdetaan pitämällä tabia pohjassa ja vetämällä sivusuunnassa.
+// Ruori pysyy aina ensimmäisenä (ei raahattavissa, eikä mikään pääse sen eteen).
+// Sama pitkä painallus + peruutus liikkeestä -tekniikka kuin
+// alustaAlapalkkiRaahaus():ssa (RAAHAUS_VIIVE_MS/RAAHAUS_PERUUTUS_PX), mutta
+// vaakasuuntainen: kosketuskohdan x:ää verrataan sisarten keskipisteisiin.
+function alustaAlapalkkiTabiRaahaus(nappi) {
+  let ajastin = null;
+  let alkuX = 0;
+  let alkuY = 0;
+  let raahausKaynnissa = false;
+  let sivuutaSeuraavaKlikkaus = false;
+
+  function pisteesta(e) { return e.touches && e.touches[0] ? e.touches[0] : (e.changedTouches && e.changedTouches[0] ? e.changedTouches[0] : e); }
+
+  function alkaa(e) {
+    const piste = pisteesta(e);
+    alkuX = piste.clientX;
+    alkuY = piste.clientY;
+    ajastin = setTimeout(function() {
+      raahausKaynnissa = true;
+      sivuutaSeuraavaKlikkaus = true;
+      nappi.classList.add('dragging');
+      if (navigator.vibrate) navigator.vibrate(15);
+    }, RAAHAUS_VIIVE_MS);
+    if (!e.touches) {
+      document.addEventListener('mousemove', liikkuu);
+      document.addEventListener('mouseup', loppuu, { once: true });
+    }
+  }
+
+  function liikkuu(e) {
+    const piste = pisteesta(e);
+    if (!raahausKaynnissa && ajastin &&
+        (Math.abs(piste.clientX - alkuX) > RAAHAUS_PERUUTUS_PX || Math.abs(piste.clientY - alkuY) > RAAHAUS_PERUUTUS_PX)) {
+      clearTimeout(ajastin);
+      ajastin = null;
+      return;
+    }
+    if (!raahausKaynnissa) return;
+    if (e.cancelable) e.preventDefault();
+    const kontti = nappi.parentElement;
+    // Siirrettävät sisaret: ei Ruoria (kiinteä ensimmäinen), ei ⋯-nappia.
+    const sisaret = Array.from(kontti.children).filter(function(el) {
+      return el !== nappi && el.dataset.id && el.dataset.id !== 'ruori';
+    });
+    const seuraava = sisaret.find(function(el) {
+      const r = el.getBoundingClientRect();
+      return piste.clientX < r.left + r.width / 2;
+    });
+    if (seuraava) {
+      if (nappi.nextElementSibling !== seuraava) kontti.insertBefore(nappi, seuraava);
+    } else {
+      const lisaa = kontti.querySelector('.alapalkki-lisaa');
+      if (lisaa) { if (nappi.nextElementSibling !== lisaa) kontti.insertBefore(nappi, lisaa); }
+      else if (kontti.lastElementChild !== nappi) kontti.appendChild(nappi);
+    }
+  }
+
+  function loppuu() {
+    if (ajastin) { clearTimeout(ajastin); ajastin = null; }
+    document.removeEventListener('mousemove', liikkuu);
+    if (!raahausKaynnissa) return;
+    raahausKaynnissa = false;
+    nappi.classList.remove('dragging');
+    const nakyvat = Array.from(nappi.parentElement.children)
+      .map(function(el) { return el.dataset.id; })
+      .filter(function(id) { return id && id !== 'ruori'; });
+    // Kapealla näytöllä osa tabeista on ⋯:n takana — ne säilyttävät vanhan
+    // keskinäisen järjestyksensä näkyvien perässä.
+    const piilossa = alapalkkiJarjestys.filter(function(id) { return id !== 'ruori' && nakyvat.indexOf(id) === -1; });
+    alapalkkiJarjestys = ['ruori'].concat(nakyvat, piilossa);
+    tallennaAlapalkkiJarjestys();
+    piirraAlapalkki();
+  }
+
+  nappi.addEventListener('touchstart', alkaa, { passive: true });
+  nappi.addEventListener('touchmove', liikkuu, { passive: false });
+  nappi.addEventListener('touchend', loppuu);
+  nappi.addEventListener('touchcancel', loppuu);
+  nappi.addEventListener('mousedown', alkaa);
+  nappi.addEventListener('contextmenu', function(e) { e.preventDefault(); });
+  // Pitkä painallus + vedon jälkeen tuleva klikkaus ei saa avata tabia.
+  nappi.addEventListener('click', function(e) {
+    if (sivuutaSeuraavaKlikkaus) {
+      e.preventDefault();
+      e.stopImmediatePropagation();
+      sivuutaSeuraavaKlikkaus = false;
+    }
+  }, true);
 }
 
 // Täyttää sekä alapalkin että järjestysarkin kalenterikuvakkeet (kaikki
