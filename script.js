@@ -8355,10 +8355,19 @@ function piirraViikkoOpiskeluMerkit(paivanSessiot) {
 // leveämpi/tummempi kuin ensimmäinen versio, jotta lukee "varattu tila"
 // eikä pelkkä ohut reunavihje (Katrin pyyntö: "like actually blocking
 // events from that time slot").
-function piirraViikkoFoliMerkit(paivanFoliLegit) {
+function piirraViikkoFoliMerkit(paivanFoliLegit, slotKartta) {
   return (paivanFoliLegit || []).map(function(s) {
     const merkki = document.createElement('div');
     merkki.className = 'kalenteri-viikko-foli-merkki';
+    // Sama vaakasijainti ja leveys kuin tapahtumalla jota matka koskee: jos
+    // tapahtuma jakaa sarakkeen toisen kanssa (esim. puoliso samaan aikaan),
+    // matka-aika kapenee samoin eikä peitä toisen tapahtuman tilaa.
+    const slot = slotKartta ? slotKartta.get(s.tapahtumaId) : null;
+    if (slot) {
+      merkki.style.left = 'calc(' + slot.leftPct + '% + 2px)';
+      merkki.style.width = 'calc(' + slot.widthPct + '% - 4px)';
+      merkki.style.right = 'auto';
+    }
     const topPct = minutesToPercent(s.alku);
     merkki.style.top = topPct + '%';
     merkki.style.height = Math.max(0, minutesToPercent(s.loppu) - topPct) + '%';
@@ -8477,8 +8486,11 @@ function piirraViikkoTuntialue(paivanAjalliset, henkselitLista, iso, paivanSessi
   alue.className = 'kalenteri-viikko-tuntialue';
   piirraViikkoHenkselitTausta(henkselitLista, iso).forEach(function(tausta) { alue.appendChild(tausta); });
   piirraViikkoOpiskeluMerkit(paivanSessiot || []).forEach(function(merkki) { alue.appendChild(merkki); });
-  piirraViikkoFoliMerkit(paivanFoliLegit).forEach(function(merkki) { alue.appendChild(merkki); });
-  assignWeekOverlapSlots(paivanAjalliset).forEach(function(kohde) {
+  const slotit = assignWeekOverlapSlots(paivanAjalliset);
+  const slotKartta = new Map();
+  slotit.forEach(function(k) { slotKartta.set(k.tapahtuma.id, k); });
+  piirraViikkoFoliMerkit(paivanFoliLegit, slotKartta).forEach(function(merkki) { alue.appendChild(merkki); });
+  slotit.forEach(function(kohde) {
     const t = kohde.tapahtuma;
     const palkki = document.createElement('div');
     palkki.className = 'kalenteri-viikko-palkki';

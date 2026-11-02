@@ -465,6 +465,9 @@ async function haeFoliSiirtymatPaivalle(tapahtumat, paivanIso, varattu) {
       alku: alku, loppu: loppu,
       pysakkiNimi: kohdePysakkiNimi, etaisyysM: kohdeEtaisyys, mapsUrl: mapsUrl,
       vari: resolveEventOwnerColor(omistajaTapahtuma),
+      // Viikkonäkymä asettaa matka-aikapalkin samalle leveydelle/paikalle kuin
+      // tapahtuman oma palkki (rinnakkaiset tapahtumat jakavat sarakkeen).
+      tapahtumaId: omistajaTapahtuma ? omistajaTapahtuma.id : null,
       kestoMin: kesto ? kesto.kestoMin : null, linja: kesto ? kesto.linja : null, viiveMin: viiveMin,
     });
   }
