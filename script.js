@@ -344,7 +344,10 @@ function alustaAlapalkkiTabiRaahaus(nappi) {
 // .tile-icon-kalenteri käytti, KALENTERI_KUUKAUDET on sama jaettu vakio.
 function paivitaAlapalkkiKalenteriPaiva() {
   const nyt = new Date();
-  const kk = KALENTERI_KUUKAUDET[nyt.getMonth()].slice(0, 3).toUpperCase();
+  // Yläraidassa viikonpäivän lyhenne (2026-11-02, Katrin pyyntö, oli
+  // kuukauden lyhenne) — oma taulukko tässä eikä VIIKONPAIVA_LYHENTEET, koska
+  // se on määritelty vasta tiedoston myöhemmässä kohdassa. Sunnuntai = 0.
+  const kk = ['SU', 'MA', 'TI', 'KE', 'TO', 'PE', 'LA'][nyt.getDay()];
   const pv = nyt.getDate();
   document.querySelectorAll('[data-role="alapalkki-kal-kk"]').forEach(function(el) { el.textContent = kk; });
   document.querySelectorAll('[data-role="alapalkki-kal-pv"]').forEach(function(el) { el.textContent = pv; });
