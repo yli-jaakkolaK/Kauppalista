@@ -264,7 +264,11 @@ function paivitaAlapalkkiKalenteriPaiva() {
 // leveyteen kesken. Vain KUINKA MONTA näytetään muuttuu leveyden mukaan,
 // ei mikään muu (järjestys/raahaus toimii ennallaan ⋯-arkin kautta silloin
 // kun se on näkyvissä).
-const ALAPALKKI_LEVEYS_KAIKKI_MAHTUU = 560;
+// MUUTETTU 560 -> 320 (2026-11-02, Katrin: "too complicated to use those
+// things behind 3 dots"): kaikki seitsemän tabia näkyvät nyt suoraan
+// puhelimen leveydellä, kuvakkeet skaalautuvat leveyden mukaan (ks.
+// .alapalkki-emoji style.css:ssä). ⋯ näkyy enää vain alle 320px näytöillä.
+const ALAPALKKI_LEVEYS_KAIKKI_MAHTUU = 320;
 
 // Ruori on koko sovelluksen "koti" ja siksi AINA näkyvissä alapalkissa
 // riippumatta käyttäjän raahaamasta järjestyksestä (2026-08-12, Katrin

@@ -5075,7 +5075,9 @@ h1 {
    mukana kuten SVG:n width:84% tekee, joten kiinteä arvo on valittu
    vastaamaan tyypillistä puhelinleveyttä (iPhone SE...Pro Max, tabi n.
    64-78px) — sama "täytä kehys" -periaate (§0) kuin muillakin kuvakkeilla. */
-.alapalkki-emoji { font-size: 52px; line-height: 1; display: block; }
+/* min(52px, 7.4vw): seitsemän tabia mahtuu puhelimen leveyteen (390px ->
+   n. 29px), leveämmillä näytöillä enintään entinen 52px. */
+.alapalkki-emoji { font-size: min(52px, 7.4vw); line-height: 1; display: block; }
 .alapalkki-arkki-lista li .alapalkki-emoji { font-size: 22px; }
 .alapalkki-alleviiva { width: 16px; height: 2.5px; border-radius: 2px; background: transparent; }
 .alapalkki-tabi.aktiivinen .alapalkki-alleviiva { background: var(--muste); }
