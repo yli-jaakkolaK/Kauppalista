@@ -8371,6 +8371,10 @@ function piirraViikkoFoliMerkit(paivanFoliLegit) {
       : ('n. ' + s.etaisyysM + ' m');
     const suuntaNimi = s.suunta === 'paluu' ? 'Paluu — ' : (s.suunta === 'valietappi' ? 'Siirtymä — ' : 'Meno — ');
     merkki.title = suuntaNimi + s.pysakkiNimi + ' — ' + kestoTeksti;
+    // Palkki on nyt koko sarakkeen levyinen ja korkeus = matka-aika; teksti
+    // vain jos palkki on tarpeeksi korkea sille (≥14 px), muuten pelkkä raita.
+    const korkeusPx = (parseFloat(merkki.style.height) / 100) * VIIKKO_TUNTIALUE_KORKEUS_PX;
+    if (s.kestoMin && korkeusPx >= 14) merkki.textContent = '🚏 ' + s.kestoMin + ' min';
     return merkki;
   });
 }
