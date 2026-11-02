@@ -222,7 +222,13 @@ async function haeDigitransitKesto(fromLat, fromLon, toLat, toLon) {
     const tulos = await vastaus.json();
     if (!tulos.kestoS) return null;
     const linja = (tulos.legit || []).find(function(l) { return l.mode === 'BUS'; });
-    const kesto = { kestoMin: Math.round(tulos.kestoS / 60), linja: linja && linja.route ? linja.route.shortName : null };
+    // Koko matka ovelta ovelle: kestoS sisältää kävelyn molemmissa päissä, kun
+    // reitti haetaan osoitekoordinaateista (ei pysäkeiltä). Ensimmäinen
+    // kävelyosuus tarvitaan jotta tiedetään milloin bussin pitää lähteä
+    // pysäkiltä (ks. haeFoliLahtoBussi-kutsu).
+    const legitLista = tulos.legit || [];
+    const ensimmainenKavely = legitLista.length && legitLista[0].mode === 'WALK' ? Math.round(legitLista[0].duration / 60) : 0;
+    const kesto = { kestoMin: Math.round(tulos.kestoS / 60), linja: linja && linja.route ? linja.route.shortName : null, kavelyAlkuMin: ensimmainenKavely };
     valimuisti[avain] = { haettu: Date.now(), kesto: kesto };
     try { localStorage.setItem(FOLI_REITTI_KEY, JSON.stringify(valimuisti)); } catch (e) { /* täynnä tms, jatketaan silti */ }
     return kesto;
@@ -408,6 +414,7 @@ async function haeFoliKohdeTiedot(tapahtuma, pysakit) {
   const loppuMin = tapahtuma.event_end_time ? aikaMinuutteina(tapahtuma.event_end_time.slice(0, 5)) : alkuMin + 60;
   return {
     tapahtuma: tapahtuma, osoiteTeksti: osoiteTeksti,
+    lat: sijainti.lat, lon: sijainti.lon,
     pysakkiId: pysakkiId, p: pysakit[pysakkiId],
     etaisyysM: Math.round(haversineMetria(sijainti.lat, sijainti.lon, pysakit[pysakkiId].stop_lat, pysakit[pysakkiId].stop_lon)),
     alkuMin: alkuMin, loppuMin: loppuMin,
@@ -442,7 +449,11 @@ async function haeFoliSiirtymatPaivalle(tapahtumat, paivanIso, varattu) {
   // koti lopuksi. p/pysakkiId yhtenäisessä muodossa koti- ja kohde-
   // solmuille, jotta silmukka alla ei tarvitse erikoistapauksia niiden
   // välillä paitsi "onko tämä koti" -tarkistuksissa.
-  const koti = { koti: true, pysakkiId: FOLI_OLETUSPYSAKKI, p: kotiPysakki, osoiteTeksti: FOLI_KOTIOSOITE };
+  const kotiSijainti = await geokoodaaOsoite(FOLI_KOTIOSOITE);
+  const koti = {
+    koti: true, pysakkiId: FOLI_OLETUSPYSAKKI, p: kotiPysakki, osoiteTeksti: FOLI_KOTIOSOITE,
+    lat: kotiSijainti ? kotiSijainti.lat : null, lon: kotiSijainti ? kotiSijainti.lon : null,
+  };
   const solmut = [koti].concat(kohteet).concat([koti]);
 
   const onkoTanaan = paivanIso === opintoTanaanPvm();
@@ -460,7 +471,14 @@ async function haeFoliSiirtymatPaivalle(tapahtumat, paivanIso, varattu) {
     // loputtua — paluulle ei ole erillistä saapumistarvetta.
     const tarveAika = onSaapumisKoti ? lahto.loppuMin : (saapumis.alkuMin - saapumis.saavuEnnenMin);
 
-    const kesto = await haeDigitransitKesto(lahto.p.stop_lat, lahto.p.stop_lon, saapumis.p.stop_lat, saapumis.p.stop_lon);
+    // Reititys OVELTA OVELLE (osoitekoordinaateista), jotta kesto sisältää
+    // kävelyn kotoa pysäkille ja pysäkiltä perille, ei vain bussimatkaa.
+    // Jos osoitteen koordinaatteja ei saatu, pudotaan pysäkkikoordinaatteihin.
+    const lahtoLat = lahto.lat != null ? lahto.lat : lahto.p.stop_lat;
+    const lahtoLon = lahto.lon != null ? lahto.lon : lahto.p.stop_lon;
+    const saapLat = saapumis.lat != null ? saapumis.lat : saapumis.p.stop_lat;
+    const saapLon = saapumis.lon != null ? saapumis.lon : saapumis.p.stop_lon;
+    const kesto = await haeDigitransitKesto(lahtoLat, lahtoLon, saapLat, saapLon);
     let alku = kesto ? Math.max(0, tarveAika - kesto.kestoMin) : Math.max(0, tarveAika);
     // Välietappi (kohde -> kohde) ei voi lähteä ennen kuin edellinen
     // tapahtuma on päättynyt, vaikka laskennallinen "lähde nyt" -hetki
@@ -486,7 +504,7 @@ async function haeFoliSiirtymatPaivalle(tapahtumat, paivanIso, varattu) {
       : null;
 
     const bussi = onkoTanaan && kesto
-      ? await haeFoliLahtoBussi(lahto.pysakkiId, kesto.linja, alku, paivaMs)
+      ? await haeFoliLahtoBussi(lahto.pysakkiId, kesto.linja, alku + (kesto.kavelyAlkuMin || 0), paivaMs)
       : null;
 
     rivit.push({
