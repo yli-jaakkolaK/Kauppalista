@@ -8485,7 +8485,7 @@ function piirraViikkoFoliMerkit(paivanFoliLegit, slotKartta, iso) {
     // Sama vaakasijainti ja leveys kuin tapahtumalla jota matka koskee: jos
     // tapahtuma jakaa sarakkeen toisen kanssa (esim. puoliso samaan aikaan),
     // matka-aika kapenee samoin eikä peitä toisen tapahtuman tilaa.
-    const slot = slotKartta ? slotKartta.get(s.tapahtumaId) : null;
+    const slot = slotKartta ? slotKartta.get(s) : null;
     if (slot) {
       // Puolikas (tai kapeampi) palkki: puristettu teksti, ks. CSS.
       if (slot.widthPct < 100) merkki.classList.add('kalenteri-viikko-foli-merkki--kapea');
@@ -8653,14 +8653,70 @@ function avaaViikkoTietolehti(otsikkoTeksti, rivit, iso) {
   document.body.appendChild(tausta);
 }
 
+// Sarakepakkaus (2026-11-02, Katrin: "travel time should not overlap with
+// actual event"): kohteet = tapahtumat + matka-aikapalkit samalla ajanakselilla.
+// Päällekkäiset kohteet asetetaan eri sarakkeisiin ahneesti (ensimmäinen vapaa
+// sarake), sarakkeiden määrä = klusterin suurin yhtäaikaisuus. Palauttaa
+// Map: ref -> { leftPct, widthPct, yksin } (yksin = ei päällekkäinen kenenkään
+// kanssa). Kohteet: [{ ref, alku, loppu }] minuutteina.
+function pakkaaViikkoSarakkeet(kohteet) {
+  const jarjestetyt = kohteet.slice().sort(function(a, b) { return a.alku - b.alku || b.loppu - a.loppu; });
+  const tulos = new Map();
+  let klusteri = [];
+  let klusterinLoppu = -1;
+  function suljeKlusteri() {
+    if (klusteri.length === 0) return;
+    const sarakkeidenLoput = [];
+    klusteri.forEach(function(k) {
+      let sarake = sarakkeidenLoput.findIndex(function(loppu) { return loppu <= k.alku; });
+      if (sarake === -1) { sarake = sarakkeidenLoput.length; sarakkeidenLoput.push(0); }
+      sarakkeidenLoput[sarake] = k.loppu;
+      k.sarake = sarake;
+    });
+    const n = sarakkeidenLoput.length;
+    klusteri.forEach(function(k) {
+      tulos.set(k.ref, { leftPct: (k.sarake / n) * 100, widthPct: 100 / n, yksin: klusteri.length === 1 });
+    });
+    klusteri = [];
+  }
+  jarjestetyt.forEach(function(k) {
+    if (klusteri.length > 0 && k.alku >= klusterinLoppu) suljeKlusteri();
+    klusteri.push({ ref: k.ref, alku: k.alku, loppu: k.loppu, sarake: 0 });
+    klusterinLoppu = klusteri.length === 1 ? k.loppu : Math.max(klusterinLoppu, k.loppu);
+  });
+  suljeKlusteri();
+  return tulos;
+}
+
 function piirraViikkoTuntialue(paivanAjalliset, henkselitLista, iso, paivanSessiot, paivanFoliLegit) {
   const alue = document.createElement('div');
   alue.className = 'kalenteri-viikko-tuntialue';
   piirraViikkoHenkselitTausta(henkselitLista, iso).forEach(function(tausta) { alue.appendChild(tausta); });
   piirraViikkoOpiskeluMerkit(paivanSessiot || []).forEach(function(merkki) { alue.appendChild(merkki); });
   const slotit = assignWeekOverlapSlots(paivanAjalliset);
+  // Tapahtumat ja matka-aikapalkit PAKATAAN yhdessä sarakkeisiin, jotta
+  // matka-aika ei koskaan piirry minkään toisen tapahtuman päälle. Matka-
+  // palkki jolla ei ole päällekkäisyyttä perii oman tapahtumansa leveyden
+  // ja paikan (sama leveys kuin "vanhempi"), muuten se jakaa tilan.
+  const legit = (paivanFoliLegit || []).filter(function(l) { return l.loppu > l.alku; });
+  const pakkaus = pakkaaViikkoSarakkeet(
+    slotit.map(function(k) {
+      const alku = aikaMinuutteina(k.tapahtuma.event_time);
+      const loppu = k.tapahtuma.event_end_time ? aikaMinuutteina(k.tapahtuma.event_end_time) : alku + 30;
+      return { ref: k, alku: alku, loppu: loppu };
+    }).concat(legit.map(function(l) { return { ref: l, alku: l.alku, loppu: l.loppu }; }))
+  );
+  slotit.forEach(function(k) {
+    const p = pakkaus.get(k);
+    if (p) { k.leftPct = p.leftPct; k.widthPct = p.widthPct; }
+  });
+  const tapahtumaSlotit = new Map();
+  slotit.forEach(function(k) { tapahtumaSlotit.set(k.tapahtuma.id, k); });
   const slotKartta = new Map();
-  slotit.forEach(function(k) { slotKartta.set(k.tapahtuma.id, k); });
+  (paivanFoliLegit || []).forEach(function(l) {
+    const p = pakkaus.get(l);
+    slotKartta.set(l, (p && !p.yksin) ? p : (tapahtumaSlotit.get(l.tapahtumaId) || p || null));
+  });
   piirraViikkoFoliMerkit(paivanFoliLegit, slotKartta, iso).forEach(function(merkki) { alue.appendChild(merkki); });
   slotit.forEach(function(kohde) {
     const t = kohde.tapahtuma;
